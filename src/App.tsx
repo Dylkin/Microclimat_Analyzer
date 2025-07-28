@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { initializeDatabase } from './lib/database';
 import Layout from './components/Layout';
 import Login from './components/Login';
 import UsersPage from './pages/UsersPage';
@@ -10,6 +12,11 @@ import ReportsPage from './pages/ReportsPage';
 function AppContent() {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState('upload');
+
+  useEffect(() => {
+    // Инициализируем базу данных при первом запуске
+    initializeDatabase();
+  }, []);
 
   if (loading) {
     return (
