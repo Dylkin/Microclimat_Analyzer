@@ -1,4 +1,13 @@
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+
+// Создаем отдельный клиент с service role для административных операций
+const adminSupabase = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY 
+  ? createClient(
+      import.meta.env.VITE_SUPABASE_URL!,
+      import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY!
+    )
+  : supabase;
 
 // Check if Supabase is properly configured
 const isSupabaseConfigured = () => {
@@ -65,7 +74,7 @@ export async function createDefaultUser() {
     }
 
     // Создаем или обновляем профиль пользователя
-    const { error: profileError } = await supabase
+    const { error: profileError } = await adminSupabase
       .from('users')
       .upsert({
         id: userId,
