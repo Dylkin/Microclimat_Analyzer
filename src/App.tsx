@@ -1,66 +1,34 @@
-import React, { useState } from 'react';
-import { useEffect } from 'react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { initializeDatabase } from './lib/database';
-import Layout from './components/Layout';
-import Login from './components/Login';
-import UsersPage from './pages/UsersPage';
-import UploadPage from './pages/UploadPage';
-import AnalysisPage from './pages/AnalysisPage';
-import ReportsPage from './pages/ReportsPage';
-
-function AppContent() {
-  const { user, loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState('upload');
-
-  useEffect(() => {
-    // Инициализируем базу данных при первом запуске
-    initializeDatabase();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Загрузка...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Login />;
-  }
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'users':
-        return <UsersPage />;
-      case 'upload':
-        return <UploadPage />;
-      case 'analysis':
-        return <AnalysisPage />;
-      case 'reports':
-        return <ReportsPage />;
-      default:
-        return <UploadPage />;
-    }
-  };
-
-  return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
-      {renderPage()}
-    </Layout>
-  );
-}
+import React from 'react'
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      fontFamily: 'Arial, sans-serif',
+      backgroundColor: '#f5f5f5'
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        padding: '2rem',
+        borderRadius: '8px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        textAlign: 'center'
+      }}>
+        <h1 style={{ color: '#333', marginBottom: '1rem' }}>
+          Microclimat Analyzer
+        </h1>
+        <p style={{ color: '#666' }}>
+          Система анализа микроклимата
+        </p>
+        <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '1rem' }}>
+          Проект очищен и готов к разработке
+        </p>
+      </div>
+    </div>
+  )
 }
 
-export default App;
+export default App
