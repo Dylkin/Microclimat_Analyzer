@@ -71,10 +71,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Handle infinite recursion in RLS policies
+        if (error.message?.includes('infinite recursion detected')) {
+          console.error('RLS Policy Error: Infinite recursion detected in users table policy. Please check your Supabase RLS policies.');
+          setUser(null);
+          return;
+        }
+        throw error;
+      }
       setUser(data);
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error fetching user profile:', errorMessage);
+      
+      // If it's a policy recursion error, don't retry
+      if (errorMessage.includes('infinite recursion detected')) {
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
