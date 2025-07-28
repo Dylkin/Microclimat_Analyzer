@@ -1,19 +1,11 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
+import { Database } from '../types/database';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
+  throw new Error('Отсутствуют переменные окружения Supabase');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-// Типы для базы данных
-export type Database = {
-  public: {
-    Tables: {
-      // Здесь будут определены таблицы после создания схемы
-    }
-  }
-}
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);

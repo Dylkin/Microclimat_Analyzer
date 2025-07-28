@@ -1,56 +1,62 @@
-import React from 'react'
-import { supabase } from './lib/supabase'
+import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Login } from './components/Login';
+import { Layout } from './components/Layout';
+import { Dashboard } from './components/Dashboard';
+import { UserManagement } from './components/UserManagement';
 
-function App() {
-  const testConnection = async () => {
-    try {
-      // Простая проверка подключения без обращения к таблицам
-      const { data, error } = await supabase.auth.getSession()
-      if (error) {
-        console.log('Ошибка при проверке сессии:', error.message)
-      } else {
-        console.log('Supabase успешно подключен!', data)
-      }
-    } catch (err) {
-      console.log('Ошибка подключения к Supabase:', err)
-    }
+const AppContent: React.FC = () => {
+  const { user, loading } = useAuth();
+  const [currentPage, setCurrentPage] = useState('dashboard');
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
   }
 
-  React.useEffect(() => {
-    testConnection()
-  }, [])
+  if (!user) {
+    return <Login />;
+  }
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'users':
+        return <UserManagement />;
+      case 'files':
+        return (
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Загрузка файлов</h2>
+            <p className="text-gray-600">Функциональность будет добавлена позже</p>
+          </div>
+        );
+      case 'research':
+        return (
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Исследование файлов</h2>
+            <p className="text-gray-600">Функциональность будет добавлена позже</p>
+          </div>
+        );
+      default:
+        return <Dashboard />;
+    }
+  };
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      fontFamily: 'Arial, sans-serif',
-      backgroundColor: '#f5f5f5'
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        padding: '2rem',
-        borderRadius: '8px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        textAlign: 'center'
-      }}>
-        <h1 style={{ color: '#333', marginBottom: '1rem' }}>
-          Microclimat Analyzer
-        </h1>
-        <p style={{ color: '#666' }}>
-          Система анализа микроклимата
-        </p>
-        <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '1rem' }}>
-          Supabase подключен. Проверьте консоль для статуса соединения.
-        </p>
-        <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '1rem' }}>
-          Проект очищен и готов к разработке
-        </p>
-      </div>
-    </div>
-  )
-}
+    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
+      {renderPage()}
+    </Layout>
+  );
+};
 
-export default App
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+};
+
+export default App;
