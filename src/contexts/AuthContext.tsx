@@ -3,6 +3,19 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
 
+// Check if Supabase is properly configured
+const isSupabaseConfigured = () => {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  
+  return url && 
+         key && 
+         url !== 'https://placeholder.supabase.co' && 
+         key !== 'placeholder-anon-key' &&
+         !url.includes('placeholder') &&
+         !key.includes('placeholder');
+};
+
 interface AuthContextType {
   user: User | null;
   supabaseUser: SupabaseUser | null;
@@ -19,6 +32,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSupabaseUser(session?.user ?? null);
@@ -63,6 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase не настроен. Пожалуйста, настройте подключение к базе данных.');
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -71,6 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    if (!isSupabaseConfigured()) {
+      return;
+    }
+
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };
