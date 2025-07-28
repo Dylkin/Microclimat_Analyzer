@@ -42,7 +42,21 @@ export async function createDefaultUser() {
     }
     // Проверяем, есть ли service role key для использования admin API
     if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('VITE_SUPABASE_SERVICE_ROLE_KEY не найден. Невозможно создать пользователя по умолчанию.');
+      console.error(`
+VITE_SUPABASE_SERVICE_ROLE_KEY не найден. 
+
+Для создания пользователя по умолчанию необходимо:
+1. Перейти в Supabase Dashboard: https://supabase.com/dashboard
+2. Выбрать ваш проект
+3. Перейти в Settings → API
+4. Скопировать "service_role" ключ (НЕ anon ключ!)
+5. Добавить в файл .env строку:
+   VITE_SUPABASE_SERVICE_ROLE_KEY=ваш_service_role_ключ
+6. Перезапустить приложение
+
+ВНИМАНИЕ: Service role ключ дает полный доступ к базе данных!
+Никогда не публикуйте его в открытом коде.
+      `);
       return;
     }
 
