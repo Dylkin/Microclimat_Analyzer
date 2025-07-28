@@ -90,6 +90,9 @@ export default function Login() {
               <p>Email: pavel.dylkin@gmail.com</p>
               <p>Пароль: 00016346</p>
               <p>Роль: Администратор</p>
+              <p className="text-blue-600 mt-2">
+                <strong>Примечание:</strong> Если пользователь не существует, он будет создан автоматически при первом входе.
+              </p>
             </div>
           </div>
         </div>

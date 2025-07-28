@@ -1,128 +1,65 @@
-import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-
-// Создаем отдельный клиент с service role для административных операций
-const adminSupabase = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY 
-  ? createClient(
-      import.meta.env.VITE_SUPABASE_URL!,
-      import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY!
-    )
-  : supabase;
-
-// Check if Supabase is properly configured
-const isSupabaseConfigured = () => {
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-  return url && 
-         key && 
-         url !== 'https://placeholder.supabase.co' && 
-         key !== 'placeholder-anon-key' &&
-         !url.includes('placeholder') &&
-         !key.includes('placeholder');
-};
 
 // Функция для создания пользователя по умолчанию
 export async function createDefaultUser() {
-  if (!isSupabaseConfigured()) {
-    console.log('Supabase не настроен. Пропускаем создание пользователя по умолчанию.');
-    return;
-  }
-
   try {
-    // Проверяем, существует ли пользователь (используем admin client для обхода RLS)
-    const { data: existingUsers } = await adminSupabase
-      .from('users')
-      .select('id')
-      .eq('email', 'pavel.dylkin@gmail.com');
-
-    if (existingUsers && existingUsers.length > 0) {
-      console.log('Пользователь по умолчанию уже существует');
-      return;
-    }
-    // Проверяем, есть ли service role key для использования admin API
-    if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
-      console.error(`
-VITE_SUPABASE_SERVICE_ROLE_KEY не найден. 
-
-Для создания пользователя по умолчанию необходимо:
-1. Перейти в Supabase Dashboard: https://supabase.com/dashboard
-2. Выбрать ваш проект
-3. Перейти в Settings → API
-4. Скопировать "service_role" ключ (НЕ anon ключ!)
-5. Добавить в файл .env строку:
-   VITE_SUPABASE_SERVICE_ROLE_KEY=ваш_service_role_ключ
-6. Перезапустить приложение
-
-ВНИМАНИЕ: Service role ключ дает полный доступ к базе данных!
-Никогда не публикуйте его в открытом коде.
-      `);
-      return;
-    }
-
-    let userData;
-
-    // Сначала пытаемся получить существующего пользователя через admin API
-    const { data: existingAuthUsers, error: listError } = await adminSupabase.auth.admin.listUsers();
+    console.log('Создание пользователя по умолчанию...');
     
-    if (listError) {
-      console.error('Ошибка получения списка пользователей:', listError.message);
+    // Проверяем, существует ли пользователь
+    const { data: existingUser } = await supabase.auth.getUser();
+    
+    if (existingUser.user) {
+      console.log('Пользователь уже авторизован');
       return;
     }
 
-    const existingAuthUser = existingAuthUsers.users.find(user => user.email === 'pavel.dylkin@gmail.com');
+    // Пытаемся войти с тестовыми данными
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: 'pavel.dylkin@gmail.com',
+      password: '00016346'
+    });
 
-    if (existingAuthUser) {
-      console.log('Пользователь уже существует в auth');
-      userData = existingAuthUser;
-    } else {
-      console.log('Создаем пользователя через admin API...');
+    if (signInError) {
+      console.log('Пользователь не найден, создаем нового...');
       
-      // Создаем пользователя через admin API с подтвержденным email
-      const { data: createData, error: createError } = await adminSupabase.auth.admin.createUser({
+      // Создаем нового пользователя
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: 'pavel.dylkin@gmail.com',
         password: '00016346',
-        email_confirm: true,
-        user_metadata: {
-          full_name: 'Дылкин П.А.'
+        options: {
+          data: {
+            full_name: 'Дылкин П.А.'
+          }
         }
       });
 
-      if (createError) {
-        console.error('Ошибка создания пользователя через admin API:', createError.message);
+      if (signUpError) {
+        console.error('Ошибка создания пользователя:', signUpError.message);
         return;
       }
 
-      if (!createData.user) {
-        console.error('Не удалось получить данные пользователя');
-        return;
-      }
+      if (signUpData.user) {
+        console.log('Пользователь создан успешно');
+        
+        // Создаем профиль в таблице users
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: signUpData.user.id,
+            email: 'pavel.dylkin@gmail.com',
+            full_name: 'Дылкин П.А.',
+            role: 'administrator'
+          });
 
-      userData = createData.user;
-      console.log('Пользователь создан через admin API');
-    }
-
-    // Создаем профиль пользователя в таблице users
-    const { error: profileError } = await adminSupabase
-      .from('users')
-      .insert({
-        id: userData!.id,
-        email: 'pavel.dylkin@gmail.com',
-        full_name: 'Дылкин П.А.',
-        role: 'administrator'
-      });
-
-    if (profileError) {
-      if (profileError.message.includes('duplicate key')) {
-        console.log('Профиль пользователя уже существует');
-      } else {
-        console.error('Ошибка создания профиля через service role:', profileError.message);
+        if (profileError && !profileError.message.includes('duplicate key')) {
+          console.error('Ошибка создания профиля:', profileError.message);
+        } else {
+          console.log('Профиль пользователя создан');
+        }
       }
     } else {
-      console.log('Профиль пользователя создан успешно');
+      console.log('Пользователь успешно авторизован');
     }
-    
-    console.log('Пользователь по умолчанию создан. Email: pavel.dylkin@gmail.com, Пароль: 00016346');
   } catch (error) {
     console.error('Ошибка при создании пользователя по умолчанию:', error);
   }
@@ -130,11 +67,6 @@ VITE_SUPABASE_SERVICE_ROLE_KEY не найден.
 
 // Функция для инициализации базы данных
 export async function initializeDatabase() {
-  if (!isSupabaseConfigured()) {
-    console.log('Supabase не настроен. База данных будет инициализирована после подключения.');
-    return;
-  }
-
   try {
     await createDefaultUser();
   } catch (error) {

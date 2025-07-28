@@ -3,19 +3,6 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
 
-// Check if Supabase is properly configured
-const isSupabaseConfigured = () => {
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-  return url && 
-         key && 
-         url !== 'https://placeholder.supabase.co' && 
-         key !== 'placeholder-anon-key' &&
-         !url.includes('placeholder') &&
-         !key.includes('placeholder');
-};
-
 interface AuthContextType {
   user: User | null;
   supabaseUser: SupabaseUser | null;
@@ -32,11 +19,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      setLoading(false);
-      return;
-    }
-
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSupabaseUser(session?.user ?? null);
@@ -65,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      // Простой запрос без сложных RLS политик
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -72,33 +55,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        // Handle infinite recursion in RLS policies
-        if (error.message?.includes('infinite recursion detected')) {
-          console.error('RLS Policy Error: Infinite recursion detected in users table policy. Please check your Supabase RLS policies.');
-          setUser(null);
+        console.error('Error fetching user profile:', error.message);
+        // Создаем базовый профиль если его нет
+        if (error.code === 'PGRST116') {
+          await createUserProfile(userId);
           return;
         }
-        throw error;
-      }
-      setUser(data);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error fetching user profile:', errorMessage);
-      
-      // If it's a policy recursion error, don't retry
-      if (errorMessage.includes('infinite recursion detected')) {
         setUser(null);
+      } else {
+        setUser(data);
       }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const signIn = async (email: string, password: string) => {
-    if (!isSupabaseConfigured()) {
-      throw new Error('Supabase не настроен. Пожалуйста, настройте подключение к базе данных.');
-    }
+  const createUserProfile = async (userId: string) => {
+    try {
+      const { data: authUser } = await supabase.auth.getUser();
+      if (!authUser.user) return;
 
+      const { data, error } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          email: authUser.user.email || '',
+          full_name: authUser.user.user_metadata?.full_name || 'Пользователь',
+          role: 'specialist'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating user profile:', error.message);
+      } else {
+        setUser(data);
+      }
+    } catch (error) {
+      console.error('Error creating user profile:', error);
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -107,10 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    if (!isSupabaseConfigured()) {
-      return;
-    }
-
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };
