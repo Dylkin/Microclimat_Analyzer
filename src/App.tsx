@@ -4,11 +4,12 @@ import { supabase } from './lib/supabase'
 function App() {
   const testConnection = async () => {
     try {
-      const { data, error } = await supabase.from('users').select('count').single()
+      // Простая проверка подключения без обращения к таблицам
+      const { data, error } = await supabase.auth.getSession()
       if (error) {
-        console.log('Supabase подключен, но таблица users не найдена:', error.message)
+        console.log('Ошибка при проверке сессии:', error.message)
       } else {
-        console.log('Supabase успешно подключен!')
+        console.log('Supabase успешно подключен!', data)
       }
     } catch (err) {
       console.log('Ошибка подключения к Supabase:', err)
