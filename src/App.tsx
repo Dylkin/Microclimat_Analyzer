@@ -10,12 +10,9 @@ const AppContent: React.FC = () => {
   const { user, hasAccess } = useAuth();
   const [currentPage, setCurrentPage] = useState('analyzer');
 
-  if (!user) {
-    return <Login />;
-  }
-
-  // Определяем стартовую страницу на основе роли
   React.useEffect(() => {
+    if (!user) return;
+    
     if (user.role === 'specialist' && !hasAccess('analyzer')) {
       setCurrentPage('analyzer');
     } else if (user.role === 'manager' && !hasAccess('analyzer')) {
@@ -29,6 +26,10 @@ const AppContent: React.FC = () => {
       }
     }
   }, [user, hasAccess, currentPage]);
+
+  if (!user) {
+    return <Login />;
+  }
 
   const renderPage = () => {
     switch (currentPage) {
