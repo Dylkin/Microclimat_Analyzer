@@ -22,13 +22,12 @@ export async function createDefaultUser() {
 
   try {
     // Проверяем, существует ли пользователь
-    const { data: existingUser } = await supabase
+    const { data: existingUsers } = await supabase
       .from('users')
       .select('id')
-      .eq('email', 'pavel.dylkin@gmail.com')
-      .single();
+      .eq('email', 'pavel.dylkin@gmail.com');
 
-    if (existingUser) {
+    if (existingUsers && existingUsers.length > 0) {
       console.log('Пользователь по умолчанию уже существует');
       return;
     }
