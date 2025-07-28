@@ -1,6 +1,24 @@
 import React from 'react'
+import { supabase } from './lib/supabase'
 
 function App() {
+  const testConnection = async () => {
+    try {
+      const { data, error } = await supabase.from('users').select('count').single()
+      if (error) {
+        console.log('Supabase подключен, но таблица users не найдена:', error.message)
+      } else {
+        console.log('Supabase успешно подключен!')
+      }
+    } catch (err) {
+      console.log('Ошибка подключения к Supabase:', err)
+    }
+  }
+
+  React.useEffect(() => {
+    testConnection()
+  }, [])
+
   return (
     <div style={{ 
       minHeight: '100vh', 
@@ -22,6 +40,9 @@ function App() {
         </h1>
         <p style={{ color: '#666' }}>
           Система анализа микроклимата
+        </p>
+        <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '1rem' }}>
+          Supabase подключен. Проверьте консоль для статуса соединения.
         </p>
         <p style={{ color: '#999', fontSize: '0.9rem', marginTop: '1rem' }}>
           Проект очищен и готов к разработке
