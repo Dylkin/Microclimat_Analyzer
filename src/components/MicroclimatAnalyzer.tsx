@@ -1,7 +1,16 @@
 import React from 'react';
-import { BarChart3, Thermometer, Droplets, Wind, Sun } from 'lucide-react';
+import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2 } from 'lucide-react';
+
+interface UploadedFile {
+  id: string;
+  name: string;
+  uploadDate: string;
+}
 
 export const MicroclimatAnalyzer: React.FC = () => {
+  const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
     { label: 'Влажность', value: '65%', icon: Droplets, color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -9,11 +18,117 @@ export const MicroclimatAnalyzer: React.FC = () => {
     { label: 'Освещенность', value: '850 лк', icon: Sun, color: 'text-yellow-600', bg: 'bg-yellow-100' }
   ];
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      // Проверяем расширение файла
+      if (!file.name.toLowerCase().endsWith('.vi2')) {
+        alert(`Файл "${file.name}" имеет неподдерживаемый формат. Поддерживаются только файлы .vi2`);
+        return;
+      }
+
+      const newFile: UploadedFile = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        uploadDate: new Date().toLocaleString('ru-RU')
+      };
+
+      setUploadedFiles(prev => [...prev, newFile]);
+    });
+
+    // Очищаем input для возможности загрузки того же файла повторно
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteFile = (fileId: string) => {
+    if (confirm('Вы уверены, что хотите удалить этот файл?')) {
+      setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+    }
+  };
+
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
         <BarChart3 className="w-8 h-8 text-indigo-600" />
         <h1 className="text-2xl font-bold text-gray-900">Microclimat Analyzer</h1>
+      </div>
+
+      {/* Секция загрузки файлов */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Загрузка файлов</h2>
+          <button
+            onClick={triggerFileUpload}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Загрузить файлы в формате Vi2</span>
+          </button>
+        </div>
+        
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".vi2"
+          multiple
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
+        {uploadedFiles.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Имя файла
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Дата загрузки
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Удалить
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {uploadedFiles.map((file) => (
+                  <tr key={file.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{file.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{file.uploadDate}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <button
+                        onClick={() => handleDeleteFile(file.id)}
+                        className="text-red-600 hover:text-red-900 transition-colors"
+                        title="Удалить файл"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <Upload className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p>Файлы не загружены</p>
+            <p className="text-sm">Нажмите кнопку "Загрузить файлы" для добавления файлов в формате Vi2</p>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
