@@ -4,7 +4,6 @@ export interface DeviceMetadata {
   deviceModel: string;
   firmwareVersion?: string;
   calibrationDate?: Date;
-  measurementInterval: number; // в минутах
 }
 
 export interface MeasurementRecord {
