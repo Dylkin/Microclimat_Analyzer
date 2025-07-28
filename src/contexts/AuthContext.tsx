@@ -19,7 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
+    // Получаем текущую сессию
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSupabaseUser(session?.user ?? null);
       if (session?.user) {
@@ -29,10 +29,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Listen for auth changes
+    // Слушаем изменения авторизации
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event);
         setSupabaseUser(session?.user ?? null);
+        
         if (session?.user) {
           await fetchUserProfile(session.user.id);
         } else {
@@ -47,7 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      // Простой запрос без сложных RLS политик
+      console.log('Получение профиля пользователя:', userId);
+      
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -55,18 +58,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        console.error('Error fetching user profile:', error.message);
-        // Создаем базовый профиль если его нет
+        console.error('Ошибка получения профиля:', error.message);
+        
         if (error.code === 'PGRST116') {
+          // Профиль не найден, создаем базовый
+          console.log('Профиль не найден, создаем новый...');
           await createUserProfile(userId);
           return;
         }
+        
         setUser(null);
       } else {
+        console.log('Профиль получен:', data);
         setUser(data);
       }
     } catch (error) {
-      console.error('Unexpected error:', error);
+      console.error('Неожиданная ошибка при получении профиля:', error);
       setUser(null);
     } finally {
       setLoading(false);
@@ -83,33 +90,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .insert({
           id: userId,
           email: authUser.user.email || '',
-          full_name: authUser.user.user_metadata?.full_name || 'Пользователь',
+          full_name: authUser.user.user_metadata?.full_name || 'Новый пользователь',
           role: 'specialist'
         })
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating user profile:', error.message);
+        console.error('Ошибка создания профиля:', error.message);
+        setUser(null);
       } else {
+        console.log('Профиль создан:', data);
         setUser(data);
       }
     } catch (error) {
-      console.error('Error creating user profile:', error);
+      console.error('Ошибка создания профиля:', error);
+      setUser(null);
     }
   };
 
   const signIn = async (email: string, password: string) => {
+    console.log('Попытка входа:', email);
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    if (error) throw error;
+    if (error) {
+      console.error('Ошибка входа:', error.message);
+      throw error;
+    }
   };
 
   const signOut = async () => {
+    console.log('Выход из системы');
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    if (error) {
+      console.error('Ошибка выхода:', error.message);
+      throw error;
+    }
   };
 
   return (
