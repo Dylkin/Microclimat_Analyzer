@@ -32,33 +32,52 @@ export async function createDefaultUser() {
       return;
     }
 
-    // Создаем пользователя через Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // Сначала пытаемся войти в систему (проверяем, существует ли пользователь в Auth)
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: 'pavel.dylkin@gmail.com',
       password: '00016346',
     });
 
-    if (authError) {
-      console.error('Ошибка создания пользователя в auth:', authError);
-      return;
+    let userId: string;
+
+    if (signInData.user) {
+      // Пользователь уже существует в Auth
+      userId = signInData.user.id;
+      console.log('Пользователь найден в Auth, создаем профиль');
+    } else {
+      // Пользователь не существует, создаем нового
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: 'pavel.dylkin@gmail.com',
+        password: '00016346',
+      });
+
+      if (authError) {
+        console.error('Ошибка создания пользователя в auth:', authError);
+        return;
+      }
+
+      if (!authData.user) {
+        console.error('Не удалось получить данные пользователя после регистрации');
+        return;
+      }
+
+      userId = authData.user.id;
     }
 
-    if (authData.user) {
-      // Создаем профиль пользователя
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
-          email: 'pavel.dylkin@gmail.com',
-          full_name: 'Дылкин П.А.',
-          role: 'administrator'
-        });
+    // Создаем или обновляем профиль пользователя
+    const { error: profileError } = await supabase
+      .from('users')
+      .upsert({
+        id: userId,
+        email: 'pavel.dylkin@gmail.com',
+        full_name: 'Дылкин П.А.',
+        role: 'administrator'
+      });
 
-      if (profileError) {
-        console.error('Ошибка создания профиля:', profileError);
-      } else {
-        console.log('Пользователь по умолчанию создан успешно');
-      }
+    if (profileError) {
+      console.error('Ошибка создания/обновления профиля:', profileError);
+    } else {
+      console.log('Пользователь по умолчанию создан/обновлен успешно');
     }
   } catch (error) {
     console.error('Ошибка при создании пользователя по умолчанию:', error);
