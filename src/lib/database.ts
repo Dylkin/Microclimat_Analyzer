@@ -43,27 +43,52 @@ export async function createDefaultUser() {
 
     console.log('Создаем пользователя по умолчанию...');
 
-    // Сначала пытаемся создать пользователя через обычный signup
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    // Сначала пытаемся войти - если пользователь уже существует в auth
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: 'pavel.dylkin@gmail.com',
       password: '00016346',
     });
 
-    if (signUpError) {
-      console.error('Ошибка создания пользователя:', signUpError.message);
-      return;
-    }
+    let userData = signInData?.user;
 
-    if (!signUpData.user) {
-      console.error('Не удалось получить данные пользователя');
-      return;
+    if (signInError) {
+      // Если вход не удался, пытаемся создать пользователя
+      if (signInError.message.includes('Invalid login credentials')) {
+        console.log('Пользователь не существует, создаем...');
+        
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: 'pavel.dylkin@gmail.com',
+          password: '00016346',
+        });
+
+        if (signUpError) {
+          if (signUpError.message.includes('User already registered')) {
+            console.log('Пользователь уже зарегистрирован, но не подтвержден');
+            return;
+          }
+          console.error('Ошибка создания пользователя:', signUpError.message);
+          return;
+        }
+
+        if (!signUpData.user) {
+          console.error('Не удалось получить данные пользователя');
+          return;
+        }
+
+        userData = signUpData.user;
+      } else {
+        console.error('Ошибка входа:', signInError.message);
+        return;
+      }
+    } else {
+      console.log('Пользователь уже существует в auth, проверяем профиль...');
     }
 
     // Создаем профиль пользователя в таблице users
     const { error: profileError } = await supabase
       .from('users')
       .insert({
-        id: signUpData.user.id,
+        id: userData!.id,
         email: 'pavel.dylkin@gmail.com',
         full_name: 'Дылкин П.А.',
         role: 'administrator'
@@ -78,7 +103,7 @@ export async function createDefaultUser() {
         const { error: adminError } = await adminSupabase
           .from('users')
           .insert({
-            id: signUpData.user.id,
+            id: userData!.id,
             email: 'pavel.dylkin@gmail.com',
             full_name: 'Дылкин П.А.',
             role: 'administrator'
