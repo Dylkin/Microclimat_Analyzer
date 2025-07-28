@@ -40,52 +40,56 @@ export async function createDefaultUser() {
       console.log('Пользователь по умолчанию уже существует');
       return;
     }
+    // Проверяем, есть ли service role key для использования admin API
+    if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('VITE_SUPABASE_SERVICE_ROLE_KEY не найден. Невозможно создать пользователя по умолчанию.');
+      return;
+    }
 
-    console.log('Создаем пользователя по умолчанию...');
+    let userData;
 
-    // Сначала пытаемся войти - если пользователь уже существует в auth
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: 'pavel.dylkin@gmail.com',
-      password: '00016346',
-    });
+    // Сначала пытаемся получить существующего пользователя через admin API
+    const { data: existingAuthUsers, error: listError } = await adminSupabase.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error('Ошибка получения списка пользователей:', listError.message);
+      return;
+    }
 
-    let userData = signInData?.user;
+    const existingAuthUser = existingAuthUsers.users.find(user => user.email === 'pavel.dylkin@gmail.com');
 
-    if (signInError) {
-      // Если вход не удался, пытаемся создать пользователя
-      if (signInError.message.includes('Invalid login credentials')) {
-        console.log('Пользователь не существует, создаем...');
-        
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: 'pavel.dylkin@gmail.com',
-          password: '00016346',
-        });
-
-        if (signUpError) {
-          if (signUpError.message.includes('User already registered')) {
-            console.log('Пользователь уже зарегистрирован, но не подтвержден');
-            return;
-          }
-          console.error('Ошибка создания пользователя:', signUpError.message);
-          return;
+    if (existingAuthUser) {
+      console.log('Пользователь уже существует в auth');
+      userData = existingAuthUser;
+    } else {
+      console.log('Создаем пользователя через admin API...');
+      
+      // Создаем пользователя через admin API с подтвержденным email
+      const { data: createData, error: createError } = await adminSupabase.auth.admin.createUser({
+        email: 'pavel.dylkin@gmail.com',
+        password: '00016346',
+        email_confirm: true,
+        user_metadata: {
+          full_name: 'Дылкин П.А.'
         }
+      });
 
-        if (!signUpData.user) {
-          console.error('Не удалось получить данные пользователя');
-          return;
-        }
-
-        userData = signUpData.user;
-      } else {
-        console.error('Ошибка входа:', signInError.message);
+      if (createError) {
+        console.error('Ошибка создания пользователя через admin API:', createError.message);
         return;
       }
-    } else {
-      console.log('Пользователь уже существует в auth, проверяем профиль...');
+
+      if (!createData.user) {
+        console.error('Не удалось получить данные пользователя');
+        return;
+      }
+
+      userData = createData.user;
+      console.log('Пользователь создан через admin API');
     }
 
     // Создаем профиль пользователя в таблице users
-    const { error: profileError } = await supabase
+    const { error: profileError } = await adminSupabase
       .from('users')
       .insert({
         id: userData!.id,
@@ -95,21 +99,7 @@ export async function createDefaultUser() {
       });
 
     if (profileError) {
-      console.error('Ошибка создания профиля:', profileError.message);
-      
-      // Если ошибка RLS, попробуем через service role (если доступен)
-      if (profileError.message.includes('row-level security') && import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
-        console.log('Пытаемся создать профиль через service role...');
-        const { error: adminError } = await adminSupabase
-          .from('users')
-          .insert({
-            id: userData!.id,
-            email: 'pavel.dylkin@gmail.com',
-            full_name: 'Дылкин П.А.',
-            role: 'administrator'
-          });
-        
-        if (adminError) {
+      if (profileError.message.includes('duplicate key')) {
           console.error('Ошибка создания профиля через service role:', adminError.message);
         } else {
           console.log('Профиль пользователя создан через service role');
