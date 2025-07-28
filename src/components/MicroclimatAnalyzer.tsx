@@ -1,11 +1,10 @@
 import React from 'react';
-import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2 } from 'lucide-react';
+import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { UploadedFile } from '../types/FileData';
+import { FileParsingService } from '../utils/fileParser';
+import { databaseService } from '../utils/database';
 
-interface UploadedFile {
-  id: string;
-  name: string;
-  uploadDate: string;
-}
+const fileParsingService = new FileParsingService();
 
 export const MicroclimatAnalyzer: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
@@ -18,25 +17,79 @@ export const MicroclimatAnalyzer: React.FC = () => {
     { label: 'Освещенность', value: '850 лк', icon: Sun, color: 'text-yellow-600', bg: 'bg-yellow-100' }
   ];
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
 
-    Array.from(files).forEach(file => {
+    const fileArray = Array.from(files);
+    
+    // Создаем записи для файлов с начальным статусом
+    const newFiles: UploadedFile[] = fileArray.map(file => {
       // Проверяем расширение файла
       if (!file.name.toLowerCase().endsWith('.vi2')) {
         alert(`Файл "${file.name}" имеет неподдерживаемый формат. Поддерживаются только файлы .vi2`);
-        return;
+        return null;
       }
 
-      const newFile: UploadedFile = {
+      return {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         name: file.name,
-        uploadDate: new Date().toLocaleString('ru-RU')
+        uploadDate: new Date().toLocaleString('ru-RU'),
+        parsingStatus: 'pending' as const
       };
+    }).filter(Boolean) as UploadedFile[];
 
-      setUploadedFiles(prev => [...prev, newFile]);
-    });
+    // Добавляем файлы в состояние
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+
+    // Запускаем парсинг файлов
+    for (let i = 0; i < newFiles.length; i++) {
+      const fileRecord = newFiles[i];
+      const file = fileArray.find(f => f.name === fileRecord.name);
+      
+      if (!file) continue;
+
+      // Обновляем статус на "обработка"
+      setUploadedFiles(prev => prev.map(f => 
+        f.id === fileRecord.id 
+          ? { ...f, parsingStatus: 'processing' }
+          : f
+      ));
+
+      try {
+        // Парсим файл
+        const parsedData = await fileParsingService.parseFile(file);
+        
+        // Сохраняем в базу данных
+        await databaseService.saveParsedFileData(parsedData, fileRecord.id);
+        
+        // Обновляем статус файла
+        setUploadedFiles(prev => prev.map(f => 
+          f.id === fileRecord.id 
+            ? { 
+                ...f, 
+                parsingStatus: 'completed',
+                parsedData,
+                recordCount: parsedData.recordCount,
+                period: `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`
+              }
+            : f
+        ));
+      } catch (error) {
+        console.error('Ошибка парсинга файла:', error);
+        
+        // Обновляем статус на ошибку
+        setUploadedFiles(prev => prev.map(f => 
+          f.id === fileRecord.id 
+            ? { 
+                ...f, 
+                parsingStatus: 'error',
+                errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка'
+              }
+            : f
+        ));
+      }
+    }
 
     // Очищаем input для возможности загрузки того же файла повторно
     if (fileInputRef.current) {
@@ -44,14 +97,52 @@ export const MicroclimatAnalyzer: React.FC = () => {
     }
   };
 
-  const handleDeleteFile = (fileId: string) => {
+  const handleDeleteFile = async (fileId: string) => {
     if (confirm('Вы уверены, что хотите удалить этот файл?')) {
+      try {
+        // Удаляем данные из базы
+        await databaseService.deleteFileData(fileId);
+      } catch (error) {
+        console.error('Ошибка удаления данных из базы:', error);
+      }
+      
+      // Удаляем из состояния
       setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
     }
   };
 
   const triggerFileUpload = () => {
     fileInputRef.current?.click();
+  };
+
+  const getStatusIcon = (status: UploadedFile['parsingStatus']) => {
+    switch (status) {
+      case 'pending':
+        return <Clock className="w-4 h-4 text-gray-500" />;
+      case 'processing':
+        return <Loader className="w-4 h-4 text-blue-500 animate-spin" />;
+      case 'completed':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'error':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusText = (status: UploadedFile['parsingStatus']) => {
+    switch (status) {
+      case 'pending':
+        return 'Ожидание';
+      case 'processing':
+        return 'Обработка';
+      case 'completed':
+        return 'Обработано';
+      case 'error':
+        return 'Ошибка';
+      default:
+        return 'Неизвестно';
+    }
   };
 
   return (
@@ -92,7 +183,13 @@ export const MicroclimatAnalyzer: React.FC = () => {
                     Имя файла
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Дата загрузки
+                    Статус
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Период данных
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Записей
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Удалить
@@ -103,10 +200,34 @@ export const MicroclimatAnalyzer: React.FC = () => {
                 {uploadedFiles.map((file) => (
                   <tr key={file.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{file.name}</div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{file.name}</div>
+                        <div className="text-xs text-gray-500">{file.uploadDate}</div>
+                        {file.parsedData && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {file.parsedData.deviceMetadata.deviceModel} (S/N: {file.parsedData.deviceMetadata.serialNumber})
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{file.uploadDate}</div>
+                      <div className="flex items-center space-x-2">
+                        {getStatusIcon(file.parsingStatus)}
+                        <span className="text-sm text-gray-900">{getStatusText(file.parsingStatus)}</span>
+                      </div>
+                      {file.errorMessage && (
+                        <div className="text-xs text-red-600 mt-1">{file.errorMessage}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {file.period || '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {file.recordCount ? file.recordCount.toLocaleString('ru-RU') : '-'}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button
