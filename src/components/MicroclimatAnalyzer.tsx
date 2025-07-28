@@ -3,10 +3,12 @@ import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, Che
 import { UploadedFile } from '../types/FileData';
 import { databaseService } from '../utils/database';
 import { CSVExporter } from '../utils/csvExporter';
+import { Vi2ParsingService } from '../utils/vi2Parser';
 
 export const MicroclimatAnalyzer: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const vi2ParsingService = new Vi2ParsingService();
 
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
@@ -33,19 +35,71 @@ export const MicroclimatAnalyzer: React.FC = () => {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         name: file.name,
         uploadDate: new Date().toLocaleString('ru-RU'),
-        parsingStatus: 'pending' as const
+        parsingStatus: 'processing' as const
       };
     }).filter(Boolean) as UploadedFile[];
 
     // Добавляем файлы в состояние
     setUploadedFiles(prev => [...prev, ...newFiles]);
 
-    // Обновляем статус файлов на "завершено" (без парсинга)
-    setUploadedFiles(prev => prev.map(f => 
-      newFiles.some(nf => nf.id === f.id)
-        ? { ...f, parsingStatus: 'completed' }
-        : f
-    ));
+    // Парсим файлы
+    try {
+      const validFiles = fileArray.filter(file => file.name.toLowerCase().endsWith('.vi2'));
+      const parsedResults = await vi2ParsingService.parseMultipleFiles(validFiles);
+      
+      // Обновляем файлы с результатами парсинга
+      setUploadedFiles(prev => prev.map(file => {
+        const newFile = newFiles.find(nf => nf.name === file.name);
+        if (!newFile) return file;
+        
+        const parsedData = parsedResults.find(pr => pr.fileName === file.name);
+        if (!parsedData) {
+          return {
+            ...file,
+            parsingStatus: 'error',
+            errorMessage: 'Не удалось найти результат парсинга'
+          };
+        }
+        
+        // Сохраняем данные в базу
+        databaseService.saveParsedFileData(parsedData, file.id).catch(error => {
+          console.error('Ошибка сохранения в базу:', error);
+        });
+        
+        // Создаем CSV файл
+        let csvDownloadUrl, csvFileName;
+        if (parsedData.parsingStatus === 'completed') {
+          csvDownloadUrl = CSVExporter.downloadCSV(parsedData);
+          csvFileName = CSVExporter.getExportFileName(parsedData);
+        }
+        
+        return {
+          ...file,
+          parsedData,
+          parsingStatus: parsedData.parsingStatus,
+          errorMessage: parsedData.errorMessage,
+          recordCount: parsedData.recordCount,
+          period: parsedData.parsingStatus === 'completed' 
+            ? `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`
+            : undefined,
+          csvDownloadUrl,
+          csvFileName
+        };
+      }));
+    } catch (error) {
+      console.error('Ошибка парсинга файлов:', error);
+      
+      // Обновляем статус на ошибку
+      setUploadedFiles(prev => prev.map(file => 
+        newFiles.some(nf => nf.id === file.id)
+          ? { 
+              ...file, 
+              parsingStatus: 'error',
+              errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка парсинга'
+            }
+          : file
+      ));
+    }
 
     // Очищаем input для возможности загрузки того же файла повторно
     if (fileInputRef.current) {
