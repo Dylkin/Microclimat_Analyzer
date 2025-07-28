@@ -1,11 +1,8 @@
 import React from 'react';
 import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
-import { FileParsingService } from '../utils/fileParser';
 import { databaseService } from '../utils/database';
 import { CSVExporter } from '../utils/csvExporter';
-
-const fileParsingService = new FileParsingService();
 
 export const MicroclimatAnalyzer: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
@@ -43,60 +40,12 @@ export const MicroclimatAnalyzer: React.FC = () => {
     // Добавляем файлы в состояние
     setUploadedFiles(prev => [...prev, ...newFiles]);
 
-    // Запускаем парсинг файлов
-    for (let i = 0; i < newFiles.length; i++) {
-      const fileRecord = newFiles[i];
-      const file = fileArray.find(f => f.name === fileRecord.name);
-      
-      if (!file) continue;
-
-      // Обновляем статус на "обработка"
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === fileRecord.id 
-          ? { ...f, parsingStatus: 'processing' }
-          : f
-      ));
-
-      try {
-        // Парсим файл
-        const parsedData = await fileParsingService.parseFile(file);
-        
-        // Сохраняем в базу данных
-        await databaseService.saveParsedFileData(parsedData, fileRecord.id);
-        
-        // Создаем CSV файл для скачивания
-        const csvUrl = CSVExporter.downloadCSV(parsedData);
-        const csvFileName = CSVExporter.getExportFileName(parsedData);
-        
-        // Обновляем статус файла
-        setUploadedFiles(prev => prev.map(f => 
-          f.id === fileRecord.id 
-            ? { 
-                ...f, 
-                parsingStatus: 'completed',
-                parsedData,
-                recordCount: parsedData.recordCount,
-                period: `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`,
-                csvDownloadUrl: csvUrl,
-                csvFileName
-              }
-            : f
-        ));
-      } catch (error) {
-        console.error('Ошибка парсинга файла:', error);
-        
-        // Обновляем статус на ошибку
-        setUploadedFiles(prev => prev.map(f => 
-          f.id === fileRecord.id 
-            ? { 
-                ...f, 
-                parsingStatus: 'error',
-                errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка'
-              }
-            : f
-        ));
-      }
-    }
+    // Обновляем статус файлов на "завершено" (без парсинга)
+    setUploadedFiles(prev => prev.map(f => 
+      newFiles.some(nf => nf.id === f.id)
+        ? { ...f, parsingStatus: 'completed' }
+        : f
+    ));
 
     // Очищаем input для возможности загрузки того же файла повторно
     if (fileInputRef.current) {
