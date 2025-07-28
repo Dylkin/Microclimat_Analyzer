@@ -100,10 +100,9 @@ export async function createDefaultUser() {
 
     if (profileError) {
       if (profileError.message.includes('duplicate key')) {
-          console.error('Ошибка создания профиля через service role:', adminError.message);
-        } else {
-          console.log('Профиль пользователя создан через service role');
-        }
+        console.log('Профиль пользователя уже существует');
+      } else {
+        console.error('Ошибка создания профиля через service role:', profileError.message);
       }
     } else {
       console.log('Профиль пользователя создан успешно');
