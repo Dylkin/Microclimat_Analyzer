@@ -29,6 +29,11 @@ export async function createDefaultUser() {
     return;
   }
 
+  if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
+    console.log('Service role key не настроен. Пропускаем создание пользователя по умолчанию.');
+    return;
+  }
+
   try {
     // Проверяем, существует ли пользователь
     const { data: existingUsers } = await supabase
@@ -41,37 +46,27 @@ export async function createDefaultUser() {
       return;
     }
 
-    // Сначала пытаемся войти в систему (проверяем, существует ли пользователь в Auth)
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    // Используем Admin API для создания пользователя с подтвержденным email
+    const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
       email: 'pavel.dylkin@gmail.com',
       password: '00016346',
+      email_confirm: true,
+      user_metadata: {
+        full_name: 'Дылкин П.А.'
+      }
     });
 
-    let userId: string;
-
-    if (signInData.user) {
-      // Пользователь уже существует в Auth
-      userId = signInData.user.id;
-      console.log('Пользователь найден в Auth, создаем профиль');
-    } else {
-      // Пользователь не существует, создаем нового
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: 'pavel.dylkin@gmail.com',
-        password: '00016346',
-      });
-
-      if (authError) {
-        console.error('Ошибка создания пользователя в auth:', authError);
-        return;
-      }
-
-      if (!authData.user) {
-        console.error('Не удалось получить данные пользователя после регистрации');
-        return;
-      }
-
-      userId = authData.user.id;
+    if (authError) {
+      console.error('Ошибка создания пользователя в auth:', authError);
+      return;
     }
+
+    if (!authData.user) {
+      console.error('Не удалось получить данные пользователя после создания');
+      return;
+    }
+
+    const userId = authData.user.id;
 
     // Создаем или обновляем профиль пользователя
     const { error: profileError } = await adminSupabase
