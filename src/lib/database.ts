@@ -30,8 +30,8 @@ export async function createDefaultUser() {
   }
 
   try {
-    // Проверяем, существует ли пользователь
-    const { data: existingUsers } = await supabase
+    // Проверяем, существует ли пользователь (используем admin client для обхода RLS)
+    const { data: existingUsers } = await adminSupabase
       .from('users')
       .select('id')
       .eq('email', 'pavel.dylkin@gmail.com');
