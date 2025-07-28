@@ -6,21 +6,17 @@ export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { login } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
-    const result = await signIn(email, password);
-    
-    if (!result.success) {
-      setError(result.error || 'Ошибка входа в систему');
+    if (login(email, password)) {
+      // Успешная авторизация
+    } else {
+      setError('Неверный логин или пароль');
     }
-    
-    setLoading(false);
   };
 
   const fillDefaultCredentials = () => {
@@ -83,10 +79,9 @@ export const Login: React.FC = () => {
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors font-medium"
           >
-            {loading ? 'Вход...' : 'Войти'}
+            Войти
           </button>
         </form>
 

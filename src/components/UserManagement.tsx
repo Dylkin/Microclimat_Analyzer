@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { User, UserRole } from '../types/database';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { User, UserRole } from '../types/User';
 import { 
   Users, 
   Plus, 
@@ -16,18 +15,16 @@ import {
 } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { users, addUser, updateUser, deleteUser } = useAuth();
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
+    fullName: '',
     email: '',
-    full_name: '',
-    role: 'specialist' as UserRole,
-    password: ''
+    password: '',
+    role: 'specialist' as UserRole
   });
-  const { user: currentUser } = useAuth();
+  const [error, setError] = useState('');
 
   const roleLabels = {
     administrator: 'Администратор',
@@ -47,133 +44,56 @@ export const UserManagement: React.FC = () => {
     specialist: 'bg-green-100 text-green-800'
   };
 
-  // Загрузка пользователей
-  const fetchUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (error) {
-      setError('Ошибка загрузки пользователей');
-      console.error(error);
-    } finally {
-      setLoading(false);
+  const handleAddUser = () => {
+    setError('');
+    
+    if (!formData.fullName || !formData.email || !formData.password) {
+      setError('Все поля обязательны для заполнения');
+      return;
     }
+
+    if (users.some(u => u.email === formData.email)) {
+      setError('Пользователь с таким email уже существует');
+      return;
+    }
+
+    addUser(formData);
+    setShowAddForm(false);
+    setFormData({ fullName: '', email: '', password: '', role: 'specialist' });
   };
 
-  // Создание пользователя
-  const createUser = async () => {
-    try {
-      setError('');
-      
-      // Проверка на единственность руководителя
-      if (formData.role === 'manager') {
-        const existingManager = users.find(u => u.role === 'manager');
-        if (existingManager) {
-          setError('Роль руководителя может быть присвоена только одному сотруднику');
-          return;
-        }
-      }
-
-      // Создание пользователя в auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: formData.email,
-        password: formData.password,
-        email_confirm: true
-      });
-
-      if (authError) throw authError;
-
-      // Создание профиля пользователя
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
-          email: formData.email,
-          full_name: formData.full_name,
-          role: formData.role
-        });
-
-      if (profileError) throw profileError;
-
-      setShowAddForm(false);
-      setFormData({ email: '', full_name: '', role: 'specialist', password: '' });
-      fetchUsers();
-    } catch (error: any) {
-      setError(error.message || 'Ошибка создания пользователя');
-    }
-  };
-
-  // Обновление пользователя
-  const updateUser = async () => {
+  const handleUpdateUser = () => {
     if (!editingUser) return;
-
-    try {
-      setError('');
-
-      // Проверка на единственность руководителя
-      if (editingUser.role === 'manager') {
-        const existingManager = users.find(u => u.role === 'manager' && u.id !== editingUser.id);
-        if (existingManager) {
-          setError('Роль руководителя может быть присвоена только одному сотруднику');
-          return;
-        }
-      }
-
-      const { error } = await supabase
-        .from('users')
-        .update({
-          full_name: editingUser.full_name,
-          role: editingUser.role
-        })
-        .eq('id', editingUser.id);
-
-      if (error) throw error;
-
-      setEditingUser(null);
-      fetchUsers();
-    } catch (error: any) {
-      setError(error.message || 'Ошибка обновления пользователя');
+    
+    setError('');
+    
+    if (!editingUser.fullName || !editingUser.email) {
+      setError('ФИО и email обязательны для заполнения');
+      return;
     }
+
+    updateUser(editingUser.id, editingUser);
+    setEditingUser(null);
   };
 
-  // Удаление пользователя
-  const deleteUser = async (userId: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) return;
-
-    try {
-      // Удаление из auth (каскадно удалится из users)
-      const { error } = await supabase.auth.admin.deleteUser(userId);
-      if (error) throw error;
-
-      fetchUsers();
-    } catch (error: any) {
-      setError(error.message || 'Ошибка удаления пользователя');
+  const handleDeleteUser = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (user?.isDefault) {
+      setError('Нельзя удалить пользователя по умолчанию');
+      return;
+    }
+    
+    if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
+      deleteUser(userId);
     }
   };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Users className="w-8 h-8 text-indigo-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Управление пользователями</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Справочник пользователей</h1>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
@@ -188,6 +108,9 @@ export const UserManagement: React.FC = () => {
         <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-4 rounded-lg">
           <AlertCircle className="w-5 h-5" />
           <span>{error}</span>
+          <button onClick={() => setError('')} className="ml-auto">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -196,6 +119,16 @@ export const UserManagement: React.FC = () => {
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold mb-4">Добавить нового пользователя</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">ФИО</label>
+              <input
+                type="text"
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                required
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
@@ -207,11 +140,11 @@ export const UserManagement: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ФИО</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
               <input
-                type="text"
-                value={formData.full_name}
-                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 required
               />
@@ -228,16 +161,6 @@ export const UserManagement: React.FC = () => {
                 <option value="administrator">Администратор</option>
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                required
-              />
-            </div>
           </div>
           <div className="flex justify-end space-x-3 mt-4">
             <button
@@ -247,7 +170,7 @@ export const UserManagement: React.FC = () => {
               Отмена
             </button>
             <button
-              onClick={createUser}
+              onClick={handleAddUser}
               className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
             >
               <Save className="w-4 h-4" />
@@ -263,16 +186,13 @@ export const UserManagement: React.FC = () => {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Пользователь
+                ФИО
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Email
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Роль
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Создан
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Действия
@@ -288,16 +208,32 @@ export const UserManagement: React.FC = () => {
                     {editingUser?.id === user.id ? (
                       <input
                         type="text"
-                        value={editingUser.full_name}
-                        onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                        value={editingUser.fullName}
+                        onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     ) : (
-                      <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
+                      <div className="flex items-center">
+                        <div className="text-sm font-medium text-gray-900">{user.fullName}</div>
+                        {user.isDefault && (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                            По умолчанию
+                          </span>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{user.email}</div>
+                    {editingUser?.id === user.id ? (
+                      <input
+                        type="email"
+                        value={editingUser.email}
+                        onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-500">{user.email}</div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingUser?.id === user.id ? (
@@ -317,14 +253,11 @@ export const UserManagement: React.FC = () => {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.created_at).toLocaleDateString('ru-RU')}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     {editingUser?.id === user.id ? (
                       <div className="flex justify-end space-x-2">
                         <button
-                          onClick={updateUser}
+                          onClick={handleUpdateUser}
                           className="text-green-600 hover:text-green-900"
                         >
                           <Save className="w-4 h-4" />
@@ -344,9 +277,9 @@ export const UserManagement: React.FC = () => {
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        {user.id !== currentUser?.id && (
+                        {!user.isDefault && (
                           <button
-                            onClick={() => deleteUser(user.id)}
+                            onClick={() => handleDeleteUser(user.id)}
                             className="text-red-600 hover:text-red-900"
                           >
                             <Trash2 className="w-4 h-4" />

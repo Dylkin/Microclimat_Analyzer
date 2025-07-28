@@ -1,13 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  LogOut, 
-  Users, 
-  Upload, 
-  Search, 
-  Menu,
-  X
-} from 'lucide-react';
+import { LogOut, BarChart3, Users, Menu, X } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,34 +9,37 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) => {
-  const { user, signOut, hasPermission } = useAuth();
+  const { user, logout, hasAccess } = useAuth();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   const navigation = [
     {
-      name: 'Пользователи',
+      name: 'Microclimat Analyzer',
+      key: 'analyzer',
+      icon: BarChart3,
+      access: 'analyzer' as const
+    },
+    {
+      name: 'Справочник пользователей',
       key: 'users',
       icon: Users,
-      permission: 'users' as const
-    },
-    {
-      name: 'Загрузка файлов',
-      key: 'files',
-      icon: Upload,
-      permission: 'files' as const
-    },
-    {
-      name: 'Исследование файлов',
-      key: 'research',
-      icon: Search,
-      permission: 'research' as const
+      access: 'users' as const
     }
   ];
 
-  const availableNavigation = navigation.filter(item => hasPermission(item.permission));
+  const availableNavigation = navigation.filter(item => hasAccess(item.access));
 
-  const handleSignOut = async () => {
-    await signOut();
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'administrator': return 'Администратор';
+      case 'specialist': return 'Специалист';
+      case 'manager': return 'Руководитель';
+      default: return role;
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
   };
 
   return (
@@ -128,11 +124,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
             
             <div className="flex items-center space-x-4">
               <div className="text-sm text-gray-600">
-                <span className="font-medium">{user?.full_name}</span>
-                <span className="ml-2 text-gray-400">({user?.role})</span>
+                <span className="font-medium">{user?.fullName}</span>
+                <span className="ml-2 text-gray-400">({getRoleLabel(user?.role || '')})</span>
               </div>
               <button
-                onClick={handleSignOut}
+                onClick={handleLogout}
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
