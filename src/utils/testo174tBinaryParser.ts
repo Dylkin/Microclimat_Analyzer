@@ -143,92 +143,11 @@ export class Testo174TBinaryParser {
 
     // Если не удалось прочитать данные, используем известные значения
     if (measurements.length === 0) {
-      return this.generateKnownMeasurements();
+      console.warn('Не удалось прочитать данные измерений из файла');
+      return [];
     }
 
     return measurements;
-  }
-
-  /**
-   * Генерация известных измерений на основе предоставленных данных
-   */
-  private generateKnownMeasurements(): MeasurementRecord[] {
-    const measurements: MeasurementRecord[] = [];
-    const baseTimestamp = new Date('2025-06-04T09:00:00');
-    
-    // Известные первые 21 записи
-    const knownData = [
-      20.7, // 1: 09:00:00
-      20.7, // 2: 09:01:00
-      20.7, // 3: 09:02:00
-      20.8, // 4: 09:03:00
-      20.8, // 5: 09:04:00
-      20.8, // 6: 09:05:00
-      20.8, // 7: 09:06:00
-      20.8, // 8: 09:07:00
-      20.8, // 9: 09:08:00
-      20.8, // 10: 09:09:00
-      20.8, // 11: 09:10:00
-      20.9, // 12: 09:11:00
-      20.9, // 13: 09:12:00
-      20.9, // 14: 09:13:00
-      20.9, // 15: 09:14:00
-      20.9, // 16: 09:15:00
-      20.9, // 17: 09:16:00
-      21.0, // 18: 09:17:00
-      21.0, // 19: 09:18:00
-      21.0, // 20: 09:19:00
-      21.0  // 21: 09:20:00
-    ];
-
-    // Создаем известные записи
-    knownData.forEach((temperature, index) => {
-      const timestamp = new Date(baseTimestamp.getTime() + index * 1 * 60 * 1000);
-      measurements.push({
-        timestamp,
-        temperature,
-        isValid: true,
-        validationErrors: []
-      });
-    });
-
-    // Генерируем остальные записи до 16000 (общее количество)
-    for (let i = knownData.length; i < 16000; i++) {
-      const timestamp = new Date(baseTimestamp.getTime() + i * 1 * 60 * 1000);
-      
-      // Генерируем реалистичные значения на основе статистики
-      const temperature = this.generateRealisticTemperature(i);
-      
-      measurements.push({
-        timestamp,
-        temperature,
-        isValid: true,
-        validationErrors: []
-      });
-    }
-
-    return measurements;
-  }
-
-  /**
-   * Генерация реалистичной температуры для одноканального логгера
-   */
-  private generateRealisticTemperature(index: number): number {
-    // Статистика: мин 13.3°C, макс 24.3°C, среднее 18.306°C
-    const min = 13.3;
-    const max = 24.3;
-    const avg = 18.306;
-    
-    // Суточные колебания (период ~1440 записей = 24 часа при интервале 1 минута)
-    const dailyCycle = Math.sin((index / 1440) * 2 * Math.PI) * 3; // Амплитуда 3°C
-    
-    // Случайные вариации
-    const randomVariation = (Math.random() - 0.5) * 1.5; // ±0.75°C случайная вариация
-    
-    let temperature = avg + dailyCycle + randomVariation;
-    temperature = Math.max(min, Math.min(max, temperature));
-    
-    return Math.round(temperature * 10) / 10;
   }
 
   /**
