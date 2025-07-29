@@ -9,6 +9,7 @@ import './index.css';
 const AppContent: React.FC = () => {
   const { user, hasAccess } = useAuth();
   const [currentPage, setCurrentPage] = useState('analyzer');
+  const [showVisualization, setShowVisualization] = useState(false);
 
   React.useEffect(() => {
     if (!user) return;
@@ -34,11 +35,19 @@ const AppContent: React.FC = () => {
   const renderPage = () => {
     switch (currentPage) {
       case 'analyzer':
-        return hasAccess('analyzer') ? <MicroclimatAnalyzer /> : <div>Доступ запрещен</div>;
+        return hasAccess('analyzer') ? (
+          <MicroclimatAnalyzer 
+            showVisualization={showVisualization}
+            onShowVisualization={setShowVisualization}
+          />
+        ) : <div>Доступ запрещен</div>;
       case 'users':
         return hasAccess('users') ? <UserManagement /> : <div>Доступ запрещен</div>;
       default:
-        return <MicroclimatAnalyzer />;
+        return <MicroclimatAnalyzer 
+          showVisualization={showVisualization}
+          onShowVisualization={setShowVisualization}
+        />;
     }
   };
 

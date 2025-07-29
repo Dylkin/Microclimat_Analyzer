@@ -4,8 +4,17 @@ import { UploadedFile } from '../types/FileData';
 import { databaseService } from '../utils/database';
 import { Testo174HBinaryParser } from '../utils/testo174hBinaryParser';
 import { Testo174TBinaryParser } from '../utils/testo174tBinaryParser';
+import { DataVisualization } from './DataVisualization';
 
-export const MicroclimatAnalyzer: React.FC = () => {
+interface MicroclimatAnalyzerProps {
+  showVisualization?: boolean;
+  onShowVisualization?: (show: boolean) => void;
+}
+
+export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({ 
+  showVisualization = false, 
+  onShowVisualization 
+}) => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [editingField, setEditingField] = React.useState<{ fileId: string; field: 'zoneNumber' | 'measurementLevel' } | null>(null);
@@ -165,10 +174,18 @@ export const MicroclimatAnalyzer: React.FC = () => {
       return;
     }
     
-    // Здесь будет логика отображения графиков
-    console.log('Исследование данных для файлов:', completedFiles);
-    alert(`Исследование данных для ${completedFiles.length} файлов (функция в разработке)`);
+    onShowVisualization?.(true);
   };
+
+  // Если показываем визуализацию, рендерим компонент визуализации
+  if (showVisualization) {
+    return (
+      <DataVisualization 
+        files={uploadedFiles.filter(f => f.parsingStatus === 'completed')}
+        onBack={() => onShowVisualization?.(false)}
+      />
+    );
+  }
 
   const getStatusIcon = (status: UploadedFile['parsingStatus']) => {
     switch (status) {
