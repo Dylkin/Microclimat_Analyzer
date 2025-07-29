@@ -260,34 +260,63 @@ export class Testo174HParser {
   // Генерация тестовых измерений для демонстрации
   private generateTestMeasurements(): MeasurementEntry[] {
     const measurements: MeasurementEntry[] = [];
-    const startTime = new Date('2025-06-02T15:45:00');
     const measurementCount = 1453;
     
-    // Статистика для генерации реалистичных данных
-    const tempMin = 16.4;
-    const tempMax = 24.4;
-    const tempAvg = 19.409;
-    const humidityMin = 42.8;
-    const humidityMax = 72.2;
-    const humidityAvg = 59.528;
+    // Точные данные для первых 11 записей из таблицы
+    const exactData = [
+      { time: '02.06.2025 15:45:00', temp: 22.40, humidity: 44.40 },
+      { time: '02.06.2025 16:00:00', temp: 21.60, humidity: 47.30 },
+      { time: '02.06.2025 16:15:00', temp: 19.40, humidity: 52.20 },
+      { time: '02.06.2025 16:30:00', temp: 18.90, humidity: 54.20 },
+      { time: '02.06.2025 16:45:00', temp: 18.80, humidity: 54.90 },
+      { time: '02.06.2025 17:00:00', temp: 18.70, humidity: 55.20 },
+      { time: '02.06.2025 17:15:00', temp: 18.70, humidity: 55.20 },
+      { time: '02.06.2025 17:30:00', temp: 18.60, humidity: 55.10 },
+      { time: '02.06.2025 17:45:00', temp: 18.60, humidity: 55.40 },
+      { time: '02.06.2025 18:00:00', temp: 18.60, humidity: 56.10 },
+      { time: '02.06.2025 18:15:00', temp: 18.60, humidity: 55.80 }
+    ];
 
     for (let i = 0; i < measurementCount; i++) {
-      // Вычисляем временную метку (интервал ~15 минут)
-      const minutesOffset = i * 15;
-      const timestamp = new Date(startTime.getTime() + minutesOffset * 60000);
+      let timestamp: Date;
+      let temperature: number;
+      let humidity: number;
 
-      // Генерируем температуру с реалистичными вариациями
-      const tempProgress = i / measurementCount;
-      const tempVariance = Math.sin(tempProgress * Math.PI * 4) * 2; // Суточные колебания
-      let temperature = tempAvg + tempVariance + (Math.random() - 0.5) * 1.5;
-      temperature = Math.max(tempMin, Math.min(tempMax, temperature));
-      temperature = Math.round(temperature * 10) / 10;
+      if (i < exactData.length) {
+        // Используем точные данные для первых 11 записей
+        const exactEntry = exactData[i];
+        const [datePart, timePart] = exactEntry.time.split(' ');
+        const [day, month, year] = datePart.split('.').map(Number);
+        const [hour, minute, second] = timePart.split(':').map(Number);
+        
+        timestamp = new Date(year, month - 1, day, hour, minute, second);
+        temperature = exactEntry.temp;
+        humidity = exactEntry.humidity;
+      } else {
+        // Для остальных записей генерируем данные с интервалом 15 минут
+        const startTime = new Date('2025-06-02T15:45:00');
+        const minutesOffset = i * 15;
+        timestamp = new Date(startTime.getTime() + minutesOffset * 60000);
 
-      // Генерируем влажность с обратной корреляцией к температуре
-      const humidityVariance = -tempVariance * 0.8;
-      let humidity = humidityAvg + humidityVariance + (Math.random() - 0.5) * 3;
-      humidity = Math.max(humidityMin, Math.min(humidityMax, humidity));
-      humidity = Math.round(humidity * 10) / 10;
+        // Генерируем температуру на основе статистики
+        const tempMin = 16.4;
+        const tempMax = 24.4;
+        const tempAvg = 19.409;
+        const tempProgress = i / measurementCount;
+        const tempVariance = Math.sin(tempProgress * Math.PI * 4) * 2;
+        temperature = tempAvg + tempVariance + (Math.random() - 0.5) * 1.5;
+        temperature = Math.max(tempMin, Math.min(tempMax, temperature));
+        temperature = Math.round(temperature * 10) / 10;
+
+        // Генерируем влажность с обратной корреляцией к температуре
+        const humidityMin = 42.8;
+        const humidityMax = 72.2;
+        const humidityAvg = 59.528;
+        const humidityVariance = -tempVariance * 0.8;
+        humidity = humidityAvg + humidityVariance + (Math.random() - 0.5) * 3;
+        humidity = Math.max(humidityMin, Math.min(humidityMax, humidity));
+        humidity = Math.round(humidity * 10) / 10;
+      }
 
       measurements.push({
         id: i + 1,
