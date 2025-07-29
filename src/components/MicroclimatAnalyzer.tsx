@@ -4,11 +4,13 @@ import { UploadedFile } from '../types/FileData';
 import { databaseService } from '../utils/database';
 import { CSVExporter } from '../utils/csvExporter';
 import { Testo174HParsingService } from '../utils/testo174hBinaryParser';
+import { Testo174TParsingService } from '../utils/testo174tBinaryParser';
 
 export const MicroclimatAnalyzer: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const parsingService = React.useMemo(() => new Testo174HParsingService(), []);
+  const singleChannelParsingService = React.useMemo(() => new Testo174TParsingService(), []);
 
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
@@ -52,7 +54,16 @@ export const MicroclimatAnalyzer: React.FC = () => {
       try {
         // Реальный парсинг файла
         console.log(`Парсинг файла: ${file.name}`);
-        const parsedData = await parsingService.parseFile(file);
+        
+        // Определяем тип логгера по имени файла
+        let parsedData;
+        if (fileName.includes('DL-019') || fileName.includes('174T')) {
+          // Одноканальный логгер
+          parsedData = await singleChannelParsingService.parseFile(file);
+        } else {
+          // Двухканальный логгер (по умолчанию)
+          parsedData = await parsingService.parseFile(file);
+        }
         
         // Сохраняем в базу данных
         await databaseService.saveParsedFileData(parsedData, fileRecord.id);
