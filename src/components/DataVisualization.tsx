@@ -367,38 +367,39 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
                   </div>
                 </div>
               )}
-              </div>
             </div>
           )}
           
-          {/* График температуры */}
           {!isLoading && (
-            <InteractiveChart
-              data={getTemperatureData()}
-              title="Температура"
-              unit="°C"
-              color="#ef4444"
-              limits={temperatureLimits}
-              markers={temperatureLines}
-              onAddMarker={handleAddTemperatureMarker}
-              onUpdateMarker={handleUpdateTemperatureMarker}
-              onRemoveMarker={handleRemoveTemperatureMarker}
-            />
-          )}
+            <>
+              {/* График температуры */}
+              <InteractiveChart
+                data={getTemperatureData()}
+                title="Температура"
+                unit="°C"
+                color="#ef4444"
+                limits={temperatureLimits}
+                markers={temperatureLines}
+                onAddMarker={handleAddTemperatureMarker}
+                onUpdateMarker={handleUpdateTemperatureMarker}
+                onRemoveMarker={handleRemoveTemperatureMarker}
+              />
 
-          {/* График влажности */}
-          {!isLoading && getHumidityData().length > 0 && (
-            <InteractiveChart
-              data={getHumidityData()}
-              title="Влажность"
-              unit="%"
-              color="#3b82f6"
-              limits={humidityLimits}
-              markers={humidityLines}
-              onAddMarker={handleAddHumidityMarker}
-              onUpdateMarker={handleUpdateHumidityMarker}
-              onRemoveMarker={handleRemoveHumidityMarker}
-            />
+              {/* График влажности */}
+              {getHumidityData().length > 0 && (
+                <InteractiveChart
+                  data={getHumidityData()}
+                  title="Влажность"
+                  unit="%"
+                  color="#3b82f6"
+                  limits={humidityLimits}
+                  markers={humidityLines}
+                  onAddMarker={handleAddHumidityMarker}
+                  onUpdateMarker={handleUpdateHumidityMarker}
+                  onRemoveMarker={handleRemoveHumidityMarker}
+                />
+              )}
+            </>
           )}
         </div>
 
