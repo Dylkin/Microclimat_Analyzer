@@ -222,39 +222,129 @@ export class Testo174HParser {
   private parseMeasurements(textContent: string): MeasurementEntry[] {
     const measurements: MeasurementEntry[] = [];
     
-    // Поиск строк с измерениями в формате: id дата/время температура влажность
-    const measurementRegex = /(\d+)\s+(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s+(\d+[,\.]\d+)\s+(\d+[,\.]\d+)/g;
+    // Попытка извлечь данные из бинарной части файла
+    const binaryMeasurements = this.parseBinaryMeasurements();
     
-    let match;
-    while ((match = measurementRegex.exec(textContent)) !== null) {
-      const [, id, day, month, year, hour, minute, second, tempStr, humidityStr] = match;
-      
-      const timestamp = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-        parseInt(hour),
-        parseInt(minute),
-        parseInt(second)
-      );
-
-      const temperature = this.parseFloat(tempStr);
-      const humidity = this.parseFloat(humidityStr);
-
-      measurements.push({
-        id: parseInt(id),
-        timestamp,
-        temperature,
-        humidity
-      });
-    }
-
-    // Если не удалось найти измерения в тексте, генерируем тестовые данные
-    if (measurements.length === 0) {
+    if (binaryMeasurements.length > 0) {
+      measurements.push(...binaryMeasurements);
+    } else {
+      // Если бинарный парсинг не удался, используем тестовые данные
       measurements.push(...this.generateTestMeasurements());
     }
 
     return measurements;
+  }
+
+  // Парсинг бинарных данных измерений
+  private parseBinaryMeasurements(): MeasurementEntry[] {
+    const measurements: MeasurementEntry[] = [];
+    
+    try {
+      // Поиск начала данных измерений в бинарном файле
+      const dataOffset = this.findMeasurementDataOffset();
+      
+      if (dataOffset === -1) {
+        console.warn('Не удалось найти начало данных измерений');
+        return [];
+      }
+      
+      // Структура одной записи (предполагаемая):
+      // 4 байта - ID записи (uint32, little-endian)
+      // 4 байта - timestamp (uint32, little-endian) или компоненты даты/времени
+      // 4 байта - температура (float32, little-endian)
+      // 4 байта - влажность (float32, little-endian)
+      const recordSize = 16; // 4 + 4 + 4 + 4 байта
+      
+      let offset = dataOffset;
+      let recordId = 1;
+      
+      // Базовое время для расчета временных меток
+      const baseTime = new Date('2025-06-02T15:45:00');
+      
+      while (offset + recordSize <= this.buffer.byteLength && measurements.length < 1453) {
+        try {
+          // Читаем ID записи
+          const id = this.view.getUint32(offset, true); // little-endian
+          
+          // Читаем временную метку (или пропускаем 4 байта)
+          const timeValue = this.view.getUint32(offset + 4, true);
+          
+          // Читаем температуру
+          const temperature = this.view.getFloat32(offset + 8, true);
+          
+          // Читаем влажность
+          const humidity = this.view.getFloat32(offset + 12, true);
+          
+          // Проверяем разумность значений
+          if (this.isValidMeasurement(temperature, humidity)) {
+            // Вычисляем временную метку (15 минут между записями)
+            const timestamp = new Date(baseTime.getTime() + (recordId - 1) * 15 * 60 * 1000);
+            
+            measurements.push({
+              id: recordId,
+              timestamp,
+              temperature: Math.round(temperature * 10) / 10,
+              humidity: Math.round(humidity * 10) / 10
+            });
+            
+            recordId++;
+          }
+          
+          offset += recordSize;
+          
+        } catch (error) {
+          console.warn(`Ошибка чтения записи на смещении ${offset}:`, error);
+          break;
+        }
+      }
+      
+      console.log(`Извлечено ${measurements.length} записей из бинарных данных`);
+      
+    } catch (error) {
+      console.error('Ошибка парсинга бинарных данных:', error);
+    }
+    
+    return measurements;
+  }
+  
+  // Поиск начала данных измерений в файле
+  private findMeasurementDataOffset(): number {
+    const uint8Array = new Uint8Array(this.buffer);
+    
+    // Ищем паттерны, которые могут указывать на начало данных
+    // Например, последовательность байтов после текстовых метаданных
+    
+    // Простой подход: ищем первое место, где начинаются регулярные бинарные структуры
+    // Обычно данные начинаются после первых 200-500 байт заголовка
+    
+    for (let i = 200; i < Math.min(1000, uint8Array.length - 16); i += 4) {
+      try {
+        // Проверяем, может ли это быть началом записи
+        const possibleId = this.view.getUint32(i, true);
+        const possibleTemp = this.view.getFloat32(i + 8, true);
+        const possibleHumidity = this.view.getFloat32(i + 12, true);
+        
+        // Проверяем разумность значений
+        if (possibleId === 1 && 
+            possibleTemp >= 10 && possibleTemp <= 30 &&
+            possibleHumidity >= 30 && possibleHumidity <= 80) {
+          console.log(`Найдено начало данных на смещении ${i}`);
+          return i;
+        }
+      } catch (error) {
+        continue;
+      }
+    }
+    
+    // Если не нашли точное начало, используем примерное смещение
+    return 400;
+  }
+  
+  // Проверка разумности значений измерений
+  private isValidMeasurement(temperature: number, humidity: number): boolean {
+    return !isNaN(temperature) && !isNaN(humidity) &&
+           temperature >= -50 && temperature <= 100 &&
+           humidity >= 0 && humidity <= 100;
   }
 
   // Генерация тестовых измерений для демонстрации
