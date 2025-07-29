@@ -1,34 +1,16 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
-  Legend,
-  TimeScale,
-  ChartOptions,
-  Plugin
-} from 'chart.js';
-import zoomPlugin from 'chartjs-plugin-zoom';
-import { Line } from 'react-chartjs-2';
-import 'chartjs-adapter-date-fns';
-import { ru } from 'date-fns/locale';
+  ResponsiveContainer,
+  ReferenceLine,
+  Brush
+} from 'recharts';
 import { Clock, RotateCcw } from 'lucide-react';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  TimeScale,
-  zoomPlugin
-);
 
 interface ChartData {
   timestamp: number;
@@ -71,194 +53,95 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
   onUpdateLineComment,
   onRemoveLine
 }) => {
-  const chartRef = useRef<ChartJS<'line'>>(null);
-  const [isZoomed, setIsZoomed] = useState(false);
+  const [zoomDomain, setZoomDomain] = useState<[number, number] | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [editingComment, setEditingComment] = useState<string | null>(null);
+  const chartRef = useRef<any>(null);
 
-  // Плагин для вертикальных линий
-  const verticalLinesPlugin: Plugin<'line'> = {
-    id: 'verticalLines',
-    afterDraw: (chart) => {
-      const ctx = chart.ctx;
-      const chartArea = chart.chartArea;
-      
-      lines.forEach(line => {
-        const xScale = chart.scales.x;
-        const x = xScale.getPixelForValue(line.timestamp);
-        
-        if (x >= chartArea.left && x <= chartArea.right) {
-          // Рисуем вертикальную линию
-          ctx.save();
-          ctx.strokeStyle = '#8b5cf6';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([]);
-          ctx.beginPath();
-          ctx.moveTo(x, chartArea.top);
-          ctx.lineTo(x, chartArea.bottom);
-          ctx.stroke();
-          
-          // Рисуем кружок для удаления
-          ctx.fillStyle = '#8b5cf6';
-          ctx.beginPath();
-          ctx.arc(x, chartArea.top + 10, 4, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.restore();
-        }
-      });
+  // Подготовка данных для Recharts
+  const chartData = data.map(d => ({
+    timestamp: d.timestamp,
+    value: d.value,
+    formattedTime: new Date(d.timestamp).toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }));
+
+  // Обработка выбора области для зума
+  const handleMouseDown = useCallback((e: any) => {
+    if (e && e.activeLabel) {
+      setIsSelecting(true);
+      setSelectionStart(e.activeLabel);
     }
-  };
+  }, []);
 
-  // Плагин для лимитов
-  const limitsPlugin: Plugin<'line'> = {
-    id: 'limits',
-    afterDraw: (chart) => {
-      const ctx = chart.ctx;
-      const chartArea = chart.chartArea;
-      const yScale = chart.scales.y;
-      
-      ctx.save();
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      
-      if (limits.min !== null) {
-        const y = yScale.getPixelForValue(limits.min);
-        ctx.beginPath();
-        ctx.moveTo(chartArea.left, y);
-        ctx.lineTo(chartArea.right, y);
-        ctx.stroke();
-      }
-      
-      if (limits.max !== null) {
-        const y = yScale.getPixelForValue(limits.max);
-        ctx.beginPath();
-        ctx.moveTo(chartArea.left, y);
-        ctx.lineTo(chartArea.right, y);
-        ctx.stroke();
-      }
-      
-      ctx.restore();
+  const handleMouseMove = useCallback((e: any) => {
+    if (isSelecting && selectionStart && e && e.activeLabel) {
+      // Визуальная обратная связь при выделении
     }
-  };
+  }, [isSelecting, selectionStart]);
 
-  const chartData = {
-    datasets: [
-      {
-        label: title,
-        data: data.map(d => ({ x: d.timestamp, y: d.value })),
-        borderColor: color,
-        backgroundColor: color + '20',
-        borderWidth: 2,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        tension: 0.1,
-      }
-    ]
-  };
-
-  const options: ChartOptions<'line'> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      intersect: false,
-      mode: 'index'
-    },
-    plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        callbacks: {
-          title: (context) => {
-            const date = new Date(context[0].parsed.x);
-            return date.toLocaleString('ru-RU');
-          },
-          label: (context) => {
-            return `${title}: ${context.parsed.y.toFixed(1)} ${unit}`;
-          }
-        }
-      },
-      zoom: {
-        pan: {
-          enabled: true,
-          mode: 'x'
-        },
-        zoom: {
-          wheel: {
-            enabled: true
-          },
-          pinch: {
-            enabled: true
-          },
-          mode: 'x',
-          onZoomComplete: () => {
-            setIsZoomed(true);
-          }
-        }
-      }
-    },
-    scales: {
-      x: {
-        type: 'time',
-        time: {
-          displayFormats: {
-            minute: 'dd.MM HH:mm',
-            hour: 'dd.MM HH:mm',
-            day: 'dd.MM'
-          }
-        },
-        adapters: {
-          date: {
-            locale: ru
-          }
-        },
-        title: {
-          display: true,
-          text: 'Время'
-        }
-      },
-      y: {
-        title: {
-          display: true,
-          text: `${title} (${unit})`
-        },
-        beginAtZero: false
-      }
-    },
-    onDoubleClick: (event, elements, chart) => {
-      const canvasPosition = ChartJS.helpers.getRelativePosition(event, chart);
-      const dataX = chart.scales.x.getValueForPixel(canvasPosition.x);
-      if (dataX) {
-        onAddLine(dataX);
-      }
-    },
-    onClick: (event, elements, chart) => {
-      // Проверяем клик по кружкам вертикальных линий
-      const canvasPosition = ChartJS.helpers.getRelativePosition(event, chart);
-      const chartArea = chart.chartArea;
+  const handleMouseUp = useCallback((e: any) => {
+    if (isSelecting && selectionStart && e && e.activeLabel) {
+      const start = Math.min(selectionStart, e.activeLabel);
+      const end = Math.max(selectionStart, e.activeLabel);
       
-      lines.forEach(line => {
-        const x = chart.scales.x.getPixelForValue(line.timestamp);
-        const y = chartArea.top + 10;
-        
-        const distance = Math.sqrt(
-          Math.pow(canvasPosition.x - x, 2) + Math.pow(canvasPosition.y - y, 2)
-        );
-        
-        if (distance <= 6) {
-          onRemoveLine(line.id);
-        }
-      });
+      // Устанавливаем зум только если выделена достаточная область
+      if (Math.abs(end - start) > 60000) { // минимум 1 минута
+        setZoomDomain([start, end]);
+      }
     }
-  };
+    setIsSelecting(false);
+    setSelectionStart(null);
+  }, [isSelecting, selectionStart]);
 
+  // Обработка двойного клика для добавления вертикальной линии
+  const handleDoubleClick = useCallback((e: any) => {
+    if (e && e.activeLabel) {
+      onAddLine(e.activeLabel);
+    }
+  }, [onAddLine]);
+
+  // Сброс зума
   const resetZoom = () => {
-    if (chartRef.current) {
-      chartRef.current.resetZoom();
-      setIsZoomed(false);
-    }
+    setZoomDomain(null);
   };
 
+  // Форматирование времени для оси X
+  const formatXAxisLabel = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Кастомный тултип
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const date = new Date(label);
+      return (
+        <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+          <p className="text-sm font-medium">
+            {date.toLocaleString('ru-RU')}
+          </p>
+          <p className="text-sm text-blue-600">
+            {`${title}: ${payload[0].value.toFixed(1)} ${unit}`}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Расчет временных периодов
   const calculateTimePeriods = () => {
     if (lines.length < 2) return [];
     
@@ -290,15 +173,21 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
     return `${hours}ч ${minutes}м ${seconds}с`;
   };
 
+  // Определение домена для оси X
+  const xAxisDomain = zoomDomain || [
+    Math.min(...chartData.map(d => d.timestamp)),
+    Math.max(...chartData.map(d => d.timestamp))
+  ];
+
   return (
     <div className="space-y-4">
       {/* Управление графиком */}
       <div className="flex justify-between items-center">
         <div className="text-sm text-gray-600">
-          Двойной клик для добавления вертикальной линии. Клик по кружку для удаления.
+          Зажмите левую кнопку мыши и выделите область для увеличения. Двойной клик для добавления вертикальной линии.
         </div>
         <div className="flex space-x-2">
-          {isZoomed && (
+          {zoomDomain && (
             <button
               onClick={resetZoom}
               className="flex items-center space-x-1 text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 transition-colors"
@@ -307,20 +196,98 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
               <span>Сбросить масштаб</span>
             </button>
           )}
-          <div className="text-xs text-gray-500">
-            Колесо мыши для масштабирования
-          </div>
         </div>
       </div>
 
       {/* График */}
       <div className="h-80 bg-white border border-gray-200 rounded-lg p-4">
-        <Line
-          ref={chartRef}
-          data={chartData}
-          options={options}
-          plugins={[verticalLinesPlugin, limitsPlugin]}
-        />
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            ref={chartRef}
+            data={chartData}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onDoubleClick={handleDoubleClick}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis
+              dataKey="timestamp"
+              type="number"
+              scale="time"
+              domain={xAxisDomain}
+              tickFormatter={formatXAxisLabel}
+              stroke="#6b7280"
+              fontSize={12}
+            />
+            <YAxis
+              stroke="#6b7280"
+              fontSize={12}
+              label={{ 
+                value: `${title} (${unit})`, 
+                angle: -90, 
+                position: 'insideLeft',
+                style: { textAnchor: 'middle' }
+              }}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            
+            {/* Основная линия данных */}
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke={color}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4, stroke: color, strokeWidth: 2 }}
+            />
+
+            {/* Лимиты */}
+            {limits.min !== null && (
+              <ReferenceLine
+                y={limits.min}
+                stroke="#ef4444"
+                strokeDasharray="5 5"
+                strokeWidth={2}
+                label={{ value: `Мин: ${limits.min}${unit}`, position: 'topLeft' }}
+              />
+            )}
+            {limits.max !== null && (
+              <ReferenceLine
+                y={limits.max}
+                stroke="#ef4444"
+                strokeDasharray="5 5"
+                strokeWidth={2}
+                label={{ value: `Макс: ${limits.max}${unit}`, position: 'topLeft' }}
+              />
+            )}
+
+            {/* Вертикальные линии */}
+            {lines.map(line => (
+              <ReferenceLine
+                key={line.id}
+                x={line.timestamp}
+                stroke="#8b5cf6"
+                strokeWidth={2}
+                label={{
+                  value: line.comment || 'Метка',
+                  position: 'top',
+                  offset: 10
+                }}
+              />
+            ))}
+
+            {/* Brush для навигации */}
+            {!zoomDomain && (
+              <Brush
+                dataKey="timestamp"
+                height={30}
+                stroke={color}
+                tickFormatter={formatXAxisLabel}
+              />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Комментарии к линиям */}
@@ -351,6 +318,12 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
                     {line.comment || 'Нажмите для добавления комментария'}
                   </div>
                 )}
+                <button
+                  onClick={() => onRemoveLine(line.id)}
+                  className="text-red-500 hover:text-red-700 text-xs"
+                >
+                  ✕
+                </button>
               </div>
             ))}
           </div>
