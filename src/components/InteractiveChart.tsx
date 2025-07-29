@@ -8,8 +8,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ReferenceLine,
-  Brush
+  ReferenceLine
 } from 'recharts';
 import { X, MessageSquare, Clock } from 'lucide-react';
 
@@ -58,8 +57,12 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
 }) => {
   const [zoomDomain, setZoomDomain] = useState<[number, number] | null>(null);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
-  const [isSelecting, setIsSelecting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ x: number; timestamp: number } | null>(null);
+  const [dragEnd, setDragEnd] = useState<{ x: number; timestamp: number } | null>(null);
+  const [selectionBox, setSelectionBox] = useState<{ left: number; width: number } | null>(null);
   const chartRef = useRef<any>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   // Форматирование времени для отображения
   const formatTime = (timestamp: number) => {
@@ -87,25 +90,100 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
 
   // Обработка двойного клика для добавления маркера
   const handleChartDoubleClick = useCallback((event: any) => {
+    if (isDragging) return; // Не добавляем маркер во время перетаскивания
+    
     if (!event || !event.activeLabel) return;
     
     const timestamp = parseInt(event.activeLabel);
     if (!isNaN(timestamp)) {
       onAddMarker(timestamp);
     }
-  }, [onAddMarker]);
+  }, [onAddMarker, isDragging]);
 
-  // Обработка зума через Brush
-  const handleBrushChange = useCallback((brushData: any) => {
-    if (brushData && brushData.startIndex !== undefined && brushData.endIndex !== undefined) {
-      const startTimestamp = data[brushData.startIndex]?.timestamp;
-      const endTimestamp = data[brushData.endIndex]?.timestamp;
-      
-      if (startTimestamp && endTimestamp) {
-        setZoomDomain([startTimestamp, endTimestamp]);
-      }
+  // Обработка начала перетаскивания
+  const handleMouseDown = useCallback((event: React.MouseEvent) => {
+    if (event.detail === 2) return; // Игнорируем двойной клик
+    
+    const rect = chartContainerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const x = event.clientX - rect.left;
+    const chartWidth = rect.width - 60; // Учитываем отступы
+    const chartLeft = 40; // Левый отступ для оси Y
+    
+    if (x < chartLeft || x > chartLeft + chartWidth) return;
+    
+    // Вычисляем timestamp на основе позиции мыши
+    const relativeX = (x - chartLeft) / chartWidth;
+    const visibleData = getVisibleData();
+    
+    if (visibleData.length === 0) return;
+    
+    const minTimestamp = visibleData[0].timestamp;
+    const maxTimestamp = visibleData[visibleData.length - 1].timestamp;
+    const timestamp = minTimestamp + (maxTimestamp - minTimestamp) * relativeX;
+    
+    setIsDragging(true);
+    setDragStart({ x, timestamp });
+    setDragEnd(null);
+    setSelectionBox(null);
+  }, [getVisibleData]);
+  
+  // Обработка перемещения мыши
+  const handleMouseMove = useCallback((event: React.MouseEvent) => {
+    if (!isDragging || !dragStart) return;
+    
+    const rect = chartContainerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const x = event.clientX - rect.left;
+    const chartWidth = rect.width - 60;
+    const chartLeft = 40;
+    
+    if (x < chartLeft) return;
+    
+    const clampedX = Math.min(x, chartLeft + chartWidth);
+    
+    // Вычисляем timestamp для текущей позиции
+    const relativeX = (clampedX - chartLeft) / chartWidth;
+    const visibleData = getVisibleData();
+    
+    if (visibleData.length === 0) return;
+    
+    const minTimestamp = visibleData[0].timestamp;
+    const maxTimestamp = visibleData[visibleData.length - 1].timestamp;
+    const timestamp = minTimestamp + (maxTimestamp - minTimestamp) * relativeX;
+    
+    setDragEnd({ x: clampedX, timestamp });
+    
+    // Обновляем прямоугольник выделения
+    const left = Math.min(dragStart.x, clampedX);
+    const width = Math.abs(clampedX - dragStart.x);
+    setSelectionBox({ left, width });
+  }, [isDragging, dragStart, getVisibleData]);
+  
+  // Обработка окончания перетаскивания
+  const handleMouseUp = useCallback(() => {
+    if (!isDragging || !dragStart || !dragEnd) {
+      setIsDragging(false);
+      setDragStart(null);
+      setDragEnd(null);
+      setSelectionBox(null);
+      return;
     }
-  }, [data]);
+    
+    // Минимальная ширина для зума (10 пикселей)
+    if (Math.abs(dragEnd.x - dragStart.x) > 10) {
+      const startTimestamp = Math.min(dragStart.timestamp, dragEnd.timestamp);
+      const endTimestamp = Math.max(dragStart.timestamp, dragEnd.timestamp);
+      setZoomDomain([startTimestamp, endTimestamp]);
+    }
+    
+    setIsDragging(false);
+    setDragStart(null);
+    setDragEnd(null);
+    setSelectionBox(null);
+  }, [isDragging, dragStart, dragEnd]);
 
   // Сброс зума
   const resetZoom = () => {
@@ -208,13 +286,35 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
             </button>
           )}
           <div className="text-xs text-gray-500">
-            Двойной клик для добавления маркера
+            Перетащите мышью для увеличения области • Двойной клик для добавления маркера
           </div>
         </div>
       </div>
 
       {/* График */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div 
+        ref={chartContainerRef}
+        className="bg-white border border-gray-200 rounded-lg p-4 relative select-none"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        style={{ cursor: isDragging ? 'col-resize' : 'crosshair' }}
+      >
+        {/* Прямоугольник выделения */}
+        {selectionBox && (
+          <div
+            className="absolute bg-blue-200 bg-opacity-30 border border-blue-400 pointer-events-none"
+            style={{
+              left: selectionBox.left,
+              top: 60,
+              width: selectionBox.width,
+              height: 340,
+              zIndex: 10
+            }}
+          />
+        )}
+        
         <ResponsiveContainer width="100%" height={400}>
           <LineChart
             ref={chartRef}
@@ -298,37 +398,6 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
             />
           </LineChart>
         </ResponsiveContainer>
-
-        {/* Brush для зума */}
-        {!zoomDomain && data.length > 0 && (
-          <div className="mt-4">
-            <ResponsiveContainer width="100%" height={60}>
-              <LineChart data={data}>
-                <XAxis
-                  dataKey="timestamp"
-                  type="number"
-                  scale="time"
-                  tickFormatter={formatTime}
-                  tick={{ fontSize: 8 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke={color}
-                  strokeWidth={1}
-                  dot={false}
-                />
-                <Brush
-                  dataKey="timestamp"
-                  height={30}
-                  stroke={color}
-                  onChange={handleBrushChange}
-                  tickFormatter={formatTime}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
       </div>
 
       {/* Управление маркерами */}
