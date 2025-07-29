@@ -34,4 +34,7 @@ export interface UploadedFile {
   errorMessage?: string;
   recordCount?: number;
   period?: string;
+  zoneNumber?: number;
+  measurementLevel?: string;
+  order: number;
 }
