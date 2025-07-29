@@ -86,43 +86,64 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     
     console.log(`Загружаем данные из ${completedFiles.length} файлов...`);
     
-    // Обрабатываем файлы последовательно, а не параллельно
-    for (let i = 0; i < completedFiles.length; i++) {
-      const file = completedFiles[i];
-      console.log(`Обрабатываем файл ${i + 1}/${completedFiles.length}: ${file.name}`);
-      
-      try {
-        const measurements = await databaseService.getMeasurements(file.id);
-        if (measurements) {
-          console.log(`Получено ${measurements.length} измерений из файла ${file.name}`);
-          
-          const fileData = measurements.map(m => ({
-            timestamp: m.timestamp.getTime(),
-            temperature: m.temperature,
-            humidity: m.humidity,
-            fileId: file.id,
-            fileName: file.name,
-            formattedTime: m.timestamp.toLocaleString('ru-RU')
-          }));
-          allData.push(...fileData);
-        } else {
-          console.warn(`Нет данных для файла ${file.name}`);
+    try {
+      // Обрабатываем файлы последовательно с оптимизацией
+      for (let i = 0; i < completedFiles.length; i++) {
+        const file = completedFiles[i];
+        console.log(`Обрабатываем файл ${i + 1}/${completedFiles.length}: ${file.name}`);
+        
+        try {
+          const measurements = await databaseService.getMeasurements(file.id);
+          if (measurements && measurements.length > 0) {
+            console.log(`Получено ${measurements.length} измерений из файла ${file.name}`);
+            
+            // Оптимизируем данные сразу при загрузке
+            const step = Math.max(1, Math.floor(measurements.length / 5000)); // Максимум 5000 точек на файл
+            
+            const fileData = measurements
+              .filter((_, index) => index % step === 0)
+              .map(m => ({
+                timestamp: m.timestamp.getTime(),
+                temperature: m.temperature,
+                humidity: m.humidity,
+                fileId: file.id,
+                fileName: file.name,
+                formattedTime: m.timestamp.toLocaleString('ru-RU')
+              }));
+            
+            allData.push(...fileData);
+            console.log(`Добавлено ${fileData.length} оптимизированных точек из файла ${file.name}`);
+          } else {
+            console.warn(`Нет данных для файла ${file.name}`);
+          }
+        } catch (error) {
+          console.error(`Ошибка загрузки данных для файла ${file.name}:`, error);
         }
-      } catch (error) {
-        console.error(`Ошибка загрузки данных для файла ${file.name}:`, error);
+        
+        // Принудительное обновление состояния после каждого файла
+        if (allData.length > 0) {
+          const sortedData = [...allData].sort((a, b) => a.timestamp - b.timestamp);
+          setChartData(sortedData);
+        }
+        
+        // Небольшая пауза для обновления UI
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
-      
-      // Добавляем небольшую задержку между файлами для предотвращения блокировки UI
-      if (i < completedFiles.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
+    } catch (error) {
+      console.error('Общая ошибка загрузки данных:', error);
     }
     
     console.log(`Всего загружено ${allData.length} записей`);
     
     // Сортируем по времени
-    allData.sort((a, b) => a.timestamp - b.timestamp);
-    setChartData(allData);
+    if (allData.length > 0) {
+      const sortedData = allData.sort((a, b) => a.timestamp - b.timestamp);
+      setChartData(sortedData);
+      console.log('Данные успешно загружены и отсортированы');
+    } else {
+      console.warn('Не удалось загрузить данные ни из одного файла');
+      setChartData([]);
+    }
   };
 
   const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,11 +197,14 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
 
   // Подготовка данных для графиков
   const getTemperatureData = () => {
-    // Ограничиваем количество точек для производительности
-    const maxPoints = 10000;
-    const step = Math.max(1, Math.floor(chartData.length / maxPoints));
+    if (chartData.length === 0) {
+      console.log('Нет данных для температурного графика');
+      return [];
+    }
     
-    return chartData.filter((_, index) => index % step === 0).map(d => ({
+    console.log(`Подготовка температурных данных: ${chartData.length} записей`);
+    
+    return chartData.map(d => ({
       timestamp: d.timestamp,
       value: d.temperature,
       formattedTime: d.formattedTime,
@@ -190,22 +214,22 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
   };
 
   const getHumidityData = () => {
-    // Ограничиваем количество точек для производительности
-    const maxPoints = 10000;
-    const humidityData = chartData
-      .filter(d => d.humidity !== undefined)
+    const humidityData = chartData.filter(d => d.humidity !== undefined && d.humidity !== null);
     
-    const step = Math.max(1, Math.floor(humidityData.length / maxPoints));
+    if (humidityData.length === 0) {
+      console.log('Нет данных влажности для графика');
+      return [];
+    }
     
-    return humidityData
-      .filter((_, index) => index % step === 0)
-      .map(d => ({
-        timestamp: d.timestamp,
-        value: d.humidity!,
-        formattedTime: d.formattedTime,
-        fileId: d.fileId,
-        fileName: d.fileName
-      }));
+    console.log(`Подготовка данных влажности: ${humidityData.length} записей`);
+    
+    return humidityData.map(d => ({
+      timestamp: d.timestamp,
+      value: d.humidity!,
+      formattedTime: d.formattedTime,
+      fileId: d.fileId,
+      fileName: d.fileName
+    }));
   };
 
   const isFormValid = () => {
@@ -440,15 +464,12 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
         {/* Информация о данных */}
         <div className="mt-8 bg-gray-50 rounded-lg p-4">
           <h4 className="text-sm font-medium text-gray-700 mb-2">Информация о загруженных данных:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="font-medium">Количество файлов:</span> {files.filter(f => f.parsingStatus === 'completed').length}
             </div>
             <div>
-              <span className="font-medium">Общее количество записей:</span> {chartData.length.toLocaleString('ru-RU')}
-            </div>
-            <div>
-              <span className="font-medium">Отображаемых точек:</span> {Math.min(chartData.length, 10000).toLocaleString('ru-RU')}
+              <span className="font-medium">Записей на графике:</span> {chartData.length.toLocaleString('ru-RU')}
             </div>
             <div>
               <span className="font-medium">Период данных:</span> 
@@ -460,12 +481,19 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
               )}
             </div>
             <div>
-              <span className="font-medium">Масштаб:</span> 
+              <span className="font-medium">Статус:</span> 
               <span className="ml-1">
-                {isLoading ? 'Загрузка...' : 'Интерактивный'}
+                {isLoading ? 'Загрузка...' : (chartData.length > 0 ? 'Готов' : 'Нет данных')}
               </span>
             </div>
           </div>
+          {chartData.length === 0 && !isLoading && (
+            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                Данные не загружены. Проверьте, что файлы успешно обработаны и содержат корректные данные измерений.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Кнопка генерации отчета */}
