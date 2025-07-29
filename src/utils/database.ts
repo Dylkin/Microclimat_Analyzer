@@ -1,30 +1,86 @@
 import { ParsedFileData, DeviceMetadata, MeasurementRecord } from '../types/FileData';
 
-// Симуляция базы данных в localStorage
+// IndexedDB-based database service for handling large measurement datasets
 class DatabaseService {
-  private readonly METADATA_KEY = 'device_metadata';
-  private readonly MEASUREMENTS_KEY = 'measurements';
+  private readonly DB_NAME = 'MicroclimatDB';
+  private readonly DB_VERSION = 1;
+  private readonly METADATA_STORE = 'device_metadata';
+  private readonly MEASUREMENTS_STORE = 'measurements';
+  private readonly SUMMARIES_STORE = 'file_summaries';
   
-  // Сохранение метаданных устройства
+  private db: IDBDatabase | null = null;
+  
+  // Initialize IndexedDB
+  private async initDB(): Promise<IDBDatabase> {
+    if (this.db) {
+      return this.db;
+    }
+    
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+      
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve(this.db);
+      };
+      
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        
+        // Create object stores
+        if (!db.objectStoreNames.contains(this.METADATA_STORE)) {
+          db.createObjectStore(this.METADATA_STORE);
+        }
+        
+        if (!db.objectStoreNames.contains(this.MEASUREMENTS_STORE)) {
+          db.createObjectStore(this.MEASUREMENTS_STORE);
+        }
+        
+        if (!db.objectStoreNames.contains(this.SUMMARIES_STORE)) {
+          db.createObjectStore(this.SUMMARIES_STORE);
+        }
+      };
+    });
+  }
+  
+  // Helper method for IndexedDB operations
+  private async performDBOperation<T>(
+    storeName: string,
+    operation: (store: IDBObjectStore) => IDBRequest,
+    mode: IDBTransactionMode = 'readonly'
+  ): Promise<T> {
+    const db = await this.initDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([storeName], mode);
+      const store = transaction.objectStore(storeName);
+      const request = operation(store);
+      
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+  
+  // Сохранение метаданных устройства (остается в localStorage для быстрого доступа)
   async saveDeviceMetadata(metadata: DeviceMetadata, fileId: string): Promise<void> {
     try {
-      const existingData = this.getStoredData(this.METADATA_KEY);
+      const existingData = this.getStoredData('device_metadata');
       existingData[fileId] = {
         ...metadata,
         savedAt: new Date().toISOString()
       };
       
-      localStorage.setItem(this.METADATA_KEY, JSON.stringify(existingData));
+      localStorage.setItem('device_metadata', JSON.stringify(existingData));
     } catch (error) {
       throw new Error(`Ошибка сохранения метаданных: ${error}`);
     }
   }
   
-  // Сохранение измерений
+  // Сохранение измерений в IndexedDB
   async saveMeasurements(measurements: MeasurementRecord[], fileId: string): Promise<void> {
     try {
-      const existingData = this.getStoredData(this.MEASUREMENTS_KEY);
-      existingData[fileId] = {
+      const measurementData = {
         measurements: measurements.map(m => ({
           ...m,
           timestamp: m.timestamp.toISOString()
@@ -32,7 +88,11 @@ class DatabaseService {
         savedAt: new Date().toISOString()
       };
       
-      localStorage.setItem(this.MEASUREMENTS_KEY, JSON.stringify(existingData));
+      await this.performDBOperation(
+        this.MEASUREMENTS_STORE,
+        (store) => store.put(measurementData, fileId),
+        'readwrite'
+      );
     } catch (error) {
       throw new Error(`Ошибка сохранения измерений: ${error}`);
     }
@@ -44,7 +104,7 @@ class DatabaseService {
       await this.saveDeviceMetadata(parsedData.deviceMetadata, fileId);
       await this.saveMeasurements(parsedData.measurements, fileId);
       
-      // Сохранение сводной информации
+      // Сохранение сводной информации в localStorage
       const summaryKey = 'file_summaries';
       const summaries = this.getStoredData(summaryKey);
       summaries[fileId] = {
@@ -69,7 +129,7 @@ class DatabaseService {
   // Получение метаданных устройства
   async getDeviceMetadata(fileId: string): Promise<DeviceMetadata | null> {
     try {
-      const data = this.getStoredData(this.METADATA_KEY);
+      const data = this.getStoredData('device_metadata');
       return data[fileId] || null;
     } catch (error) {
       console.error('Ошибка получения метаданных:', error);
@@ -77,11 +137,13 @@ class DatabaseService {
     }
   }
   
-  // Получение измерений
+  // Получение измерений из IndexedDB
   async getMeasurements(fileId: string): Promise<MeasurementRecord[] | null> {
     try {
-      const data = this.getStoredData(this.MEASUREMENTS_KEY);
-      const fileData = data[fileId];
+      const fileData = await this.performDBOperation<any>(
+        this.MEASUREMENTS_STORE,
+        (store) => store.get(fileId)
+      );
       
       if (!fileData) return null;
       
@@ -120,17 +182,19 @@ class DatabaseService {
   // Удаление данных файла
   async deleteFileData(fileId: string): Promise<void> {
     try {
-      // Удаление метаданных
-      const metadata = this.getStoredData(this.METADATA_KEY);
+      // Удаление метаданных из localStorage
+      const metadata = this.getStoredData('device_metadata');
       delete metadata[fileId];
-      localStorage.setItem(this.METADATA_KEY, JSON.stringify(metadata));
+      localStorage.setItem('device_metadata', JSON.stringify(metadata));
       
-      // Удаление измерений
-      const measurements = this.getStoredData(this.MEASUREMENTS_KEY);
-      delete measurements[fileId];
-      localStorage.setItem(this.MEASUREMENTS_KEY, JSON.stringify(measurements));
+      // Удаление измерений из IndexedDB
+      await this.performDBOperation(
+        this.MEASUREMENTS_STORE,
+        (store) => store.delete(fileId),
+        'readwrite'
+      );
       
-      // Удаление сводки
+      // Удаление сводки из localStorage
       const summaries = this.getStoredData('file_summaries');
       delete summaries[fileId];
       localStorage.setItem('file_summaries', JSON.stringify(summaries));
