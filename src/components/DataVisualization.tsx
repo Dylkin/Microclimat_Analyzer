@@ -167,6 +167,9 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
         formattedTime: d.formattedTime,
         fileId: d.fileId,
         fileName: d.fileName
+      }));
+  };
+
   const isFormValid = () => {
     return researchInfo.reportNumber && 
            researchInfo.reportDate && 
