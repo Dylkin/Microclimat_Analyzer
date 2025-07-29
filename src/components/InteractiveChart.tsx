@@ -64,6 +64,58 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
   const chartRef = useRef<any>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
+  // Получение видимых данных
+  const getVisibleData = useCallback(() => {
+    if (!zoomDomain) return data;
+    
+    return data.filter(d => 
+      d.timestamp >= zoomDomain[0] && d.timestamp <= zoomDomain[1]
+    );
+  }, [data, zoomDomain]);
+
+  // Получение видимых маркеров
+  const getVisibleMarkers = useCallback(() => {
+    if (!zoomDomain) return markers;
+    
+    return markers.filter(m => 
+      m.timestamp >= zoomDomain[0] && m.timestamp <= zoomDomain[1]
+    );
+  }, [markers, zoomDomain]);
+
+  // Вычисление временных периодов между маркерами
+  const calculateTimePeriods = useCallback(() => {
+    const visibleMarkers = getVisibleMarkers();
+    if (visibleMarkers.length < 2) return [];
+    
+    const sortedMarkers = [...visibleMarkers].sort((a, b) => a.timestamp - b.timestamp);
+    const periods = [];
+    
+    for (let i = 0; i < sortedMarkers.length - 1; i++) {
+      const start = new Date(sortedMarkers[i].timestamp);
+      const end = new Date(sortedMarkers[i + 1].timestamp);
+      const duration = end.getTime() - start.getTime();
+      
+      periods.push({
+        start: start.toLocaleString('ru-RU'),
+        end: end.toLocaleString('ru-RU'),
+        duration: formatDuration(duration),
+        startComment: sortedMarkers[i].comment,
+        endComment: sortedMarkers[i + 1].comment
+      });
+    }
+    
+    return periods;
+  }, [getVisibleMarkers]);
+
+  // Форматирование длительности
+  const formatDuration = (milliseconds: number) => {
+    const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+    
+    return `${hours}ч ${minutes}м ${seconds}с`;
+  };
+
   // Форматирование времени для отображения
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -188,58 +240,6 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
   // Сброс зума
   const resetZoom = () => {
     setZoomDomain(null);
-  };
-
-  // Получение видимых данных
-  const getVisibleData = () => {
-    if (!zoomDomain) return data;
-    
-    return data.filter(d => 
-      d.timestamp >= zoomDomain[0] && d.timestamp <= zoomDomain[1]
-    );
-  };
-
-  // Получение видимых маркеров
-  const getVisibleMarkers = () => {
-    if (!zoomDomain) return markers;
-    
-    return markers.filter(m => 
-      m.timestamp >= zoomDomain[0] && m.timestamp <= zoomDomain[1]
-    );
-  };
-
-  // Вычисление временных периодов между маркерами
-  const calculateTimePeriods = () => {
-    const visibleMarkers = getVisibleMarkers();
-    if (visibleMarkers.length < 2) return [];
-    
-    const sortedMarkers = [...visibleMarkers].sort((a, b) => a.timestamp - b.timestamp);
-    const periods = [];
-    
-    for (let i = 0; i < sortedMarkers.length - 1; i++) {
-      const start = new Date(sortedMarkers[i].timestamp);
-      const end = new Date(sortedMarkers[i + 1].timestamp);
-      const duration = end.getTime() - start.getTime();
-      
-      periods.push({
-        start: start.toLocaleString('ru-RU'),
-        end: end.toLocaleString('ru-RU'),
-        duration: formatDuration(duration),
-        startComment: sortedMarkers[i].comment,
-        endComment: sortedMarkers[i + 1].comment
-      });
-    }
-    
-    return periods;
-  };
-
-  // Форматирование длительности
-  const formatDuration = (milliseconds: number) => {
-    const hours = Math.floor(milliseconds / (1000 * 60 * 60));
-    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
-    
-    return `${hours}ч ${minutes}м ${seconds}с`;
   };
 
   const visibleData = getVisibleData();
