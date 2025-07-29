@@ -26,6 +26,10 @@ export const useMultiThreadDataLoader = () => {
   const loadData = useCallback(async (files: UploadedFile[]) => {
     const completedFiles = files.filter(f => f.parsingStatus === 'completed');
     
+    console.log('useMultiThreadDataLoader: Начинаем загрузку данных');
+    console.log('useMultiThreadDataLoader: Всего файлов:', files.length);
+    console.log('useMultiThreadDataLoader: Обработанных файлов:', completedFiles.length);
+    
     if (completedFiles.length === 0) {
       console.log('Нет файлов для загрузки');
       setChartData([]);
@@ -37,11 +41,14 @@ export const useMultiThreadDataLoader = () => {
     setChartData([]);
     loadedDataRef.current.clear();
 
-    console.log(`Начинаем многопоточную загрузку ${completedFiles.length} файлов`);
+    console.log(`useMultiThreadDataLoader: Начинаем многопоточную загрузку ${completedFiles.length} файлов`);
 
     // Определяем количество воркеров (максимум 4 или количество файлов)
     const workerCount = Math.min(4, completedFiles.length);
     const maxPointsPerFile = Math.floor(10000 / completedFiles.length); // Распределяем точки между файлами
+
+    console.log('useMultiThreadDataLoader: Количество воркеров:', workerCount);
+    console.log('useMultiThreadDataLoader: Максимум точек на файл:', maxPointsPerFile);
 
     try {
       // Создаем воркеры
@@ -68,10 +75,12 @@ export const useMultiThreadDataLoader = () => {
               worker.removeEventListener('message', handleMessage);
 
               if (type === 'FILE_DATA_LOADED') {
-                console.log(`Получены данные для файла ${payload.fileName}: ${payload.optimizedCount} точек`);
+                console.log(`useMultiThreadDataLoader: Получены данные для файла ${payload.fileName}: ${payload.optimizedCount} точек`);
                 
                 // Сохраняем данные
                 loadedDataRef.current.set(file.id, payload.data);
+                
+                console.log('useMultiThreadDataLoader: Всего загружено файлов:', loadedDataRef.current.size);
                 
                 // Обновляем прогресс
                 setLoadingProgress(prev => ({
@@ -88,11 +97,13 @@ export const useMultiThreadDataLoader = () => {
                 
                 // Сортируем по времени
                 allData.sort((a, b) => a.timestamp - b.timestamp);
+                
+                console.log('useMultiThreadDataLoader: Обновляем chartData, всего записей:', allData.length);
                 setChartData([...allData]);
 
                 resolve();
               } else if (type === 'ERROR') {
-                console.error(`Ошибка загрузки файла ${file.name}:`, payload.error);
+                console.error(`useMultiThreadDataLoader: Ошибка загрузки файла ${file.name}:`, payload.error);
                 setLoadingProgress(prev => ({
                   ...prev,
                   completed: prev.completed + 1
@@ -119,10 +130,20 @@ export const useMultiThreadDataLoader = () => {
       // Ждем завершения всех задач
       await Promise.all(filePromises);
 
-      console.log(`Многопоточная загрузка завершена. Всего точек: ${chartData.length}`);
+      console.log(`useMultiThreadDataLoader: Многопоточная загрузка завершена`);
+      
+      // Финальная проверка данных
+      const finalData: ChartData[] = [];
+      loadedDataRef.current.forEach(fileData => {
+        finalData.push(...fileData);
+      });
+      finalData.sort((a, b) => a.timestamp - b.timestamp);
+      
+      console.log(`useMultiThreadDataLoader: Финальная установка данных, всего точек: ${finalData.length}`);
+      setChartData([...finalData]);
 
     } catch (error) {
-      console.error('Ошибка многопоточной загрузки:', error);
+      console.error('useMultiThreadDataLoader: Ошибка многопоточной загрузки:', error);
     } finally {
       // Очищаем воркеры
       workersRef.current.forEach(worker => worker.terminate());

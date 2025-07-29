@@ -57,6 +57,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
 
   // Загрузка данных при монтировании компонента
   useEffect(() => {
+    console.log('DataVisualization: Компонент смонтирован, файлов для загрузки:', files.length);
     loadData(files);
     
     // Автоматический фокус на блок информации для исследования
@@ -67,6 +68,16 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     // Очистка воркеров при размонтировании
     return cleanup;
   }, [files, loadData, cleanup]);
+
+  // Отладочная информация
+  useEffect(() => {
+    console.log('DataVisualization: chartData обновлен:', {
+      length: chartData.length,
+      isLoading,
+      firstRecord: chartData[0],
+      lastRecord: chartData[chartData.length - 1]
+    });
+  }, [chartData, isLoading]);
 
   const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -119,23 +130,31 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
 
   // Подготовка данных для графиков
   const getTemperatureData = () => {
+    console.log('getTemperatureData: Подготовка данных температуры, исходных записей:', chartData.length);
+    
     if (chartData.length === 0) {
       console.log('Нет данных для температурного графика');
       return [];
     }
     
-    console.log(`Подготовка температурных данных: ${chartData.length} записей`);
-    
-    return chartData.map(d => ({
+    const temperatureData = chartData.map(d => ({
       timestamp: d.timestamp,
       value: d.temperature,
       formattedTime: d.formattedTime,
       fileId: d.fileId,
       fileName: d.fileName
     }));
+    
+    console.log('getTemperatureData: Подготовлено записей:', temperatureData.length);
+    console.log('getTemperatureData: Первая запись:', temperatureData[0]);
+    console.log('getTemperatureData: Последняя запись:', temperatureData[temperatureData.length - 1]);
+    
+    return temperatureData;
   };
 
   const getHumidityData = () => {
+    console.log('getHumidityData: Подготовка данных влажности, исходных записей:', chartData.length);
+    
     const humidityData = chartData.filter(d => d.humidity !== undefined && d.humidity !== null);
     
     if (humidityData.length === 0) {
@@ -143,15 +162,18 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
       return [];
     }
     
-    console.log(`Подготовка данных влажности: ${humidityData.length} записей`);
-    
-    return humidityData.map(d => ({
+    const processedHumidityData = humidityData.map(d => ({
       timestamp: d.timestamp,
       value: d.humidity!,
       formattedTime: d.formattedTime,
       fileId: d.fileId,
       fileName: d.fileName
     }));
+    
+    console.log('getHumidityData: Подготовлено записей:', processedHumidityData.length);
+    console.log('getHumidityData: Первая запись:', processedHumidityData[0]);
+    
+    return processedHumidityData;
   };
 
   const isFormValid = () => {

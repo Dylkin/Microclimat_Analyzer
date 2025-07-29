@@ -27,7 +27,10 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       // Загружаем измерения
       const measurements = await databaseService.getMeasurements(fileId);
       
+      console.log(`Worker: Получено измерений для файла ${fileName}:`, measurements?.length || 0);
+      
       if (!measurements || measurements.length === 0) {
+        console.error(`Worker: Нет данных для файла ${fileName}`);
         self.postMessage({
           type: 'ERROR',
           payload: { fileId, error: 'Нет данных для файла' }
@@ -37,6 +40,8 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
       // Оптимизируем данные
       const step = Math.max(1, Math.floor(measurements.length / maxPoints));
+      console.log(`Worker: Шаг оптимизации для файла ${fileName}:`, step);
+      
       const optimizedData = measurements
         .filter((_, index) => index % step === 0)
         .map(m => ({
@@ -48,7 +53,9 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           formattedTime: m.timestamp.toLocaleString('ru-RU')
         }));
 
-      console.log(`Worker: Обработано ${optimizedData.length} точек для файла ${fileName}`);
+      console.log(`Worker: Обработано ${optimizedData.length} точек для файла ${fileName} из ${measurements.length} исходных`);
+      console.log(`Worker: Первая запись:`, optimizedData[0]);
+      console.log(`Worker: Последняя запись:`, optimizedData[optimizedData.length - 1]);
 
       // Отправляем результат
       self.postMessage({
