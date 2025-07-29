@@ -44,13 +44,14 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       
       const optimizedData = measurements
         .filter((_, index) => index % step === 0)
-        .map(m => ({
+        .map((m, index) => ({
           timestamp: m.timestamp.getTime(),
           temperature: m.temperature,
           humidity: m.humidity,
           fileId,
           fileName,
-          formattedTime: m.timestamp.toLocaleString('ru-RU')
+          formattedTime: m.timestamp.toLocaleString('ru-RU'),
+          uniqueKey: `${fileId}-${index}-${m.timestamp.getTime()}`
         }));
 
       console.log(`Worker: Обработано ${optimizedData.length} точек для файла ${fileName} из ${measurements.length} исходных`);

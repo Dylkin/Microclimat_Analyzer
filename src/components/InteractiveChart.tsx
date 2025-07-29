@@ -392,6 +392,7 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
             )}
             
             {/* Вертикальные маркеры */}
+                allowDuplicatedCategory={false}
             {visibleMarkers.map(marker => (
               <ReferenceLine
                 key={marker.id}

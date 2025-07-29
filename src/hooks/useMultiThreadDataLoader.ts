@@ -8,6 +8,7 @@ interface ChartData {
   fileId: string;
   fileName: string;
   formattedTime: string;
+  uniqueKey?: string;
 }
 
 interface LoadingProgress {
