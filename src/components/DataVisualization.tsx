@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BarChart, FileText, Calendar, Building, Settings, Target, Clock, MessageSquare, Download, ArrowLeft, Droplets, Thermometer } from 'lucide-react';
 import { UploadedFile, MeasurementRecord } from '../types/FileData';
-import { databaseService } from '../utils/database';
 import { InteractiveChart } from './InteractiveChart';
+import { useMultiThreadDataLoader } from '../hooks/useMultiThreadDataLoader';
 
 interface DataVisualizationProps {
   files: UploadedFile[];
@@ -28,15 +28,6 @@ interface VerticalLine {
   comment: string;
 }
 
-interface ChartData {
-  timestamp: number;
-  temperature: number;
-  humidity?: number;
-  fileId: string;
-  fileName: string;
-  formattedTime: string;
-}
-
 export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onBack }) => {
   const [researchInfo, setResearchInfo] = useState<ResearchInfo>({
     reportNumber: '',
@@ -49,11 +40,12 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
   const [temperatureLimits, setTemperatureLimits] = useState<Limits>({ min: null, max: null });
   const [humidityLimits, setHumidityLimits] = useState<Limits>({ min: null, max: null });
   const [testType, setTestType] = useState('empty-object');
-  const [chartData, setChartData] = useState<ChartData[]>([]);
   const [temperatureLines, setTemperatureLines] = useState<VerticalLine[]>([]);
   const [humidityLines, setHumidityLines] = useState<VerticalLine[]>([]);
   const researchInfoRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  // Используем хук для многопоточной загрузки данных
+  const { chartData, isLoading, loadingProgress, loadData, cleanup } = useMultiThreadDataLoader();
 
   const testTypes = [
     { value: 'empty-object', label: 'Соответствие критериям в пустом объекте' },
@@ -65,86 +57,16 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
 
   // Загрузка данных при монтировании компонента
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        await loadChartData();
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
+    loadData(files);
+    
     // Автоматический фокус на блок информации для исследования
     setTimeout(() => {
       researchInfoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
-  }, [files]);
-
-  const loadChartData = async () => {
-    const allData: ChartData[] = [];
-    const completedFiles = files.filter(f => f.parsingStatus === 'completed');
     
-    console.log(`Загружаем данные из ${completedFiles.length} файлов...`);
-    
-    try {
-      // Обрабатываем файлы последовательно с оптимизацией
-      for (let i = 0; i < completedFiles.length; i++) {
-        const file = completedFiles[i];
-        console.log(`Обрабатываем файл ${i + 1}/${completedFiles.length}: ${file.name}`);
-        
-        try {
-          const measurements = await databaseService.getMeasurements(file.id);
-          if (measurements && measurements.length > 0) {
-            console.log(`Получено ${measurements.length} измерений из файла ${file.name}`);
-            
-            // Оптимизируем данные сразу при загрузке
-            const step = Math.max(1, Math.floor(measurements.length / 5000)); // Максимум 5000 точек на файл
-            
-            const fileData = measurements
-              .filter((_, index) => index % step === 0)
-              .map(m => ({
-                timestamp: m.timestamp.getTime(),
-                temperature: m.temperature,
-                humidity: m.humidity,
-                fileId: file.id,
-                fileName: file.name,
-                formattedTime: m.timestamp.toLocaleString('ru-RU')
-              }));
-            
-            allData.push(...fileData);
-            console.log(`Добавлено ${fileData.length} оптимизированных точек из файла ${file.name}`);
-          } else {
-            console.warn(`Нет данных для файла ${file.name}`);
-          }
-        } catch (error) {
-          console.error(`Ошибка загрузки данных для файла ${file.name}:`, error);
-        }
-        
-        // Принудительное обновление состояния после каждого файла
-        if (allData.length > 0) {
-          const sortedData = [...allData].sort((a, b) => a.timestamp - b.timestamp);
-          setChartData(sortedData);
-        }
-        
-        // Небольшая пауза для обновления UI
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    } catch (error) {
-      console.error('Общая ошибка загрузки данных:', error);
-    }
-    
-    console.log(`Всего загружено ${allData.length} записей`);
-    
-    // Сортируем по времени
-    if (allData.length > 0) {
-      const sortedData = allData.sort((a, b) => a.timestamp - b.timestamp);
-      setChartData(sortedData);
-      console.log('Данные успешно загружены и отсортированы');
-    } else {
-      console.warn('Не удалось загрузить данные ни из одного файла');
-      setChartData([]);
-    }
-  };
+    // Очистка воркеров при размонтировании
+    return cleanup;
+  }, [files, loadData, cleanup]);
 
   const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -422,10 +344,29 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
         {/* Графики */}
         <div className="space-y-8">
           {isLoading && (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex flex-col items-center justify-center py-8 space-y-4">
               <div className="flex items-center space-x-3">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
-                <span className="text-gray-600">Загрузка данных...</span>
+                <span className="text-gray-600">Многопоточная загрузка данных...</span>
+              </div>
+              {loadingProgress.total > 0 && (
+                <div className="text-center">
+                  <div className="text-sm text-gray-600 mb-2">
+                    Обработано файлов: {loadingProgress.completed} из {loadingProgress.total}
+                  </div>
+                  {loadingProgress.currentFile && (
+                    <div className="text-xs text-gray-500">
+                      Текущий файл: {loadingProgress.currentFile}
+                    </div>
+                  )}
+                  <div className="w-64 bg-gray-200 rounded-full h-2 mt-2">
+                    <div 
+                      className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${(loadingProgress.completed / loadingProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               </div>
             </div>
           )}
@@ -472,6 +413,9 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
               <span className="font-medium">Записей на графике:</span> {chartData.length.toLocaleString('ru-RU')}
             </div>
             <div>
+              <span className="font-medium">Режим загрузки:</span> Многопоточный (до 4 воркеров)
+            </div>
+            <div>
               <span className="font-medium">Период данных:</span> 
               {chartData.length > 0 && (
                 <span className="ml-1">
@@ -490,7 +434,8 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
           {chartData.length === 0 && !isLoading && (
             <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
-                Данные не загружены. Проверьте, что файлы успешно обработаны и содержат корректные данные измерений.
+                Данные не загружены. Проверьте, что файлы успешно обработаны и содержат корректные данные измерений. 
+                Попробуйте перезагрузить страницу или проверить консоль браузера для диагностики.
               </p>
             </div>
           )}
