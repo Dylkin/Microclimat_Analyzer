@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { databaseService } from '../utils/database';
 import { Testo174HBinaryParser } from '../utils/testo174hBinaryParser';
@@ -8,6 +8,7 @@ import { Testo174TBinaryParser } from '../utils/testo174tBinaryParser';
 export const MicroclimatAnalyzer: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [editingField, setEditingField] = React.useState<{ fileId: string; field: 'zoneNumber' | 'measurementLevel' } | null>(null);
 
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
@@ -34,7 +35,8 @@ export const MicroclimatAnalyzer: React.FC = () => {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         name: file.name,
         uploadDate: new Date().toLocaleString('ru-RU'),
-        parsingStatus: 'processing' as const
+        parsingStatus: 'processing' as const,
+        order: uploadedFiles.length + newFiles.length
       };
     }).filter(Boolean) as UploadedFile[];
 
@@ -74,7 +76,7 @@ export const MicroclimatAnalyzer: React.FC = () => {
             const period = `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`;
             return {
               ...f,
-              parsingStatus: 'completed' as const,
+              parsingStatus: 'completed' as const, 
               parsedData,
               recordCount: parsedData.recordCount,
               period
@@ -124,6 +126,50 @@ export const MicroclimatAnalyzer: React.FC = () => {
     fileInputRef.current?.click();
   };
 
+  const moveFile = (fileId: string, direction: 'up' | 'down') => {
+    setUploadedFiles(prev => {
+      const sortedFiles = [...prev].sort((a, b) => a.order - b.order);
+      const currentIndex = sortedFiles.findIndex(f => f.id === fileId);
+      
+      if (currentIndex === -1) return prev;
+      if (direction === 'up' && currentIndex === 0) return prev;
+      if (direction === 'down' && currentIndex === sortedFiles.length - 1) return prev;
+      
+      const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      
+      // Меняем местами order
+      const currentFile = sortedFiles[currentIndex];
+      const targetFile = sortedFiles[newIndex];
+      
+      return prev.map(f => {
+        if (f.id === currentFile.id) return { ...f, order: targetFile.order };
+        if (f.id === targetFile.id) return { ...f, order: currentFile.order };
+        return f;
+      });
+    });
+  };
+
+  const updateFileField = (fileId: string, field: 'zoneNumber' | 'measurementLevel', value: string | number) => {
+    setUploadedFiles(prev => prev.map(f => {
+      if (f.id === fileId) {
+        return { ...f, [field]: value };
+      }
+      return f;
+    }));
+  };
+
+  const handleExploreData = () => {
+    const completedFiles = uploadedFiles.filter(f => f.parsingStatus === 'completed');
+    if (completedFiles.length === 0) {
+      alert('Нет обработанных файлов для исследования');
+      return;
+    }
+    
+    // Здесь будет логика отображения графиков
+    console.log('Исследование данных для файлов:', completedFiles);
+    alert(`Исследование данных для ${completedFiles.length} файлов (функция в разработке)`);
+  };
+
   const getStatusIcon = (status: UploadedFile['parsingStatus']) => {
     switch (status) {
       case 'pending':
@@ -142,17 +188,20 @@ export const MicroclimatAnalyzer: React.FC = () => {
   const getStatusText = (status: UploadedFile['parsingStatus']) => {
     switch (status) {
       case 'pending':
-        return 'Ожидание';
+        return 'Загрузка';
       case 'processing':
         return 'Обработка';
       case 'completed':
-        return 'Обработано';
+        return 'Обработан';
       case 'error':
-        return 'Ошибка';
+        return 'Ошибка обработки';
       default:
         return 'Неизвестно';
     }
   };
+
+  // Сортируем файлы по порядку для отображения
+  const sortedFiles = [...uploadedFiles].sort((a, b) => a.order - b.order);
 
   return (
     <div className="space-y-6">
@@ -165,13 +214,23 @@ export const MicroclimatAnalyzer: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Загрузка файлов</h2>
-          <button
-            onClick={triggerFileUpload}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-          >
-            <Upload className="w-4 h-4" />
-            <span>Загрузить файлы в формате Vi2</span>
-          </button>
+          <div className="flex space-x-3">
+            <button
+              onClick={handleExploreData}
+              disabled={uploadedFiles.filter(f => f.parsingStatus === 'completed').length === 0}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              <BarChart className="w-4 h-4" />
+              <span>Исследовать данные</span>
+            </button>
+            <button
+              onClick={triggerFileUpload}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Загрузить файлы в формате Vi2</span>
+            </button>
+          </div>
         </div>
         
         <input
@@ -188,17 +247,26 @@ export const MicroclimatAnalyzer: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Имя файла
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                    Порядок
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Статус
+                    Имя файла
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Период данных
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Записей
+                    Количество записей
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    № зоны измерения
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Уровень измерения (м.)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Статус
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Удалить
@@ -206,8 +274,26 @@ export const MicroclimatAnalyzer: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {uploadedFiles.map((file) => (
+                {sortedFiles.map((file, index) => (
                   <tr key={file.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      <div className="flex flex-col space-y-1">
+                        <button
+                          onClick={() => moveFile(file.id, 'up')}
+                          disabled={index === 0}
+                          className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => moveFile(file.id, 'down')}
+                          disabled={index === sortedFiles.length - 1}
+                          className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">{file.name}</div>
@@ -220,15 +306,6 @@ export const MicroclimatAnalyzer: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(file.parsingStatus)}
-                        <span className="text-sm text-gray-900">{getStatusText(file.parsingStatus)}</span>
-                      </div>
-                      {file.errorMessage && (
-                        <div className="text-xs text-red-600 mt-1">{file.errorMessage}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">
                         {file.period || '-'}
                       </div>
@@ -237,6 +314,57 @@ export const MicroclimatAnalyzer: React.FC = () => {
                       <div className="text-sm text-gray-500">
                         {file.recordCount ? file.recordCount.toLocaleString('ru-RU') : '-'}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {editingField?.fileId === file.id && editingField?.field === 'zoneNumber' ? (
+                        <input
+                          type="number"
+                          min="1"
+                          max="99"
+                          value={file.zoneNumber || ''}
+                          onChange={(e) => updateFileField(file.id, 'zoneNumber', parseInt(e.target.value) || '')}
+                          onBlur={() => setEditingField(null)}
+                          onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          autoFocus
+                        />
+                      ) : (
+                        <div
+                          onClick={() => setEditingField({ fileId: file.id, field: 'zoneNumber' })}
+                          className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+                        >
+                          {file.zoneNumber || 'Нажмите для ввода'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {editingField?.fileId === file.id && editingField?.field === 'measurementLevel' ? (
+                        <input
+                          type="text"
+                          value={file.measurementLevel || ''}
+                          onChange={(e) => updateFileField(file.id, 'measurementLevel', e.target.value)}
+                          onBlur={() => setEditingField(null)}
+                          onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          autoFocus
+                        />
+                      ) : (
+                        <div
+                          onClick={() => setEditingField({ fileId: file.id, field: 'measurementLevel' })}
+                          className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+                        >
+                          {file.measurementLevel || 'Нажмите для ввода'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        {getStatusIcon(file.parsingStatus)}
+                        <span className="text-sm text-gray-900">{getStatusText(file.parsingStatus)}</span>
+                      </div>
+                      {file.errorMessage && (
+                        <div className="text-xs text-red-600 mt-1">{file.errorMessage}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button
