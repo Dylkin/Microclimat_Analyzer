@@ -3,14 +3,12 @@ import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, Che
 import { UploadedFile } from '../types/FileData';
 import { databaseService } from '../utils/database';
 import { CSVExporter } from '../utils/csvExporter';
-import { Testo174HParsingService } from '../utils/testo174hBinaryParser';
-import { Testo174TParsingService } from '../utils/testo174tBinaryParser';
+import { Testo174HBinaryParser } from '../utils/testo174hBinaryParser';
+import { Testo174TBinaryParser } from '../utils/testo174tBinaryParser';
 
 export const MicroclimatAnalyzer: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const parsingService = React.useMemo(() => new Testo174HParsingService(), []);
-  const singleChannelParsingService = React.useMemo(() => new Testo174TParsingService(), []);
 
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
@@ -55,14 +53,18 @@ export const MicroclimatAnalyzer: React.FC = () => {
         // Реальный парсинг файла
         console.log(`Парсинг файла: ${file.name}`);
         
-        // Определяем тип логгера по имени файла
+        // Читаем файл как ArrayBuffer
+        const arrayBuffer = await file.arrayBuffer();
+        
         let parsedData;
-        if (fileName.includes('DL-019') || fileName.includes('174T')) {
-          // Одноканальный логгер
-          parsedData = await singleChannelParsingService.parseFile(file);
+        if (file.name.includes('DL-019') || file.name.includes('174T')) {
+          // Одноканальный логгер (Testo 174T)
+          const parser = new Testo174TBinaryParser(arrayBuffer);
+          parsedData = parser.parse(file.name);
         } else {
-          // Двухканальный логгер (по умолчанию)
-          parsedData = await parsingService.parseFile(file);
+          // Двухканальный логгер (Testo 174H) - по умолчанию
+          const parser = new Testo174HBinaryParser(arrayBuffer);
+          parsedData = parser.parse(file.name);
         }
         
         // Сохраняем в базу данных
