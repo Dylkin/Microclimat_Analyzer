@@ -170,9 +170,6 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
       }));
   };
 
-      }));
-  };
-
   const isFormValid = () => {
     return researchInfo.reportNumber && 
            researchInfo.reportDate && 
