@@ -3,10 +3,12 @@ import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, Che
 import { UploadedFile } from '../types/FileData';
 import { databaseService } from '../utils/database';
 import { CSVExporter } from '../utils/csvExporter';
+import { Testo174HParsingService } from '../utils/testo174hBinaryParser';
 
 export const MicroclimatAnalyzer: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const parsingService = React.useMemo(() => new Testo174HParsingService(), []);
 
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
@@ -48,16 +50,30 @@ export const MicroclimatAnalyzer: React.FC = () => {
       if (!fileRecord) continue;
       
       try {
-        // Имитация обработки файла
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Реальный парсинг файла
+        console.log(`Парсинг файла: ${file.name}`);
+        const parsedData = await parsingService.parseFile(file);
+        
+        // Сохраняем в базу данных
+        await databaseService.saveParsedFileData(parsedData, fileRecord.id);
+        
+        // Создаем CSV файл
+        const csvContent = CSVExporter.exportToCSV(parsedData);
+        const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const csvUrl = URL.createObjectURL(csvBlob);
+        const csvFileName = CSVExporter.getExportFileName(parsedData);
         
         setUploadedFiles(prev => prev.map(f => {
           if (f.id === fileRecord.id) {
+            const period = `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`;
             return {
               ...f,
               parsingStatus: 'completed' as const,
-              recordCount: Math.floor(Math.random() * 1000) + 100,
-              period: '02.06.2025 - 17.06.2025'
+              parsedData,
+              recordCount: parsedData.recordCount,
+              period,
+              csvDownloadUrl: csvUrl,
+              csvFileName
             };
           }
           return f;
