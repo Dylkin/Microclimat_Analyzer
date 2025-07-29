@@ -364,9 +364,6 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
           {/* График температуры */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">График температуры</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Двойной клик для добавления вертикальной линии. Клик по кружку для удаления линии.
-            </p>
             {renderChart(
               chartData,
               'temperature',
@@ -383,9 +380,6 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
           {chartData.some(d => d.humidity !== undefined) && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">График влажности</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Двойной клик для добавления вертикальной линии. Клик по кружку для удаления линии.
-              </p>
               {renderChart(
                 chartData,
                 'humidity',
