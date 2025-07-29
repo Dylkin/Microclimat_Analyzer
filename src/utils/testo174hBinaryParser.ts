@@ -112,9 +112,6 @@ export class Testo174HBinaryParser {
     // Читаем данные до конца файла или до нулевых значений
     for (let offset = dataStartOffset; offset < this.buffer.byteLength - recordSize; offset += recordSize) {
       try {
-        // Читаем временную метку (4 байта, little-endian)
-        const timestampRaw = this.view.getUint32(offset, true);
-        
         // Читаем температуру (4 байта, float32, little-endian)
         const temperatureRaw = this.view.getFloat32(offset + 4, true);
         

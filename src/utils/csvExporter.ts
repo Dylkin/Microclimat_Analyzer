@@ -1,4 +1,4 @@
-import { ParsedFileData, MeasurementRecord } from '../types/FileData';
+import { ParsedFileData } from '../types/FileData';
 
 export class CSVExporter {
   // Экспорт данных в CSV формат
