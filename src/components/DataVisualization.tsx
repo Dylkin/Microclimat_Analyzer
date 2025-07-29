@@ -53,6 +53,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
   const [temperatureLines, setTemperatureLines] = useState<VerticalLine[]>([]);
   const [humidityLines, setHumidityLines] = useState<VerticalLine[]>([]);
   const researchInfoRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const testTypes = [
     { value: 'empty-object', label: 'Соответствие критериям в пустом объекте' },
@@ -64,7 +65,15 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
 
   // Загрузка данных при монтировании компонента
   useEffect(() => {
-    loadChartData();
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        await loadChartData();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
     // Автоматический фокус на блок информации для исследования
     setTimeout(() => {
       researchInfoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -73,11 +82,20 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
 
   const loadChartData = async () => {
     const allData: ChartData[] = [];
+    const completedFiles = files.filter(f => f.parsingStatus === 'completed');
     
-    for (const file of files.filter(f => f.parsingStatus === 'completed')) {
+    console.log(`Загружаем данные из ${completedFiles.length} файлов...`);
+    
+    // Обрабатываем файлы последовательно, а не параллельно
+    for (let i = 0; i < completedFiles.length; i++) {
+      const file = completedFiles[i];
+      console.log(`Обрабатываем файл ${i + 1}/${completedFiles.length}: ${file.name}`);
+      
       try {
         const measurements = await databaseService.getMeasurements(file.id);
         if (measurements) {
+          console.log(`Получено ${measurements.length} измерений из файла ${file.name}`);
+          
           const fileData = measurements.map(m => ({
             timestamp: m.timestamp.getTime(),
             temperature: m.temperature,
@@ -87,11 +105,20 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             formattedTime: m.timestamp.toLocaleString('ru-RU')
           }));
           allData.push(...fileData);
+        } else {
+          console.warn(`Нет данных для файла ${file.name}`);
         }
       } catch (error) {
         console.error(`Ошибка загрузки данных для файла ${file.name}:`, error);
       }
+      
+      // Добавляем небольшую задержку между файлами для предотвращения блокировки UI
+      if (i < completedFiles.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
     }
+    
+    console.log(`Всего загружено ${allData.length} записей`);
     
     // Сортируем по времени
     allData.sort((a, b) => a.timestamp - b.timestamp);
@@ -149,7 +176,11 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
 
   // Подготовка данных для графиков
   const getTemperatureData = () => {
-    return chartData.map(d => ({
+    // Ограничиваем количество точек для производительности
+    const maxPoints = 10000;
+    const step = Math.max(1, Math.floor(chartData.length / maxPoints));
+    
+    return chartData.filter((_, index) => index % step === 0).map(d => ({
       timestamp: d.timestamp,
       value: d.temperature,
       formattedTime: d.formattedTime,
@@ -159,8 +190,15 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
   };
 
   const getHumidityData = () => {
-    return chartData
+    // Ограничиваем количество точек для производительности
+    const maxPoints = 10000;
+    const humidityData = chartData
       .filter(d => d.humidity !== undefined)
+    
+    const step = Math.max(1, Math.floor(humidityData.length / maxPoints));
+    
+    return humidityData
+      .filter((_, index) => index % step === 0)
       .map(d => ({
         timestamp: d.timestamp,
         value: d.humidity!,
@@ -359,21 +397,32 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
 
         {/* Графики */}
         <div className="space-y-8">
+          {isLoading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                <span className="text-gray-600">Загрузка данных...</span>
+              </div>
+            </div>
+          )}
+          
           {/* График температуры */}
-          <InteractiveChart
-            data={getTemperatureData()}
-            title="Температура"
-            unit="°C"
-            color="#ef4444"
-            limits={temperatureLimits}
-            markers={temperatureLines}
-            onAddMarker={handleAddTemperatureMarker}
-            onUpdateMarker={handleUpdateTemperatureMarker}
-            onRemoveMarker={handleRemoveTemperatureMarker}
-          />
+          {!isLoading && (
+            <InteractiveChart
+              data={getTemperatureData()}
+              title="Температура"
+              unit="°C"
+              color="#ef4444"
+              limits={temperatureLimits}
+              markers={temperatureLines}
+              onAddMarker={handleAddTemperatureMarker}
+              onUpdateMarker={handleUpdateTemperatureMarker}
+              onRemoveMarker={handleRemoveTemperatureMarker}
+            />
+          )}
 
           {/* График влажности */}
-          {getHumidityData().length > 0 && (
+          {!isLoading && getHumidityData().length > 0 && (
             <InteractiveChart
               data={getHumidityData()}
               title="Влажность"
@@ -391,12 +440,15 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
         {/* Информация о данных */}
         <div className="mt-8 bg-gray-50 rounded-lg p-4">
           <h4 className="text-sm font-medium text-gray-700 mb-2">Информация о загруженных данных:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-sm">
             <div>
               <span className="font-medium">Количество файлов:</span> {files.filter(f => f.parsingStatus === 'completed').length}
             </div>
             <div>
               <span className="font-medium">Общее количество записей:</span> {chartData.length.toLocaleString('ru-RU')}
+            </div>
+            <div>
+              <span className="font-medium">Отображаемых точек:</span> {Math.min(chartData.length, 10000).toLocaleString('ru-RU')}
             </div>
             <div>
               <span className="font-medium">Период данных:</span> 
@@ -410,7 +462,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             <div>
               <span className="font-medium">Масштаб:</span> 
               <span className="ml-1">
-                Интерактивный
+                {isLoading ? 'Загрузка...' : 'Интерактивный'}
               </span>
             </div>
           </div>

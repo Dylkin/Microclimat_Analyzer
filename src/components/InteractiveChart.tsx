@@ -63,6 +63,7 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
   const [selectionBox, setSelectionBox] = useState<{ left: number; width: number } | null>(null);
   const chartRef = useRef<any>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Получение видимых данных
   const getVisibleData = useCallback(() => {
@@ -143,14 +144,19 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
   // Обработка двойного клика для добавления маркера
   const handleChartDoubleClick = useCallback((event: any) => {
     if (isDragging) return; // Не добавляем маркер во время перетаскивания
+    if (isProcessing) return; // Предотвращаем множественные клики
     
     if (!event || !event.activeLabel) return;
     
+    setIsProcessing(true);
     const timestamp = parseInt(event.activeLabel);
     if (!isNaN(timestamp)) {
       onAddMarker(timestamp);
     }
-  }, [onAddMarker, isDragging]);
+    
+    // Сбрасываем флаг обработки через небольшую задержку
+    setTimeout(() => setIsProcessing(false), 200);
+  }, [onAddMarker, isDragging, isProcessing]);
 
   // Обработка начала перетаскивания
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
@@ -216,6 +222,8 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
   
   // Обработка окончания перетаскивания
   const handleMouseUp = useCallback(() => {
+    if (isProcessing) return;
+    
     if (!isDragging || !dragStart || !dragEnd) {
       setIsDragging(false);
       setDragStart(null);
@@ -226,9 +234,13 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
     
     // Минимальная ширина для зума (10 пикселей)
     if (Math.abs(dragEnd.x - dragStart.x) > 10) {
+      setIsProcessing(true);
       const startTimestamp = Math.min(dragStart.timestamp, dragEnd.timestamp);
       const endTimestamp = Math.max(dragStart.timestamp, dragEnd.timestamp);
       setZoomDomain([startTimestamp, endTimestamp]);
+      
+      // Сбрасываем флаг обработки
+      setTimeout(() => setIsProcessing(false), 300);
     }
     
     setIsDragging(false);
@@ -238,9 +250,14 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
   }, [isDragging, dragStart, dragEnd]);
 
   // Сброс зума
-  const resetZoom = () => {
+  const resetZoom = useCallback(() => {
+    if (isProcessing) return;
+    
+    setIsProcessing(true);
     setZoomDomain(null);
-  };
+    
+    setTimeout(() => setIsProcessing(false), 200);
+  }, [isProcessing]);
 
   const visibleData = getVisibleData();
   const visibleMarkers = getVisibleMarkers();
@@ -280,9 +297,10 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
           {zoomDomain && (
             <button
               onClick={resetZoom}
-              className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 transition-colors"
+              disabled={isProcessing}
+              className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Сбросить масштаб
+              {isProcessing ? 'Обработка...' : 'Сбросить масштаб'}
             </button>
           )}
           <div className="text-xs text-gray-500">
@@ -299,7 +317,7 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        style={{ cursor: isDragging ? 'col-resize' : 'crosshair' }}
+        style={{ cursor: isProcessing ? 'wait' : (isDragging ? 'col-resize' : 'crosshair') }}
       >
         {/* Прямоугольник выделения */}
         {selectionBox && (
@@ -334,6 +352,7 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
               angle={-45}
               textAnchor="end"
               height={60}
+              interval="preserveStartEnd"
             />
             
             <YAxis
@@ -392,9 +411,10 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
               dataKey="value"
               stroke={color}
               strokeWidth={2}
-              dot={false}
+              dot={visibleData.length < 100 ? { r: 1 } : false}
               name={title}
               connectNulls={false}
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>
