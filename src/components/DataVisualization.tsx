@@ -23,9 +23,9 @@ interface Limits {
 
 interface VerticalLine {
   id: string;
-  value: number;
+  timestamp: number;
   comment: string;
-  y: number;
+  x: number;
 }
 
 interface ChartData {
@@ -52,9 +52,6 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
   const [temperatureLines, setTemperatureLines] = useState<VerticalLine[]>([]);
   const [humidityLines, setHumidityLines] = useState<VerticalLine[]>([]);
   const [editingComment, setEditingComment] = useState<{ lineId: string; chartType: 'temperature' | 'humidity' } | null>(null);
-  const [temperatureZoom, setTemperatureZoom] = useState<{ min: number; max: number } | null>(null);
-  const [humidityZoom, setHumidityZoom] = useState<{ min: number; max: number } | null>(null);
-  const [isSelecting, setIsSelecting] = useState<{ chartType: 'temperature' | 'humidity'; startY: number } | null>(null);
 
   const temperatureChartRef = useRef<HTMLDivElement>(null);
   const humidityChartRef = useRef<HTMLDivElement>(null);
@@ -114,26 +111,19 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
 
   const handleChartDoubleClick = (event: React.MouseEvent, chartType: 'temperature' | 'humidity') => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const y = event.clientY - rect.top;
-    const chartHeight = rect.height - 60; // Учитываем отступы
+    const x = event.clientX - rect.left;
+    const chartWidth = rect.width - 80; // Учитываем отступы
+    const dataWidth = chartData.length > 0 ? chartData[chartData.length - 1].timestamp - chartData[0].timestamp : 0;
     
-    // Определяем диапазон значений для текущего графика
-    const values = chartData.map(d => d[chartType === 'temperature' ? 'temperature' : 'humidity']).filter(v => v !== undefined) as number[];
-    if (values.length === 0) return;
+    if (dataWidth === 0) return;
     
-    const currentZoom = chartType === 'temperature' ? temperatureZoom : humidityZoom;
-    const minValue = currentZoom?.min ?? Math.min(...values);
-    const maxValue = currentZoom?.max ?? Math.max(...values);
-    const range = maxValue - minValue;
-    
-    // Вычисляем значение по Y координате (инвертируем, так как Y=0 вверху)
-    const value = maxValue - ((y - 30) / chartHeight) * range;
+    const timestamp = chartData[0].timestamp + (x - 40) / chartWidth * dataWidth;
     
     const newLine: VerticalLine = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      value,
+      timestamp,
       comment: '',
-      y
+      x
     };
 
     if (chartType === 'temperature') {
@@ -143,67 +133,6 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     }
 
     setEditingComment({ lineId: newLine.id, chartType });
-  };
-
-  const handleChartMouseDown = (event: React.MouseEvent, chartType: 'temperature' | 'humidity') => {
-    if (event.detail === 2) return; // Игнорируем если это двойной клик
-    
-    const rect = event.currentTarget.getBoundingClientRect();
-    const y = event.clientY - rect.top;
-    
-    setIsSelecting({ chartType, startY: y });
-  };
-
-  const handleChartMouseUp = (event: React.MouseEvent, chartType: 'temperature' | 'humidity') => {
-    if (!isSelecting || isSelecting.chartType !== chartType) return;
-    
-    const rect = event.currentTarget.getBoundingClientRect();
-    const endY = event.clientY - rect.top;
-    const startY = isSelecting.startY;
-    
-    // Минимальная высота выделения для зума
-    if (Math.abs(endY - startY) < 20) {
-      setIsSelecting(null);
-      return;
-    }
-    
-    const chartHeight = rect.height - 60;
-    const values = chartData.map(d => d[chartType === 'temperature' ? 'temperature' : 'humidity']).filter(v => v !== undefined) as number[];
-    
-    if (values.length === 0) {
-      setIsSelecting(null);
-      return;
-    }
-    
-    const currentZoom = chartType === 'temperature' ? temperatureZoom : humidityZoom;
-    const minValue = currentZoom?.min ?? Math.min(...values);
-    const maxValue = currentZoom?.max ?? Math.max(...values);
-    const range = maxValue - minValue;
-    
-    // Вычисляем новые границы зума (инвертируем Y координаты)
-    const topY = Math.min(startY, endY);
-    const bottomY = Math.max(startY, endY);
-    
-    const newMax = maxValue - ((topY - 30) / chartHeight) * range;
-    const newMin = maxValue - ((bottomY - 30) / chartHeight) * range;
-    
-    const newZoom = { min: newMin, max: newMax };
-    
-    if (chartType === 'temperature') {
-      setTemperatureZoom(newZoom);
-    } else {
-      setHumidityZoom(newZoom);
-    }
-    
-    setIsSelecting(null);
-  };
-
-  const resetZoom = (chartType: 'temperature' | 'humidity') => {
-    if (chartType === 'temperature') {
-      setTemperatureZoom(null);
-    } else {
-      setHumidityZoom(null);
-    }
   };
 
   const updateLineComment = (lineId: string, chartType: 'temperature' | 'humidity', comment: string) => {
@@ -229,24 +158,32 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
   const calculateTimePeriods = (lines: VerticalLine[]) => {
     if (lines.length < 2) return [];
     
-    const sortedLines = [...lines].sort((a, b) => a.value - b.value);
+    const sortedLines = [...lines].sort((a, b) => a.timestamp - b.timestamp);
     const periods = [];
     
     for (let i = 0; i < sortedLines.length - 1; i++) {
-      const startValue = sortedLines[i].value;
-      const endValue = sortedLines[i + 1].value;
-      const difference = Math.abs(endValue - startValue);
+      const start = new Date(sortedLines[i].timestamp);
+      const end = new Date(sortedLines[i + 1].timestamp);
+      const duration = end.getTime() - start.getTime();
       
       periods.push({
-        start: `${startValue.toFixed(1)}`,
-        end: `${endValue.toFixed(1)}`,
-        difference: `${difference.toFixed(1)}`,
+        start: start.toLocaleString('ru-RU'),
+        end: end.toLocaleString('ru-RU'),
+        duration: formatDuration(duration),
         startComment: sortedLines[i].comment,
         endComment: sortedLines[i + 1].comment
       });
     }
     
     return periods;
+  };
+
+  const formatDuration = (milliseconds: number) => {
+    const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+    
+    return `${hours}ч ${minutes}м ${seconds}с`;
   };
 
   const renderChart = (
@@ -257,8 +194,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     chartType: 'temperature' | 'humidity',
     title: string,
     unit: string,
-    color: string,
-    zoom: { min: number; max: number } | null
+    color: string
   ) => {
     if (data.length === 0) {
       return (
@@ -269,122 +205,54 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     }
 
     const values = data.map(d => d[valueKey]).filter(v => v !== undefined) as number[];
-    const allMinValue = Math.min(...values);
-    const allMaxValue = Math.max(...values);
-    
-    // Используем зум если установлен, иначе полный диапазон
-    const minValue = zoom?.min ?? allMinValue;
-    const maxValue = zoom?.max ?? allMaxValue;
+    const minValue = Math.min(...values, limits.min || Infinity);
+    const maxValue = Math.max(...values, limits.max || -Infinity);
     const range = maxValue - minValue;
-    
-    // Фильтруем данные по времени для отображения
-    const timeValues = data.map(d => d.timestamp);
-    const minTime = Math.min(...timeValues);
-    const maxTime = Math.max(...timeValues);
-    const timeRange = maxTime - minTime;
+    const padding = range * 0.1;
 
     return (
       <div className="relative">
-        {/* Кнопки управления */}
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <div className="flex space-x-2">
-            {zoom && (
-              <button
-                onClick={() => resetZoom(chartType)}
-                className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-              >
-                Сбросить масштаб
-              </button>
-            )}
-            <div className="text-xs text-gray-500">
-              Выделите область для масштабирования
-            </div>
-          </div>
-        </div>
-        
         <div
           ref={chartType === 'temperature' ? temperatureChartRef : humidityChartRef}
           className="h-80 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 cursor-crosshair relative overflow-hidden"
           onDoubleClick={(e) => handleChartDoubleClick(e, chartType)}
-          onMouseDown={(e) => handleChartMouseDown(e, chartType)}
-          onMouseUp={(e) => handleChartMouseUp(e, chartType)}
           title="Двойной клик для добавления вертикальной линии"
         >
-          {/* Область выделения */}
-          {isSelecting && isSelecting.chartType === chartType && (
-            <div
-              className="absolute bg-blue-200 bg-opacity-50 border border-blue-400 pointer-events-none"
-              style={{
-                left: 40,
-                right: 40,
-                top: Math.min(isSelecting.startY, isSelecting.startY),
-                height: Math.abs(isSelecting.startY - isSelecting.startY)
-              }}
-            />
-          )}
-          
           {/* Сетка */}
           <svg className="absolute inset-0 w-full h-full">
-            {/* Горизонтальные линии сетки (значения) */}
+            {/* Горизонтальные линии сетки */}
             {[0, 1, 2, 3, 4].map(i => (
-              <g key={`h-${i}`}>
-                <line
-                  x1="40"
-                  y1={30 + i * 62.5}
-                  x2="100%"
-                  y2={30 + i * 62.5}
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-                <text
-                  x="35"
-                  y={35 + i * 62.5}
-                  fill="#6b7280"
-                  fontSize="10"
-                  textAnchor="end"
-                >
-                  {(maxValue - (i / 4) * range).toFixed(1)}
-                </text>
-              </g>
+              <line
+                key={`h-${i}`}
+                x1="40"
+                y1={60 + i * 55}
+                x2="100%"
+                y2={60 + i * 55}
+                stroke="#e5e7eb"
+                strokeWidth="1"
+              />
             ))}
             
-            {/* Вертикальные линии сетки (время) */}
-            {[0, 1, 2, 3, 4].map(i => (
-              <g key={`v-${i}`}>
-                <line
-                  x1={50 + i * 150}
-                  y1="30"
-                  x2={50 + i * 150}
-                  y2="280"
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-                <text
-                  x={50 + i * 150}
-                  y="295"
-                  fill="#6b7280"
-                  fontSize="10"
-                  textAnchor="middle"
-                  transform={`rotate(-45 ${50 + i * 150} 295)`}
-                >
-                  {new Date(minTime + (i / 4) * timeRange).toLocaleString('ru-RU', {
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </text>
-              </g>
+            {/* Вертикальные линии сетки */}
+            {[0, 1, 2, 3, 4, 5].map(i => (
+              <line
+                key={`v-${i}`}
+                x1={40 + i * 120}
+                y1="20"
+                x2={40 + i * 120}
+                y2="280"
+                stroke="#e5e7eb"
+                strokeWidth="1"
+              />
             ))}
 
             {/* Лимиты */}
             {limits.min !== null && (
               <line
-                x1="50"
-                y1={280 - ((limits.min - minValue) / range) * 250}
+                x1="40"
+                y1={280 - ((limits.min - minValue + padding) / (range + 2 * padding)) * 260}
                 x2="100%"
-                y2={280 - ((limits.min - minValue) / range) * 250}
+                y2={280 - ((limits.min - minValue + padding) / (range + 2 * padding)) * 260}
                 stroke="#ef4444"
                 strokeWidth="2"
                 strokeDasharray="5,5"
@@ -393,10 +261,10 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             
             {limits.max !== null && (
               <line
-                x1="50"
-                y1={280 - ((limits.max - minValue) / range) * 250}
+                x1="40"
+                y1={280 - ((limits.max - minValue + padding) / (range + 2 * padding)) * 260}
                 x2="100%"
-                y2={280 - ((limits.max - minValue) / range) * 250}
+                y2={280 - ((limits.max - minValue + padding) / (range + 2 * padding)) * 260}
                 stroke="#ef4444"
                 strokeWidth="2"
                 strokeDasharray="5,5"
@@ -407,10 +275,10 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             {data.length > 1 && (
               <polyline
                 points={data.map((d, i) => {
-                  const x = 50 + ((d.timestamp - minTime) / timeRange) * 650;
+                  const x = 40 + (i / (data.length - 1)) * (100 - 40) + '%';
                   const value = d[valueKey] as number;
-                  const y = 280 - ((value - minValue) / range) * 250;
-                  return `${x},${y}`;
+                  const y = 280 - ((value - minValue + padding) / (range + 2 * padding)) * 260;
+                  return `${x.replace('%', '')},${y}`;
                 }).join(' ')}
                 fill="none"
                 stroke={color}
@@ -422,34 +290,16 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             {lines.map(line => (
               <g key={line.id}>
                 <line
-                  x1="50"
-                  y1={280 - ((line.value - minValue) / range) * 250}
-                  x2="700"
-                  y2={280 - ((line.value - minValue) / range) * 250}
+                  x1={line.x}
+                  y1="20"
+                  x2={line.x}
+                  y2="280"
                   stroke="#8b5cf6"
                   strokeWidth="2"
                 />
-                <line
-                  x1="50"
-                  y1={280 - ((line.value - minValue) / range) * 250}
-                  x2="700"
-                  y2={280 - ((line.value - minValue) / range) * 250}
-                  stroke="#8b5cf6"
-                  strokeWidth="2"
-                  strokeDasharray="3,3"
-                />
                 <circle
-                  cx="60"
-                  cy={280 - ((line.value - minValue) / range) * 250}
-                  r="4"
-                  fill="#8b5cf6"
-                  className="cursor-pointer"
-                  onClick={() => removeVerticalLine(line.id, chartType)}
-                  title="Нажмите для удаления"
-                />
-                <circle
-                  cx="690"
-                  cy={280 - ((line.value - minValue) / range) * 250}
+                  cx={line.x}
+                  cy="30"
                   r="4"
                   fill="#8b5cf6"
                   className="cursor-pointer"
@@ -460,282 +310,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             ))}
 
             {/* Подписи осей */}
-            <text x="25" y="160" fill="#6b7280" fontSize="12" textAnchor="middle" transform="rotate(-90 25 160)">
-              {title} ({unit})
-            </text>
-            <text x="375" y="315" fill="#6b7280" fontSize="12" textAnchor="middle">
-              Время
-            </text>
-          </svg>
-
-          {/* Комментарии к линиям */}
-          {lines.map(line => (
-            <div
-              key={`comment-${line.id}`}
-              className="absolute left-16"
-              style={{ top: 280 - ((line.value - minValue) / range) * 250 - 15 }}
-            >
-              {editingComment?.lineId === line.id && editingComment?.chartType === chartType ? (
-                <input
-                  type="text"
-                  value={line.comment}
-                  onChange={(e) => updateLineComment(line.id, chartType, e.target.value)}
-                  onBlur={() => setEditingComment(null)}
-                  onKeyDown={(e) => e.key === 'Enter' && setEditingComment(null)}
-                  className="w-32 px-2 py-1 text-xs border border-purple-300 rounded bg-white shadow-sm"
-                  autoFocus
-                />
-              ) : (
-                <div
-                  className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded cursor-pointer max-w-32 truncate shadow-sm"
-                  onClick={() => setEditingComment({ lineId: line.id, chartType })}
-                  title={line.comment || 'Нажмите для добавления комментария'}
-                >
-                  {line.comment || `${line.value.toFixed(1)}${unit}`}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Информация о масштабе */}
-        {zoom && (
-          <div className="mt-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
-            Масштаб: {zoom.min.toFixed(1)} - {zoom.max.toFixed(1)} {unit}
-          </div>
-        )}
-
-        {/* Временные периоды */}
-        {lines.length >= 2 && (
-          <div className="mt-4 space-y-2">
-            <h4 className="text-sm font-medium text-gray-700">Интервалы значений:</h4>
-            {calculateTimePeriods(lines).map((period, index) => (
-              <div key={index} className="text-xs bg-blue-50 p-2 rounded border">
-                <div className="flex items-center space-x-2">
-                  <Target className="w-3 h-3 text-blue-600" />
-                  <span className="font-medium">Интервал {index + 1}:</span>
-                </div>
-                <div className="mt-1 space-y-1">
-                  <div>Начальное значение: {period.start}{unit} {period.startComment && `(${period.startComment})`}</div>
-                  <div>Конечное значение: {period.end}{unit} {period.endComment && `(${period.endComment})`}</div>
-                  <div className="font-medium text-blue-700">Разность: {period.difference}{unit}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderTimeChart = (
-    data: ChartData[],
-    valueKey: 'temperature' | 'humidity',
-    limits: Limits,
-    lines: VerticalLine[],
-    chartType: 'temperature' | 'humidity',
-    title: string,
-    unit: string,
-    color: string,
-    zoom: { min: number; max: number } | null
-  ) => {
-    if (data.length === 0) {
-      return (
-        <div className="h-80 bg-gray-100 rounded-lg flex items-center justify-center">
-          <p className="text-gray-500">Нет данных для отображения</p>
-        </div>
-      );
-    }
-
-    // Получаем временные значения
-    const timeValues = data.map(d => d.timestamp);
-    const allMinTime = Math.min(...timeValues);
-    const allMaxTime = Math.max(...timeValues);
-    
-    // Используем зум если установлен, иначе полный диапазон времени
-    const minTime = zoom?.min ?? allMinTime;
-    const maxTime = zoom?.max ?? allMaxTime;
-    const timeRange = maxTime - minTime;
-    
-    // Получаем значения для оси X (температура/влажность)
-    const values = data.map(d => d[valueKey]).filter(v => v !== undefined) as number[];
-    const minValue = Math.min(...values);
-    const maxValue = Math.max(...values);
-    const valueRange = maxValue - minValue;
-    const padding = valueRange * 0.1;
-
-    return (
-      <div className="relative">
-        {/* Кнопки управления */}
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <div className="flex space-x-2">
-            {zoom && (
-              <button
-                onClick={() => resetZoom(chartType)}
-                className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-              >
-                Сбросить масштаб
-              </button>
-            )}
-            <div className="text-xs text-gray-500">
-              Выделите область для масштабирования • Двойной клик для добавления линии
-            </div>
-          </div>
-        </div>
-        
-        <div
-          ref={chartType === 'temperature' ? temperatureChartRef : humidityChartRef}
-          className="h-80 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 cursor-crosshair relative overflow-hidden"
-          onDoubleClick={(e) => handleChartDoubleClick(e, chartType)}
-          onMouseDown={(e) => handleChartMouseDown(e, chartType)}
-          onMouseUp={(e) => handleChartMouseUp(e, chartType)}
-          title="Двойной клик для добавления горизонтальной линии • Выделите область для масштабирования"
-        >
-          {/* Область выделения для зума */}
-          {isSelecting && isSelecting.chartType === chartType && (
-            <div
-              className="absolute bg-blue-200 bg-opacity-30 border border-blue-400 pointer-events-none"
-              style={{
-                left: 60,
-                right: 60,
-                top: Math.min(isSelecting.startY, isSelecting.startY),
-                height: Math.abs(isSelecting.startY - isSelecting.startY) || 1
-              }}
-            />
-          )}
-          
-          {/* Сетка */}
-          <svg className="absolute inset-0 w-full h-full">
-            {/* Горизонтальные линии сетки (время) */}
-            {[0, 1, 2, 3, 4, 5].map(i => (
-              <g key={`h-${i}`}>
-                <line
-                  x1="60"
-                  y1={30 + i * 42}
-                  x2="100%"
-                  y2={30 + i * 42}
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-                <text
-                  x="55"
-                  y={35 + i * 42}
-                  fill="#6b7280"
-                  fontSize="10"
-                  textAnchor="end"
-                >
-                  {new Date(maxTime - (i / 5) * timeRange).toLocaleString('ru-RU', {
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </text>
-              </g>
-            ))}
-            
-            {/* Вертикальные линии сетки (значения) */}
-            {[0, 1, 2, 3, 4].map(i => (
-              <g key={`v-${i}`}>
-                <line
-                  x1={60 + i * 150}
-                  y1="30"
-                  x2={60 + i * 150}
-                  y2="280"
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-                <text
-                  x={60 + i * 150}
-                  y="295"
-                  fill="#6b7280"
-                  fontSize="10"
-                  textAnchor="middle"
-                >
-                  {(minValue - padding + (i / 4) * (valueRange + 2 * padding)).toFixed(1)}
-                </text>
-              </g>
-            ))}
-
-            {/* Лимиты */}
-            {limits.min !== null && (
-              <line
-                x1={60 + ((limits.min - minValue + padding) / (valueRange + 2 * padding)) * 600}
-                y1="30"
-                x2={60 + ((limits.min - minValue + padding) / (valueRange + 2 * padding)) * 600}
-                y2="280"
-                stroke="#ef4444"
-                strokeWidth="2"
-                strokeDasharray="5,5"
-              />
-            )}
-            
-            {limits.max !== null && (
-              <line
-                x1={60 + ((limits.max - minValue + padding) / (valueRange + 2 * padding)) * 600}
-                y1="30"
-                x2={60 + ((limits.max - minValue + padding) / (valueRange + 2 * padding)) * 600}
-                y2="280"
-                stroke="#ef4444"
-                strokeWidth="2"
-                strokeDasharray="5,5"
-              />
-            )}
-
-            {/* Данные */}
-            {data.length > 1 && (
-              <polyline
-                points={data.map((d) => {
-                  const value = d[valueKey] as number;
-                  const x = 60 + ((value - minValue + padding) / (valueRange + 2 * padding)) * 600;
-                  const y = 280 - ((d.timestamp - minTime) / timeRange) * 250;
-                  return `${x},${y}`;
-                }).join(' ')}
-                fill="none"
-                stroke={color}
-                strokeWidth="2"
-              />
-            )}
-
-            {/* Горизонтальные линии значений */}
-            {lines.map(line => (
-              <g key={line.id}>
-                <line
-                  x1={60 + ((line.value - minValue + padding) / (valueRange + 2 * padding)) * 600}
-                  y1="30"
-                  x2={60 + ((line.value - minValue + padding) / (valueRange + 2 * padding)) * 600}
-                  y2="280"
-                  stroke="#8b5cf6"
-                  strokeWidth="2"
-                  strokeDasharray="3,3"
-                />
-                <circle
-                  cx={60 + ((line.value - minValue + padding) / (valueRange + 2 * padding)) * 600}
-                  cy="40"
-                  r="4"
-                  fill="#8b5cf6"
-                  className="cursor-pointer"
-                  onClick={() => removeVerticalLine(line.id, chartType)}
-                  title="Нажмите для удаления"
-                />
-                <circle
-                  cx={60 + ((line.value - minValue + padding) / (valueRange + 2 * padding)) * 600}
-                  cy="270"
-                  r="4"
-                  fill="#8b5cf6"
-                  className="cursor-pointer"
-                  onClick={() => removeVerticalLine(line.id, chartType)}
-                  title="Нажмите для удаления"
-                />
-              </g>
-            ))}
-
-            {/* Подписи осей */}
-            <text x="25" y="160" fill="#6b7280" fontSize="12" textAnchor="middle" transform="rotate(-90 25 160)">
-              Время
-            </text>
-            <text x="375" y="315" fill="#6b7280" fontSize="12" textAnchor="middle">
+            <text x="20" y="150" fill="#6b7280" fontSize="12" textAnchor="middle" transform="rotate(-90 20 150)">
               {title} ({unit})
             </text>
           </svg>
@@ -745,7 +320,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             <div
               key={`comment-${line.id}`}
               className="absolute top-2"
-              style={{ left: 60 + ((line.value - minValue + padding) / (valueRange + 2 * padding)) * 600 - 25 }}
+              style={{ left: line.x - 50 }}
             >
               {editingComment?.lineId === line.id && editingComment?.chartType === chartType ? (
                 <input
@@ -754,43 +329,36 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
                   onChange={(e) => updateLineComment(line.id, chartType, e.target.value)}
                   onBlur={() => setEditingComment(null)}
                   onKeyDown={(e) => e.key === 'Enter' && setEditingComment(null)}
-                  className="w-32 px-2 py-1 text-xs border border-purple-300 rounded bg-white shadow-sm"
+                  className="w-24 px-1 py-0.5 text-xs border border-purple-300 rounded bg-white"
                   autoFocus
                 />
               ) : (
                 <div
-                  className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded cursor-pointer max-w-32 truncate shadow-sm"
+                  className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded cursor-pointer max-w-24 truncate"
                   onClick={() => setEditingComment({ lineId: line.id, chartType })}
                   title={line.comment || 'Нажмите для добавления комментария'}
                 >
-                  {line.comment || `${line.value.toFixed(1)}${unit}`}
+                  {line.comment || 'Комментарий'}
                 </div>
               )}
             </div>
           ))}
         </div>
 
-        {/* Информация о масштабе */}
-        {zoom && (
-          <div className="mt-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
-            Временной масштаб: {new Date(zoom.min).toLocaleString('ru-RU')} - {new Date(zoom.max).toLocaleString('ru-RU')}
-          </div>
-        )}
-
-        {/* Интервалы значений */}
+        {/* Временные периоды */}
         {lines.length >= 2 && (
           <div className="mt-4 space-y-2">
-            <h4 className="text-sm font-medium text-gray-700">Интервалы значений:</h4>
+            <h4 className="text-sm font-medium text-gray-700">Временные периоды:</h4>
             {calculateTimePeriods(lines).map((period, index) => (
               <div key={index} className="text-xs bg-blue-50 p-2 rounded border">
                 <div className="flex items-center space-x-2">
-                  <Target className="w-3 h-3 text-blue-600" />
-                  <span className="font-medium">Интервал {index + 1}:</span>
+                  <Clock className="w-3 h-3 text-blue-600" />
+                  <span className="font-medium">Период {index + 1}:</span>
                 </div>
                 <div className="mt-1 space-y-1">
-                  <div>Начальное значение: {period.start}{unit} {period.startComment && `(${period.startComment})`}</div>
-                  <div>Конечное значение: {period.end}{unit} {period.endComment && `(${period.endComment})`}</div>
-                  <div className="font-medium text-blue-700">Разность: {period.difference}{unit}</div>
+                  <div>Начало: {period.start} {period.startComment && `(${period.startComment})`}</div>
+                  <div>Конец: {period.end} {period.endComment && `(${period.endComment})`}</div>
+                  <div className="font-medium text-blue-700">Длительность: {period.duration}</div>
                 </div>
               </div>
             ))}
@@ -991,7 +559,11 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
         <div className="space-y-8">
           {/* График температуры */}
           <div>
-            {renderTimeChart(
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">График температуры</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Двойной клик для добавления вертикальной линии. Клик по кружку для удаления линии.
+            </p>
+            {renderChart(
               chartData,
               'temperature',
               temperatureLimits,
@@ -999,15 +571,18 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
               'temperature',
               'Температура',
               '°C',
-              '#ef4444',
-              temperatureZoom
+              '#ef4444'
             )}
           </div>
 
           {/* График влажности */}
           {chartData.some(d => d.humidity !== undefined) && (
             <div>
-              {renderTimeChart(
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">График влажности</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Двойной клик для добавления вертикальной линии. Клик по кружку для удаления линии.
+              </p>
+              {renderChart(
                 chartData,
                 'humidity',
                 humidityLimits,
@@ -1015,8 +590,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
                 'humidity',
                 'Влажность',
                 '%',
-                '#3b82f6',
-                humidityZoom
+                '#3b82f6'
               )}
             </div>
           )}
