@@ -34,6 +34,4 @@ export interface UploadedFile {
   errorMessage?: string;
   recordCount?: number;
   period?: string;
-  csvDownloadUrl?: string;
-  csvFileName?: string;
 }

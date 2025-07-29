@@ -2,7 +2,6 @@ import React from 'react';
 import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { databaseService } from '../utils/database';
-import { CSVExporter } from '../utils/csvExporter';
 import { Testo174HBinaryParser } from '../utils/testo174hBinaryParser';
 import { Testo174TBinaryParser } from '../utils/testo174tBinaryParser';
 
@@ -70,12 +69,6 @@ export const MicroclimatAnalyzer: React.FC = () => {
         // Сохраняем в базу данных
         await databaseService.saveParsedFileData(parsedData, fileRecord.id);
         
-        // Создаем CSV файл
-        const csvContent = CSVExporter.exportToCSV(parsedData);
-        const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const csvUrl = URL.createObjectURL(csvBlob);
-        const csvFileName = CSVExporter.getExportFileName(parsedData);
-        
         setUploadedFiles(prev => prev.map(f => {
           if (f.id === fileRecord.id) {
             const period = `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`;
@@ -84,9 +77,7 @@ export const MicroclimatAnalyzer: React.FC = () => {
               parsingStatus: 'completed' as const,
               parsedData,
               recordCount: parsedData.recordCount,
-              period,
-              csvDownloadUrl: csvUrl,
-              csvFileName
+              period
             };
           }
           return f;
@@ -131,17 +122,6 @@ export const MicroclimatAnalyzer: React.FC = () => {
 
   const triggerFileUpload = () => {
     fileInputRef.current?.click();
-  };
-
-  const handleDownloadCSV = (file: UploadedFile) => {
-    if (file.csvDownloadUrl && file.csvFileName) {
-      const link = document.createElement('a');
-      link.href = file.csvDownloadUrl;
-      link.download = file.csvFileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
   };
 
   const getStatusIcon = (status: UploadedFile['parsingStatus']) => {
@@ -220,9 +200,6 @@ export const MicroclimatAnalyzer: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Записей
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    CSV экспорт
-                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Удалить
                   </th>
@@ -260,22 +237,6 @@ export const MicroclimatAnalyzer: React.FC = () => {
                       <div className="text-sm text-gray-500">
                         {file.recordCount ? file.recordCount.toLocaleString('ru-RU') : '-'}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {file.csvDownloadUrl ? (
-                        <button
-                          onClick={() => handleDownloadCSV(file)}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 transition-colors"
-                          title="Скачать CSV файл"
-                        >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          CSV
-                        </button>
-                      ) : (
-                        <span className="text-gray-400 text-sm">-</span>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button
