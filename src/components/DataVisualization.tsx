@@ -51,6 +51,8 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [temperatureLines, setTemperatureLines] = useState<VerticalLine[]>([]);
   const [humidityLines, setHumidityLines] = useState<VerticalLine[]>([]);
+  const [temperatureZoom, setTemperatureZoom] = useState({ isZoomed: false });
+  const [humidityZoom, setHumidityZoom] = useState({ isZoomed: false });
 
   const researchInfoRef = useRef<HTMLDivElement>(null);
 
@@ -138,6 +140,36 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     } else {
       setHumidityLines(prev => prev.filter(line => line.id !== lineId));
     }
+  };
+
+  const renderChart = (
+    data: ChartData[],
+    dataKey: 'temperature' | 'humidity',
+    limits: Limits,
+    lines: VerticalLine[],
+    chartType: 'temperature' | 'humidity',
+    title: string,
+    unit: string,
+    color: string
+  ) => {
+    return (
+      <InteractiveChart
+        data={data.filter(d => d[dataKey] !== undefined).map(d => ({ 
+          timestamp: d.timestamp, 
+          value: d[dataKey]!, 
+          fileId: d.fileId, 
+          fileName: d.fileName 
+        }))}
+        title={title}
+        unit={unit}
+        color={color}
+        limits={limits}
+        lines={lines}
+        onAddLine={(timestamp) => addVerticalLine(timestamp, chartType)}
+        onUpdateLineComment={(lineId, comment) => updateLineComment(lineId, comment, chartType)}
+        onRemoveLine={(lineId) => removeVerticalLine(lineId, chartType)}
+      />
+    );
   };
 
   const isFormValid = () => {
@@ -332,79 +364,12 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
           {/* График температуры */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">График температуры</h3>
-            <InteractiveChart
-              data={chartData.map(d => ({ timestamp: d.timestamp, value: d.temperature, fileId: d.fileId, fileName: d.fileName }))}
-              title="Температура"
-              unit="°C"
-              color="#ef4444"
-              limits={temperatureLimits}
-              lines={temperatureLines}
-              onAddLine={(timestamp) => addVerticalLine(timestamp, 'temperature')}
-              onUpdateLineComment={(lineId, comment) => updateLineComment(lineId, comment, 'temperature')}
-              onRemoveLine={(lineId) => removeVerticalLine(lineId, 'temperature')}
-            />
-          </div>
-
-          {/* График влажности */}
-          {chartData.some(d => d.humidity !== undefined) && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">График влажности</h3>
-              <InteractiveChart
-                data={chartData.filter(d => d.humidity !== undefined).map(d => ({ 
-                  timestamp: d.timestamp, 
-                  value: d.humidity!, 
-                  fileId: d.fileId, 
-                  fileName: d.fileName 
-                }))}
-                title="Влажность"
-                unit="%"
-                color="#3b82f6"
-                limits={humidityLimits}
-                lines={humidityLines}
-                onAddLine={(timestamp) => addVerticalLine(timestamp, 'humidity')}
-                onUpdateLineComment={(lineId, comment) => updateLineComment(lineId, comment, 'humidity')}
-                onRemoveLine={(lineId) => removeVerticalLine(lineId, 'humidity')}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Информация о данных */}
-        <div className="mt-8 bg-gray-50 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Информация о загруженных данных:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <span className="font-medium">Количество файлов:</span> {files.filter(f => f.parsingStatus === 'completed').length}
-            </div>
-            <div>
-              <span className="font-medium">Общее количество записей:</span> {chartData.length.toLocaleString('ru-RU')}
-            </div>
-            <div>
-              <span className="font-medium">Период данных:</span> 
-              {chartData.length > 0 && (
-                <span className="ml-1">
-                  {new Date(chartData[0].timestamp).toLocaleDateString('ru-RU')} - 
-                  {new Date(chartData[chartData.length - 1].timestamp).toLocaleDateString('ru-RU')}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Кнопка генерации отчета */}
-        <div className="mt-6 flex justify-end">
-          <button
-            disabled={!isFormValid()}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            <Download className="w-5 h-5" />
-            <span>Сформировать отчет</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+            <p className="text-sm text-gray-600 mb-4">
+              Двойной клик для добавления вертикальной линии. Клик по кружку для удаления линии.
+            </p>
+            {renderChart(
+              chartData,
+              'temperature',
               temperatureLimits,
               temperatureLines,
               'temperature',
