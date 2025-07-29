@@ -36,7 +36,7 @@ export const MicroclimatAnalyzer: React.FC = () => {
         name: file.name,
         uploadDate: new Date().toLocaleString('ru-RU'),
         parsingStatus: 'processing' as const,
-        order: uploadedFiles.length + newFiles.length
+        order: uploadedFiles.length + index
       };
     }).filter(Boolean) as UploadedFile[];
 
