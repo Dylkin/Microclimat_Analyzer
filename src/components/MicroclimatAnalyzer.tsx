@@ -24,7 +24,7 @@ export const MicroclimatAnalyzer: React.FC = () => {
     const fileArray = Array.from(files);
     
     // Создаем записи для файлов с начальным статусом
-    const newFiles: UploadedFile[] = fileArray.map(file => {
+    const newFiles: UploadedFile[] = fileArray.map((file, index) => {
       // Проверяем расширение файла
       if (!file.name.toLowerCase().endsWith('.vi2')) {
         alert(`Файл "${file.name}" имеет неподдерживаемый формат. Поддерживаются только файлы .vi2`);
