@@ -129,7 +129,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     
     const rect = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - rect.left;
-    const chartWidth = rect.width - 80;
+    const chartWidth = rect.width - 60; // 40px слева + 20px справа
     
     const currentZoom = chartType === 'temperature' ? temperatureZoom : humidityZoom;
     const visibleData = getVisibleData(chartType);
@@ -183,7 +183,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     
     // Минимальная ширина выделения для зума
     if (Math.abs(endX - startX) > 20) {
-      const chartWidth = rect.width - 80;
+      const chartWidth = rect.width - 60; // 40px слева + 20px справа
       const visibleData = getVisibleData(chartType);
       
       if (visibleData.length > 0) {
@@ -329,7 +329,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
       const timestamp = visibleData[dataIndex]?.timestamp;
       if (timestamp) {
         timeLabels.push({
-          x: 40 + (i / (labelCount - 1)) * (100 - 40) + '%',
+          x: 40 + (i / (labelCount - 1)) * 60,
           label: formatAxisDate(timestamp)
         });
       }
@@ -369,7 +369,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
                 key={`h-${i}`}
                 x1="40"
                 y1={60 + i * 55}
-                x2="100%"
+                x2="calc(100% - 20px)"
                 y2={60 + i * 55}
                 stroke="#e5e7eb"
                 strokeWidth="1"
@@ -380,9 +380,9 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             {timeLabels.map((label, i) => (
               <line
                 key={`v-${i}`} 
-                x1={label.x.replace('%', '')}
+                x1={label.x}
                 y1="20"
-                x2={label.x.replace('%', '')}
+                x2={label.x}
                 y2="280"
                 stroke="#e5e7eb"
                 strokeWidth="1"
@@ -393,7 +393,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             {timeLabels.map((label, i) => (
               <text
                 key={`time-${i}`}
-                x={label.x.replace('%', '')}
+                x={label.x}
                 y="300"
                 fill="#6b7280"
                 fontSize="10"
@@ -427,7 +427,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
               <line
                 x1="40"
                 y1={280 - ((limits.min - minValue + padding) / (range + 2 * padding)) * 260}
-                x2="100%"
+                x2="calc(100% - 20px)"
                 y2={280 - ((limits.min - minValue + padding) / (range + 2 * padding)) * 260}
                 stroke="#ef4444"
                 strokeWidth="2"
@@ -439,7 +439,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
               <line
                 x1="40"
                 y1={280 - ((limits.max - minValue + padding) / (range + 2 * padding)) * 260}
-                x2="100%"
+                x2="calc(100% - 20px)"
                 y2={280 - ((limits.max - minValue + padding) / (range + 2 * padding)) * 260}
                 stroke="#ef4444"
                 strokeWidth="2"
@@ -451,10 +451,10 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             {visibleData.length > 1 && (
               <polyline
                 points={visibleData.map((d, i) => {
-                  const x = 40 + (i / (visibleData.length - 1)) * (100 - 40) + '%';
+                  const x = 40 + (i / (visibleData.length - 1)) * (100 - 60);
                   const value = d[valueKey] as number;
                   const y = 280 - ((value - minValue + padding) / (range + 2 * padding)) * 260;
-                  return `${x.replace('%', '')},${y}`;
+                  return `${x},${y}`;
                 }).join(' ')}
                 fill="none"
                 stroke={color}
@@ -473,20 +473,20 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
               // Вычисляем позицию линии относительно видимых данных
               const timeRange = visibleData[visibleData.length - 1].timestamp - visibleData[0].timestamp;
               const relativeTime = line.timestamp - visibleData[0].timestamp;
-              const xPos = 40 + (relativeTime / timeRange) * (100 - 40) + '%';
+              const xPos = 40 + (relativeTime / timeRange) * (100 - 60);
               
               return (
                 <g key={line.id}>
                   <line
-                    x1={xPos.replace('%', '')}
+                    x1={xPos}
                     y1="20"
-                    x2={xPos.replace('%', '')}
+                    x2={xPos}
                     y2="280"
                     stroke="#8b5cf6"
                     strokeWidth="2"
                   />
                   <circle
-                    cx={xPos.replace('%', '')}
+                    cx={xPos}
                     cy="30"
                     r="4"
                     fill="#8b5cf6"
@@ -517,8 +517,8 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
                   
                   const timeRange = visibleData[visibleData.length - 1].timestamp - visibleData[0].timestamp;
                   const relativeTime = line.timestamp - visibleData[0].timestamp;
-                  const xPercent = 40 + (relativeTime / timeRange) * (100 - 40);
-                  return `calc(${xPercent}% - 50px)`;
+                  const xPos = 40 + (relativeTime / timeRange) * (100 - 60);
+                  return `calc(${xPos}px - 50px)`;
                 })()
               }}
             >
