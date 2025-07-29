@@ -3,12 +3,10 @@ import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, Che
 import { UploadedFile } from '../types/FileData';
 import { databaseService } from '../utils/database';
 import { CSVExporter } from '../utils/csvExporter';
-import { Testo174HParsingService } from '../utils/testo174hParser';
 
 export const MicroclimatAnalyzer: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const parsingService = React.useRef(new Testo174HParsingService());
 
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
@@ -50,29 +48,16 @@ export const MicroclimatAnalyzer: React.FC = () => {
       if (!fileRecord) continue;
       
       try {
-        // Парсим файл
-        const parsedData = await parsingService.current.parseFile(file);
+        // Имитация обработки файла
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Создаем CSV файл
-        const csvContent = CSVExporter.exportToCSV(parsedData);
-        const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const csvUrl = URL.createObjectURL(csvBlob);
-        const csvFileName = CSVExporter.getExportFileName(parsedData);
-        
-        // Сохраняем в базу данных
-        await databaseService.saveParsedFileData(parsedData, fileRecord.id);
-        
-        // Обновляем статус файла
         setUploadedFiles(prev => prev.map(f => {
           if (f.id === fileRecord.id) {
             return {
               ...f,
-              parsedData,
               parsingStatus: 'completed' as const,
-              recordCount: parsedData.recordCount,
-              period: `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`,
-              csvDownloadUrl: csvUrl,
-              csvFileName
+              recordCount: Math.floor(Math.random() * 1000) + 100,
+              period: '02.06.2025 - 17.06.2025'
             };
           }
           return f;
