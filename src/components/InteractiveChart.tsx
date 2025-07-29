@@ -11,7 +11,6 @@ import {
   TimeScale,
   ChartOptions,
   Plugin,
-  helpers
 } from 'chart.js';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import { Line } from 'react-chartjs-2';
@@ -227,7 +226,7 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
       }
     },
     onDoubleClick: (event, elements, chart) => {
-      const canvasPosition = helpers.getRelativePosition(event, chart);
+      const canvasPosition = ChartJS.helpers.getRelativePosition(event, chart);
       const dataX = chart.scales.x.getValueForPixel(canvasPosition.x);
       if (dataX) {
         onAddLine(dataX);
@@ -235,7 +234,7 @@ export const InteractiveChart: React.FC<InteractiveChartProps> = ({
     },
     onClick: (event, elements, chart) => {
       // Проверяем клик по кружкам вертикальных линий
-      const canvasPosition = helpers.getRelativePosition(event, chart);
+      const canvasPosition = ChartJS.helpers.getRelativePosition(event, chart);
       const chartArea = chart.chartArea;
       
       lines.forEach(line => {
