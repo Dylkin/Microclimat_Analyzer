@@ -186,27 +186,6 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
         </div>
       )}
 
-      {/* Быстрый доступ к анализатору временных рядов */}
-      <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <TrendingUp className="w-8 h-8 text-indigo-600" />
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Анализатор временных рядов</h3>
-              <p className="text-sm text-gray-600">Интерактивные графики с зумом, маркерами и лимитами</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowTimeSeriesAnalyzer(true)}
-            disabled={files.filter(f => f.parsingStatus === 'completed').length === 0}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            <TrendingUp className="w-5 h-5" />
-            <span>Открыть анализатор</span>
-          </button>
-        </div>
-      </div>
-
       {/* Информация для исследования */}
       <div ref={researchInfoRef} className="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500">
         <div className="flex items-center space-x-3 mb-6">
@@ -295,47 +274,25 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
           </div>
         </div>
 
-        {/* Вид испытаний */}
-        <div className="mt-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Вид испытаний
-          </label>
-          <select
-            value={testType}
-            onChange={(e) => setTestType(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            {testTypes.map(type => (
-              <option key={type.value} value={type.value}>{type.label}</option>
-            ))}
-          </select>
-        </div>
+      </div>
 
-        {/* Кнопка генерации отчета */}
-        <div className="mt-6 flex items-center justify-between">
-          <div>
-            {!isFormValid() && (
-              <p className="text-sm text-yellow-600">
-                Пожалуйста, заполните все обязательные поля (отмечены *)
-              </p>
-            )}
+      {/* Быстрый доступ к анализатору временных рядов */}
+      <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <TrendingUp className="w-8 h-8 text-indigo-600" />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Анализатор временных рядов</h3>
+              <p className="text-sm text-gray-600">Интерактивные графики с зумом, маркерами и лимитами</p>
+            </div>
           </div>
           <button
-            onClick={handleGenerateReport}
-            disabled={!isFormValid() || isGeneratingReport}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            onClick={() => setShowTimeSeriesAnalyzer(true)}
+            disabled={files.filter(f => f.parsingStatus === 'completed').length === 0}
+            className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {isGeneratingReport ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Генерация отчета...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-5 h-5" />
-                <span>Сформировать отчет</span>
-              </>
-            )}
+            <TrendingUp className="w-5 h-5" />
+            <span>Открыть анализатор</span>
           </button>
         </div>
       </div>
