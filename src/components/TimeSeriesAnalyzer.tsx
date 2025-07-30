@@ -18,6 +18,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [chartHeight, setChartHeight] = useState(400);
   const [dataType, setDataType] = useState<DataType>('temperature');
   const [testType, setTestType] = useState('empty-object');
+  const [editingMarker, setEditingMarker] = useState<string | null>(null);
 
   const { data, loading, progress, error, reload } = useTimeSeriesData({ files });
 
@@ -61,6 +62,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // Обработчик удаления маркера
   const handleMarkerDelete = useCallback((markerId: string) => {
     setMarkers(prev => prev.filter(m => m.id !== markerId));
+  }, []);
+
+  // Обработчик изменения названия маркера
+  const handleMarkerLabelChange = useCallback((markerId: string, newLabel: string) => {
+    setMarkers(prev => prev.map(m => 
+      m.id === markerId ? { ...m, label: newLabel } : m
+    ));
   }, []);
 
   // Обработчик зума
@@ -407,13 +415,41 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       {markers.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold mb-4">Вертикальные маркеры</h3>
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Редактирование маркеров:</strong> Нажмите на название маркера для редактирования
+            </p>
+          </div>
           <div className="space-y-2">
             {markers.map(marker => (
               <div key={marker.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <div className="w-4 h-4 rounded-full" style={{ backgroundColor: marker.color }}></div>
                   <div>
-                    <div className="font-medium">{marker.label}</div>
+                    <div className="font-medium">
+                      {editingMarker === marker.id ? (
+                        <input
+                          type="text"
+                          value={marker.label || ''}
+                          onChange={(e) => handleMarkerLabelChange(marker.id, e.target.value)}
+                          onBlur={() => setEditingMarker(null)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') setEditingMarker(null);
+                            if (e.key === 'Escape') setEditingMarker(null);
+                          }}
+                          className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          autoFocus
+                          placeholder="Введите название маркера"
+                        />
+                      ) : (
+                        <span
+                          onClick={() => setEditingMarker(marker.id)}
+                          className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+                        >
+                          {marker.label || 'Нажмите для редактирования'}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-gray-600">
                       {new Date(marker.timestamp).toLocaleString('ru-RU')}
                     </div>
