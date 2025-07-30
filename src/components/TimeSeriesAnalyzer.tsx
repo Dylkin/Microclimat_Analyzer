@@ -8,6 +8,14 @@ import { databaseService } from '../utils/database';
 import { ReportGenerator } from '../utils/reportGenerator';
 import { useAuth } from '../contexts/AuthContext';
 
+interface ResearchInfo {
+  reportNumber: string;
+  reportDate: string;
+  templateFile: File | null;
+  objectName: string;
+  climateSystemName: string;
+}
+
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
   onBack: () => void;
@@ -27,6 +35,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [generatedReports, setGeneratedReports] = useState<string[]>([]);
   const chartRef = React.useRef<HTMLDivElement>(null);
+  const [researchInfo, setResearchInfo] = useState<ResearchInfo>({
+    reportNumber: '',
+    reportDate: new Date().toISOString().split('T')[0],
+    templateFile: null,
+    objectName: '',
+    climateSystemName: ''
+  });
 
   const { user, users } = useAuth();
   const { data, loading, progress, error, reload } = useTimeSeriesData({ files });
@@ -101,20 +116,56 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   }, []);
 
   // Генерация отчета из анализатора
-  const handleGenerateReportFromAnalyzer = async () => {
-    if (!isReportReady) {
-      setReportStatus({ type: 'error', message: 'Заполните поле "Вывод" для формирования отчета' });
+  const handleGenerateReport = async () => {
+    if (!isFormValid()) {
+      setReportStatus({ type: 'error', message: 'Заполните все обязательные поля и выводы' });
       return;
     }
 
-    // Проверяем, что есть данные для отчета
-    if (!data || resultsTableData.length === 0) {
-      setReportStatus({ type: 'error', message: 'Нет данных для формирования отчета' });
-      return;
-    }
+    setIsGeneratingReport(true);
+    setReportStatus(null);
 
-    setReportStatus({ type: 'error', message: 'Для генерации отчета перейдите в раздел "Визуализация данных", загрузите шаблон DOCX и заполните информацию об исследовании' });
-    return;
+    try {
+      const reportGenerator = ReportGenerator.getInstance();
+      
+      // Получаем руководителя из справочника пользователей
+      const director = users.find(u => u.role === 'manager')?.fullName || 'Не назначен';
+      
+      // Подготавливаем данные для отчета
+      const reportData = {
+        reportNumber: researchInfo.reportNumber,
+        reportDate: researchInfo.reportDate,
+        objectName: researchInfo.objectName,
+        climateSystemName: researchInfo.climateSystemName,
+        testType,
+        limits,
+        markers,
+        resultsTableData,
+        conclusion,
+        user: user || { fullName: 'Текущий пользователь', email: '', id: '', role: 'specialist' as const },
+        director
+      };
+
+      const result = await reportGenerator.generateReport(
+        researchInfo.templateFile!,
+        reportData,
+        chartRef.current || undefined
+      );
+
+      if (result.success) {
+        setReportStatus({ type: 'success', message: `Отчет "${result.fileName}" успешно сгенерирован и скачан` });
+        setGeneratedReports(reportGenerator.getGeneratedReports());
+      } else {
+        setReportStatus({ type: 'error', message: result.error || 'Ошибка генерации отчета' });
+      }
+    } catch (error) {
+      setReportStatus({ 
+        type: 'error', 
+        message: error instanceof Error ? error.message : 'Неизвестная ошибка' 
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
   };
 
 
