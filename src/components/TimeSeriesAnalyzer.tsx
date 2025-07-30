@@ -15,14 +15,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [limits, setLimits] = useState<ChartLimits>({});
   const [markers, setMarkers] = useState<VerticalMarker[]>([]);
   const [zoomState, setZoomState] = useState<ZoomState | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [chartHeight, setChartHeight] = useState(400);
   const [dataType, setDataType] = useState<DataType>('temperature');
   const [testType, setTestType] = useState('empty-object');
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
 
   const { data, loading, progress, error, reload } = useTimeSeriesData({ files });
-  const [fileStats, setFileStats] = useState<Map<string, any>>(new Map());
 
   const testTypes = [
     { value: 'empty-object', label: 'Соответствие критериям в пустом объекте' },
@@ -165,57 +163,43 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       .filter(f => f.parsingStatus === 'completed')
       .sort((a, b) => a.order - b.order);
     
+    if (!data) return [];
+    
     return sortedFiles.map(file => {
-      const stats = fileStats.get(file.id);
       const fileName = file.name;
       
       // Извлекаем данные из имени файла
       const loggerName = fileName.substring(0, 6);
-      const serialNumber = fileName.substring(6, 15);
+      const serialNumber = fileName.substring(7, 15); // 8-15 символы (индексы 7-14)
+      
+      // Фильтруем данные для конкретного файла
+      let fileData = data.points.filter(p => p.fileId === fileName && p.temperature !== undefined);
+      
+      // Применяем зум если установлен
+      if (zoomState) {
+        fileData = fileData.filter(p => 
+          p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
+        );
+      }
+      
+      // Вычисляем статистику на основе отфильтрованных данных
+      let stats = null;
+      if (fileData.length > 0) {
+        const temperatures = fileData.map(p => p.temperature!);
+        const min = Math.min(...temperatures);
+        const max = Math.max(...temperatures);
+        const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+        
+        stats = {
+          min: Math.round(min * 10) / 10,
+          max: Math.round(max * 10) / 10,
+          avg: Math.round(avg * 10) / 10,
+          count: temperatures.length
+        };
+      }
       
       // Проверка соответствия лимитам
       let meetsLimits = '-';
-      if (limits.temperature?.min !== undefined || limits.temperature?.max !== undefined) {
-        if (stats) {
-          const minLimit = limits.temperature?.min;
-          const maxLimit = limits.temperature?.max;
-          
-          let withinLimits = true;
-          if (minLimit !== undefined && stats.min < minLimit) withinLimits = false;
-          if (maxLimit !== undefined && stats.max > maxLimit) withinLimits = false;
-          
-          meetsLimits = withinLimits ? 'Да' : 'Нет';
-        }
-      }
-      
-      return {
-        fileId: file.id,
-        zoneNumber: file.zoneNumber || '-',
-        measurementLevel: file.measurementLevel || '-',
-        loggerName,
-        serialNumber,
-        minTemp: stats?.min || '-',
-        maxTemp: stats?.max || '-',
-        avgTemp: stats?.avg || '-',
-        meetsLimits
-      };
-    });
-  }, [files, fileStats, limits.temperature]);
-
-  // Находим глобальные минимум и максимум для подсветки
-  const globalMinMax = useMemo(() => {
-    const validStats = resultsTableData.filter(row => typeof row.minTemp === 'number' && typeof row.maxTemp === 'number');
-    if (validStats.length === 0) return { globalMin: null, globalMax: null };
-    
-    const allMins = validStats.map(row => row.minTemp as number);
-    const allMaxs = validStats.map(row => row.maxTemp as number);
-    
-    return {
-      globalMin: Math.min(...allMins),
-      globalMax: Math.max(...allMaxs)
-    };
-  }, [resultsTableData]);
-
   // Статистика данных
   const stats = useMemo(() => {
     if (!data) return null;
@@ -299,14 +283,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="flex items-center space-x-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-            <span>Настройки</span>
-          </button>
-          
           {zoomState && (
             <button
               onClick={handleZoomReset}
@@ -393,153 +369,151 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       </div>
 
       {/* Панель настроек */}
-      {showSettings && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Настройки отображения</h3>
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-            <p className="text-sm text-blue-800">
-              <strong>Автоматическое масштабирование:</strong>
-            </p>
-            <ul className="text-sm text-blue-700 space-y-1 ml-4">
-              <li>• <strong>По вертикали:</strong> При зуме Y-ось подстраивается под видимые данные</li>
-              <li>• <strong>Лимиты:</strong> Установленные лимиты расширяют масштаб для лучшего отображения</li>
-              <li>• <strong>Динамическое:</strong> Масштаб автоматически изменяется при изменении временного диапазона</li>
-            </ul>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Лимиты температуры */}
-            <div>
-              <h4 className="font-medium mb-3 text-red-600">Лимиты температуры</h4>
-              <div className="space-y-2">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Минимум (°C)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={limits.temperature?.min || ''}
-                    onChange={(e) => handleLimitChange('temperature', 'min', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Не установлен"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Максимум (°C)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={limits.temperature?.max || ''}
-                    onChange={(e) => handleLimitChange('temperature', 'max', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Не установлен"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Лимиты влажности */}
-            <div>
-              <h4 className="font-medium mb-3 text-blue-600">Лимиты влажности</h4>
-              <div className="space-y-2">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Минимум (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={limits.humidity?.min || ''}
-                    onChange={(e) => handleLimitChange('humidity', 'min', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Не установлен"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Максимум (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={limits.humidity?.max || ''}
-                    onChange={(e) => handleLimitChange('humidity', 'max', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Не установлен"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Настройки отображения */}
-            <div>
-              <h4 className="font-medium mb-3 text-green-600">Настройки отображения</h4>
-              <div className="space-y-2">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Высота графика (px)</label>
-                  <input
-                    type="number"
-                    min="300"
-                    max="800"
-                    step="50"
-                    value={chartHeight}
-                    onChange={(e) => setChartHeight(parseInt(e.target.value) || 400)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Исследовательский режим */}
-          <div className="md:col-span-3 border-t border-gray-200 pt-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <Target className="w-6 h-6 text-green-600" />
-              <h4 className="text-lg font-semibold text-gray-900">Исследовательский режим</h4>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold mb-4">Настройки отображения</h3>
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+          <p className="text-sm text-blue-800">
+            <strong>Автоматическое масштабирование:</strong>
+          </p>
+          <ul className="text-sm text-blue-700 space-y-1 ml-4">
+            <li>• <strong>По вертикали:</strong> При зуме Y-ось подстраивается под видимые данные</li>
+            <li>• <strong>Лимиты:</strong> Установленные лимиты расширяют масштаб для лучшего отображения</li>
+            <li>• <strong>Динамическое:</strong> Масштаб автоматически изменяется при изменении временного диапазона</li>
+          </ul>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Лимиты температуры */}
+          <div>
+            <h4 className="font-medium mb-3 text-red-600">Лимиты температуры</h4>
+            <div className="space-y-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Вид испытаний</label>
-                <select
-                  value={testType}
-                  onChange={(e) => setTestType(e.target.value)}
+                <label className="block text-sm text-gray-600 mb-1">Минимум (°C)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={limits.temperature?.min || ''}
+                  onChange={(e) => handleLimitChange('temperature', 'min', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  {testTypes.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
+                  placeholder="Не установлен"
+                />
               </div>
-
-              <div className="flex items-end">
-                <div className="text-sm text-gray-600">
-                  Данные готовы для анализа и формирования отчета
-                </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Максимум (°C)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={limits.temperature?.max || ''}
+                  onChange={(e) => handleLimitChange('temperature', 'max', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Не установлен"
+                />
               </div>
             </div>
+          </div>
 
-            {/* Информация о данных */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <h5 className="text-sm font-medium text-gray-700 mb-2">Информация о загруженных данных:</h5>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Количество файлов:</span> {stats?.filesLoaded || 0}
-                </div>
-                <div>
-                  <span className="font-medium">Общее количество записей:</span> {stats?.totalPoints.toLocaleString('ru-RU') || '0'}
-                </div>
-                <div>
-                  <span className="font-medium">Период данных:</span> 
-                  <span className="ml-1">{stats?.days || 0} дней</span>
-                </div>
+          {/* Лимиты влажности */}
+          <div>
+            <h4 className="font-medium mb-3 text-blue-600">Лимиты влажности</h4>
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Минимум (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={limits.humidity?.min || ''}
+                  onChange={(e) => handleLimitChange('humidity', 'min', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Не установлен"
+                />
               </div>
-              {(!stats || stats.filesLoaded === 0) && (
-                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    Нет обработанных файлов. Загрузите файлы в формате .vi2 для анализа данных.
-                  </p>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Максимум (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={limits.humidity?.max || ''}
+                  onChange={(e) => handleLimitChange('humidity', 'max', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Не установлен"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Настройки отображения */}
+          <div>
+            <h4 className="font-medium mb-3 text-green-600">Настройки отображения</h4>
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Высота графика (px)</label>
+                <input
+                  type="number"
+                  min="300"
+                  max="800"
+                  step="50"
+                  value={chartHeight}
+                  onChange={(e) => setChartHeight(parseInt(e.target.value) || 400)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
             </div>
           </div>
         </div>
-      )}
+
+        {/* Исследовательский режим */}
+        <div className="md:col-span-3 border-t border-gray-200 pt-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <Target className="w-6 h-6 text-green-600" />
+            <h4 className="text-lg font-semibold text-gray-900">Исследовательский режим</h4>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Вид испытаний</label>
+              <select
+                value={testType}
+                onChange={(e) => setTestType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                {testTypes.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-end">
+              <div className="text-sm text-gray-600">
+                Данные готовы для анализа и формирования отчета
+              </div>
+            </div>
+          </div>
+
+          {/* Информация о данных */}
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <h5 className="text-sm font-medium text-gray-700 mb-2">Информация о загруженных данных:</h5>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <span className="font-medium">Количество файлов:</span> {stats?.filesLoaded || 0}
+              </div>
+              <div>
+                <span className="font-medium">Общее количество записей:</span> {stats?.totalPoints.toLocaleString('ru-RU') || '0'}
+              </div>
+              <div>
+                <span className="font-medium">Период данных:</span> 
+                <span className="ml-1">{stats?.days || 0} дней</span>
+              </div>
+            </div>
+            {(!stats || stats.filesLoaded === 0) && (
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  Нет обработанных файлов. Загрузите файлы в формате .vi2 для анализа данных.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Управление маркерами */}
       {markers.length > 0 && (
@@ -627,8 +601,35 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
       )}
 
-      {/* Таблица результатов */}
-      {resultsTableData.length > 0 && (
+      {/* График */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className={`text-lg font-semibold mb-4 ${dataType === 'temperature' ? 'text-red-600' : 'text-blue-600'}`}>
+          График {dataType === 'temperature' ? 'температуры' : 'влажности'}
+        </h3>
+        <div className="text-sm text-gray-600 mb-4">
+          Двойной клик для добавления маркера • Выделите область мышью для зума
+        </div>
+        <div className="overflow-x-auto">
+          <TimeSeriesChart
+            data={data.points}
+            width={chartWidth}
+            height={chartHeight}
+            margin={margin}
+            dataType={dataType}
+            limits={limits}
+            markers={markers}
+            zoomState={zoomState}
+            onZoomChange={handleZoomChange}
+            onMarkerAdd={handleMarkerAdd}
+            color={dataType === 'temperature' ? '#ef4444' : '#3b82f6'}
+            yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
+            showLegend={true}
+          />
+        </div>
+      </div>
+
+      {/* Таблица результатов - только для температуры */}
+      {dataType === 'temperature' && resultsTableData.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold mb-4">Таблица результатов</h3>
           <div className="overflow-x-auto">
@@ -734,33 +735,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
         </div>
       )}
-
-      {/* График */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className={`text-lg font-semibold mb-4 ${dataType === 'temperature' ? 'text-red-600' : 'text-blue-600'}`}>
-          График {dataType === 'temperature' ? 'температуры' : 'влажности'}
-        </h3>
-        <div className="text-sm text-gray-600 mb-4">
-          Двойной клик для добавления маркера • Выделите область мышью для зума
-        </div>
-        <div className="overflow-x-auto">
-          <TimeSeriesChart
-            data={data.points}
-            width={chartWidth}
-            height={chartHeight}
-            margin={margin}
-            dataType={dataType}
-            limits={limits}
-            markers={markers}
-            zoomState={zoomState}
-            onZoomChange={handleZoomChange}
-            onMarkerAdd={handleMarkerAdd}
-            color={dataType === 'temperature' ? '#ef4444' : '#3b82f6'}
-            yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
-            showLegend={true}
-          />
-        </div>
-      </div>
 
       {/* Инструкции */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
