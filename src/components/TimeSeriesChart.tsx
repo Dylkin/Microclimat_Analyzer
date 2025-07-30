@@ -81,7 +81,20 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     .range([0, innerWidth]);
 
   // Y-шкала с учетом пользовательских лимитов
-  let yDomain = extent(filteredData, d => dataType === 'temperature' ? d.temperature! : d.humidity!) as [number, number];
+  // Фильтруем данные по времени если применен зум для расчета Y-домена
+  let dataForYScale = filteredData;
+  if (zoomState) {
+    dataForYScale = filteredData.filter(d => 
+      d.timestamp >= zoomState.startTime && d.timestamp <= zoomState.endTime
+    );
+  }
+  
+  // Если после фильтрации по времени нет данных, используем все данные
+  if (dataForYScale.length === 0) {
+    dataForYScale = filteredData;
+  }
+  
+  let yDomain = extent(dataForYScale, d => dataType === 'temperature' ? d.temperature! : d.humidity!) as [number, number];
   
   // Применяем пользовательские лимиты если они установлены
   if (limits && limits[dataType]) {

@@ -249,9 +249,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       {showSettings && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold mb-4">Настройки отображения</h3>
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
             <p className="text-sm text-blue-800">
-              <strong>Вертикальное масштабирование:</strong> Установленные лимиты автоматически расширяют масштаб графика для лучшего отображения данных.
+              <strong>Автоматическое масштабирование:</strong>
+            </p>
+            <ul className="text-sm text-blue-700 space-y-1 ml-4">
+              <li>• <strong>По вертикали:</strong> При зуме Y-ось подстраивается под видимые данные</li>
+              <li>• <strong>Лимиты:</strong> Установленные лимиты расширяют масштаб для лучшего отображения</li>
+              <li>• <strong>Динамическое:</strong> Масштаб автоматически изменяется при изменении временного диапазона</li>
+            </ul>
             </p>
           </div>
           
