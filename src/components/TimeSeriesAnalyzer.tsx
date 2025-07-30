@@ -19,6 +19,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [dataType, setDataType] = useState<DataType>('temperature');
   const [testType, setTestType] = useState('empty-object');
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
+  const [fileStats, setFileStats] = useState(new Map());
 
   const { data, loading, progress, error, reload } = useTimeSeriesData({ files });
 
@@ -200,6 +201,48 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       // Проверка соответствия лимитам
       let meetsLimits = '-';
+      
+      if (stats && limits.temperature) {
+        const tempLimits = limits.temperature;
+        let withinLimits = true;
+        
+        if (tempLimits.min !== undefined && stats.min < tempLimits.min) {
+          withinLimits = false;
+        }
+        if (tempLimits.max !== undefined && stats.max > tempLimits.max) {
+          withinLimits = false;
+        }
+        
+        meetsLimits = withinLimits ? 'Да' : 'Нет';
+      }
+      
+      return {
+        fileId: fileName,
+        zoneNumber: file.order,
+        measurementLevel: '-',
+        loggerName,
+        serialNumber,
+        minTemp: stats ? stats.min : '-',
+        maxTemp: stats ? stats.max : '-',
+        avgTemp: stats ? stats.avg : '-',
+        meetsLimits
+      };
+    });
+  }, [files, data, zoomState, limits]);
+
+  // Вычисление глобальных минимума и максимума
+  const globalMinMax = useMemo(() => {
+    const validTemps = resultsTableData
+      .map(row => [row.minTemp, row.maxTemp])
+      .flat()
+      .filter(temp => typeof temp === 'number') as number[];
+    
+    return {
+      globalMin: validTemps.length > 0 ? Math.min(...validTemps) : null,
+      globalMax: validTemps.length > 0 ? Math.max(...validTemps) : null
+    };
+  }, [resultsTableData]);
+
   // Статистика данных
   const stats = useMemo(() => {
     if (!data) return null;
