@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { BarChart, FileText, Calendar, Building, Settings, Target, Download, ArrowLeft, TrendingUp } from 'lucide-react';
 import { UploadedFile, MeasurementRecord } from '../types/FileData';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
-import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 
 interface DataVisualizationProps {
   files: UploadedFile[];
