@@ -107,7 +107,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return;
     }
 
-    setReportStatus({ type: 'error', message: 'Для генерации отчета необходимо загрузить шаблон DOCX в разделе "Визуализация данных"' });
+    // Проверяем, что есть данные для отчета
+    if (!data || resultsTableData.length === 0) {
+      setReportStatus({ type: 'error', message: 'Нет данных для формирования отчета' });
+      return;
+    }
+
+    setReportStatus({ type: 'error', message: 'Для генерации отчета перейдите в раздел "Визуализация данных", загрузите шаблон DOCX и заполните информацию об исследовании' });
     return;
   };
 

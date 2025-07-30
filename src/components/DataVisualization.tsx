@@ -23,7 +23,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
   const [generatedReports, setGeneratedReports] = useState<string[]>([]);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const { users } = useAuth();
+  const { users, user } = useAuth();
   const [researchInfo, setResearchInfo] = useState<ResearchInfo>({
     reportNumber: '',
     reportDate: new Date().toISOString().split('T')[0],
@@ -95,7 +95,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
         markers: [], // Будет заполнено из анализатора
         resultsTableData: [], // Будет заполнено из анализатора
         conclusion: '', // Будет заполнено из анализатора
-        user: { fullName: 'Текущий пользователь', email: '', id: '', role: 'specialist' as const }, // Заглушка
+        user: user || { fullName: 'Текущий пользователь', email: '', id: '', role: 'specialist' as const },
         director
       };
 
@@ -275,8 +275,57 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
               />
             </div>
           </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Вид испытания
+            </label>
+            <div className="relative">
+              <Target className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <select
+                value={testType}
+                onChange={(e) => setTestType(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                {testTypes.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
+        {/* Кнопка генерации базового отчета */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Генерация базового отчета</h3>
+              <p className="text-sm text-gray-600">
+                {isFormValid() 
+                  ? 'Все поля заполнены. Можно сгенерировать базовый отчет.' 
+                  : 'Заполните обязательные поля для генерации отчета'
+                }
+              </p>
+            </div>
+            <button
+              onClick={handleGenerateReport}
+              disabled={!isFormValid() || isGeneratingReport}
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {isGeneratingReport ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Генерация...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-5 h-5" />
+                  <span>Сгенерировать отчет</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Быстрый доступ к анализатору временных рядов */}
