@@ -184,14 +184,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
       
       // Вычисляем статистику на основе отфильтрованных данных
-      let stats = null;
+      let fileStats = null;
       if (fileData.length > 0) {
         const temperatures = fileData.map(p => p.temperature!);
         const min = Math.min(...temperatures);
         const max = Math.max(...temperatures);
         const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
         
-        stats = {
+        fileStats = {
           min: Math.round(min * 10) / 10,
           max: Math.round(max * 10) / 10,
           avg: Math.round(avg * 10) / 10,
@@ -202,32 +202,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Проверка соответствия лимитам
       let meetsLimits = '-';
       
-      if (stats && limits.temperature) {
+      if (fileStats && limits.temperature) {
         const tempLimits = limits.temperature;
         let withinLimits = true;
         
-        if (tempLimits.min !== undefined && stats.min < tempLimits.min) {
-          withinLimits = false;
-        }
-        if (tempLimits.max !== undefined && stats.max > tempLimits.max) {
-          withinLimits = false;
-        }
-        
-        meetsLimits = withinLimits ? 'Да' : 'Нет';
-      }
-      
-      return {
-        fileId: fileName,
-        zoneNumber: file.order,
-        measurementLevel: '-',
-        loggerName,
-        serialNumber,
-        minTemp: stats ? stats.min : '-',
-        maxTemp: stats ? stats.max : '-',
-        avgTemp: stats ? stats.avg : '-',
-        meetsLimits
-      };
-    });
   }, [files, data, zoomState, limits]);
 
   // Вычисление глобальных минимума и максимума
@@ -242,6 +220,28 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       globalMax: validTemps.length > 0 ? Math.max(...validTemps) : null
     };
   }, [resultsTableData]);
+
+  // Статистика данных
+  const stats = useMemo(() => {
+    if (!data) return null;
+
+    const totalPoints = data.points.length;
+    const tempPoints = data.points.filter(p => p.temperature !== undefined).length;
+    const humidityPoints = data.points.filter(p => p.humidity !== undefined).length;
+    const timeSpan = data.timeRange[1] - data.timeRange[0];
+    const days = Math.ceil(timeSpan / (1000 * 60 * 60 * 24));
+
+    return {
+      totalPoints,
+      tempPoints,
+      humidityPoints,
+      days,
+      filesLoaded: files.filter(f => f.parsingStatus === 'completed').length,
+      totalFiles: files.length,
+      hasTemperature: data.hasTemperature,
+      hasHumidity: data.hasHumidity
+    };
+  }, [data, files]);
 
   // Статистика данных
   const stats = useMemo(() => {
