@@ -17,8 +17,8 @@ interface ResearchInfo {
 }
 
 export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onBack }) => {
-  const [researchInfo, setResearchInfo] = useState<ResearchInfo>({
   const [showTimeSeriesAnalyzer, setShowTimeSeriesAnalyzer] = useState(false);
+  const [researchInfo, setResearchInfo] = useState<ResearchInfo>({
     reportNumber: '',
     reportDate: new Date().toISOString().split('T')[0],
     templateFile: null,
