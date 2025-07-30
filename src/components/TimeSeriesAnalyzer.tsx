@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { BarChart, Settings, Trash2, RotateCcw, Thermometer, Droplets, Target } from 'lucide-react';
+import { BarChart, Settings, Trash2, RotateCcw, Thermometer, Droplets, Target, Clock } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { TimeSeriesChart } from './TimeSeriesChart';
+import { databaseService } from '../utils/database';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -21,6 +22,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
 
   const { data, loading, progress, error, reload } = useTimeSeriesData({ files });
+  const [fileStats, setFileStats] = useState<Map<string, any>>(new Map());
 
   const testTypes = [
     { value: 'empty-object', label: 'Соответствие критериям в пустом объекте' },
@@ -85,6 +87,134 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const handleDataTypeChange = useCallback((newDataType: DataType) => {
     setDataType(newDataType);
   }, []);
+
+  // Загрузка статистики по файлам
+  React.useEffect(() => {
+    const loadFileStats = async () => {
+      const stats = new Map();
+      
+      for (const file of files) {
+        if (file.parsingStatus === 'completed') {
+          try {
+            const measurements = await databaseService.getMeasurements(file.id);
+            if (measurements && measurements.length > 0) {
+              const temperatures = measurements
+                .map(m => m.temperature)
+                .filter(t => t !== undefined) as number[];
+              
+              if (temperatures.length > 0) {
+                const min = Math.min(...temperatures);
+                const max = Math.max(...temperatures);
+                const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+                
+                stats.set(file.id, {
+                  min: Math.round(min * 10) / 10,
+                  max: Math.round(max * 10) / 10,
+                  avg: Math.round(avg * 10) / 10,
+                  count: temperatures.length
+                });
+              }
+            }
+          } catch (error) {
+            console.error(`Error loading stats for file ${file.name}:`, error);
+          }
+        }
+      }
+      
+      setFileStats(stats);
+    };
+
+    if (files.length > 0) {
+      loadFileStats();
+    }
+  }, [files]);
+
+  // Вычисление периода между маркерами
+  const markersPeriod = useMemo(() => {
+    if (markers.length < 2) return null;
+    
+    const sortedMarkers = [...markers].sort((a, b) => a.timestamp - b.timestamp);
+    const startTime = sortedMarkers[0].timestamp;
+    const endTime = sortedMarkers[sortedMarkers.length - 1].timestamp;
+    const duration = endTime - startTime;
+    
+    const formatDuration = (ms: number) => {
+      const hours = Math.floor(ms / (1000 * 60 * 60));
+      const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+      
+      if (hours > 0) {
+        return `${hours}ч ${minutes}м ${seconds}с`;
+      } else if (minutes > 0) {
+        return `${minutes}м ${seconds}с`;
+      } else {
+        return `${seconds}с`;
+      }
+    };
+    
+    return {
+      startTime: new Date(startTime),
+      endTime: new Date(endTime),
+      duration: formatDuration(duration)
+    };
+  }, [markers]);
+
+  // Подготовка данных для таблицы результатов
+  const resultsTableData = useMemo(() => {
+    const sortedFiles = [...files]
+      .filter(f => f.parsingStatus === 'completed')
+      .sort((a, b) => a.order - b.order);
+    
+    return sortedFiles.map(file => {
+      const stats = fileStats.get(file.id);
+      const fileName = file.name;
+      
+      // Извлекаем данные из имени файла
+      const loggerName = fileName.substring(0, 6);
+      const serialNumber = fileName.substring(6, 15);
+      
+      // Проверка соответствия лимитам
+      let meetsLimits = '-';
+      if (limits.temperature?.min !== undefined || limits.temperature?.max !== undefined) {
+        if (stats) {
+          const minLimit = limits.temperature?.min;
+          const maxLimit = limits.temperature?.max;
+          
+          let withinLimits = true;
+          if (minLimit !== undefined && stats.min < minLimit) withinLimits = false;
+          if (maxLimit !== undefined && stats.max > maxLimit) withinLimits = false;
+          
+          meetsLimits = withinLimits ? 'Да' : 'Нет';
+        }
+      }
+      
+      return {
+        fileId: file.id,
+        zoneNumber: file.zoneNumber || '-',
+        measurementLevel: file.measurementLevel || '-',
+        loggerName,
+        serialNumber,
+        minTemp: stats?.min || '-',
+        maxTemp: stats?.max || '-',
+        avgTemp: stats?.avg || '-',
+        meetsLimits
+      };
+    });
+  }, [files, fileStats, limits.temperature]);
+
+  // Находим глобальные минимум и максимум для подсветки
+  const globalMinMax = useMemo(() => {
+    const validStats = resultsTableData.filter(row => typeof row.minTemp === 'number' && typeof row.maxTemp === 'number');
+    if (validStats.length === 0) return { globalMin: null, globalMax: null };
+    
+    const allMins = validStats.map(row => row.minTemp as number);
+    const allMaxs = validStats.map(row => row.maxTemp as number);
+    
+    return {
+      globalMin: Math.min(...allMins),
+      globalMax: Math.max(...allMaxs)
+    };
+  }, [resultsTableData]);
 
   // Статистика данных
   const stats = useMemo(() => {
@@ -414,12 +544,42 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       {/* Управление маркерами */}
       {markers.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Вертикальные маркеры</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Вертикальные маркеры</h3>
+            {markersPeriod && (
+              <div className="flex items-center space-x-2 text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
+                <Clock className="w-4 h-4" />
+                <span>Период испытания: {markersPeriod.duration}</span>
+              </div>
+            )}
+          </div>
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
               <strong>Редактирование маркеров:</strong> Нажмите на название маркера для редактирования
             </p>
           </div>
+          
+          {/* Информация о периоде между маркерами */}
+          {markersPeriod && (
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Временной период испытания:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-green-600">Время начала:</span>
+                  <div className="text-gray-900">{markersPeriod.startTime.toLocaleString('ru-RU')}</div>
+                </div>
+                <div>
+                  <span className="font-medium text-red-600">Время завершения:</span>
+                  <div className="text-gray-900">{markersPeriod.endTime.toLocaleString('ru-RU')}</div>
+                </div>
+                <div>
+                  <span className="font-medium text-blue-600">Длительность:</span>
+                  <div className="text-gray-900">{markersPeriod.duration}</div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="space-y-2">
             {markers.map(marker => (
               <div key={marker.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -463,6 +623,114 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Таблица результатов */}
+      {resultsTableData.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold mb-4">Таблица результатов</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    № зоны измерения
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Уровень измерения (м.)
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Наименование логгера
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Серийный № логгера
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Мин. t°С
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Макс. t°С
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Среднее t°С
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Соответствует заданным критериям
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {resultsTableData.map((row, index) => (
+                  <tr key={row.fileId} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {row.zoneNumber}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {row.measurementLevel}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                      {row.loggerName}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                      {row.serialNumber}
+                    </td>
+                    <td className={`px-4 py-4 whitespace-nowrap text-sm text-gray-900 ${
+                      typeof row.minTemp === 'number' && row.minTemp === globalMinMax.globalMin 
+                        ? 'bg-blue-100 text-blue-900 font-semibold' 
+                        : ''
+                    }`}>
+                      {typeof row.minTemp === 'number' ? `${row.minTemp}°C` : row.minTemp}
+                    </td>
+                    <td className={`px-4 py-4 whitespace-nowrap text-sm text-gray-900 ${
+                      typeof row.maxTemp === 'number' && row.maxTemp === globalMinMax.globalMax 
+                        ? 'bg-red-100 text-red-900 font-semibold' 
+                        : ''
+                    }`}>
+                      {typeof row.maxTemp === 'number' ? `${row.maxTemp}°C` : row.maxTemp}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {typeof row.avgTemp === 'number' ? `${row.avgTemp}°C` : row.avgTemp}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        row.meetsLimits === 'Да' 
+                          ? 'bg-green-100 text-green-800'
+                          : row.meetsLimits === 'Нет'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {row.meetsLimits}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Легенда для таблицы */}
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Обозначения:</h4>
+            <div className="flex flex-wrap gap-4 text-xs">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-blue-100 rounded"></div>
+                <span>Глобальное минимальное значение температуры</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-red-100 rounded"></div>
+                <span>Глобальное максимальное значение температуры</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Да</span>
+                <span>Соответствует лимитам</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Нет</span>
+                <span>Не соответствует лимитам</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
