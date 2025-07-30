@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { BarChart, FileText, Calendar, Building, Settings, Target, Download, ArrowLeft, TrendingUp } from 'lucide-react';
+import { BarChart, FileText, Calendar, Building, Settings, Target, Download, ArrowLeft, TrendingUp, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
 import { UploadedFile, MeasurementRecord } from '../types/FileData';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
+import { ReportGenerator } from '../utils/reportGenerator';
+import { useAuth } from '../contexts/AuthContext';
 
 interface DataVisualizationProps {
   files: UploadedFile[];
@@ -18,6 +20,10 @@ interface ResearchInfo {
 
 export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onBack }) => {
   const [showTimeSeriesAnalyzer, setShowTimeSeriesAnalyzer] = useState(false);
+  const [generatedReports, setGeneratedReports] = useState<string[]>([]);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const { users } = useAuth();
   const [researchInfo, setResearchInfo] = useState<ResearchInfo>({
     reportNumber: '',
     reportDate: new Date().toISOString().split('T')[0],
@@ -42,6 +48,10 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     setTimeout(() => {
       researchInfoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
+    
+    // Загружаем список сгенерированных отчетов
+    const reportGenerator = ReportGenerator.getInstance();
+    setGeneratedReports(reportGenerator.getGeneratedReports());
   }, []);
 
   // Если показываем анализатор временных рядов
@@ -53,15 +63,81 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     const file = event.target.files?.[0];
     if (file && file.name.toLowerCase().endsWith('.docx')) {
       setResearchInfo(prev => ({ ...prev, templateFile: file }));
+      setReportStatus(null);
     } else {
       alert('Пожалуйста, выберите файл в формате .docx');
     }
   };
 
-  // Если показываем анализатор временных рядов
-  if (showTimeSeriesAnalyzer) {
-    return <TimeSeriesAnalyzer files={files} onBack={() => setShowTimeSeriesAnalyzer(false)} />;
-  }
+  const handleGenerateReport = async () => {
+    if (!isFormValid()) {
+      setReportStatus({ type: 'error', message: 'Заполните все обязательные поля' });
+      return;
+    }
+
+    setIsGeneratingReport(true);
+    setReportStatus(null);
+
+    try {
+      const reportGenerator = ReportGenerator.getInstance();
+      
+      // Получаем руководителя из справочника пользователей
+      const director = users.find(u => u.role === 'manager')?.fullName || 'Не назначен';
+      
+      // Подготавливаем данные для отчета
+      const reportData = {
+        reportNumber: researchInfo.reportNumber,
+        reportDate: researchInfo.reportDate,
+        objectName: researchInfo.objectName,
+        climateSystemName: researchInfo.climateSystemName,
+        testType,
+        limits: {}, // Будет заполнено из анализатора
+        markers: [], // Будет заполнено из анализатора
+        resultsTableData: [], // Будет заполнено из анализатора
+        conclusion: '', // Будет заполнено из анализатора
+        user: { fullName: 'Текущий пользователь', email: '', id: '', role: 'specialist' as const }, // Заглушка
+        director
+      };
+
+      const result = await reportGenerator.generateReport(
+        researchInfo.templateFile!,
+        reportData
+      );
+
+      if (result.success) {
+        setReportStatus({ type: 'success', message: `Отчет "${result.fileName}" успешно сгенерирован и скачан` });
+        setGeneratedReports(reportGenerator.getGeneratedReports());
+      } else {
+        setReportStatus({ type: 'error', message: result.error || 'Ошибка генерации отчета' });
+      }
+    } catch (error) {
+      setReportStatus({ 
+        type: 'error', 
+        message: error instanceof Error ? error.message : 'Неизвестная ошибка' 
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handleDeleteReport = (fileName: string) => {
+    if (confirm(`Вы уверены, что хотите удалить отчет "${fileName}"?`)) {
+      const reportGenerator = ReportGenerator.getInstance();
+      if (reportGenerator.deleteReport(fileName)) {
+        setGeneratedReports(reportGenerator.getGeneratedReports());
+        setReportStatus({ type: 'success', message: 'Отчет успешно удален' });
+      }
+    }
+  };
+
+  const handleDownloadReport = (fileName: string) => {
+    const reportGenerator = ReportGenerator.getInstance();
+    if (reportGenerator.downloadReport(fileName)) {
+      setReportStatus({ type: 'success', message: 'Отчет скачан' });
+    } else {
+      setReportStatus({ type: 'error', message: 'Ошибка скачивания отчета' });
+    }
+  };
 
   const isFormValid = () => {
     return researchInfo.reportNumber && 
@@ -87,6 +163,28 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
           <span>Назад к загрузке</span>
         </button>
       </div>
+
+      {/* Статус генерации отчета */}
+      {reportStatus && (
+        <div className={`flex items-center space-x-2 p-4 rounded-lg ${
+          reportStatus.type === 'success' 
+            ? 'bg-green-50 text-green-800 border border-green-200' 
+            : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          {reportStatus.type === 'success' ? (
+            <CheckCircle className="w-5 h-5" />
+          ) : (
+            <AlertCircle className="w-5 h-5" />
+          )}
+          <span>{reportStatus.message}</span>
+          <button 
+            onClick={() => setReportStatus(null)}
+            className="ml-auto text-gray-500 hover:text-gray-700"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Быстрый доступ к анализатору временных рядов */}
       <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg p-6">
@@ -197,14 +295,87 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
           </div>
         </div>
 
-        {!isFormValid() && (
-          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
-              Пожалуйста, заполните все обязательные поля (отмечены *)
-            </p>
+        {/* Вид испытаний */}
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Вид испытаний
+          </label>
+          <select
+            value={testType}
+            onChange={(e) => setTestType(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            {testTypes.map(type => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Кнопка генерации отчета */}
+        <div className="mt-6 flex items-center justify-between">
+          <div>
+            {!isFormValid() && (
+              <p className="text-sm text-yellow-600">
+                Пожалуйста, заполните все обязательные поля (отмечены *)
+              </p>
+            )}
           </div>
-        )}
+          <button
+            onClick={handleGenerateReport}
+            disabled={!isFormValid() || isGeneratingReport}
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {isGeneratingReport ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Генерация отчета...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-5 h-5" />
+                <span>Сформировать отчет</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Список сгенерированных отчетов */}
+      {generatedReports.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <FileText className="w-6 h-6 text-green-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Сгенерированные отчеты</h3>
+          </div>
+          
+          <div className="space-y-3">
+            {generatedReports.map((fileName, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium text-gray-900">{fileName}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleDownloadReport(fileName)}
+                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                    title="Скачать отчет"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteReport(fileName)}
+                    className="text-red-600 hover:text-red-800 transition-colors"
+                    title="Удалить отчет"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { BarChart, Settings, Trash2, RotateCcw, Thermometer, Droplets, Target, Clock, Download, Copy, FileText } from 'lucide-react';
+import { BarChart, Settings, Trash2, RotateCcw, Thermometer, Droplets, Target, Clock, Download, Copy, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { databaseService } from '../utils/database';
+import { ReportGenerator } from '../utils/reportGenerator';
+import { useAuth } from '../contexts/AuthContext';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -21,7 +23,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
   const [fileStats, setFileStats] = useState(new Map());
   const [conclusion, setConclusion] = useState('');
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [generatedReports, setGeneratedReports] = useState<string[]>([]);
+  const chartRef = React.useRef<HTMLDivElement>(null);
 
+  const { user, users } = useAuth();
   const { data, loading, progress, error, reload } = useTimeSeriesData({ files });
 
   const testTypes = [
@@ -36,6 +43,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const chartWidth = Math.min(1400, window.innerWidth - 100);
   const margin = { top: 20, right: 50, bottom: 60, left: 80 };
 
+  // Загрузка списка сгенерированных отчетов при монтировании
+  React.useEffect(() => {
+    const reportGenerator = ReportGenerator.getInstance();
+    setGeneratedReports(reportGenerator.getGeneratedReports());
+  }, []);
   // Обработчики лимитов
   const handleLimitChange = useCallback((type: 'temperature' | 'humidity', limitType: 'min' | 'max', value: string) => {
     const numValue = parseFloat(value);
@@ -88,6 +100,110 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setDataType(newDataType);
   }, []);
 
+  // Генерация отчета из анализатора
+  const handleGenerateReportFromAnalyzer = async () => {
+    if (!isReportReady) {
+      setReportStatus({ type: 'error', message: 'Заполните поле "Вывод" для формирования отчета' });
+      return;
+    }
+
+    // Создаем временный шаблон для демонстрации
+    const templateContent = `
+Отчет по испытанию: {{name of the test}}
+Объект исследования: {{name of the object}}
+Климатическая установка: {{name of the air conditioning system}}
+
+Критерии приемки:
+{{acceptance criteria}}
+
+Период испытания:
+Начало: {{Date time of test start}}
+Завершение: {{Date time of test completion}}
+Длительность: {{Duration of the test}}
+
+Результаты:
+{{Results table}}
+
+Выводы:
+{{Result}}
+
+Исполнитель: {{executor}}
+Дата формирования: {{test date}}
+Номер отчета: {{Report No.}}
+Дата отчета: {{Report date}}
+Руководитель: {{director}}
+
+График: {{chart}}
+    `;
+
+    // Создаем временный файл шаблона
+    const templateBlob = new Blob([templateContent], { type: 'text/plain' });
+    const templateFile = new File([templateBlob], 'template.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+    setIsGeneratingReport(true);
+    setReportStatus(null);
+
+    try {
+      const reportGenerator = ReportGenerator.getInstance();
+      
+      // Получаем руководителя из справочника пользователей
+      const director = users.find(u => u.role === 'manager')?.fullName || 'Не назначен';
+      
+      // Подготавливаем данные для отчета
+      const reportData = {
+        reportNumber: `AUTO-${Date.now()}`,
+        reportDate: new Date().toISOString().split('T')[0],
+        objectName: 'Объект из анализатора',
+        climateSystemName: 'Климатическая установка',
+        testType,
+        limits,
+        markers,
+        resultsTableData,
+        conclusion,
+        user: user!,
+        director
+      };
+
+      const result = await reportGenerator.generateReport(
+        templateFile,
+        reportData,
+        chartRef.current || undefined
+      );
+
+      if (result.success) {
+        setReportStatus({ type: 'success', message: `Отчет "${result.fileName}" успешно сгенерирован и скачан` });
+        setGeneratedReports(reportGenerator.getGeneratedReports());
+      } else {
+        setReportStatus({ type: 'error', message: result.error || 'Ошибка генерации отчета' });
+      }
+    } catch (error) {
+      setReportStatus({ 
+        type: 'error', 
+        message: error instanceof Error ? error.message : 'Неизвестная ошибка' 
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handleDeleteReport = (fileName: string) => {
+    if (confirm(`Вы уверены, что хотите удалить отчет "${fileName}"?`)) {
+      const reportGenerator = ReportGenerator.getInstance();
+      if (reportGenerator.deleteReport(fileName)) {
+        setGeneratedReports(reportGenerator.getGeneratedReports());
+        setReportStatus({ type: 'success', message: 'Отчет успешно удален' });
+      }
+    }
+  };
+
+  const handleDownloadReport = (fileName: string) => {
+    const reportGenerator = ReportGenerator.getInstance();
+    if (reportGenerator.downloadReport(fileName)) {
+      setReportStatus({ type: 'success', message: 'Отчет скачан' });
+    } else {
+      setReportStatus({ type: 'error', message: 'Ошибка скачивания отчета' });
+    }
+  };
   // Загрузка статистики по файлам
   React.useEffect(() => {
     const loadFileStats = async () => {
@@ -460,6 +576,27 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
       </div>
 
+      {/* Статус генерации отчета */}
+      {reportStatus && (
+        <div className={`flex items-center space-x-2 p-4 rounded-lg ${
+          reportStatus.type === 'success' 
+            ? 'bg-green-50 text-green-800 border border-green-200' 
+            : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          {reportStatus.type === 'success' ? (
+            <CheckCircle className="w-5 h-5" />
+          ) : (
+            <AlertCircle className="w-5 h-5" />
+          )}
+          <span>{reportStatus.message}</span>
+          <button 
+            onClick={() => setReportStatus(null)}
+            className="ml-auto text-gray-500 hover:text-gray-700"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {/* Статистика */}
       {stats && (
         <div className="bg-white rounded-lg shadow p-6">
@@ -760,7 +897,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       )}
 
       {/* График */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div ref={chartRef} className="bg-white rounded-lg shadow p-6">
         <h3 className={`text-lg font-semibold mb-4 ${dataType === 'temperature' ? 'text-red-600' : 'text-blue-600'}`}>
           График {dataType === 'temperature' ? 'температуры' : 'влажности'}
         </h3>
@@ -799,15 +936,61 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             </p>
           </div>
           <button
-            disabled={!isReportReady}
+            onClick={handleGenerateReportFromAnalyzer}
+            disabled={!isReportReady || isGeneratingReport}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            <Download className="w-5 h-5" />
-            <span>Сформировать отчет</span>
+            {isGeneratingReport ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Генерация отчета...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-5 h-5" />
+                <span>Сформировать отчет</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
+      {/* Список сгенерированных отчетов */}
+      {generatedReports.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <FileText className="w-6 h-6 text-green-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Сгенерированные отчеты</h3>
+          </div>
+          
+          <div className="space-y-3">
+            {generatedReports.map((fileName, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium text-gray-900">{fileName}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleDownloadReport(fileName)}
+                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                    title="Скачать отчет"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteReport(fileName)}
+                    className="text-red-600 hover:text-red-800 transition-colors"
+                    title="Удалить отчет"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Блок рекомендаций - только для температуры */}
       {dataType === 'temperature' && recommendations && (
         <div className="bg-white rounded-lg shadow p-6">
@@ -969,6 +1152,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <li>• <strong>Tooltip:</strong> Наведите курсор на график для просмотра точных значений</li>
           <li>• <strong>Лимиты:</strong> Установите в настройках для отображения красных пунктирных линий</li>
           <li>• <strong>Производительность:</strong> Компонент автоматически оптимизирует отображение больших наборов данных</li>
+          <li>• <strong>Генерация отчетов:</strong> Заполните поле "Вывод" и нажмите "Сформировать отчет" для создания документа</li>
         </ul>
       </div>
     </div>
