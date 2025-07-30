@@ -109,27 +109,6 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
         </div>
       </div>
 
-      {/* Быстрый доступ к анализатору временных рядов */}
-      <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <TrendingUp className="w-8 h-8 text-indigo-600" />
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Анализатор временных рядов</h3>
-              <p className="text-sm text-gray-600">Интерактивные графики с зумом, маркерами и лимитами</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowTimeSeriesAnalyzer(true)}
-            disabled={files.filter(f => f.parsingStatus === 'completed').length === 0}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            <TrendingUp className="w-5 h-5" />
-            <span>Открыть анализатор</span>
-          </button>
-        </div>
-      </div>
-
       {/* Информация для исследования */}
       <div ref={researchInfoRef} className="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500">
         <div className="flex items-center space-x-3 mb-6">

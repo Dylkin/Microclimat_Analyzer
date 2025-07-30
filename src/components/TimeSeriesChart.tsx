@@ -52,7 +52,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
 
   // Создаем шкалы
   const xScale = scaleTime()
-    .domain(extent(filteredData, d => new Date(d.timestamp)) as [Date, Date])
+    .domain(extent(data, d => new Date(d.timestamp)) as [Date, Date])
     .range([0, innerWidth]);
 
   const yScale = scaleLinear()
@@ -63,6 +63,17 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   // Применяем зум если есть
   if (zoomState) {
     xScale.domain([new Date(zoomState.startTime), new Date(zoomState.endTime)]);
+    
+    // Фильтруем данные по зумированному диапазону для оптимизации
+    const zoomedData = filteredData.filter(d => 
+      d.timestamp >= zoomState.startTime && d.timestamp <= zoomState.endTime
+    );
+    
+    // Пересчитываем Y-шкалу для зумированных данных
+    const zoomedYDomain = extent(zoomedData, d => dataType === 'temperature' ? d.temperature! : d.humidity!) as [number, number];
+    if (zoomedYDomain[0] !== undefined && zoomedYDomain[1] !== undefined) {
+      yScale.domain(zoomedYDomain).nice();
+    }
   }
 
   // Форматтеры
@@ -175,14 +186,22 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
 
   // Создание линии графика с оптимизацией для больших данных
   const createPath = useCallback(() => {
-    if (filteredData.length === 0) return '';
-
-    // Для больших наборов данных используем упрощение
     let dataToRender = filteredData;
-    if (filteredData.length > 10000) {
+    
+    // Если применен зум, используем только данные в зумированном диапазоне
+    if (zoomState) {
+      dataToRender = filteredData.filter(d => 
+        d.timestamp >= zoomState.startTime && d.timestamp <= zoomState.endTime
+      );
+    }
+    
+    if (dataToRender.length === 0) return '';
+
+    // Для больших наборов данных используем упрощение только если не применен зум
+    if (dataToRender.length > 10000 && !zoomState) {
       // Берем каждую N-ю точку для оптимизации рендеринга
-      const step = Math.ceil(filteredData.length / 10000);
-      dataToRender = filteredData.filter((_, index) => index % step === 0);
+      const step = Math.ceil(dataToRender.length / 10000);
+      dataToRender = dataToRender.filter((_, index) => index % step === 0);
     }
 
     return dataToRender.map((d, i) => {
@@ -191,7 +210,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
       const y = yScale(value);
       return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
     }).join(' ');
-  }, [filteredData, dataType, xScale, yScale]);
+  }, [filteredData, dataType, xScale, yScale, zoomState]);
 
   // Рендер компонента
   return (
@@ -324,12 +343,18 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
 
         {/* Основная линия графика */}
         <g transform={`translate(${margin.left}, ${margin.top})`}>
+          <defs>
+            <clipPath id={`clip-${dataType}`}>
+              <rect x={0} y={0} width={innerWidth} height={innerHeight} />
+            </clipPath>
+          </defs>
           <path
             d={createPath()}
             fill="none"
             stroke={color}
             strokeWidth={1.5}
             opacity={0.8}
+            clipPath={`url(#clip-${dataType})`}
           />
         </g>
 

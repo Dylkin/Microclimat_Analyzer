@@ -74,6 +74,9 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
       // Сортируем по времени
       allPoints.sort((a, b) => a.timestamp - b.timestamp);
 
+      console.log(`Всего загружено точек данных: ${allPoints.length}`);
+      console.log(`Файлов обработано: ${completedFiles.length}`);
+      
       // Вычисляем диапазоны и проверяем наличие данных
       const temperatures = allPoints.filter(p => p.temperature !== undefined).map(p => p.temperature!);
       const humidities = allPoints.filter(p => p.humidity !== undefined).map(p => p.humidity!);
@@ -93,7 +96,6 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
         hasHumidity
       };
 
-      console.log(`Loaded ${allPoints.length} data points`);
       console.log('Time range:', new Date(processedData.timeRange[0]), 'to', new Date(processedData.timeRange[1]));
       console.log('Temperature range:', processedData.temperatureRange);
       console.log('Humidity range:', processedData.humidityRange);
