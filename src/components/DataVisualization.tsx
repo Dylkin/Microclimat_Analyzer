@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { BarChart, FileText, Calendar, Building, Settings, Target, Clock, MessageSquare, Download, ArrowLeft, Droplets, Thermometer } from 'lucide-react';
+import { BarChart, FileText, Calendar, Building, Settings, Target, Download, ArrowLeft } from 'lucide-react';
 import { UploadedFile, MeasurementRecord } from '../types/FileData';
-import { InteractiveChart } from './InteractiveChart';
-import { useMultiThreadDataLoader } from '../hooks/useMultiThreadDataLoader';
 
 interface DataVisualizationProps {
   files: UploadedFile[];
@@ -17,17 +15,6 @@ interface ResearchInfo {
   climateSystemName: string;
 }
 
-interface Limits {
-  min: number | null;
-  max: number | null;
-}
-
-interface VerticalLine {
-  id: string;
-  timestamp: number;
-  comment: string;
-}
-
 export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onBack }) => {
   const [researchInfo, setResearchInfo] = useState<ResearchInfo>({
     reportNumber: '',
@@ -37,15 +24,8 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     climateSystemName: ''
   });
 
-  const [temperatureLimits, setTemperatureLimits] = useState<Limits>({ min: null, max: null });
-  const [humidityLimits, setHumidityLimits] = useState<Limits>({ min: null, max: null });
   const [testType, setTestType] = useState('empty-object');
-  const [temperatureLines, setTemperatureLines] = useState<VerticalLine[]>([]);
-  const [humidityLines, setHumidityLines] = useState<VerticalLine[]>([]);
   const researchInfoRef = useRef<HTMLDivElement>(null);
-  
-  // Используем хук для многопоточной загрузки данных
-  const { chartData, isLoading, loadingProgress, loadData, cleanup } = useMultiThreadDataLoader();
 
   const testTypes = [
     { value: 'empty-object', label: 'Соответствие критериям в пустом объекте' },
@@ -55,29 +35,12 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     { value: 'power-on', label: 'Включение электропитания' }
   ];
 
-  // Загрузка данных при монтировании компонента
   useEffect(() => {
-    console.log('DataVisualization: Компонент смонтирован, файлов для загрузки:', files.length);
-    loadData(files);
-    
     // Автоматический фокус на блок информации для исследования
     setTimeout(() => {
       researchInfoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
-    
-    // Очистка воркеров при размонтировании
-    return cleanup;
-  }, [files, loadData, cleanup]);
-
-  // Отладочная информация
-  useEffect(() => {
-    console.log('DataVisualization: chartData обновлен:', {
-      length: chartData.length,
-      isLoading,
-      firstRecord: chartData[0],
-      lastRecord: chartData[chartData.length - 1]
-    });
-  }, [chartData, isLoading]);
+  }, []);
 
   const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -86,94 +49,6 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     } else {
       alert('Пожалуйста, выберите файл в формате .docx');
     }
-  };
-
-  // Обработчики для температурных маркеров
-  const handleAddTemperatureMarker = (timestamp: number) => {
-    const newLine: VerticalLine = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      timestamp,
-      comment: ''
-    };
-    setTemperatureLines(prev => [...prev, newLine]);
-  };
-
-  const handleUpdateTemperatureMarker = (markerId: string, comment: string) => {
-    setTemperatureLines(prev => prev.map(line => 
-      line.id === markerId ? { ...line, comment } : line
-    ));
-  };
-
-  const handleRemoveTemperatureMarker = (markerId: string) => {
-    setTemperatureLines(prev => prev.filter(line => line.id !== markerId));
-  };
-
-  // Обработчики для маркеров влажности
-  const handleAddHumidityMarker = (timestamp: number) => {
-    const newLine: VerticalLine = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      timestamp,
-      comment: ''
-    };
-    setHumidityLines(prev => [...prev, newLine]);
-  };
-
-  const handleUpdateHumidityMarker = (markerId: string, comment: string) => {
-    setHumidityLines(prev => prev.map(line => 
-      line.id === markerId ? { ...line, comment } : line
-    ));
-  };
-
-  const handleRemoveHumidityMarker = (markerId: string) => {
-    setHumidityLines(prev => prev.filter(line => line.id !== markerId));
-  };
-
-  // Подготовка данных для графиков
-  const getTemperatureData = () => {
-    console.log('getTemperatureData: Подготовка данных температуры, исходных записей:', chartData.length);
-    
-    if (chartData.length === 0) {
-      console.log('Нет данных для температурного графика');
-      return [];
-    }
-    
-    const temperatureData = chartData.map(d => ({
-      timestamp: d.timestamp,
-      value: d.temperature,
-      formattedTime: d.formattedTime,
-      fileId: d.fileId,
-      fileName: d.fileName
-    }));
-    
-    console.log('getTemperatureData: Подготовлено записей:', temperatureData.length);
-    console.log('getTemperatureData: Первая запись:', temperatureData[0]);
-    console.log('getTemperatureData: Последняя запись:', temperatureData[temperatureData.length - 1]);
-    
-    return temperatureData;
-  };
-
-  const getHumidityData = () => {
-    console.log('getHumidityData: Подготовка данных влажности, исходных записей:', chartData.length);
-    
-    const humidityData = chartData.filter(d => d.humidity !== undefined && d.humidity !== null);
-    
-    if (humidityData.length === 0) {
-      console.log('Нет данных влажности для графика');
-      return [];
-    }
-    
-    const processedHumidityData = humidityData.map(d => ({
-      timestamp: d.timestamp,
-      value: d.humidity!,
-      formattedTime: d.formattedTime,
-      fileId: d.fileId,
-      fileName: d.fileName
-    }));
-    
-    console.log('getHumidityData: Подготовлено записей:', processedHumidityData.length);
-    console.log('getHumidityData: Первая запись:', processedHumidityData[0]);
-    
-    return processedHumidityData;
   };
 
   const isFormValid = () => {
@@ -304,7 +179,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
           <h2 className="text-xl font-semibold text-gray-900">Исследовательский режим</h2>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Вид испытаний</label>
             <select
@@ -318,147 +193,36 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Лимиты температуры (°C)</label>
-            <div className="flex space-x-2">
-              <input
-                type="number"
-                step="0.1"
-                value={temperatureLimits.min || ''}
-                onChange={(e) => setTemperatureLimits(prev => ({ ...prev, min: e.target.value ? parseFloat(e.target.value) : null }))}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Мин"
-              />
-              <input
-                type="number"
-                step="0.1"
-                value={temperatureLimits.max || ''}
-                onChange={(e) => setTemperatureLimits(prev => ({ ...prev, max: e.target.value ? parseFloat(e.target.value) : null }))}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Макс"
-              />
+          <div className="flex items-end">
+            <div className="text-sm text-gray-600">
+              Данные готовы для анализа и формирования отчета
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Лимиты влажности (%)</label>
-            <div className="flex space-x-2">
-              <input
-                type="number"
-                step="0.1"
-                value={humidityLimits.min || ''}
-                onChange={(e) => setHumidityLimits(prev => ({ ...prev, min: e.target.value ? parseFloat(e.target.value) : null }))}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Мин"
-              />
-              <input
-                type="number"
-                step="0.1"
-                value={humidityLimits.max || ''}
-                onChange={(e) => setHumidityLimits(prev => ({ ...prev, max: e.target.value ? parseFloat(e.target.value) : null }))}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Макс"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Графики */}
-        <div className="space-y-8">
-          {isLoading && (
-            <div className="flex flex-col items-center justify-center py-8 space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
-                <span className="text-gray-600">Многопоточная загрузка данных...</span>
-              </div>
-              {loadingProgress.total > 0 && (
-                <div className="text-center">
-                  <div className="text-sm text-gray-600 mb-2">
-                    Обработано файлов: {loadingProgress.completed} из {loadingProgress.total}
-                  </div>
-                  {loadingProgress.currentFile && (
-                    <div className="text-xs text-gray-500">
-                      Текущий файл: {loadingProgress.currentFile}
-                    </div>
-                  )}
-                  <div className="w-64 bg-gray-200 rounded-full h-2 mt-2">
-                    <div 
-                      className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${(loadingProgress.completed / loadingProgress.total) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {!isLoading && (
-            <>
-              {/* График температуры */}
-              <InteractiveChart
-                data={getTemperatureData()}
-                title="Температура"
-                unit="°C"
-                color="#ef4444"
-                limits={temperatureLimits}
-                markers={temperatureLines}
-                onAddMarker={handleAddTemperatureMarker}
-                onUpdateMarker={handleUpdateTemperatureMarker}
-                onRemoveMarker={handleRemoveTemperatureMarker}
-              />
-
-              {/* График влажности */}
-              {getHumidityData().length > 0 && (
-                <InteractiveChart
-                  data={getHumidityData()}
-                  title="Влажность"
-                  unit="%"
-                  color="#3b82f6"
-                  limits={humidityLimits}
-                  markers={humidityLines}
-                  onAddMarker={handleAddHumidityMarker}
-                  onUpdateMarker={handleUpdateHumidityMarker}
-                  onRemoveMarker={handleRemoveHumidityMarker}
-                />
-              )}
-            </>
-          )}
         </div>
 
         {/* Информация о данных */}
         <div className="mt-8 bg-gray-50 rounded-lg p-4">
           <h4 className="text-sm font-medium text-gray-700 mb-2">Информация о загруженных данных:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="font-medium">Количество файлов:</span> {files.filter(f => f.parsingStatus === 'completed').length}
             </div>
             <div>
-              <span className="font-medium">Записей на графике:</span> {chartData.length.toLocaleString('ru-RU')}
-            </div>
-            <div>
-              <span className="font-medium">Режим загрузки:</span> Многопоточный (до 4 воркеров)
+              <span className="font-medium">Общее количество записей:</span> {files.reduce((sum, f) => sum + (f.recordCount || 0), 0).toLocaleString('ru-RU')}
             </div>
             <div>
               <span className="font-medium">Период данных:</span> 
-              {chartData.length > 0 && (
+              {files.length > 0 && files[0].period && (
                 <span className="ml-1">
-                  {new Date(chartData[0].timestamp).toLocaleDateString('ru-RU')} - 
-                  {new Date(chartData[chartData.length - 1].timestamp).toLocaleDateString('ru-RU')}
+                  {files[0].period}
                 </span>
               )}
             </div>
-            <div>
-              <span className="font-medium">Статус:</span> 
-              <span className="ml-1">
-                {isLoading ? 'Загрузка...' : (chartData.length > 0 ? 'Готов' : 'Нет данных')}
-              </span>
-            </div>
           </div>
-          {chartData.length === 0 && !isLoading && (
+          {files.filter(f => f.parsingStatus === 'completed').length === 0 && (
             <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
-                Данные не загружены. Проверьте, что файлы успешно обработаны и содержат корректные данные измерений. 
-                Попробуйте перезагрузить страницу или проверить консоль браузера для диагностики.
+                Нет обработанных файлов. Загрузите файлы в формате .vi2 для анализа данных.
               </p>
             </div>
           )}
