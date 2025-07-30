@@ -4,14 +4,14 @@ import { extent, bisector } from 'd3-array';
 import { timeFormat } from 'd3-time-format';
 import { select, pointer } from 'd3-selection';
 import { zoom, zoomIdentity } from 'd3-zoom';
-import { TimeSeriesPoint, ChartLimits, VerticalMarker, ZoomState, TooltipData } from '../types/TimeSeriesData';
+import { TimeSeriesPoint, ChartLimits, VerticalMarker, ZoomState, TooltipData, DataType } from '../types/TimeSeriesData';
 
 interface TimeSeriesChartProps {
   data: TimeSeriesPoint[];
   width: number;
   height: number;
   margin: { top: number; right: number; bottom: number; left: number };
-  type: 'temperature' | 'humidity';
+  dataType: DataType;
   limits?: ChartLimits;
   markers?: VerticalMarker[];
   zoomState?: ZoomState;
@@ -26,7 +26,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   width,
   height,
   margin,
-  type,
+  dataType,
   limits,
   markers = [],
   zoomState,
@@ -39,17 +39,24 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   const [tooltip, setTooltip] = useState<TooltipData>({ x: 0, y: 0, timestamp: 0, visible: false });
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
 
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
 
+  // Фильтруем данные по типу
+  const filteredData = data.filter(d => {
+    const value = dataType === 'temperature' ? d.temperature : d.humidity;
+    return value !== undefined;
+  });
+
   // Создаем шкалы
   const xScale = scaleTime()
-    .domain(extent(data, d => new Date(d.timestamp)) as [Date, Date])
+    .domain(extent(filteredData, d => new Date(d.timestamp)) as [Date, Date])
     .range([0, innerWidth]);
 
   const yScale = scaleLinear()
-    .domain(extent(data, d => type === 'temperature' ? d.temperature : d.humidity) as [number, number])
+    .domain(extent(filteredData, d => dataType === 'temperature' ? d.temperature! : d.humidity!) as [number, number])
     .nice()
     .range([innerHeight, 0]);
 
@@ -60,16 +67,16 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
 
   // Форматтеры
   const formatTime = timeFormat('%d.%m.%Y %H:%M');
-  const formatValue = (value: number) => `${value.toFixed(1)}${type === 'temperature' ? '°C' : '%'}`;
+  const formatValue = (value: number) => `${value.toFixed(1)}${dataType === 'temperature' ? '°C' : '%'}`;
 
   // Бисектор для поиска ближайшей точки
   const bisectDate = bisector((d: TimeSeriesPoint) => d.timestamp).left;
 
   // Обработчик движения мыши
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
-    if (!svgRef.current) return;
+    if (!svgRef.current || isSelecting) return;
 
-    const [mouseX] = pointer(event, svgRef.current);
+    const [mouseX, mouseY] = pointer(event, svgRef.current);
     const adjustedX = mouseX - margin.left;
 
     if (adjustedX < 0 || adjustedX > innerWidth) {
@@ -78,22 +85,22 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     }
 
     const timestamp = xScale.invert(adjustedX).getTime();
-    const index = bisectDate(data, timestamp);
-    const point = data[index];
+    const index = bisectDate(filteredData, timestamp);
+    const point = filteredData[index];
 
     if (point) {
-      const value = type === 'temperature' ? point.temperature : point.humidity;
+      const value = dataType === 'temperature' ? point.temperature : point.humidity;
       if (value !== undefined) {
         setTooltip({
           x: mouseX,
-          y: event.clientY,
+          y: mouseY,
           timestamp: point.timestamp,
-          [type]: value,
+          [dataType]: value,
           visible: true
         });
       }
     }
-  }, [data, xScale, margin.left, innerWidth, type, bisectDate]);
+  }, [filteredData, xScale, margin.left, innerWidth, dataType, bisectDate, isSelecting]);
 
   // Обработчик выхода мыши
   const handleMouseLeave = useCallback(() => {
@@ -123,49 +130,68 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     if (adjustedX >= 0 && adjustedX <= innerWidth) {
       setIsSelecting(true);
       setSelectionStart(adjustedX);
+      setSelectionEnd(adjustedX);
     }
   }, [margin.left, innerWidth]);
 
-  // Обработчик окончания выделения
-  const handleMouseUp = useCallback((event: React.MouseEvent) => {
+  // Обработчик движения при выделении
+  const handleMouseMoveSelection = useCallback((event: React.MouseEvent) => {
     if (!isSelecting || selectionStart === null) return;
 
     const [mouseX] = pointer(event, svgRef.current);
     const adjustedX = mouseX - margin.left;
 
-    if (adjustedX >= 0 && adjustedX <= innerWidth && Math.abs(adjustedX - selectionStart) > 10) {
-      const startTime = xScale.invert(Math.min(selectionStart, adjustedX)).getTime();
-      const endTime = xScale.invert(Math.max(selectionStart, adjustedX)).getTime();
+    if (adjustedX >= 0 && adjustedX <= innerWidth) {
+      setSelectionEnd(adjustedX);
+    }
+  }, [isSelecting, selectionStart, margin.left, innerWidth]);
+
+  // Обработчик окончания выделения
+  const handleMouseUp = useCallback((event: React.MouseEvent) => {
+    if (!isSelecting || selectionStart === null || selectionEnd === null) {
+      setIsSelecting(false);
+      setSelectionStart(null);
+      setSelectionEnd(null);
+      return;
+    }
+
+    if (Math.abs(selectionEnd - selectionStart) > 10) {
+      const startTime = xScale.invert(Math.min(selectionStart, selectionEnd)).getTime();
+      const endTime = xScale.invert(Math.max(selectionStart, selectionEnd)).getTime();
 
       if (onZoomChange) {
         onZoomChange({
           startTime,
           endTime,
-          scale: innerWidth / Math.abs(adjustedX - selectionStart)
+          scale: innerWidth / Math.abs(selectionEnd - selectionStart)
         });
       }
     }
 
     setIsSelecting(false);
     setSelectionStart(null);
-  }, [isSelecting, selectionStart, xScale, margin.left, innerWidth, onZoomChange]);
+    setSelectionEnd(null);
+  }, [isSelecting, selectionStart, selectionEnd, xScale, innerWidth, onZoomChange]);
 
-  // Создание линии графика
+  // Создание линии графика с оптимизацией для больших данных
   const createPath = useCallback(() => {
-    const filteredData = data.filter(d => {
-      const value = type === 'temperature' ? d.temperature : d.humidity;
-      return value !== undefined;
-    });
-
     if (filteredData.length === 0) return '';
 
-    return filteredData.map((d, i) => {
+    // Для больших наборов данных используем упрощение
+    let dataToRender = filteredData;
+    if (filteredData.length > 10000) {
+      // Берем каждую N-ю точку для оптимизации рендеринга
+      const step = Math.ceil(filteredData.length / 10000);
+      dataToRender = filteredData.filter((_, index) => index % step === 0);
+    }
+
+    return dataToRender.map((d, i) => {
       const x = xScale(new Date(d.timestamp));
-      const value = type === 'temperature' ? d.temperature! : d.humidity!;
+      const value = dataType === 'temperature' ? d.temperature! : d.humidity!;
       const y = yScale(value);
       return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
     }).join(' ');
-  }, [data, type, xScale, yScale]);
+  }, [filteredData, dataType, xScale, yScale]);
 
   // Рендер компонента
   return (
@@ -175,7 +201,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
         width={width}
         height={height}
         className="border border-gray-200 bg-white cursor-crosshair"
-        onMouseMove={handleMouseMove}
+        onMouseMove={isSelecting ? handleMouseMoveSelection : handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onDoubleClick={handleDoubleClick}
         onMouseDown={handleMouseDown}
@@ -242,25 +268,25 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
         </g>
 
         {/* Лимиты */}
-        {limits && limits[type] && (
+        {limits && limits[dataType] && (
           <g transform={`translate(${margin.left}, ${margin.top})`}>
-            {limits[type]!.min !== undefined && (
+            {limits[dataType]!.min !== undefined && (
               <line
                 x1={0}
-                y1={yScale(limits[type]!.min!)}
+                y1={yScale(limits[dataType]!.min!)}
                 x2={innerWidth}
-                y2={yScale(limits[type]!.min!)}
+                y2={yScale(limits[dataType]!.min!)}
                 stroke="#ef4444"
                 strokeWidth={2}
                 strokeDasharray="5,5"
               />
             )}
-            {limits[type]!.max !== undefined && (
+            {limits[dataType]!.max !== undefined && (
               <line
                 x1={0}
-                y1={yScale(limits[type]!.max!)}
+                y1={yScale(limits[dataType]!.max!)}
                 x2={innerWidth}
-                y2={yScale(limits[type]!.max!)}
+                y2={yScale(limits[dataType]!.max!)}
                 stroke="#ef4444"
                 strokeWidth={2}
                 strokeDasharray="5,5"
@@ -308,11 +334,11 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
         </g>
 
         {/* Область выделения */}
-        {isSelecting && selectionStart !== null && (
+        {isSelecting && selectionStart !== null && selectionEnd !== null && (
           <rect
-            x={margin.left + Math.min(selectionStart, tooltip.x - margin.left)}
+            x={margin.left + Math.min(selectionStart, selectionEnd)}
             y={margin.top}
-            width={Math.abs((tooltip.x - margin.left) - selectionStart)}
+            width={Math.abs(selectionEnd - selectionStart)}
             height={innerHeight}
             fill="rgba(59, 130, 246, 0.2)"
             stroke="rgba(59, 130, 246, 0.5)"

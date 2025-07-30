@@ -11,6 +11,8 @@ export interface ProcessedTimeSeriesData {
   temperatureRange: [number, number];
   humidityRange: [number, number];
   timeRange: [number, number];
+  hasTemperature: boolean;
+  hasHumidity: boolean;
 }
 
 export interface ChartLimits {
@@ -45,3 +47,5 @@ export interface TooltipData {
   humidity?: number;
   visible: boolean;
 }
+
+export type DataType = 'temperature' | 'humidity';

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { BarChart, Settings, Plus, Trash2, RotateCcw, ZoomIn, ZoomOut, Download } from 'lucide-react';
+import { BarChart, Settings, Trash2, RotateCcw, Thermometer, Droplets } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
-import { ChartLimits, VerticalMarker, ZoomState } from '../types/TimeSeriesData';
+import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 
@@ -15,16 +15,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [markers, setMarkers] = useState<VerticalMarker[]>([]);
   const [zoomState, setZoomState] = useState<ZoomState | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [chartHeight, setChartHeight] = useState(300);
-  const [maxPointsPerFile, setMaxPointsPerFile] = useState(100);
+  const [chartHeight, setChartHeight] = useState(400);
+  const [dataType, setDataType] = useState<DataType>('temperature');
 
-  const { data, chartData, loading, progress, error, reload } = useTimeSeriesData({
-    files,
-    maxPointsPerFile
-  });
+  const { data, loading, progress, error, reload } = useTimeSeriesData({ files });
 
   // Размеры графиков
-  const chartWidth = Math.min(1200, window.innerWidth - 100);
+  const chartWidth = Math.min(1400, window.innerWidth - 100);
   const margin = { top: 20, right: 50, bottom: 60, left: 80 };
 
   // Обработчики лимитов
@@ -67,6 +64,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setZoomState(null);
   }, []);
 
+  // Переключение типа данных
+  const handleDataTypeChange = useCallback((newDataType: DataType) => {
+    setDataType(newDataType);
+  }, []);
+
   // Статистика данных
   const stats = useMemo(() => {
     if (!data) return null;
@@ -83,7 +85,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       humidityPoints,
       days,
       filesLoaded: files.filter(f => f.parsingStatus === 'completed').length,
-      totalFiles: files.length
+      totalFiles: files.length,
+      hasTemperature: data.hasTemperature,
+      hasHumidity: data.hasHumidity
     };
   }, [data, files]);
 
@@ -122,7 +126,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     );
   }
 
-  if (!data || !chartData) {
+  if (!data) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -208,6 +212,39 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
       )}
 
+      {/* Переключатель типа данных */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold mb-4">Тип отображаемых данных</h3>
+        <div className="flex space-x-4">
+          {stats?.hasTemperature && (
+            <button
+              onClick={() => handleDataTypeChange('temperature')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                dataType === 'temperature'
+                  ? 'bg-red-100 text-red-700 border-2 border-red-300'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Thermometer className="w-5 h-5" />
+              <span>Температура</span>
+            </button>
+          )}
+          {stats?.hasHumidity && (
+            <button
+              onClick={() => handleDataTypeChange('humidity')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                dataType === 'humidity'
+                  ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Droplets className="w-5 h-5" />
+              <span>Влажность</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Панель настроек */}
       {showSettings && (
         <div className="bg-white rounded-lg shadow p-6">
@@ -272,34 +309,21 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </div>
             </div>
 
-            {/* Настройки производительности */}
+            {/* Настройки отображения */}
             <div>
-              <h4 className="font-medium mb-3 text-green-600">Производительность</h4>
+              <h4 className="font-medium mb-3 text-green-600">Настройки отображения</h4>
               <div className="space-y-2">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Высота графика (px)</label>
                   <input
                     type="number"
-                    min="200"
-                    max="600"
+                    min="300"
+                    max="800"
                     step="50"
                     value={chartHeight}
-                    onChange={(e) => setChartHeight(parseInt(e.target.value) || 300)}
+                    onChange={(e) => setChartHeight(parseInt(e.target.value) || 400)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Точек на файл</label>
-                  <select
-                    value={maxPointsPerFile}
-                    onChange={(e) => setMaxPointsPerFile(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value={50}>50 (быстро)</option>
-                    <option value={100}>100 (оптимально)</option>
-                    <option value={200}>200 (детально)</option>
-                    <option value={500}>500 (максимум)</option>
-                  </select>
                 </div>
               </div>
             </div>
@@ -335,63 +359,42 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
       )}
 
-      {/* График температуры */}
-      {chartData.temperature.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4 text-red-600">График температуры</h3>
-          <div className="text-sm text-gray-600 mb-4">
-            Двойной клик для добавления маркера • Выделите область мышью для зума
-          </div>
+      {/* График */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className={`text-lg font-semibold mb-4 ${dataType === 'temperature' ? 'text-red-600' : 'text-blue-600'}`}>
+          График {dataType === 'temperature' ? 'температуры' : 'влажности'}
+        </h3>
+        <div className="text-sm text-gray-600 mb-4">
+          Двойной клик для добавления маркера • Выделите область мышью для зума
+        </div>
+        <div className="overflow-x-auto">
           <TimeSeriesChart
-            data={chartData.temperature}
+            data={data.points}
             width={chartWidth}
             height={chartHeight}
             margin={margin}
-            type="temperature"
+            dataType={dataType}
             limits={limits}
             markers={markers}
             zoomState={zoomState}
             onZoomChange={handleZoomChange}
             onMarkerAdd={handleMarkerAdd}
-            color="#ef4444"
-            yAxisLabel="Температура (°C)"
+            color={dataType === 'temperature' ? '#ef4444' : '#3b82f6'}
+            yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
           />
         </div>
-      )}
-
-      {/* График влажности */}
-      {chartData.humidity.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4 text-blue-600">График влажности</h3>
-          <div className="text-sm text-gray-600 mb-4">
-            Двойной клик для добавления маркера • Выделите область мышью для зума
-          </div>
-          <TimeSeriesChart
-            data={chartData.humidity}
-            width={chartWidth}
-            height={chartHeight}
-            margin={margin}
-            type="humidity"
-            limits={limits}
-            markers={markers}
-            zoomState={zoomState}
-            onZoomChange={handleZoomChange}
-            onMarkerAdd={handleMarkerAdd}
-            color="#3b82f6"
-            yAxisLabel="Влажность (%)"
-          />
-        </div>
-      )}
+      </div>
 
       {/* Инструкции */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="font-semibold text-blue-800 mb-2">Инструкции по использованию:</h4>
         <ul className="text-sm text-blue-700 space-y-1">
-          <li>• <strong>Зум:</strong> Выделите область на графике левой кнопкой мыши</li>
+          <li>• <strong>Переключение данных:</strong> Используйте кнопки "Температура" и "Влажность" для выбора типа данных</li>
+          <li>• <strong>Зум:</strong> Выделите область на графике левой кнопкой мыши для увеличения</li>
           <li>• <strong>Маркеры:</strong> Двойной клик по графику для добавления вертикального маркера</li>
           <li>• <strong>Tooltip:</strong> Наведите курсор на график для просмотра точных значений</li>
           <li>• <strong>Лимиты:</strong> Установите в настройках для отображения красных пунктирных линий</li>
-          <li>• <strong>Производительность:</strong> Уменьшите количество точек на файл для ускорения отображения</li>
+          <li>• <strong>Производительность:</strong> Компонент автоматически оптимизирует отображение больших наборов данных</li>
         </ul>
       </div>
     </div>

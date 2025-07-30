@@ -5,10 +5,9 @@ import { databaseService } from '../utils/database';
 
 interface UseTimeSeriesDataProps {
   files: UploadedFile[];
-  maxPointsPerFile?: number;
 }
 
-export const useTimeSeriesData = ({ files, maxPointsPerFile = 100 }: UseTimeSeriesDataProps) => {
+export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
   const [data, setData] = useState<ProcessedTimeSeriesData | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -22,27 +21,21 @@ export const useTimeSeriesData = ({ files, maxPointsPerFile = 100 }: UseTimeSeri
         return [];
       }
 
-      // Оптимизация: берем каждую N-ю точку для больших файлов
-      const step = Math.max(1, Math.floor(measurements.length / maxPointsPerFile));
-      const points: TimeSeriesPoint[] = [];
-
-      for (let i = 0; i < measurements.length; i += step) {
-        const measurement = measurements[i];
-        points.push({
-          timestamp: measurement.timestamp.getTime(),
-          temperature: measurement.temperature,
-          humidity: measurement.humidity,
-          fileId: file.id,
-          originalIndex: i
-        });
-      }
+      // Преобразуем все данные без сэмплирования для отображения всех точек
+      const points: TimeSeriesPoint[] = measurements.map((measurement, index) => ({
+        timestamp: measurement.timestamp.getTime(),
+        temperature: measurement.temperature,
+        humidity: measurement.humidity,
+        fileId: file.id,
+        originalIndex: index
+      }));
 
       return points;
     } catch (error) {
       console.error(`Error processing file ${file.name}:`, error);
       return [];
     }
-  }, [maxPointsPerFile]);
+  }, []);
 
   const loadData = useCallback(async () => {
     if (files.length === 0) {
@@ -60,8 +53,8 @@ export const useTimeSeriesData = ({ files, maxPointsPerFile = 100 }: UseTimeSeri
 
       console.log(`Loading data from ${completedFiles.length} files...`);
 
-      // Параллельная загрузка файлов батчами по 10
-      const batchSize = 10;
+      // Параллельная загрузка файлов батчами по 20 для оптимизации
+      const batchSize = 20;
       for (let i = 0; i < completedFiles.length; i += batchSize) {
         const batch = completedFiles.slice(i, i + batchSize);
         const batchPromises = batch.map(file => processFileData(file));
@@ -81,24 +74,31 @@ export const useTimeSeriesData = ({ files, maxPointsPerFile = 100 }: UseTimeSeri
       // Сортируем по времени
       allPoints.sort((a, b) => a.timestamp - b.timestamp);
 
-      // Вычисляем диапазоны
+      // Вычисляем диапазоны и проверяем наличие данных
       const temperatures = allPoints.filter(p => p.temperature !== undefined).map(p => p.temperature!);
       const humidities = allPoints.filter(p => p.humidity !== undefined).map(p => p.humidity!);
       const timestamps = allPoints.map(p => p.timestamp);
 
+      const hasTemperature = temperatures.length > 0;
+      const hasHumidity = humidities.length > 0;
+
       const processedData: ProcessedTimeSeriesData = {
         points: allPoints,
-        temperatureRange: temperatures.length > 0 ? 
+        temperatureRange: hasTemperature ? 
           [Math.min(...temperatures), Math.max(...temperatures)] : [0, 100],
-        humidityRange: humidities.length > 0 ? 
+        humidityRange: hasHumidity ? 
           [Math.min(...humidities), Math.max(...humidities)] : [0, 100],
-        timeRange: [Math.min(...timestamps), Math.max(...timestamps)]
+        timeRange: [Math.min(...timestamps), Math.max(...timestamps)],
+        hasTemperature,
+        hasHumidity
       };
 
       console.log(`Loaded ${allPoints.length} data points`);
       console.log('Time range:', new Date(processedData.timeRange[0]), 'to', new Date(processedData.timeRange[1]));
       console.log('Temperature range:', processedData.temperatureRange);
       console.log('Humidity range:', processedData.humidityRange);
+      console.log('Has temperature:', hasTemperature);
+      console.log('Has humidity:', hasHumidity);
 
       setData(processedData);
     } catch (error) {
@@ -115,19 +115,8 @@ export const useTimeSeriesData = ({ files, maxPointsPerFile = 100 }: UseTimeSeri
     loadData();
   }, [loadData]);
 
-  // Мемоизированные данные для графиков
-  const chartData = useMemo(() => {
-    if (!data) return null;
-
-    return {
-      temperature: data.points.filter(p => p.temperature !== undefined),
-      humidity: data.points.filter(p => p.humidity !== undefined)
-    };
-  }, [data]);
-
   return {
     data,
-    chartData,
     loading,
     progress,
     error,
