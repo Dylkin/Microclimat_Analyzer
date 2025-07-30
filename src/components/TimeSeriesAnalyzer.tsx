@@ -16,12 +16,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [zoomState, setZoomState] = useState<ZoomState | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [chartHeight, setChartHeight] = useState(300);
-  const [maxPointsPerFile, setMaxPointsPerFile] = useState(100);
 
-  const { data, chartData, loading, progress, error, reload } = useTimeSeriesData({
-    files,
-    maxPointsPerFile
-  });
+  const { data, chartData, loading, progress, error, reload } = useTimeSeriesData({ files });
 
   // Размеры графиков
   const chartWidth = Math.min(1200, window.innerWidth - 100);
@@ -288,19 +284,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Точек на файл</label>
-                  <select
-                    value={maxPointsPerFile}
-                    onChange={(e) => setMaxPointsPerFile(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value={50}>50 (быстро)</option>
-                    <option value={100}>100 (оптимально)</option>
-                    <option value={200}>200 (детально)</option>
-                    <option value={500}>500 (максимум)</option>
-                  </select>
-                </div>
               </div>
             </div>
           </div>
@@ -391,7 +374,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <li>• <strong>Маркеры:</strong> Двойной клик по графику для добавления вертикального маркера</li>
           <li>• <strong>Tooltip:</strong> Наведите курсор на график для просмотра точных значений</li>
           <li>• <strong>Лимиты:</strong> Установите в настройках для отображения красных пунктирных линий</li>
-          <li>• <strong>Производительность:</strong> Уменьшите количество точек на файл для ускорения отображения</li>
         </ul>
       </div>
     </div>

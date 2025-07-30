@@ -5,10 +5,9 @@ import { databaseService } from '../utils/database';
 
 interface UseTimeSeriesDataProps {
   files: UploadedFile[];
-  maxPointsPerFile?: number;
 }
 
-export const useTimeSeriesData = ({ files, maxPointsPerFile = 100 }: UseTimeSeriesDataProps) => {
+export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
   const [data, setData] = useState<ProcessedTimeSeriesData | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -22,11 +21,10 @@ export const useTimeSeriesData = ({ files, maxPointsPerFile = 100 }: UseTimeSeri
         return [];
       }
 
-      // Оптимизация: берем каждую N-ю точку для больших файлов
-      const step = Math.max(1, Math.floor(measurements.length / maxPointsPerFile));
+      // Отображаем все данные без сэмплирования
       const points: TimeSeriesPoint[] = [];
 
-      for (let i = 0; i < measurements.length; i += step) {
+      for (let i = 0; i < measurements.length; i++) {
         const measurement = measurements[i];
         points.push({
           timestamp: measurement.timestamp.getTime(),
@@ -42,7 +40,7 @@ export const useTimeSeriesData = ({ files, maxPointsPerFile = 100 }: UseTimeSeri
       console.error(`Error processing file ${file.name}:`, error);
       return [];
     }
-  }, [maxPointsPerFile]);
+  }, []);
 
   const loadData = useCallback(async () => {
     if (files.length === 0) {
