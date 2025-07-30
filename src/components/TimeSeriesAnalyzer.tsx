@@ -258,7 +258,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <li>• <strong>Лимиты:</strong> Установленные лимиты расширяют масштаб для лучшего отображения</li>
               <li>• <strong>Динамическое:</strong> Масштаб автоматически изменяется при изменении временного диапазона</li>
             </ul>
-            </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
