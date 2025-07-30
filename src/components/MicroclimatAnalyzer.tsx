@@ -174,7 +174,10 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       return;
     }
     
-    onShowVisualization?.(true);
+    // Переходим напрямую к анализатору временных рядов
+    if (onShowVisualization) {
+      onShowVisualization(true);
+    }
   };
 
   // Если показываем визуализацию, рендерим компонент визуализации
