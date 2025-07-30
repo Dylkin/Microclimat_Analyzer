@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { BarChart, Settings, Trash2, RotateCcw, Thermometer, Droplets } from 'lucide-react';
+import { BarChart, Settings, Trash2, RotateCcw, Thermometer, Droplets, Target } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -17,8 +17,17 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [showSettings, setShowSettings] = useState(false);
   const [chartHeight, setChartHeight] = useState(400);
   const [dataType, setDataType] = useState<DataType>('temperature');
+  const [testType, setTestType] = useState('empty-object');
 
   const { data, loading, progress, error, reload } = useTimeSeriesData({ files });
+
+  const testTypes = [
+    { value: 'empty-object', label: 'Соответствие критериям в пустом объекте' },
+    { value: 'loaded-object', label: 'Соответствие критериям в загруженном объекте' },
+    { value: 'door-opening', label: 'Открытие двери' },
+    { value: 'power-off', label: 'Отключение электропитания' },
+    { value: 'power-on', label: 'Включение электропитания' }
+  ];
 
   // Размеры графиков
   const chartWidth = Math.min(1400, window.innerWidth - 100);
@@ -336,6 +345,59 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                   />
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Исследовательский режим */}
+          <div className="md:col-span-3 border-t border-gray-200 pt-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <Target className="w-6 h-6 text-green-600" />
+              <h4 className="text-lg font-semibold text-gray-900">Исследовательский режим</h4>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Вид испытаний</label>
+                <select
+                  value={testType}
+                  onChange={(e) => setTestType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  {testTypes.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-end">
+                <div className="text-sm text-gray-600">
+                  Данные готовы для анализа и формирования отчета
+                </div>
+              </div>
+            </div>
+
+            {/* Информация о данных */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <h5 className="text-sm font-medium text-gray-700 mb-2">Информация о загруженных данных:</h5>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Количество файлов:</span> {stats?.filesLoaded || 0}
+                </div>
+                <div>
+                  <span className="font-medium">Общее количество записей:</span> {stats?.totalPoints.toLocaleString('ru-RU') || '0'}
+                </div>
+                <div>
+                  <span className="font-medium">Период данных:</span> 
+                  <span className="ml-1">{stats?.days || 0} дней</span>
+                </div>
+              </div>
+              {(!stats || stats.filesLoaded === 0) && (
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    Нет обработанных файлов. Загрузите файлы в формате .vi2 для анализа данных.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
