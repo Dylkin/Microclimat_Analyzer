@@ -81,7 +81,7 @@ export class ReportGenerator {
         doc.render();
       } catch (error) {
         console.error('Ошибка рендеринга шаблона:', error);
-        throw new Error('Ошибка обработки шаблона. Проверьте корректность плейсхолдеров.');
+        throw new Error('Ошибка обработки шаблона. Проверьте корректность плейсхолдеров. Детали: ' + (error.message || error));
       }
 
       // Получаем обработанный документ
