@@ -77,7 +77,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   }
 
   // Форматтеры
-  const formatTime = timeFormat('%d.%m.%Y %H:%M');
+  const formatTime = timeFormat('%d.%m %H:%M');
   const formatValue = (value: number) => `${value.toFixed(1)}${dataType === 'temperature' ? '°C' : '%'}`;
 
   // Бисектор для поиска ближайшей точки
@@ -102,10 +102,15 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     if (point) {
       const value = dataType === 'temperature' ? point.temperature : point.humidity;
       if (value !== undefined) {
+        // Получаем имя файла из данных
+        const fileName = data.find(d => d.fileId === point.fileId)?.fileId || '';
+        const shortFileName = fileName.substring(0, 6);
+        
         setTooltip({
           x: mouseX,
           y: mouseY,
           timestamp: point.timestamp,
+          fileName: shortFileName,
           [dataType]: value,
           visible: true
         });
@@ -406,6 +411,9 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           }}
         >
           <div className="font-semibold">{formatTime(new Date(tooltip.timestamp))}</div>
+          {tooltip.fileName && (
+            <div className="text-xs text-gray-300">Файл: {tooltip.fileName}</div>
+          )}
           {tooltip.temperature !== undefined && (
             <div>Температура: {formatValue(tooltip.temperature)}</div>
           )}

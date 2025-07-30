@@ -43,6 +43,7 @@ export interface TooltipData {
   x: number;
   y: number;
   timestamp: number;
+  fileName?: string;
   temperature?: number;
   humidity?: number;
   visible: boolean;
