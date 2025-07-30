@@ -18,6 +18,7 @@ interface ResearchInfo {
 
 export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onBack }) => {
   const [researchInfo, setResearchInfo] = useState<ResearchInfo>({
+  const [showTimeSeriesAnalyzer, setShowTimeSeriesAnalyzer] = useState(false);
     reportNumber: '',
     reportDate: new Date().toISOString().split('T')[0],
     templateFile: null,
@@ -25,7 +26,6 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
     climateSystemName: ''
   });
 
-  const [showTimeSeriesAnalyzer, setShowTimeSeriesAnalyzer] = useState(false);
   const [testType, setTestType] = useState('empty-object');
   const researchInfoRef = useRef<HTMLDivElement>(null);
 
