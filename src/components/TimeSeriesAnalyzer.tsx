@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { BarChart, Settings, Trash2, RotateCcw, Thermometer, Droplets, Target, Clock } from 'lucide-react';
+import { BarChart, Settings, Trash2, RotateCcw, Thermometer, Droplets, Target, Clock, Download, Copy, FileText } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -20,6 +20,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [testType, setTestType] = useState('empty-object');
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
   const [fileStats, setFileStats] = useState(new Map());
+  const [conclusion, setConclusion] = useState('');
 
   const { data, loading, progress, error, reload } = useTimeSeriesData({ files });
 
@@ -242,6 +243,120 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       globalMax: validTemps.length > 0 ? Math.max(...validTemps) : null
     };
   }, [resultsTableData]);
+
+  // Генерация рекомендаций
+  const recommendations = useMemo(() => {
+    if (!data || resultsTableData.length === 0) return null;
+
+    // Находим холодную и горячую точки
+    const validResults = resultsTableData.filter(row => typeof row.minTemp === 'number' && typeof row.maxTemp === 'number');
+    if (validResults.length === 0) return null;
+
+    const coldestPoint = validResults.find(row => row.minTemp === globalMinMax.globalMin);
+    const hottestPoint = validResults.find(row => row.maxTemp === globalMinMax.globalMax);
+
+    // Получаем информацию о временном периоде
+    let testPeriodInfo = null;
+    if (markers.length >= 2) {
+      const sortedMarkers = [...markers].sort((a, b) => a.timestamp - b.timestamp);
+      const startTime = new Date(sortedMarkers[0].timestamp);
+      const endTime = new Date(sortedMarkers[sortedMarkers.length - 1].timestamp);
+      const duration = endTime.getTime() - startTime.getTime();
+      
+      const formatDuration = (ms: number) => {
+        const hours = Math.floor(ms / (1000 * 60 * 60));
+        const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+        
+        if (hours > 0) {
+          return `${hours}ч ${minutes}м ${seconds}с`;
+        } else if (minutes > 0) {
+          return `${minutes}м ${seconds}с`;
+        } else {
+          return `${seconds}с`;
+        }
+      };
+
+      testPeriodInfo = {
+        startTime: startTime.toLocaleString('ru-RU'),
+        endTime: endTime.toLocaleString('ru-RU'),
+        duration: formatDuration(duration)
+      };
+    }
+
+    // Оценка соответствия лимитам
+    let complianceAssessment = '';
+    if (limits.temperature && (limits.temperature.min !== undefined || limits.temperature.max !== undefined)) {
+      const compliantFiles = resultsTableData.filter(row => row.meetsLimits === 'Да').length;
+      const totalFiles = resultsTableData.length;
+      
+      if (compliantFiles === totalFiles) {
+        complianceAssessment = 'Все зоны измерения соответствуют установленным температурным критериям.';
+      } else if (compliantFiles === 0) {
+        complianceAssessment = 'Ни одна зона измерения не соответствует установленным температурным критериям.';
+      } else {
+        complianceAssessment = `${compliantFiles} из ${totalFiles} зон измерения соответствуют установленным температурным критериям.`;
+      }
+    } else {
+      complianceAssessment = 'Температурные критерии не установлены для оценки соответствия.';
+    }
+
+    return {
+      coldestPoint,
+      hottestPoint,
+      testPeriodInfo,
+      complianceAssessment,
+      globalMin: globalMinMax.globalMin,
+      globalMax: globalMinMax.globalMax
+    };
+  }, [data, resultsTableData, globalMinMax, markers, limits.temperature]);
+
+  // Генерация текста рекомендаций
+  const recommendationsText = useMemo(() => {
+    if (!recommendations) return '';
+
+    const testTypeLabel = testTypes.find(t => t.value === testType)?.label || testType;
+    
+    let text = `Вид испытания: ${testTypeLabel}\n\n`;
+    
+    if (recommendations.testPeriodInfo) {
+      text += `Временной период испытания:\n`;
+      text += `Дата время начала: ${recommendations.testPeriodInfo.startTime}\n`;
+      text += `Дата время завершения: ${recommendations.testPeriodInfo.endTime}\n`;
+      text += `Длительность: ${recommendations.testPeriodInfo.duration}\n\n`;
+    }
+    
+    text += `Оценка данных:\n`;
+    text += `${recommendations.complianceAssessment}\n\n`;
+    
+    if (recommendations.coldestPoint) {
+      text += `Холодная точка:\n`;
+      text += `- Зона измерения: ${recommendations.coldestPoint.zoneNumber}\n`;
+      text += `- Уровень расположения: ${recommendations.coldestPoint.measurementLevel}\n`;
+      text += `- Минимальная температура: ${recommendations.globalMin}°C\n`;
+      text += `- Логгер: ${recommendations.coldestPoint.loggerName} (S/N: ${recommendations.coldestPoint.serialNumber})\n\n`;
+    }
+    
+    if (recommendations.hottestPoint) {
+      text += `Горячая точка:\n`;
+      text += `- Зона измерения: ${recommendations.hottestPoint.zoneNumber}\n`;
+      text += `- Уровень расположения: ${recommendations.hottestPoint.measurementLevel}\n`;
+      text += `- Максимальная температура: ${recommendations.globalMax}°C\n`;
+      text += `- Логгер: ${recommendations.hottestPoint.loggerName} (S/N: ${recommendations.hottestPoint.serialNumber})\n`;
+    }
+    
+    return text;
+  }, [recommendations, testType, testTypes]);
+
+  // Копирование рекомендаций в поле вывода
+  const handleCopyRecommendations = useCallback(() => {
+    setConclusion(recommendationsText);
+  }, [recommendationsText]);
+
+  // Проверка готовности для формирования отчета
+  const isReportReady = useMemo(() => {
+    return resultsTableData.length > 0 && conclusion.trim().length > 0;
+  }, [resultsTableData, conclusion]);
 
   // Статистика данных
   const stats = useMemo(() => {
@@ -668,6 +783,71 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
             showLegend={true}
           />
+        </div>
+      </div>
+
+      {/* Кнопка формирования отчета */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Формирование отчета</h3>
+            <p className="text-sm text-gray-600">
+              {isReportReady 
+                ? 'Данные готовы для формирования отчета' 
+                : 'Заполните поле "Вывод" для формирования отчета'
+              }
+            </p>
+          </div>
+          <button
+            disabled={!isReportReady}
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            <Download className="w-5 h-5" />
+            <span>Сформировать отчет</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Блок рекомендаций - только для температуры */}
+      {dataType === 'temperature' && recommendations && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <FileText className="w-6 h-6 text-blue-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Рекомендации</h3>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono">
+              {recommendationsText}
+            </pre>
+          </div>
+          
+          <button
+            onClick={handleCopyRecommendations}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          >
+            <Copy className="w-4 h-4" />
+            <span>Скопировать</span>
+          </button>
+        </div>
+      )}
+
+      {/* Поле для ввода вывода */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <FileText className="w-6 h-6 text-green-600" />
+          <h3 className="text-lg font-semibold text-gray-900">Вывод</h3>
+        </div>
+        
+        <textarea
+          value={conclusion}
+          onChange={(e) => setConclusion(e.target.value)}
+          className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-vertical"
+          placeholder="Введите выводы по результатам анализа данных..."
+        />
+        
+        <div className="mt-2 text-sm text-gray-500">
+          Символов: {conclusion.length}
         </div>
       </div>
 
