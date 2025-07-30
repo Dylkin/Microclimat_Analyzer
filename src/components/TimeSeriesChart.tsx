@@ -3,7 +3,7 @@ import { scaleLinear, scaleTime } from 'd3-scale';
 import { extent, bisector } from 'd3-array';
 import { timeFormat } from 'd3-time-format';
 import { select, pointer } from 'd3-selection';
-import { zoom, zoomIdentity } from 'd3-zoom';
+import { schemeCategory10 } from 'd3-scale-chromatic';
 import { TimeSeriesPoint, ChartLimits, VerticalMarker, ZoomState, TooltipData, DataType } from '../types/TimeSeriesData';
 
 interface TimeSeriesChartProps {
@@ -19,6 +19,7 @@ interface TimeSeriesChartProps {
   onMarkerAdd?: (timestamp: number) => void;
   color?: string;
   yAxisLabel?: string;
+  showLegend?: boolean;
 }
 
 export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
@@ -33,7 +34,8 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   onZoomChange,
   onMarkerAdd,
   color = '#3b82f6',
-  yAxisLabel
+  yAxisLabel,
+  showLegend = true
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tooltip, setTooltip] = useState<TooltipData>({ x: 0, y: 0, timestamp: 0, visible: false });
@@ -50,30 +52,45 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     return value !== undefined;
   });
 
+  // Группируем данные по файлам для легенды и отображения
+  const dataByFile = React.useMemo(() => {
+    const grouped = new Map<string, TimeSeriesPoint[]>();
+    filteredData.forEach(point => {
+      const fileKey = point.fileId;
+      if (!grouped.has(fileKey)) {
+        grouped.set(fileKey, []);
+      }
+      grouped.get(fileKey)!.push(point);
+    });
+    return grouped;
+  }, [filteredData]);
+
+  // Получаем уникальные файлы и назначаем им цвета
+  const fileColors = React.useMemo(() => {
+    const files = Array.from(dataByFile.keys());
+    const colors = new Map<string, string>();
+    files.forEach((file, index) => {
+      colors.set(file, schemeCategory10[index % schemeCategory10.length]);
+    });
+    return colors;
+  }, [dataByFile]);
+
   // Создаем шкалы
   const xScale = scaleTime()
     .domain(extent(data, d => new Date(d.timestamp)) as [Date, Date])
     .range([0, innerWidth]);
 
+  // Фиксированная Y-шкала (не изменяется при зуме)
+  const yDomain = extent(filteredData, d => dataType === 'temperature' ? d.temperature! : d.humidity!) as [number, number];
   const yScale = scaleLinear()
-    .domain(extent(filteredData, d => dataType === 'temperature' ? d.temperature! : d.humidity!) as [number, number])
+    .domain(yDomain)
     .nice()
     .range([innerHeight, 0]);
 
   // Применяем зум если есть
   if (zoomState) {
     xScale.domain([new Date(zoomState.startTime), new Date(zoomState.endTime)]);
-    
-    // Фильтруем данные по зумированному диапазону для оптимизации
-    const zoomedData = filteredData.filter(d => 
-      d.timestamp >= zoomState.startTime && d.timestamp <= zoomState.endTime
-    );
-    
-    // Пересчитываем Y-шкалу для зумированных данных
-    const zoomedYDomain = extent(zoomedData, d => dataType === 'temperature' ? d.temperature! : d.humidity!) as [number, number];
-    if (zoomedYDomain[0] !== undefined && zoomedYDomain[1] !== undefined) {
-      yScale.domain(zoomedYDomain).nice();
-    }
+    // НЕ изменяем Y-шкалу при зуме - она остается фиксированной
   }
 
   // Форматтеры
@@ -190,22 +207,24 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   }, [isSelecting, selectionStart, selectionEnd, xScale, innerWidth, onZoomChange]);
 
   // Создание линии графика с оптимизацией для больших данных
-  const createPath = useCallback(() => {
-    let dataToRender = filteredData;
-    
-    // Если применен зум, используем только данные в зумированном диапазоне
+  const createPathForFile = useCallback((fileData: TimeSeriesPoint[]) => {
+    let dataToRender = fileData;
+
+    // Фильтруем по времени если применен зум
     if (zoomState) {
-      dataToRender = filteredData.filter(d => 
+      dataToRender = fileData.filter(d => 
         d.timestamp >= zoomState.startTime && d.timestamp <= zoomState.endTime
       );
     }
-    
+
     if (dataToRender.length === 0) return '';
 
+    // Сортируем по времени
+    dataToRender.sort((a, b) => a.timestamp - b.timestamp);
+
     // Для больших наборов данных используем упрощение только если не применен зум
-    if (dataToRender.length > 10000 && !zoomState) {
-      // Берем каждую N-ю точку для оптимизации рендеринга
-      const step = Math.ceil(dataToRender.length / 10000);
+    if (dataToRender.length > 5000 && !zoomState) {
+      const step = Math.ceil(dataToRender.length / 5000);
       dataToRender = dataToRender.filter((_, index) => index % step === 0);
     }
 
@@ -215,11 +234,36 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
       const y = yScale(value);
       return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
     }).join(' ');
-  }, [filteredData, dataType, xScale, yScale, zoomState]);
+  }, [dataType, xScale, yScale, zoomState]);
 
   // Рендер компонента
   return (
-    <div className="relative">
+    <div className="relative flex flex-col">
+      {/* Легенда */}
+      {showLegend && dataByFile.size > 1 && (
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Файлы данных:</h4>
+          <div className="flex flex-wrap gap-3">
+            {Array.from(dataByFile.keys()).map(fileId => {
+              const shortName = fileId.substring(0, 6);
+              const color = fileColors.get(fileId);
+              const pointCount = dataByFile.get(fileId)?.length || 0;
+              return (
+                <div key={fileId} className="flex items-center space-x-2 text-xs">
+                  <div 
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: color }}
+                  ></div>
+                  <span className="text-gray-700">
+                    {shortName} ({pointCount.toLocaleString()} точек)
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <svg
         ref={svgRef}
         width={width}
@@ -346,21 +390,27 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           </g>
         ))}
 
-        {/* Основная линия графика */}
+        {/* Линии графиков для каждого файла */}
         <g transform={`translate(${margin.left}, ${margin.top})`}>
           <defs>
             <clipPath id={`clip-${dataType}`}>
               <rect x={0} y={0} width={innerWidth} height={innerHeight} />
             </clipPath>
           </defs>
-          <path
-            d={createPath()}
-            fill="none"
-            stroke={color}
-            strokeWidth={1.5}
-            opacity={0.8}
-            clipPath={`url(#clip-${dataType})`}
-          />
+          {Array.from(dataByFile.entries()).map(([fileId, fileData]) => {
+            const pathColor = dataByFile.size > 1 ? fileColors.get(fileId) : color;
+            return (
+              <path
+                key={fileId}
+                d={createPathForFile(fileData)}
+                fill="none"
+                stroke={pathColor}
+                strokeWidth={1.5}
+                opacity={0.8}
+                clipPath={`url(#clip-${dataType})`}
+              />
+            );
+          })}
         </g>
 
         {/* Область выделения */}
@@ -412,7 +462,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
         >
           <div className="font-semibold">{formatTime(new Date(tooltip.timestamp))}</div>
           {tooltip.fileName && (
-            <div className="text-xs text-gray-300">Файл: {tooltip.fileName}</div>
+            <div className="text-xs text-gray-300">Файл: {tooltip.fileName.substring(0, 6)}</div>
           )}
           {tooltip.temperature !== undefined && (
             <div>Температура: {formatValue(tooltip.temperature)}</div>

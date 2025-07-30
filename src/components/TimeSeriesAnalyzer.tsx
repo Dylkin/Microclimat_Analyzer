@@ -381,6 +381,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             onMarkerAdd={handleMarkerAdd}
             color={dataType === 'temperature' ? '#ef4444' : '#3b82f6'}
             yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
+            showLegend={true}
           />
         </div>
       </div>
