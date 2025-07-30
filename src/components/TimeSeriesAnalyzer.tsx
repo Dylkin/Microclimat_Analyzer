@@ -107,84 +107,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return;
     }
 
-    // Создаем временный шаблон для демонстрации
-    const templateContent = `
-Отчет по испытанию: {{name of the test}}
-Объект исследования: {{name of the object}}
-Климатическая установка: {{name of the air conditioning system}}
-
-Критерии приемки:
-{{acceptance criteria}}
-
-Период испытания:
-Начало: {{Date time of test start}}
-Завершение: {{Date time of test completion}}
-Длительность: {{Duration of the test}}
-
-Результаты:
-{{Results table}}
-
-Выводы:
-{{Result}}
-
-Исполнитель: {{executor}}
-Дата формирования: {{test date}}
-Номер отчета: {{Report No.}}
-Дата отчета: {{Report date}}
-Руководитель: {{director}}
-
-График: {{chart}}
-    `;
-
-    // Создаем временный файл шаблона
-    const templateBlob = new Blob([templateContent], { type: 'text/plain' });
-    const templateFile = new File([templateBlob], 'template.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-
-    setIsGeneratingReport(true);
-    setReportStatus(null);
-
-    try {
-      const reportGenerator = ReportGenerator.getInstance();
-      
-      // Получаем руководителя из справочника пользователей
-      const director = users.find(u => u.role === 'manager')?.fullName || 'Не назначен';
-      
-      // Подготавливаем данные для отчета
-      const reportData = {
-        reportNumber: `AUTO-${Date.now()}`,
-        reportDate: new Date().toISOString().split('T')[0],
-        objectName: 'Объект из анализатора',
-        climateSystemName: 'Климатическая установка',
-        testType,
-        limits,
-        markers,
-        resultsTableData,
-        conclusion,
-        user: user!,
-        director
-      };
-
-      const result = await reportGenerator.generateReport(
-        templateFile,
-        reportData,
-        chartRef.current || undefined
-      );
-
-      if (result.success) {
-        setReportStatus({ type: 'success', message: `Отчет "${result.fileName}" успешно сгенерирован и скачан` });
-        setGeneratedReports(reportGenerator.getGeneratedReports());
-      } else {
-        setReportStatus({ type: 'error', message: result.error || 'Ошибка генерации отчета' });
-      }
-    } catch (error) {
-      setReportStatus({ 
-        type: 'error', 
-        message: error instanceof Error ? error.message : 'Неизвестная ошибка' 
-      });
-    } finally {
-      setIsGeneratingReport(false);
-    }
+    setReportStatus({ type: 'error', message: 'Для генерации отчета необходимо загрузить шаблон DOCX в разделе "Визуализация данных"' });
+    return;
   };
+
 
   const handleDeleteReport = (fileName: string) => {
     if (confirm(`Вы уверены, что хотите удалить отчет "${fileName}"?`)) {

@@ -43,6 +43,18 @@ export class ReportGenerator {
   ): Promise<{ success: boolean; fileName: string; error?: string }> {
     try {
       console.log('Начинаем генерацию отчета...');
+      console.log('Размер файла шаблона:', templateFile.size, 'байт');
+      console.log('Тип файла:', templateFile.type);
+      console.log('Имя файла:', templateFile.name);
+
+      // Проверяем, что файл действительно DOCX
+      if (!templateFile.name.toLowerCase().endsWith('.docx')) {
+        throw new Error('Файл должен иметь расширение .docx');
+      }
+
+      if (templateFile.size === 0) {
+        throw new Error('Файл шаблона пустой');
+      }
 
       // Получаем изображение графика если элемент предоставлен
       let chartImageData = '';
@@ -63,10 +75,24 @@ export class ReportGenerator {
 
       // Читаем шаблон DOCX
       const templateBuffer = await templateFile.arrayBuffer();
+      
+      // Проверяем, что это действительно ZIP-архив (DOCX)
+      const uint8Array = new Uint8Array(templateBuffer);
+      const zipSignature = uint8Array[0] === 0x50 && uint8Array[1] === 0x4B;
+      
+      if (!zipSignature) {
+        throw new Error('Файл не является корректным DOCX документом. Убедитесь, что загружен правильный файл шаблона.');
+      }
+      
       const zip = new PizZip(templateBuffer);
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
+        errorLogging: true,
+        nullGetter: (part) => {
+          console.warn(`Плейсхолдер не найден: ${part.module}:${part.value}`);
+          return '';
+        }
       });
 
       // Подготавливаем данные для замены плейсхолдеров
@@ -79,9 +105,27 @@ export class ReportGenerator {
 
       try {
         doc.render();
-      } catch (error) {
-        console.error('Ошибка рендеринга шаблона:', error);
-        throw new Error('Ошибка обработки шаблона. Проверьте корректность плейсхолдеров. Детали: ' + (error.message || error));
+      } catch (renderError: any) {
+        console.error('Ошибка рендеринга шаблона:', renderError);
+        
+        // Обработка специфических ошибок docxtemplater
+        if (renderError.name === 'TemplateError') {
+          const errors = renderError.properties?.errors || [];
+          const errorMessages = errors.map((err: any) => 
+            `Строка ${err.line}: ${err.message}`
+          ).join('\n');
+          throw new Error(`Ошибки в шаблоне:\n${errorMessages}`);
+        }
+        
+        if (renderError.properties && renderError.properties.errors) {
+          const errors = renderError.properties.errors;
+          const errorDetails = errors.map((err: any) => {
+            return `Ошибка в позиции ${err.offset}: ${err.message}`;
+          }).join('\n');
+          throw new Error(`Ошибки обработки шаблона:\n${errorDetails}`);
+        }
+        
+        throw new Error(`Ошибка обработки шаблона: ${renderError.message || renderError}`);
       }
 
       // Получаем обработанный документ
@@ -108,6 +152,16 @@ export class ReportGenerator {
 
     } catch (error) {
       console.error('Ошибка генерации отчета:', error);
+      
+      // Специальная обработка для ошибок ZIP
+      if (error instanceof Error && error.message.includes('central directory')) {
+        return {
+          success: false,
+          fileName: '',
+          error: 'Загруженный файл не является корректным DOCX документом. Пожалуйста, загрузите правильный файл шаблона в формате .docx'
+        };
+      }
+      
       return {
         success: false,
         fileName: '',
