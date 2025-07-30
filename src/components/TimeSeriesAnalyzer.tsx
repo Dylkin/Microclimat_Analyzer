@@ -63,6 +63,25 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     const reportGenerator = ReportGenerator.getInstance();
     setGeneratedReports(reportGenerator.getGeneratedReports());
   }, []);
+
+  const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.name.toLowerCase().endsWith('.docx')) {
+        setReportStatus({ type: 'error', message: 'Пожалуйста, загрузите файл в формате .docx' });
+        return;
+      }
+      setResearchInfo(prev => ({ ...prev, templateFile: file }));
+      setReportStatus({ type: 'success', message: `Шаблон "${file.name}" успешно загружен` });
+    }
+  };
+
+  const isFormValid = () => {
+    return researchInfo.reportNumber.trim() !== '' &&
+           researchInfo.objectName.trim() !== '' &&
+           researchInfo.templateFile !== null &&
+           conclusion.trim() !== '';
+  };
   // Обработчики лимитов
   const handleLimitChange = useCallback((type: 'temperature' | 'humidity', limitType: 'min' | 'max', value: string) => {
     const numValue = parseFloat(value);
