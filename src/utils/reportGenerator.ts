@@ -134,10 +134,19 @@ export class ReportGenerator {
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       });
 
-      // Конвертируем в PDF (упрощенная версия - сохраняем как DOCX)
-      const fileName = `Отчет_${reportData.reportNumber}_${new Date().toISOString().split('T')[0]}.docx`;
+      // Определяем имя файла
+      let fileName: string;
+      if (this.masterReport && this.masterReportName) {
+        // Используем существующее имя файла
+        fileName = this.masterReportName;
+      } else {
+        // Создаем новое имя файла
+        fileName = `Отчет_${reportData.reportNumber}_${new Date().toISOString().split('T')[0]}.docx`;
+        this.masterReportName = fileName;
+      }
       
-      // Сохраняем сгенерированный отчет
+      // Сохраняем как мастер-отчет для последующих добавлений
+      this.masterReport = output;
       this.generatedReports.set(fileName, output);
 
       // Скачиваем файл

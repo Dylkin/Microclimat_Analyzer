@@ -1198,6 +1198,30 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             <FileText className="w-6 h-6 text-green-600" />
             <h3 className="text-lg font-semibold text-gray-900">Сгенерированные отчеты</h3>
           </div>
+        
+        {/* Генерация отчета */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-gray-900">Генерация отчета</h4>
+              <p className="text-sm text-gray-600">Заполните все обязательные поля и выводы для генерации отчета</p>
+            </div>
+            <button
+              onClick={handleGenerateReport}
+              disabled={!canGenerateReport()}
+              className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Сгенерировать отчет</span>
+            </button>
+          </div>
+          {!canGenerateReport() && (
+            <div className="mt-2 text-sm text-red-600">
+              Заполните все обязательные поля: № отчета, дата, шаблон, объект исследования, вид испытания и выводы
+            </div>
+          )}
+        </div>
+
           
           <div className="space-y-3">
             {generatedReports.map((fileName, index) => (
