@@ -80,8 +80,20 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     .domain(extent(data, d => new Date(d.timestamp)) as [Date, Date])
     .range([0, innerWidth]);
 
-  // Фиксированная Y-шкала (не изменяется при зуме)
-  const yDomain = extent(filteredData, d => dataType === 'temperature' ? d.temperature! : d.humidity!) as [number, number];
+  // Y-шкала с учетом пользовательских лимитов
+  let yDomain = extent(filteredData, d => dataType === 'temperature' ? d.temperature! : d.humidity!) as [number, number];
+  
+  // Применяем пользовательские лимиты если они установлены
+  if (limits && limits[dataType]) {
+    const userLimits = limits[dataType]!;
+    if (userLimits.min !== undefined) {
+      yDomain[0] = Math.min(yDomain[0], userLimits.min);
+    }
+    if (userLimits.max !== undefined) {
+      yDomain[1] = Math.max(yDomain[1], userLimits.max);
+    }
+  }
+  
   const yScale = scaleLinear()
     .domain(yDomain)
     .nice()
@@ -90,7 +102,6 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   // Применяем зум если есть
   if (zoomState) {
     xScale.domain([new Date(zoomState.startTime), new Date(zoomState.endTime)]);
-    // НЕ изменяем Y-шкалу при зуме - она остается фиксированной
   }
 
   // Форматтеры
