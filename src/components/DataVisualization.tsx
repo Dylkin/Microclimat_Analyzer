@@ -4,6 +4,7 @@ import { UploadedFile, MeasurementRecord } from '../types/FileData';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 import { ReportGenerator } from '../utils/reportGenerator';
 import { useAuth } from '../contexts/AuthContext';
+import { TemplateManager } from './TemplateManager';
 
 interface DataVisualizationProps {
   files: UploadedFile[];
@@ -185,6 +186,9 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
           </button>
         </div>
       )}
+
+      {/* Управление шаблонами */}
+      <TemplateManager onTemplateSelect={(file) => setResearchInfo(prev => ({ ...prev, templateFile: file }))} />
 
       {/* Информация для исследования */}
       <div ref={researchInfoRef} className="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500">
