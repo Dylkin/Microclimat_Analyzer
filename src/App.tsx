@@ -4,6 +4,7 @@ import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
 import { UserManagement } from './components/UserManagement';
+import { Help } from './components/Help';
 import './index.css';
 
 const AppContent: React.FC = () => {
@@ -43,6 +44,8 @@ const AppContent: React.FC = () => {
         ) : <div>Доступ запрещен</div>;
       case 'users':
         return hasAccess('users') ? <UserManagement /> : <div>Доступ запрещен</div>;
+      case 'help':
+        return hasAccess('help') ? <Help /> : <div>Доступ запрещен</div>;
       default:
         return <MicroclimatAnalyzer 
           showVisualization={showVisualization}

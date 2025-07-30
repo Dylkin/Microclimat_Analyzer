@@ -4,7 +4,6 @@ import { UploadedFile, MeasurementRecord } from '../types/FileData';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 import { ReportGenerator } from '../utils/reportGenerator';
 import { useAuth } from '../contexts/AuthContext';
-import { TemplateManager } from './TemplateManager';
 
 interface DataVisualizationProps {
   files: UploadedFile[];
@@ -187,14 +186,14 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ files, onB
         </div>
       )}
 
-      {/* Управление шаблонами */}
-      <TemplateManager onTemplateSelect={(file) => setResearchInfo(prev => ({ ...prev, templateFile: file }))} />
-
       {/* Информация для исследования */}
       <div ref={researchInfoRef} className="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500">
         <div className="flex items-center space-x-3 mb-6">
           <FileText className="w-6 h-6 text-indigo-600" />
           <h2 className="text-xl font-semibold text-gray-900">Информация для исследования</h2>
+          <div className="text-sm text-gray-500">
+            Инструкции по созданию шаблонов доступны в разделе "Справка"
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
