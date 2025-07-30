@@ -1055,21 +1055,104 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         <div className="mt-2 text-sm text-gray-500">
           Символов: {conclusion.length}
         </div>
-        
-        {/* Кнопка формирования отчета */}
-        <div className="bg-white rounded-lg shadow p-6">
+      </div>
+
+      {/* Информация для исследования */}
+      <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+        <div className="flex items-center space-x-3 mb-6">
+          <FileText className="w-6 h-6 text-green-600" />
+          <h2 className="text-xl font-semibold text-gray-900">Информация для исследования</h2>
+          <div className="text-sm text-gray-500">
+            Инструкции по созданию шаблонов доступны в разделе "Справка"
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              № отчета <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={researchInfo.reportNumber}
+              onChange={(e) => setResearchInfo(prev => ({ ...prev, reportNumber: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Введите номер отчета"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Дата отчета <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={researchInfo.reportDate}
+              onChange={(e) => setResearchInfo(prev => ({ ...prev, reportDate: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Шаблон выходной формы отчета <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="file"
+              accept=".docx"
+              onChange={handleTemplateUpload}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              required
+            />
+            {researchInfo.templateFile && (
+              <p className="text-sm text-green-600 mt-1">Загружен: {researchInfo.templateFile.name}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Название объекта исследования <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={researchInfo.objectName}
+              onChange={(e) => setResearchInfo(prev => ({ ...prev, objectName: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Введите название объекта"
+              required
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Название климатической установки
+            </label>
+            <input
+              type="text"
+              value={researchInfo.climateSystemName}
+              onChange={(e) => setResearchInfo(prev => ({ ...prev, climateSystemName: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Введите название климатической установки"
+            />
+          </div>
+        </div>
+
+        {/* Кнопка генерации отчета */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Формирование отчета</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Генерация отчета</h3>
               <p className="text-sm text-gray-600">
                 {isReportReady 
-                  ? 'Данные готовы для формирования отчета' 
-                  : 'Заполните поле "Вывод" для формирования отчета'
+                  ? 'Все поля заполнены. Можно сгенерировать отчет с полными данными анализа.' 
+                  : 'Заполните все обязательные поля и выводы для генерации отчета'
                 }
               </p>
             </div>
             <button
-              onClick={handleGenerateReportFromAnalyzer}
+              onClick={handleGenerateReport}
               disabled={!isReportReady || isGeneratingReport}
               className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
@@ -1081,7 +1164,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               ) : (
                 <>
                   <Download className="w-5 h-5" />
-                  <span>Сформировать отчет</span>
+                  <span>Сгенерировать отчет</span>
                 </>
               )}
             </button>
