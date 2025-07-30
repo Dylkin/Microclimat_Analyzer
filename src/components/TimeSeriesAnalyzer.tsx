@@ -206,6 +206,28 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         const tempLimits = limits.temperature;
         let withinLimits = true;
         
+        if (tempLimits.min !== undefined && fileStats.min < tempLimits.min) {
+          withinLimits = false;
+        }
+        if (tempLimits.max !== undefined && fileStats.max > tempLimits.max) {
+          withinLimits = false;
+        }
+        
+        meetsLimits = withinLimits ? 'Да' : 'Нет';
+      }
+      
+      return {
+        fileId: fileName,
+        zoneNumber: file.order,
+        measurementLevel: '-',
+        loggerName,
+        serialNumber,
+        minTemp: fileStats ? fileStats.min : '-',
+        maxTemp: fileStats ? fileStats.max : '-',
+        avgTemp: fileStats ? fileStats.avg : '-',
+        meetsLimits
+      };
+    });
   }, [files, data, zoomState, limits]);
 
   // Вычисление глобальных минимума и максимума
@@ -220,28 +242,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       globalMax: validTemps.length > 0 ? Math.max(...validTemps) : null
     };
   }, [resultsTableData]);
-
-  // Статистика данных
-  const stats = useMemo(() => {
-    if (!data) return null;
-
-    const totalPoints = data.points.length;
-    const tempPoints = data.points.filter(p => p.temperature !== undefined).length;
-    const humidityPoints = data.points.filter(p => p.humidity !== undefined).length;
-    const timeSpan = data.timeRange[1] - data.timeRange[0];
-    const days = Math.ceil(timeSpan / (1000 * 60 * 60 * 24));
-
-    return {
-      totalPoints,
-      tempPoints,
-      humidityPoints,
-      days,
-      filesLoaded: files.filter(f => f.parsingStatus === 'completed').length,
-      totalFiles: files.length,
-      hasTemperature: data.hasTemperature,
-      hasHumidity: data.hasHumidity
-    };
-  }, [data, files]);
 
   // Статистика данных
   const stats = useMemo(() => {
