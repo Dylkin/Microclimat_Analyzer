@@ -849,117 +849,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
       </div>
 
-      {/* Кнопка формирования отчета */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Формирование отчета</h3>
-            <p className="text-sm text-gray-600">
-              {isReportReady 
-                ? 'Данные готовы для формирования отчета' 
-                : 'Заполните поле "Вывод" для формирования отчета'
-              }
-            </p>
-          </div>
-          <button
-            onClick={handleGenerateReportFromAnalyzer}
-            disabled={!isReportReady || isGeneratingReport}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {isGeneratingReport ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Генерация отчета...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-5 h-5" />
-                <span>Сформировать отчет</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Список сгенерированных отчетов */}
-      {generatedReports.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <FileText className="w-6 h-6 text-green-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Сгенерированные отчеты</h3>
-          </div>
-          
-          <div className="space-y-3">
-            {generatedReports.map((fileName, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                  <span className="font-medium text-gray-900">{fileName}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleDownloadReport(fileName)}
-                    className="text-blue-600 hover:text-blue-800 transition-colors"
-                    title="Скачать отчет"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteReport(fileName)}
-                    className="text-red-600 hover:text-red-800 transition-colors"
-                    title="Удалить отчет"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {/* Блок рекомендаций - только для температуры */}
-      {dataType === 'temperature' && recommendations && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <FileText className="w-6 h-6 text-blue-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Рекомендации</h3>
-          </div>
-          
-          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono">
-              {recommendationsText}
-            </pre>
-          </div>
-          
-          <button
-            onClick={handleCopyRecommendations}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-          >
-            <Copy className="w-4 h-4" />
-            <span>Скопировать</span>
-          </button>
-        </div>
-      )}
-
-      {/* Поле для ввода вывода */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <FileText className="w-6 h-6 text-green-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Вывод</h3>
-        </div>
-        
-        <textarea
-          value={conclusion}
-          onChange={(e) => setConclusion(e.target.value)}
-          className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-vertical"
-          placeholder="Введите выводы по результатам анализа данных..."
-        />
-        
-        <div className="mt-2 text-sm text-gray-500">
-          Символов: {conclusion.length}
-        </div>
-      </div>
-
       {/* Таблица результатов - только для температуры */}
       {dataType === 'temperature' && resultsTableData.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
@@ -1064,6 +953,118 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <span>Не соответствует лимитам</span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Блок рекомендаций - только для температуры */}
+      {dataType === 'temperature' && recommendations && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <FileText className="w-6 h-6 text-blue-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Рекомендации</h3>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono">
+              {recommendationsText}
+            </pre>
+          </div>
+          
+          <button
+            onClick={handleCopyRecommendations}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          >
+            <Copy className="w-4 h-4" />
+            <span>Скопировать</span>
+          </button>
+        </div>
+      )}
+
+      {/* Поле для ввода вывода */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <FileText className="w-6 h-6 text-green-600" />
+          <h3 className="text-lg font-semibold text-gray-900">Вывод</h3>
+        </div>
+        
+        <textarea
+          value={conclusion}
+          onChange={(e) => setConclusion(e.target.value)}
+          className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-vertical"
+          placeholder="Введите выводы по результатам анализа данных..."
+        />
+        
+        <div className="mt-2 text-sm text-gray-500">
+          Символов: {conclusion.length}
+        </div>
+        
+        {/* Кнопка формирования отчета */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Формирование отчета</h3>
+              <p className="text-sm text-gray-600">
+                {isReportReady 
+                  ? 'Данные готовы для формирования отчета' 
+                  : 'Заполните поле "Вывод" для формирования отчета'
+                }
+              </p>
+            </div>
+            <button
+              onClick={handleGenerateReportFromAnalyzer}
+              disabled={!isReportReady || isGeneratingReport}
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {isGeneratingReport ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Генерация отчета...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-5 h-5" />
+                  <span>Сформировать отчет</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Список сгенерированных отчетов */}
+      {generatedReports.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <FileText className="w-6 h-6 text-green-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Сгенерированные отчеты</h3>
+          </div>
+          
+          <div className="space-y-3">
+            {generatedReports.map((fileName, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium text-gray-900">{fileName}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleDownloadReport(fileName)}
+                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                    title="Скачать отчет"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteReport(fileName)}
+                    className="text-red-600 hover:text-red-800 transition-colors"
+                    title="Удалить отчет"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
