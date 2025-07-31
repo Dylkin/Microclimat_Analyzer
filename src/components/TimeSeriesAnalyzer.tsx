@@ -60,7 +60,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         return {
           zoneNumber: file.zoneNumber || '-',
           measurementLevel: file.measurementLevel || '-',
-          loggerName: file.parsedData?.deviceMetadata?.deviceModel || 'Unknown',
+          loggerName: file.name.substring(0, 6),
           serialNumber: file.parsedData?.deviceMetadata?.serialNumber || 'Unknown',
           minTemp: '-',
           maxTemp: '-',
