@@ -348,6 +348,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     });
   }, [files, data, zoomState, limits]);
 
+      // Находим соответствующий файл из props для получения номера зоны
+      const correspondingFile = files.find(f => f.name === fileName);
+      
   // Вычисление глобальных минимума и максимума
   const globalMinMax = useMemo(() => {
     const validTemps = resultsTableData
