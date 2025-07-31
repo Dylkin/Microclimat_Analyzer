@@ -488,7 +488,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 {dataType === 'temperature' ? (
                   <>
                     {data.temperatureRange[1] - data.temperatureRange[0] > 10 && (
-                      <span className="block mt-1">⚠️ Большой разброс температур (>{10}°C) может указывать на проблемы с климат-контролем</span>
+                      <span className="block mt-1">⚠️ Большой разброс температур (&gt;10°C) может указывать на проблемы с климат-контролем</span>
                     )}
                     {data.temperatureRange[0] < -30 && (
                       <span className="block mt-1">❄️ Обнаружены экстремально низкие температуры - проверьте калибровку датчиков</span>
@@ -500,7 +500,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 ) : (
                   <>
                     {data.humidityRange[1] > 80 && (
-                      <span className="block mt-1">💧 Высокая влажность (>80%) - риск конденсации и плесени</span>
+                      <span className="block mt-1">💧 Высокая влажность (&gt;80%) - риск конденсации и плесени</span>
                     )}
                     {data.humidityRange[0] < 20 && (
                       <span className="block mt-1">🏜️ Низкая влажность (&lt;20%) - риск статического электричества</span>
