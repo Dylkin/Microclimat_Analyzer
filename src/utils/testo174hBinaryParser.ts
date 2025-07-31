@@ -45,7 +45,7 @@ export class Testo174HBinaryParser {
         fileName,
         deviceMetadata: {
           deviceType: 2,
-          deviceModel: 'DL-221',
+          deviceModel: 'Unknown',
           serialNumber: 'Unknown'
         },
         measurements: [],
@@ -82,15 +82,9 @@ export class Testo174HBinaryParser {
       deviceType = parseInt(typeStr) || 2;
     }
 
-    // Определяем модель устройства
-    let deviceModel = 'DL-221';
-    if (serialNumber === '83401350') {
-      deviceModel = 'DL-221';
-    }
-
     return {
       deviceType,
-      deviceModel,
+      deviceModel: 'Unknown',
       serialNumber
     };
   }
