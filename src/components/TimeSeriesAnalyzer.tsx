@@ -473,7 +473,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     <div>• Лаборатории: 40% - 60%</div>
                     <div>• Архивы и склады: 45% - 55%</div>
                     <div>• Производственные помещения: 40% - 70%</div>
-                    <div>• Критично: избегать >80% и <30%</div>
+                    <div>• Критично: избегать &gt;80% и &lt;30%</div>
                   </div>
                 )}
               </div>
