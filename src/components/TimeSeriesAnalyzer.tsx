@@ -1,92 +1,145 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { BarChart, Settings, Trash2, RotateCcw, Thermometer, Droplets, Target, Clock, Download, Copy, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
+import { ArrowLeft, Download, Upload, Settings, Plus, Trash2, Edit2, Save, X, BarChart, FileText, Thermometer, Droplets } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
-import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
-import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { TimeSeriesChart } from './TimeSeriesChart';
-import { databaseService } from '../utils/database';
+import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
+import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { ReportGenerator } from '../utils/reportGenerator';
 import { useAuth } from '../contexts/AuthContext';
 
-interface ResearchInfo {
-  reportNumber: string;
-  reportDate: string;
-  templateFile: File | null;
-  objectName: string;
-  climateSystemName: string;
-}
-
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack }) => {
+  const { user } = useAuth();
+  const { data, loading, error } = useTimeSeriesData({ files });
+  
+  // Chart settings
+  const [dataType, setDataType] = useState<DataType>('temperature');
   const [limits, setLimits] = useState<ChartLimits>({});
   const [markers, setMarkers] = useState<VerticalMarker[]>([]);
-  const [zoomState, setZoomState] = useState<ZoomState | null>(null);
-  const [chartHeight, setChartHeight] = useState(400);
-  const [dataType, setDataType] = useState<DataType>('temperature');
-  const [testType, setTestType] = useState('empty-object');
-  const [editingMarker, setEditingMarker] = useState<string | null>(null);
-  const [fileStats, setFileStats] = useState(new Map());
-  const [conclusion, setConclusion] = useState('');
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [generatedReports, setGeneratedReports] = useState<string[]>([]);
-  const chartRef = React.useRef<HTMLDivElement>(null);
-  const [researchInfo, setResearchInfo] = useState<ResearchInfo>({
+  const [zoomState, setZoomState] = useState<ZoomState | undefined>();
+  
+  // Report settings
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [reportData, setReportData] = useState({
     reportNumber: '',
     reportDate: new Date().toISOString().split('T')[0],
-    templateFile: null,
     objectName: '',
-    climateSystemName: ''
+    climateSystemName: '',
+    testType: 'empty-object',
+    conclusion: '',
+    director: ''
   });
+  
+  // UI state
+  const [showSettings, setShowSettings] = useState(false);
+  const [editingMarker, setEditingMarker] = useState<string | null>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  
+  const chartRef = useRef<HTMLDivElement>(null);
+  const templateInputRef = useRef<HTMLInputElement>(null);
 
-  const { user, users } = useAuth();
-  const { data, loading, progress, error, reload } = useTimeSeriesData({ files });
+  // Chart dimensions
+  const chartWidth = 1200;
+  const chartHeight = 400;
+  const chartMargin = { top: 20, right: 60, bottom: 60, left: 80 };
 
-  const testTypes = [
-    { value: 'empty-object', label: 'Соответствие критериям в пустом объекте' },
-    { value: 'loaded-object', label: 'Соответствие критериям в загруженном объекте' },
-    { value: 'door-opening', label: 'Открытие двери' },
-    { value: 'power-off', label: 'Отключение электропитания' },
-    { value: 'power-on', label: 'Включение электропитания' }
-  ];
+  // Generate analysis results table data
+  const analysisResults = useMemo(() => {
+    if (!data || !data.points.length) return [];
 
-  // Размеры графиков
-  const chartWidth = Math.min(1400, window.innerWidth - 100);
-  const margin = { top: 20, right: 50, bottom: 60, left: 80 };
-
-  // Загрузка списка сгенерированных отчетов при монтировании
-  React.useEffect(() => {
-    const reportGenerator = ReportGenerator.getInstance();
-    setGeneratedReports(reportGenerator.getGeneratedReports());
-  }, []);
-
-  const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (!file.name.toLowerCase().endsWith('.docx')) {
-        setReportStatus({ type: 'error', message: 'Пожалуйста, загрузите файл в формате .docx' });
-        return;
+    return files.map((file) => {
+      // Find data points for this file
+      const filePoints = data.points.filter(point => point.fileId === file.name);
+      
+      if (filePoints.length === 0) {
+        return {
+          zoneNumber: file.zoneNumber || '-',
+          measurementLevel: file.measurementLevel || '-',
+          loggerName: file.parsedData?.deviceMetadata?.deviceModel || 'Unknown',
+          serialNumber: file.parsedData?.deviceMetadata?.serialNumber || 'Unknown',
+          minTemp: '-',
+          maxTemp: '-',
+          avgTemp: '-',
+          minHumidity: '-',
+          maxHumidity: '-',
+          avgHumidity: '-',
+          meetsLimits: '-'
+        };
       }
-      setResearchInfo(prev => ({ ...prev, templateFile: file }));
-      setReportStatus({ type: 'success', message: `Шаблон "${file.name}" успешно загружен` });
-    }
-  };
 
-  const isFormValid = () => {
-    return researchInfo.reportNumber.trim() !== '' &&
-           researchInfo.objectName.trim() !== '' &&
-           researchInfo.templateFile !== null &&
-           conclusion.trim() !== '';
-  };
-  // Обработчики лимитов
-  const handleLimitChange = useCallback((type: 'temperature' | 'humidity', limitType: 'min' | 'max', value: string) => {
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return;
+      // Calculate temperature statistics
+      const temperatures = filePoints
+        .filter(p => p.temperature !== undefined)
+        .map(p => p.temperature!);
+      
+      const humidities = filePoints
+        .filter(p => p.humidity !== undefined)
+        .map(p => p.humidity!);
 
+      let tempStats = { min: '-', max: '-', avg: '-' };
+      let humidityStats = { min: '-', max: '-', avg: '-' };
+      
+      if (temperatures.length > 0) {
+        const min = Math.min(...temperatures);
+        const max = Math.max(...temperatures);
+        const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+        
+        tempStats = {
+          min: Math.round(min * 10) / 10,
+          max: Math.round(max * 10) / 10,
+          avg: Math.round(avg * 10) / 10
+        };
+      }
+      
+      if (humidities.length > 0) {
+        const min = Math.min(...humidities);
+        const max = Math.max(...humidities);
+        const avg = humidities.reduce((sum, h) => sum + h, 0) / humidities.length;
+        
+        humidityStats = {
+          min: Math.round(min * 10) / 10,
+          max: Math.round(max * 10) / 10,
+          avg: Math.round(avg * 10) / 10
+        };
+      }
+
+      // Check if meets limits
+      let meetsLimits = 'Да';
+      if (limits.temperature && temperatures.length > 0) {
+        const min = Math.min(...temperatures);
+        const max = Math.max(...temperatures);
+        
+        if (limits.temperature.min !== undefined && min < limits.temperature.min) {
+          meetsLimits = 'Нет';
+        }
+        if (limits.temperature.max !== undefined && max > limits.temperature.max) {
+          meetsLimits = 'Нет';
+        }
+      }
+
+      return {
+        zoneNumber: file.zoneNumber || '-',
+        measurementLevel: file.measurementLevel || '-',
+        loggerName: file.parsedData?.deviceMetadata?.deviceModel || 'Unknown',
+        serialNumber: file.parsedData?.deviceMetadata?.serialNumber || 'Unknown',
+        minTemp: tempStats.min,
+        maxTemp: tempStats.max,
+        avgTemp: tempStats.avg,
+        minHumidity: humidityStats.min,
+        maxHumidity: humidityStats.max,
+        avgHumidity: humidityStats.avg,
+        meetsLimits
+      };
+    });
+  }, [data, files, limits]);
+
+  const handleLimitChange = (type: DataType, limitType: 'min' | 'max', value: string) => {
+    const numValue = value === '' ? undefined : parseFloat(value);
     setLimits(prev => ({
       ...prev,
       [type]: {
@@ -94,10 +147,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         [limitType]: numValue
       }
     }));
-  }, []);
+  };
 
-  // Обработчик добавления маркера
-  const handleMarkerAdd = useCallback((timestamp: number) => {
+  const handleAddMarker = useCallback((timestamp: number) => {
     const newMarker: VerticalMarker = {
       id: Date.now().toString(),
       timestamp,
@@ -107,75 +159,67 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setMarkers(prev => [...prev, newMarker]);
   }, [markers.length]);
 
-  // Обработчик удаления маркера
-  const handleMarkerDelete = useCallback((markerId: string) => {
-    setMarkers(prev => prev.filter(m => m.id !== markerId));
-  }, []);
+  const handleUpdateMarker = (id: string, label: string) => {
+    setMarkers(prev => prev.map(m => m.id === id ? { ...m, label } : m));
+    setEditingMarker(null);
+  };
 
-  // Обработчик изменения названия маркера
-  const handleMarkerLabelChange = useCallback((markerId: string, newLabel: string) => {
-    setMarkers(prev => prev.map(m => 
-      m.id === markerId ? { ...m, label: newLabel } : m
-    ));
-  }, []);
+  const handleDeleteMarker = (id: string) => {
+    setMarkers(prev => prev.filter(m => m.id !== id));
+  };
 
-  // Обработчик зума
-  const handleZoomChange = useCallback((newZoomState: ZoomState) => {
-    setZoomState(newZoomState);
-  }, []);
+  const handleResetZoom = () => {
+    setZoomState(undefined);
+  };
 
-  // Сброс зума
-  const handleZoomReset = useCallback(() => {
-    setZoomState(null);
-  }, []);
+  const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.name.toLowerCase().endsWith('.docx')) {
+      setTemplateFile(file);
+      setReportStatus({ type: 'success', message: `Шаблон "${file.name}" загружен успешно` });
+    } else {
+      setReportStatus({ type: 'error', message: 'Пожалуйста, загрузите файл в формате .docx' });
+    }
+  };
 
-  // Переключение типа данных
-  const handleDataTypeChange = useCallback((newDataType: DataType) => {
-    setDataType(newDataType);
-  }, []);
-
-  // Генерация отчета из анализатора
   const handleGenerateReport = async () => {
-    if (!isFormValid()) {
-      setReportStatus({ type: 'error', message: 'Заполните все обязательные поля и выводы' });
+    if (!templateFile) {
+      setReportStatus({ type: 'error', message: 'Пожалуйста, загрузите шаблон отчета' });
       return;
     }
 
-    setIsGeneratingReport(true);
+    if (!reportData.reportNumber || !reportData.objectName) {
+      setReportStatus({ type: 'error', message: 'Пожалуйста, заполните обязательные поля' });
+      return;
+    }
+
+    setGeneratingReport(true);
     setReportStatus(null);
 
     try {
       const reportGenerator = ReportGenerator.getInstance();
-      
-      // Получаем руководителя из справочника пользователей
-      const director = users.find(u => u.role === 'manager')?.fullName || 'Не назначен';
-      
-      // Подготавливаем данные для отчета
-      const reportData = {
-        reportNumber: researchInfo.reportNumber,
-        reportDate: researchInfo.reportDate,
-        objectName: researchInfo.objectName,
-        climateSystemName: researchInfo.climateSystemName,
-        testType,
-        limits,
-        markers,
-        resultsTableData,
-        conclusion,
-        user: user || { fullName: 'Текущий пользователь', email: '', id: '', role: 'specialist' as const },
-        director
-      };
-
       const result = await reportGenerator.generateReport(
-        researchInfo.templateFile!,
-        reportData,
+        templateFile,
+        {
+          ...reportData,
+          limits,
+          markers,
+          resultsTableData: analysisResults,
+          user: user!
+        },
         chartRef.current || undefined
       );
 
       if (result.success) {
-        setReportStatus({ type: 'success', message: `Отчет "${result.fileName}" успешно сгенерирован и скачан` });
-        setGeneratedReports(reportGenerator.getGeneratedReports());
+        setReportStatus({ 
+          type: 'success', 
+          message: `Отчет "${result.fileName}" успешно сгенерирован и скачан` 
+        });
       } else {
-        setReportStatus({ type: 'error', message: result.error || 'Ошибка генерации отчета' });
+        setReportStatus({ 
+          type: 'error', 
+          message: result.error || 'Ошибка генерации отчета' 
+        });
       }
     } catch (error) {
       setReportStatus({ 
@@ -183,314 +227,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         message: error instanceof Error ? error.message : 'Неизвестная ошибка' 
       });
     } finally {
-      setIsGeneratingReport(false);
+      setGeneratingReport(false);
     }
   };
-
-  const handleDeleteReport = (fileName: string) => {
-    if (confirm(`Вы уверены, что хотите удалить отчет "${fileName}"?`)) {
-      const reportGenerator = ReportGenerator.getInstance();
-      if (reportGenerator.deleteReport(fileName)) {
-        setGeneratedReports(reportGenerator.getGeneratedReports());
-        setReportStatus({ type: 'success', message: 'Отчет успешно удален' });
-      }
-    }
-  };
-
-  const handleDownloadReport = (fileName: string) => {
-    const reportGenerator = ReportGenerator.getInstance();
-    if (reportGenerator.downloadReport(fileName)) {
-      setReportStatus({ type: 'success', message: 'Отчет скачан' });
-    } else {
-      setReportStatus({ type: 'error', message: 'Ошибка скачивания отчета' });
-    }
-  };
-  // Загрузка статистики по файлам
-  React.useEffect(() => {
-    const loadFileStats = async () => {
-      const stats = new Map();
-      
-      for (const file of files) {
-        if (file.parsingStatus === 'completed') {
-          try {
-            const measurements = await databaseService.getMeasurements(file.id);
-            if (measurements && measurements.length > 0) {
-              const temperatures = measurements
-                .map(m => m.temperature)
-                .filter(t => t !== undefined) as number[];
-              
-              if (temperatures.length > 0) {
-                const min = Math.min(...temperatures);
-                const max = Math.max(...temperatures);
-                const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
-                
-                stats.set(file.id, {
-                  min: Math.round(min * 10) / 10,
-                  max: Math.round(max * 10) / 10,
-                  avg: Math.round(avg * 10) / 10,
-                  count: temperatures.length
-                });
-              }
-            }
-          } catch (error) {
-            console.error(`Error loading stats for file ${file.name}:`, error);
-          }
-        }
-      }
-      
-      setFileStats(stats);
-    };
-
-    if (files.length > 0) {
-      loadFileStats();
-    }
-  }, [files]);
-
-  // Вычисление периода между маркерами
-  const markersPeriod = useMemo(() => {
-    if (markers.length < 2) return null;
-    
-    const sortedMarkers = [...markers].sort((a, b) => a.timestamp - b.timestamp);
-    const startTime = sortedMarkers[0].timestamp;
-    const endTime = sortedMarkers[sortedMarkers.length - 1].timestamp;
-    const duration = endTime - startTime;
-    
-    const formatDuration = (ms: number) => {
-      const hours = Math.floor(ms / (1000 * 60 * 60));
-      const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((ms % (1000 * 60)) / 1000);
-      
-      if (hours > 0) {
-        return `${hours}ч ${minutes}м ${seconds}с`;
-      } else if (minutes > 0) {
-        return `${minutes}м ${seconds}с`;
-      } else {
-        return `${seconds}с`;
-      }
-    };
-    
-    return {
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
-      duration: formatDuration(duration)
-    };
-  }, [markers]);
-
-  // Подготовка данных для таблицы результатов
-  const resultsTableData = useMemo(() => {
-    const sortedFiles = [...files]
-      .filter(f => f.parsingStatus === 'completed')
-      .sort((a, b) => a.order - b.order);
-    
-    if (!data) return [];
-    
-    return sortedFiles.map(file => {
-      const fileName = file.name;
-      
-      // Извлекаем данные из имени файла
-      const loggerName = fileName.substring(0, 6);
-      const serialNumber = fileName.substring(7, 15); // 8-15 символы (индексы 7-14)
-      
-      // Фильтруем данные для конкретного файла
-      let fileData = data.points.filter(p => p.fileId === fileName && p.temperature !== undefined);
-      
-      // Применяем зум если установлен
-      if (zoomState) {
-        fileData = fileData.filter(p => 
-          p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
-        );
-      }
-
-      // Получаем статистику из состояния
-      const fileStats = fileStats.get(file.id);
-      
-      // Вычисляем статистики
-      const temperatures = fileData.map(p => p.temperature!);
-      const min = Math.min(...temperatures);
-      const max = Math.max(...temperatures);
-      const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
-      
-      // Проверяем соответствие лимитам
-      const meetsMinLimit = !limits.temperature?.min || min >= limits.temperature.min;
-      const meetsMaxLimit = !limits.temperature?.max || max <= limits.temperature.max;
-      const meetsLimits = meetsMinLimit && meetsMaxLimit ? 'Да' : 'Нет';
-      
-      return {
-        fileId: file.id,
-        zoneNumber: file.zoneNumber || '-',
-        measurementLevel: '-',
-        loggerName: file.parsedData?.deviceMetadata?.deviceModel || 'Unknown',
-        serialNumber,
-        minTemp: Math.round(min * 10) / 10,
-        maxTemp: Math.round(max * 10) / 10,
-        avgTemp: Math.round(avg * 10) / 10,
-        meetsLimits
-      };
-    });
-  }, [files, data, zoomState, limits.temperature, fileStats]);
-
-  // Вычисление глобальных минимума и максимума
-  const globalMinMax = useMemo(() => {
-    if (resultsTableData.length === 0) return { globalMin: 0, globalMax: 0 };
-    
-    const validResults = resultsTableData.filter(row => typeof row.minTemp === 'number' && typeof row.maxTemp === 'number');
-    if (validResults.length === 0) return { globalMin: 0, globalMax: 0 };
-    
-    const globalMin = Math.min(...validResults.map(row => row.minTemp as number));
-    const globalMax = Math.max(...validResults.map(row => row.maxTemp as number));
-    
-    return { globalMin, globalMax };
-  }, [resultsTableData]);
-
-  // Генерация рекомендаций
-  const recommendations = useMemo(() => {
-    if (!data || resultsTableData.length === 0) return null;
-
-    // Находим холодную и горячую точки
-    const validResults = resultsTableData.filter(row => typeof row.minTemp === 'number' && typeof row.maxTemp === 'number');
-    if (validResults.length === 0) return null;
-
-    const coldestPoint = validResults.find(row => row.minTemp === globalMinMax.globalMin);
-    const hottestPoint = validResults.find(row => row.maxTemp === globalMinMax.globalMax);
-
-    // Получаем информацию о временном периоде
-    let testPeriodInfo = null;
-    if (markers.length >= 2) {
-      const sortedMarkers = [...markers].sort((a, b) => a.timestamp - b.timestamp);
-      const startTime = new Date(sortedMarkers[0].timestamp);
-      const endTime = new Date(sortedMarkers[sortedMarkers.length - 1].timestamp);
-      const duration = endTime.getTime() - startTime.getTime();
-      
-      const formatDuration = (ms: number) => {
-        const hours = Math.floor(ms / (1000 * 60 * 60));
-        const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((ms % (1000 * 60)) / 1000);
-        
-        if (hours > 0) {
-          return `${hours}ч ${minutes}м ${seconds}с`;
-        } else if (minutes > 0) {
-          return `${minutes}м ${seconds}с`;
-        } else {
-          return `${seconds}с`;
-        }
-      };
-
-      testPeriodInfo = {
-        startTime: startTime.toLocaleString('ru-RU'),
-        endTime: endTime.toLocaleString('ru-RU'),
-        duration: formatDuration(duration)
-      };
-    }
-
-    // Оценка соответствия лимитам
-    let complianceAssessment = '';
-    if (limits.temperature && (limits.temperature.min !== undefined || limits.temperature.max !== undefined)) {
-      const compliantFiles = resultsTableData.filter(row => row.meetsLimits === 'Да').length;
-      const totalFiles = resultsTableData.length;
-      
-      if (compliantFiles === totalFiles) {
-        complianceAssessment = 'Все зоны измерения соответствуют установленным температурным критериям.';
-      } else if (compliantFiles === 0) {
-        complianceAssessment = 'Ни одна зона измерения не соответствует установленным температурным критериям.';
-      } else {
-        complianceAssessment = `${compliantFiles} из ${totalFiles} зон измерения соответствуют установленным температурным критериям.`;
-      }
-    } else {
-      complianceAssessment = 'Температурные критерии не установлены для оценки соответствия.';
-    }
-
-    return {
-      coldestPoint,
-      hottestPoint,
-      testPeriodInfo,
-      complianceAssessment,
-      globalMin: globalMinMax.globalMin,
-      globalMax: globalMinMax.globalMax
-    };
-  }, [data, resultsTableData, globalMinMax, markers, limits.temperature]);
-
-  // Генерация текста рекомендаций
-  const recommendationsText = useMemo(() => {
-    if (!recommendations) return '';
-
-    const testTypeLabel = testTypes.find(t => t.value === testType)?.label || testType;
-    
-    let text = `Вид испытания: ${testTypeLabel}\n\n`;
-    
-    if (recommendations.testPeriodInfo) {
-      text += `Временной период испытания:\n`;
-      text += `Дата время начала: ${recommendations.testPeriodInfo.startTime}\n`;
-      text += `Дата время завершения: ${recommendations.testPeriodInfo.endTime}\n`;
-      text += `Длительность: ${recommendations.testPeriodInfo.duration}\n\n`;
-    }
-    
-    text += `Оценка данных:\n`;
-    text += `${recommendations.complianceAssessment}\n\n`;
-    
-    if (recommendations.coldestPoint) {
-      text += `Холодная точка:\n`;
-      text += `- Зона измерения: ${recommendations.coldestPoint.zoneNumber}\n`;
-      text += `- Уровень расположения: ${recommendations.coldestPoint.measurementLevel}\n`;
-      text += `- Минимальная температура: ${recommendations.globalMin}°C\n`;
-      text += `- Логгер: ${recommendations.coldestPoint.loggerName} (S/N: ${recommendations.coldestPoint.serialNumber})\n\n`;
-    }
-    
-    if (recommendations.hottestPoint) {
-      text += `Горячая точка:\n`;
-      text += `- Зона измерения: ${recommendations.hottestPoint.zoneNumber}\n`;
-      text += `- Уровень расположения: ${recommendations.hottestPoint.measurementLevel}\n`;
-      text += `- Максимальная температура: ${recommendations.globalMax}°C\n`;
-      text += `- Логгер: ${recommendations.hottestPoint.loggerName} (S/N: ${recommendations.hottestPoint.serialNumber})\n`;
-    }
-    
-    return text;
-  }, [recommendations, testType, testTypes]);
-
-  // Копирование рекомендаций в поле вывода
-  const handleCopyRecommendations = useCallback(() => {
-    setConclusion(recommendationsText);
-  }, [recommendationsText]);
-
-  // Проверка готовности для формирования отчета
-  const isReportReady = useMemo(() => {
-    return resultsTableData.length > 0 && conclusion.trim().length > 0;
-  }, [resultsTableData, conclusion]);
-
-  // Статистика данных
-  const stats = useMemo(() => {
-    if (!data) return null;
-
-    const totalPoints = data.points.length;
-    const tempPoints = data.points.filter(p => p.temperature !== undefined).length;
-    const humidityPoints = data.points.filter(p => p.humidity !== undefined).length;
-    const timeSpan = data.timeRange[1] - data.timeRange[0];
-    const days = Math.ceil(timeSpan / (1000 * 60 * 60 * 24));
-
-    return {
-      totalPoints,
-      tempPoints,
-      humidityPoints,
-      days,
-      filesLoaded: files.filter(f => f.parsingStatus === 'completed').length,
-      totalFiles: files.length,
-      hasTemperature: data.hasTemperature,
-      hasHumidity: data.hasHumidity
-    };
-  }, [data, files]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <div className="text-lg font-semibold text-gray-900 mb-2">Загрузка данных временных рядов</div>
-          <div className="text-sm text-gray-600 mb-4">Обработано {progress.toFixed(1)}%</div>
-          <div className="w-64 bg-gray-200 rounded-full h-2 mx-auto">
-            <div 
-              className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
+          <p className="text-gray-600">Загрузка данных...</p>
         </div>
       </div>
     );
@@ -498,705 +244,220 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="text-red-600 text-lg font-semibold mb-4">Ошибка загрузки данных</div>
-          <div className="text-gray-600 mb-4">{error}</div>
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-red-800 mb-2">Ошибка загрузки данных</h3>
+        <p className="text-red-600">{error}</p>
+        {onBack && (
           <button
-            onClick={reload}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+            onClick={onBack}
+            className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
           >
-            Попробовать снова
+            Вернуться назад
           </button>
-        </div>
+        )}
       </div>
     );
   }
 
-  if (!data) {
+  if (!data || data.points.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="text-gray-600 text-lg mb-4">Нет данных для отображения</div>
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-yellow-800 mb-2">Нет данных для анализа</h3>
+        <p className="text-yellow-600">Загруженные файлы не содержат данных измерений.</p>
+        {onBack && (
           <button
             onClick={onBack}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+            className="mt-4 bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors"
           >
-            Вернуться к загрузке файлов
+            Вернуться назад
           </button>
-        </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Заголовок и управление */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+          )}
           <BarChart className="w-8 h-8 text-indigo-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Анализ временных рядов</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Анализатор временных рядов</h1>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-2">
-          {zoomState && (
-            <button
-              onClick={handleZoomReset}
-              className="flex items-center space-x-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Сбросить зум</span>
-            </button>
-          )}
-          
+        <div className="flex items-center space-x-3">
           <button
-            onClick={onBack}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            onClick={() => setShowSettings(!showSettings)}
+            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
           >
-            Назад
+            <Settings className="w-4 h-4" />
+            <span>Настройки</span>
           </button>
         </div>
       </div>
 
-      {/* Статус генерации отчета */}
-      {reportStatus && (
-        <div className={`flex items-center space-x-2 p-4 rounded-lg ${
-          reportStatus.type === 'success' 
-            ? 'bg-green-50 text-green-800 border border-green-200' 
-            : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          {reportStatus.type === 'success' ? (
-            <CheckCircle className="w-5 h-5" />
-          ) : (
-            <AlertCircle className="w-5 h-5" />
-          )}
-          <span>{reportStatus.message}</span>
-          <button 
-            onClick={() => setReportStatus(null)}
-            className="ml-auto text-gray-500 hover:text-gray-700"
-          >
-            ×
-          </button>
-        </div>
-      )}
-      {/* Статистика */}
-      {stats && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Статистика данных</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-indigo-600">{stats.filesLoaded}</div>
-              <div className="text-gray-600">Файлов загружено</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.totalPoints.toLocaleString()}</div>
-              <div className="text-gray-600">Всего точек</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.tempPoints.toLocaleString()}</div>
-              <div className="text-gray-600">Температура</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.humidityPoints.toLocaleString()}</div>
-              <div className="text-gray-600">Влажность</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{stats.days}</div>
-              <div className="text-gray-600">Дней данных</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">{markers.length}</div>
-              <div className="text-gray-600">Маркеров</div>
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="bg-white rounded-lg shadow p-6 space-y-6">
+          <h3 className="text-lg font-semibold text-gray-900">Настройки анализа</h3>
+          
+          {/* Data Type Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Тип данных</label>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setDataType('temperature')}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                  dataType === 'temperature'
+                    ? 'bg-red-100 text-red-700 border border-red-300'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Thermometer className="w-4 h-4" />
+                <span>Температура</span>
+              </button>
+              {data.hasHumidity && (
+                <button
+                  onClick={() => setDataType('humidity')}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                    dataType === 'humidity'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <Droplets className="w-4 h-4" />
+                  <span>Влажность</span>
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Limits */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Лимиты {dataType === 'temperature' ? 'температуры (°C)' : 'влажности (%)'}
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Минимум</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={limits[dataType]?.min ?? ''}
+                  onChange={(e) => handleLimitChange(dataType, 'min', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Не установлен"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Максимум</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={limits[dataType]?.max ?? ''}
+                  onChange={(e) => handleLimitChange(dataType, 'max', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Не установлен"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Zoom Controls */}
+          {zoomState && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Управление масштабом</label>
+              <button
+                onClick={handleResetZoom}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Сбросить масштаб
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Переключатель типа данных */}
+      {/* Chart */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Тип отображаемых данных</h3>
-        <div className="flex space-x-4">
-          {stats?.hasTemperature && (
-            <button
-              onClick={() => handleDataTypeChange('temperature')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                dataType === 'temperature'
-                  ? 'bg-red-100 text-red-700 border-2 border-red-300'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <Thermometer className="w-5 h-5" />
-              <span>Температура</span>
-            </button>
-          )}
-          {stats?.hasHumidity && (
-            <button
-              onClick={() => handleDataTypeChange('humidity')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                dataType === 'humidity'
-                  ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <Droplets className="w-5 h-5" />
-              <span>Влажность</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Панель настроек */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Настройки отображения</h3>
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-          <p className="text-sm text-blue-800">
-            <strong>Автоматическое масштабирование:</strong>
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">
+            График {dataType === 'temperature' ? 'температуры' : 'влажности'}
+          </h3>
+          <p className="text-sm text-gray-600">
+            Двойной клик для добавления маркера, выделение области для увеличения
           </p>
-          <ul className="text-sm text-blue-700 space-y-1 ml-4">
-            <li>• <strong>По вертикали:</strong> При зуме Y-ось подстраивается под видимые данные</li>
-            <li>• <strong>Лимиты:</strong> Установленные лимиты расширяют масштаб для лучшего отображения</li>
-            <li>• <strong>Динамическое:</strong> Масштаб автоматически изменяется при изменении временного диапазона</li>
-          </ul>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Лимиты температуры */}
-          <div>
-            <h4 className="font-medium mb-3 text-red-600">Лимиты температуры</h4>
-            <div className="space-y-2">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Минимум (°C)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={limits.temperature?.min || ''}
-                  onChange={(e) => handleLimitChange('temperature', 'min', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Не установлен"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Максимум (°C)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={limits.temperature?.max || ''}
-                  onChange={(e) => handleLimitChange('temperature', 'max', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Не установлен"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Лимиты влажности */}
-          <div>
-            <h4 className="font-medium mb-3 text-blue-600">Лимиты влажности</h4>
-            <div className="space-y-2">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Минимум (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={limits.humidity?.min || ''}
-                  onChange={(e) => handleLimitChange('humidity', 'min', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Не установлен"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Максимум (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={limits.humidity?.max || ''}
-                  onChange={(e) => handleLimitChange('humidity', 'max', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Не установлен"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Настройки отображения */}
-          <div>
-            <h4 className="font-medium mb-3 text-green-600">Настройки отображения</h4>
-            <div className="space-y-2">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Высота графика (px)</label>
-                <input
-                  type="number"
-                  min="300"
-                  max="800"
-                  step="50"
-                  value={chartHeight}
-                  onChange={(e) => setChartHeight(parseInt(e.target.value) || 400)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Исследовательский режим */}
-        <div className="md:col-span-3 border-t border-gray-200 pt-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <Target className="w-6 h-6 text-green-600" />
-            <h4 className="text-lg font-semibold text-gray-900">Исследовательский режим</h4>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Вид испытаний</label>
-              <select
-                value={testType}
-                onChange={(e) => setTestType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                {testTypes.map(type => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <div className="text-sm text-gray-600">
-                Данные готовы для анализа и формирования отчета
-              </div>
-            </div>
-          </div>
-
-          {/* Информация о данных */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <h5 className="text-sm font-medium text-gray-700 mb-2">Информация о загруженных данных:</h5>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="font-medium">Количество файлов:</span> {stats?.filesLoaded || 0}
-              </div>
-              <div>
-                <span className="font-medium">Общее количество записей:</span> {stats?.totalPoints.toLocaleString('ru-RU') || '0'}
-              </div>
-              <div>
-                <span className="font-medium">Период данных:</span> 
-                <span className="ml-1">{stats?.days || 0} дней</span>
-              </div>
-            </div>
-            {(!stats || stats.filesLoaded === 0) && (
-              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  Нет обработанных файлов. Загрузите файлы в формате .vi2 для анализа данных.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Управление маркерами */}
-      {markers.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Вертикальные маркеры</h3>
-            {markersPeriod && (
-              <div className="flex items-center space-x-2 text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
-                <Clock className="w-4 h-4" />
-                <span>Период испытания: {markersPeriod.duration}</span>
-              </div>
-            )}
-          </div>
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>Редактирование маркеров:</strong> Нажмите на название маркера для редактирования
-            </p>
-          </div>
-          
-          {/* Информация о периоде между маркерами */}
-          {markersPeriod && (
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Временной период испытания:</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-green-600">Время начала:</span>
-                  <div className="text-gray-900">{markersPeriod.startTime.toLocaleString('ru-RU')}</div>
-                </div>
-                <div>
-                  <span className="font-medium text-red-600">Время завершения:</span>
-                  <div className="text-gray-900">{markersPeriod.endTime.toLocaleString('ru-RU')}</div>
-                </div>
-                <div>
-                  <span className="font-medium text-blue-600">Длительность:</span>
-                  <div className="text-gray-900">{markersPeriod.duration}</div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div className="space-y-2">
-            {markers.map(marker => (
-              <div key={marker.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: marker.color }}></div>
-                  <div>
-                    <div className="font-medium">
-                      {editingMarker === marker.id ? (
-                        <input
-                          type="text"
-                          value={marker.label || ''}
-                          onChange={(e) => handleMarkerLabelChange(marker.id, e.target.value)}
-                          onBlur={() => setEditingMarker(null)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') setEditingMarker(null);
-                            if (e.key === 'Escape') setEditingMarker(null);
-                          }}
-                          className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          autoFocus
-                          placeholder="Введите название маркера"
-                        />
-                      ) : (
-                        <span
-                          onClick={() => setEditingMarker(marker.id)}
-                          className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
-                        >
-                          {marker.label || 'Нажмите для редактирования'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {new Date(marker.timestamp).toLocaleString('ru-RU')}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleMarkerDelete(marker.id)}
-                  className="text-red-600 hover:text-red-800 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* График */}
-      <div ref={chartRef} className="bg-white rounded-lg shadow p-6">
-        <h3 className={`text-lg font-semibold mb-4 ${dataType === 'temperature' ? 'text-red-600' : 'text-blue-600'}`}>
-          График {dataType === 'temperature' ? 'температуры' : 'влажности'}
-        </h3>
-        <div className="text-sm text-gray-600 mb-4">
-          Двойной клик для добавления маркера • Выделите область мышью для зума
-        </div>
-        <div className="overflow-x-auto">
+        <div ref={chartRef}>
           <TimeSeriesChart
             data={data.points}
             width={chartWidth}
             height={chartHeight}
-            margin={margin}
+            margin={chartMargin}
             dataType={dataType}
             limits={limits}
             markers={markers}
             zoomState={zoomState}
-            onZoomChange={handleZoomChange}
-            onMarkerAdd={handleMarkerAdd}
-            color={dataType === 'temperature' ? '#ef4444' : '#3b82f6'}
+            onZoomChange={setZoomState}
+            onMarkerAdd={handleAddMarker}
             yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
-            showLegend={false}
           />
         </div>
       </div>
 
-      {/* Таблица результатов */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Результаты анализа</h3>
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  № зоны измерения
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Уровень измерения (м.)
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Наименование логгера
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Серийный № логгера
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Мин. t°С
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Макс. t°С
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Среднее t°С
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Соответствует заданным критериям
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {resultsTableData.map((row, index) => (
-                <tr key={row.fileId} className="hover:bg-gray-50">
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {row.zoneNumber}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {row.measurementLevel}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                    {row.loggerName}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                    {row.serialNumber}
-                  </td>
-                  <td className={`px-4 py-4 whitespace-nowrap text-sm text-gray-900 ${
-                    typeof row.minTemp === 'number' && row.minTemp === globalMinMax.globalMin 
-                      ? 'bg-blue-100 text-blue-900 font-semibold' 
-                      : ''
-                  }`}>
-                    {typeof row.minTemp === 'number' ? `${row.minTemp}°C` : row.minTemp}
-                  </td>
-                  <td className={`px-4 py-4 whitespace-nowrap text-sm text-gray-900 ${
-                    typeof row.maxTemp === 'number' && row.maxTemp === globalMinMax.globalMax 
-                      ? 'bg-red-100 text-red-900 font-semibold' 
-                      : ''
-                  }`}>
-                    {typeof row.maxTemp === 'number' ? `${row.maxTemp}°C` : row.maxTemp}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {typeof row.avgTemp === 'number' ? `${row.avgTemp}°C` : row.avgTemp}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      row.meetsLimits === 'Да' 
-                        ? 'bg-green-100 text-green-800'
-                        : row.meetsLimits === 'Нет'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {row.meetsLimits}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Легенда для таблицы */}
-        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Обозначения:</h4>
-          <div className="flex flex-wrap gap-4 text-xs">
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-blue-100 rounded"></div>
-              <span>Глобальное минимальное значение температуры</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-red-100 rounded"></div>
-              <span>Глобальное максимальное значение температуры</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Да</span>
-              <span>Соответствует лимитам</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Нет</span>
-              <span>Не соответствует лимитам</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Блок рекомендаций - только для температуры */}
-      {dataType === 'temperature' && recommendations && (
+      {/* Markers */}
+      {markers.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <FileText className="w-6 h-6 text-blue-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Рекомендации</h3>
-          </div>
-          
-          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono">
-              {recommendationsText}
-            </pre>
-          </div>
-          
-          <button
-            onClick={handleCopyRecommendations}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-          >
-            <Copy className="w-4 h-4" />
-            <span>Скопировать</span>
-          </button>
-        </div>
-      )}
-
-      {/* Поле для ввода вывода */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <FileText className="w-6 h-6 text-green-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Вывод</h3>
-        </div>
-        
-        <textarea
-          value={conclusion}
-          onChange={(e) => setConclusion(e.target.value)}
-          className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-vertical"
-          placeholder="Введите выводы по результатам анализа данных..."
-        />
-        
-        <div className="mt-2 text-sm text-gray-500">
-          Символов: {conclusion.length}
-        </div>
-      </div>
-
-      {/* Информация для исследования */}
-      <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-        <div className="flex items-center space-x-3 mb-6">
-          <FileText className="w-6 h-6 text-green-600" />
-          <h2 className="text-xl font-semibold text-gray-900">Информация для исследования</h2>
-          <div className="text-sm text-gray-500">
-            Инструкции по созданию шаблонов доступны в разделе "Справка"
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              № отчета <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={researchInfo.reportNumber}
-              onChange={(e) => setResearchInfo(prev => ({ ...prev, reportNumber: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Введите номер отчета"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Дата отчета <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={researchInfo.reportDate}
-              onChange={(e) => setResearchInfo(prev => ({ ...prev, reportDate: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Шаблон выходной формы отчета <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="file"
-              accept=".docx"
-              onChange={handleTemplateUpload}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              required
-            />
-            {researchInfo.templateFile && (
-              <p className="text-sm text-green-600 mt-1">Загружен: {researchInfo.templateFile.name}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Название объекта исследования <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={researchInfo.objectName}
-              onChange={(e) => setResearchInfo(prev => ({ ...prev, objectName: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Введите название объекта"
-              required
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Название климатической установки
-            </label>
-            <input
-              type="text"
-              value={researchInfo.climateSystemName}
-              onChange={(e) => setResearchInfo(prev => ({ ...prev, climateSystemName: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Введите название климатической установки"
-            />
-          </div>
-        </div>
-
-        {/* Кнопка генерации отчета */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Генерация отчета</h3>
-              <p className="text-sm text-gray-600">
-                {isReportReady 
-                  ? 'Все поля заполнены. Можно сгенерировать отчет с полными данными анализа.' 
-                  : 'Заполните все обязательные поля и выводы для генерации отчета'
-                }
-              </p>
-            </div>
-            <button
-              onClick={handleGenerateReport}
-              disabled={!isReportReady || isGeneratingReport}
-              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {isGeneratingReport ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Генерация отчета...</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-5 h-5" />
-                  <span>Сгенерировать отчет</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Список сгенерированных отчетов */}
-      {generatedReports.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <FileText className="w-6 h-6 text-green-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Сгенерированные отчеты</h3>
-          </div>
-          
-          <div className="space-y-3">
-            {generatedReports.map((fileName, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Маркеры</h3>
+          <div className="space-y-2">
+            {markers.map((marker) => (
+              <div key={marker.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
                 <div className="flex items-center space-x-3">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                  <span className="font-medium text-gray-900">{fileName}</span>
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: marker.color }}
+                  ></div>
+                  {editingMarker === marker.id ? (
+                    <input
+                      type="text"
+                      value={marker.label}
+                      onChange={(e) => setMarkers(prev => 
+                        prev.map(m => m.id === marker.id ? { ...m, label: e.target.value } : m)
+                      )}
+                      onBlur={() => setEditingMarker(null)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setEditingMarker(null);
+                        }
+                      }}
+                      className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="font-medium">{marker.label}</span>
+                  )}
+                  <span className="text-sm text-gray-500">
+                    {new Date(marker.timestamp).toLocaleString('ru-RU')}
+                  </span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => handleDownloadReport(fileName)}
-                    className="text-blue-600 hover:text-blue-800 transition-colors"
-                    title="Скачать отчет"
+                    onClick={() => setEditingMarker(marker.id)}
+                    className="text-indigo-600 hover:text-indigo-800 transition-colors"
                   >
-                    <Download className="w-4 h-4" />
+                    <Edit2 className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleDeleteReport(fileName)}
+                    onClick={() => handleDeleteMarker(marker.id)}
                     className="text-red-600 hover:text-red-800 transition-colors"
-                    title="Удалить отчет"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -1207,18 +468,261 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
       )}
 
-      {/* Инструкции */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-semibold text-blue-800 mb-2">Инструкции по использованию:</h4>
-        <ul className="text-sm text-blue-700 space-y-1">
-          <li>• <strong>Переключение данных:</strong> Используйте кнопки "Температура" и "Влажность" для выбора типа данных</li>
-          <li>• <strong>Зум:</strong> Выделите область на графике левой кнопкой мыши для увеличения</li>
-          <li>• <strong>Маркеры:</strong> Двойной клик по графику для добавления вертикального маркера</li>
-          <li>• <strong>Tooltip:</strong> Наведите курсор на график для просмотра точных значений</li>
-          <li>• <strong>Лимиты:</strong> Установите в настройках для отображения красных пунктирных линий</li>
-          <li>• <strong>Производительность:</strong> Компонент автоматически оптимизирует отображение больших наборов данных</li>
-          <li>• <strong>Генерация отчетов:</strong> Заполните поле "Вывод" и нажмите "Сформировать отчет" для создания документа</li>
-        </ul>
+      {/* Analysis Results */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
+        
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  № зоны измерения
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Уровень измерения (м.)
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Наименование логгера
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Серийный № логгера
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Мин. t°C
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Макс. t°C
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Среднее t°C
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Соответствие лимитам
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {analysisResults.map((result, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {result.zoneNumber}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {result.measurementLevel}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {result.loggerName}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {result.serialNumber}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {result.minTemp}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {result.maxTemp}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {result.avgTemp}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      result.meetsLimits === 'Да' 
+                        ? 'bg-green-100 text-green-800' 
+                        : result.meetsLimits === 'Нет'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {result.meetsLimits}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Обозначения:</h4>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-blue-200 rounded"></div>
+              <span>Глобальное минимальное значение температуры</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-red-200 rounded"></div>
+              <span>Глобальное максимальное значение температуры</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                Да
+              </span>
+              <span>Соответствует лимитам</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                Нет
+              </span>
+              <span>Не соответствует лимитам</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Report Generation */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Генерация отчета</h3>
+        
+        {/* Template Upload */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Шаблон отчета (DOCX)
+          </label>
+          <div className="flex items-center space-x-3">
+            <input
+              ref={templateInputRef}
+              type="file"
+              accept=".docx"
+              onChange={handleTemplateUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => templateInputRef.current?.click()}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Загрузить шаблон</span>
+            </button>
+            {templateFile && (
+              <span className="text-sm text-green-600">
+                Загружен: {templateFile.name}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Report Data */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Номер отчета *
+            </label>
+            <input
+              type="text"
+              value={reportData.reportNumber}
+              onChange={(e) => setReportData(prev => ({ ...prev, reportNumber: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Дата отчета
+            </label>
+            <input
+              type="date"
+              value={reportData.reportDate}
+              onChange={(e) => setReportData(prev => ({ ...prev, reportDate: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Объект исследования *
+            </label>
+            <input
+              type="text"
+              value={reportData.objectName}
+              onChange={(e) => setReportData(prev => ({ ...prev, objectName: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Климатическая установка
+            </label>
+            <input
+              type="text"
+              value={reportData.climateSystemName}
+              onChange={(e) => setReportData(prev => ({ ...prev, climateSystemName: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Тип испытания
+            </label>
+            <select
+              value={reportData.testType}
+              onChange={(e) => setReportData(prev => ({ ...prev, testType: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="empty-object">Соответствие критериям в пустом объекте</option>
+              <option value="loaded-object">Соответствие критериям в загруженном объекте</option>
+              <option value="door-opening">Открытие двери</option>
+              <option value="power-off">Отключение электропитания</option>
+              <option value="power-on">Включение электропитания</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Руководитель
+            </label>
+            <input
+              type="text"
+              value={reportData.director}
+              onChange={(e) => setReportData(prev => ({ ...prev, director: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+        </div>
+
+        {/* Conclusion */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Выводы и заключение
+          </label>
+          <textarea
+            value={reportData.conclusion}
+            onChange={(e) => setReportData(prev => ({ ...prev, conclusion: e.target.value }))}
+            rows={4}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Введите выводы по результатам анализа..."
+          />
+        </div>
+
+        {/* Status */}
+        {reportStatus && (
+          <div className={`mb-4 p-4 rounded-lg ${
+            reportStatus.type === 'success' 
+              ? 'bg-green-50 text-green-800 border border-green-200' 
+              : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
+            {reportStatus.message}
+          </div>
+        )}
+
+        {/* Generate Button */}
+        <button
+          onClick={handleGenerateReport}
+          disabled={generatingReport || !templateFile}
+          className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        >
+          {generatingReport ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <span>Генерация...</span>
+            </>
+          ) : (
+            <>
+              <FileText className="w-4 h-4" />
+              <span>Сгенерировать отчет</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
