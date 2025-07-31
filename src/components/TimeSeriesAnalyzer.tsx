@@ -300,15 +300,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
         );
       }
-      
+    return files.map((file) => {
       // Вычисляем статистику на основе отфильтрованных данных
-      let fileStats = null;
+      const filePoints = timeSeriesData.data.points.filter(point => point.fileId === file.name);
       if (fileData.length > 0) {
         const temperatures = fileData.map(p => p.temperature!);
         const min = Math.min(...temperatures);
-        const max = Math.max(...temperatures);
+          zoneNumber: file.zoneNumber || '-',
         const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
-        
+          loggerName: file.parsedData?.deviceMetadata?.deviceModel || 'Unknown',
         fileStats = {
           min: Math.round(min * 10) / 10,
           max: Math.round(max * 10) / 10,
@@ -336,9 +336,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       return {
         fileId: fileName,
-        zoneNumber: file.order,
+        zoneNumber: file.zoneNumber || '-',
         measurementLevel: '-',
-        loggerName,
+        loggerName: file.parsedData?.deviceMetadata?.deviceModel || 'Unknown',
         serialNumber,
         minTemp: fileStats ? fileStats.min : '-',
         maxTemp: fileStats ? fileStats.max : '-',

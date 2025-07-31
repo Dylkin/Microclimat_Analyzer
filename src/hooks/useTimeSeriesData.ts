@@ -26,7 +26,7 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
         timestamp: measurement.timestamp.getTime(),
         temperature: measurement.temperature,
         humidity: measurement.humidity,
-        fileId: file.name, // Используем имя файла вместо ID
+        fileId: file.name, // Используем имя файла для связи
         originalIndex: index
       }));
 
