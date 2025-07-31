@@ -2,7 +2,6 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import ImageModule from 'docxtemplater-image-module-free';
 import { saveAs } from 'file-saver';
 import { UploadedFile } from '../types/FileData';
 import { AuthUser } from '../types/User';
@@ -98,28 +97,100 @@ export class ReportGenerator {
         throw new Error('Загруженный файл не является корректным DOCX документом или поврежден. Пожалуйста, загрузите правильный файл шаблона в формате .docx');
       }
       
-      const doc = new Docxtemplater(zip, {
-        modules: [new ImageModule({
-          centered: false,
-          getImage: (tagValue: string) => {
-            if (tagValue.startsWith('data:image/png;base64,')) {
-              // Извлекаем base64 данные
-              const base64Data = tagValue.split(',')[1];
-              // Конвертируем в ArrayBuffer
-              const binaryString = atob(base64Data);
-              const bytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-              }
-              return bytes.buffer;
-            }
-            return null;
-          },
-          getSize: () => {
-            // Размер изображения в пикселях (ширина x высота)
-            return [600, 300];
+      // Создаем модуль для обработки изображений
+      const ImageModule = {
+        name: 'ImageModule',
+        parse: function(tag: any) {
+          if (tag.value === 'chart') {
+            return {
+              type: 'placeholder',
+              value: tag.value,
+              module: 'ImageModule'
+            };
           }
-        })],
+          return null;
+        },
+        render: function(part: any, options: any) {
+          if (part.module === 'ImageModule' && part.value === 'chart') {
+            const chartImageData = options.scopeManager.getValue('chart');
+            if (chartImageData && chartImageData.startsWith('data:image/png;base64,')) {
+              // Создаем XML для вставки изображения
+              const base64Data = chartImageData.split(',')[1];
+              const imageId = Math.floor(Math.random() * 1000000);
+              
+              // Добавляем изображение в архив
+              const imageBuffer = this.base64ToArrayBuffer(base64Data);
+              const imagePath = `word/media/image${imageId}.png`;
+              zip.file(imagePath, imageBuffer);
+              
+              // Создаем relationship
+              const relsXml = zip.file('word/_rels/document.xml.rels');
+              if (relsXml) {
+                let relsContent = relsXml.asText();
+                const relationshipId = `rId${imageId}`;
+                const newRelationship = `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image${imageId}.png"/>`;
+                relsContent = relsContent.replace('</Relationships>', newRelationship + '</Relationships>');
+                zip.file('word/_rels/document.xml.rels', relsContent);
+              }
+              
+              // Возвращаем XML для изображения
+              return {
+                value: `<w:p>
+                  <w:r>
+                    <w:drawing>
+                      <wp:inline distT="0" distB="0" distL="0" distR="0">
+                        <wp:extent cx="5486400" cy="2743200"/>
+                        <wp:effectExtent l="0" t="0" r="0" b="0"/>
+                        <wp:docPr id="${imageId}" name="График"/>
+                        <wp:cNvGraphicFramePr>
+                          <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+                        </wp:cNvGraphicFramePr>
+                        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                            <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                              <pic:nvPicPr>
+                                <pic:cNvPr id="${imageId}" name="График"/>
+                                <pic:cNvPicPr/>
+                              </pic:nvPicPr>
+                              <pic:blipFill>
+                                <a:blip r:embed="${relationshipId}"/>
+                                <a:stretch>
+                                  <a:fillRect/>
+                                </a:stretch>
+                              </pic:blipFill>
+                              <pic:spPr>
+                                <a:xfrm>
+                                  <a:off x="0" y="0"/>
+                                  <a:ext cx="5486400" cy="2743200"/>
+                                </a:xfrm>
+                                <a:prstGeom prst="rect">
+                                  <a:avLst/>
+                                </a:prstGeom>
+                              </pic:spPr>
+                            </pic:pic>
+                          </a:graphicData>
+                        </a:graphic>
+                      </wp:inline>
+                    </w:drawing>
+                  </w:r>
+                </w:p>`
+              };
+            }
+          }
+          return { value: '[ГРАФИК НЕ ДОСТУПЕН]' };
+        },
+        base64ToArrayBuffer: function(base64: string) {
+          const binaryString = atob(base64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          return bytes.buffer;
+        }
+      };
+      
+      const doc = new Docxtemplater(zip, {
+        modules: [ImageModule],
         paragraphLoop: true,
         linebreaks: true,
         errorLogging: true,
