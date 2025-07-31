@@ -123,30 +123,40 @@ export class ReportGenerator {
       
       // Создаем модуль для обработки изображений с правильной библиотекой
       const imageModule = new ImageModule({
+        centered: false,
         getImage: function(tagValue: string, tagName: string) {
           console.log('getImage called with tagValue:', tagValue, 'tagName:', tagName);
-          
-          // Проверяем, что это плейсхолдер chart и у нас есть данные изображения
-          if (tagName === 'chart' && chartImageData) {
-            // Если tagValue содержит data URL, извлекаем base64 часть
-            let base64Data;
-            if (tagValue && tagValue.startsWith('data:image/png;base64,')) {
-              base64Data = tagValue.split(',')[1];
-            } else if (chartImageData.startsWith('data:image/png;base64,')) {
-              base64Data = chartImageData.split(',')[1];
-            } else {
-              console.warn('Неожиданный формат данных изображения');
-              return null;
+          // Для плейсхолдера {chart} возвращаем данные изображения
+          if (tagName === 'chart') {
+            console.log('Обрабатываем плейсхолдер chart');
+            
+            // Используем chartImageData если он доступен
+            if (chartImageData && chartImageData.startsWith('data:image/png;base64,')) {
+              const base64Data = chartImageData.split(',')[1];
+              console.log('Извлекли base64 данные, длина:', base64Data.length);
+              return Buffer.from(base64Data, 'base64');
             }
             
-            console.log('Обрабатываем base64 данные изображения, длина:', base64Data.length);
-            return Buffer.from(base64Data, 'base64'); // Используем Buffer напрямую
+            // Если tagValue содержит base64 данные
+            if (tagValue && tagValue.startsWith('data:image/png;base64,')) {
+              const base64Data = tagValue.split(',')[1];
+              console.log('Используем tagValue base64 данные, длина:', base64Data.length);
+              return Buffer.from(base64Data, 'base64');
+            }
+            
+            console.warn('Нет доступных данных изображения для chart');
           }
           
+          console.log('Возвращаем null для tagName:', tagName);
           return null;
         },
-        getSize: function() {
-          return [1200, 400]; // Размер изображения в пикселях
+        getSize: function(img: Buffer, tagValue: string, tagName: string) {
+          console.log('getSize called for tagName:', tagName);
+          // Возвращаем размер в пикселях [ширина, высота]
+          if (tagName === 'chart') {
+            return [600, 300]; // Уменьшенный размер для лучшего отображения в документе
+          }
+          return [400, 300];
         }
       });
       
