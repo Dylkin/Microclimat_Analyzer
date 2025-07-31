@@ -27,6 +27,7 @@ interface ReportData {
 export class ReportGenerator {
   private static instance: ReportGenerator;
   private generatedReports: Map<string, Blob> = new Map();
+  private generatedCharts: Map<string, Blob> = new Map();
   private masterReport: Blob | null = null;
   private masterReportName: string | null = null;
 
@@ -62,6 +63,7 @@ export class ReportGenerator {
 
       // Получаем изображение графика если элемент предоставлен
       let chartImageData = '';
+      let chartBlob: Blob | null = null;
       if (chartElement) {
         try {
           const canvas = await html2canvas(chartElement, {
@@ -74,6 +76,14 @@ export class ReportGenerator {
           });
           chartImageData = canvas.toDataURL('image/png');
           console.log('График успешно конвертирован в изображение');
+          
+          // Создаем Blob для PNG файла
+          canvas.toBlob((blob) => {
+            if (blob) {
+              chartBlob = blob;
+            }
+          }, 'image/png');
+          
         } catch (error) {
           console.warn('Ошибка конвертации графика:', error);
         }
@@ -192,6 +202,12 @@ export class ReportGenerator {
       // Сохраняем как мастер-отчет для последующих добавлений
       this.masterReport = output;
       this.generatedReports.set(fileName, output);
+      
+      // Сохраняем график если он был создан
+      if (chartBlob) {
+        const chartFileName = fileName.replace('.docx', '_график.png');
+        this.generatedCharts.set(chartFileName, chartBlob);
+      }
 
       // Скачиваем файл
       saveAs(output, fileName);
@@ -407,10 +423,21 @@ export class ReportGenerator {
   }
 
   /**
+   * Получение списка сгенерированных графиков
+   */
+  getGeneratedCharts(): string[] {
+    return Array.from(this.generatedCharts.keys());
+  }
+
+  /**
    * Удаление сгенерированного отчета
    */
   deleteReport(fileName: string): boolean {
-    return this.generatedReports.delete(fileName);
+    const reportDeleted = this.generatedReports.delete(fileName);
+    // Также удаляем соответствующий график
+    const chartFileName = fileName.replace('.docx', '_график.png');
+    this.generatedCharts.delete(chartFileName);
+    return reportDeleted;
   }
 
   /**
@@ -421,12 +448,31 @@ export class ReportGenerator {
   }
 
   /**
+   * Проверка существования графика
+   */
+  hasChart(fileName: string): boolean {
+    return this.generatedCharts.has(fileName);
+  }
+
+  /**
    * Получение отчета для повторного скачивания
    */
   downloadReport(fileName: string): boolean {
     const report = this.generatedReports.get(fileName);
     if (report) {
       saveAs(report, fileName);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Получение графика для повторного скачивания
+   */
+  downloadChart(fileName: string): boolean {
+    const chart = this.generatedCharts.get(fileName);
+    if (chart) {
+      saveAs(chart, fileName);
       return true;
     }
     return false;
