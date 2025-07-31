@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+import ImageModule from 'docxtemplater-image-module-free';
 import { saveAs } from 'file-saver';
 import { UploadedFile } from '../types/FileData';
 import { AuthUser } from '../types/User';
@@ -28,7 +29,6 @@ export class ReportGenerator {
   private generatedReports: Map<string, Blob> = new Map();
   private masterReport: Blob | null = null;
   private masterReportName: string | null = null;
-  private nextImageId: number = 1;
 
   static getInstance(): ReportGenerator {
     if (!ReportGenerator.instance) {
@@ -99,6 +99,27 @@ export class ReportGenerator {
       }
       
       const doc = new Docxtemplater(zip, {
+        modules: [new ImageModule({
+          centered: false,
+          getImage: (tagValue: string) => {
+            if (tagValue.startsWith('data:image/png;base64,')) {
+              // Извлекаем base64 данные
+              const base64Data = tagValue.split(',')[1];
+              // Конвертируем в ArrayBuffer
+              const binaryString = atob(base64Data);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              return bytes.buffer;
+            }
+            return null;
+          },
+          getSize: () => {
+            // Размер изображения в пикселях (ширина x высота)
+            return [600, 300];
+          }
+        })],
         paragraphLoop: true,
         linebreaks: true,
         errorLogging: true,
@@ -259,7 +280,7 @@ export class ReportGenerator {
       'Report No.': reportData.reportNumber || 'Не указан',
       'Report date': reportData.reportDate ? new Date(reportData.reportDate).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
       'director': reportData.director || 'Не назначен',
-      'chart': '[ГРАФИК ТЕМПЕРАТУРЫ/ВЛАЖНОСТИ]'
+      'chart': chartImageData || ''
     };
   }
 
