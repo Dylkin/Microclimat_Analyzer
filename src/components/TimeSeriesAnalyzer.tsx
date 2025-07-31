@@ -926,10 +926,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       {/* Таблица результатов */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Settings className="w-6 h-6 text-gray-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Результаты анализа</h3>
-        </div>
+        <h3 className="text-lg font-semibold mb-4">Результаты анализа</h3>
         
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
