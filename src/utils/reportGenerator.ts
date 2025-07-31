@@ -124,26 +124,30 @@ export class ReportGenerator {
       // Создаем модуль для обработки изображений с правильной библиотекой
       const imageModule = new ImageModule({
         getImage: function(tagValue: string, tagName: string, meta: any) {
-          console.log('getImage called with tagValue:', tagValue, 'tagName:', tagName);
-          console.log('getImage meta:', meta);
+          console.log('getImage called with:', { tagValue, tagName, meta });
           
-          // Проверяем, что это плейсхолдер chart и у нас есть данные изображения
-          if (tagName === 'chart' && chartImageData) {
-            // Извлекаем base64 данные из chartImageData
-            if (!chartImageData.startsWith('data:image/png;base64,')) {
-              console.warn('Неожиданный формат данных изображения:', chartImageData.substring(0, 50));
-              return null;
-            }
+          // Если это плейсхолдер chart, возвращаем данные изображения
+          if (tagName === 'chart') {
+            // Проверяем chartImageData из templateData
+            const imageData = chartImageData || tagValue;
             
-            const base64Data = chartImageData.split(',')[1];
-            
-            try {
-              const buffer = Buffer.from(base64Data, 'base64');
-              console.log('Создан буфер изображения размером:', buffer.length, 'байт');
-              return buffer;
-            } catch (error) {
-              console.error('Ошибка создания буфера изображения:', error);
-              return null;
+            if (imageData && imageData.startsWith('data:image/png;base64,')) {
+              const base64Data = imageData.split(',')[1];
+              
+              try {
+                // Создаем ArrayBuffer из base64
+                const binaryString = atob(base64Data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                  bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                console.log('Создан буфер изображения размером:', bytes.length, 'байт');
+                return bytes.buffer;
+              } catch (error) {
+                console.error('Ошибка создания буфера изображения:', error);
+                return null;
+              }
             }
           }
           
@@ -152,13 +156,11 @@ export class ReportGenerator {
         },
         getSize: function(img: any, tagValue: string, tagName: string) {
           console.log('getSize called for tagName:', tagName);
-          // Возвращаем размер в пикселях (ширина, высота)
-          // docxtemplater автоматически конвертирует в нужные единицы
-          return [600, 200]; // Уменьшенный размер для лучшего отображения в документе
+          // Возвращаем размер в пикселях [ширина, высота]
+          return [600, 200];
         },
-        centered: false, // Изображение не центрируется
+        centered: false,
         getProps: function(img: any, tagValue: string, tagName: string) {
-          console.log('getProps called for tagName:', tagName);
           return {};
         }
       });
@@ -178,6 +180,9 @@ export class ReportGenerator {
 
       // Подготавливаем данные для замены плейсхолдеров
       const templateData = this.prepareTemplateData(reportData, chartImageData);
+      
+      // Добавляем изображение как отдельное поле
+      templateData.chart = chartImageData;
       
       console.log('Данные для шаблона:', templateData);
 
