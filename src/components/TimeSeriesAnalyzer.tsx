@@ -317,6 +317,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         };
       }
       
+      // Вычисляем статистики
+      const min = Math.min(...temperatures);
+      const max = Math.max(...temperatures);
+      const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+      
+      // Проверяем соответствие лимитам
+      const meetsMinLimit = !limits.temperature?.min || min >= limits.temperature.min;
+      const meetsMaxLimit = !limits.temperature?.max || max <= limits.temperature.max;
+      const meetsLimits = meetsMinLimit && meetsMaxLimit ? 'Да' : 'Нет';
+      
       // Проверка соответствия лимитам
       let meetsLimits = '-';
       
@@ -335,30 +345,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
       
       return {
-        fileId: fileName,
-        zoneNumber: file.zoneNumber || '-',
         measurementLevel: '-',
-        loggerName: file.parsedData?.deviceMetadata?.deviceModel || 'Unknown',
         serialNumber,
         minTemp: fileStats ? fileStats.min : '-',
-        maxTemp: fileStats ? fileStats.max : '-',
-        avgTemp: fileStats ? fileStats.avg : '-',
+        meetsLimits
+        minTemp: `${Math.round(min * 10) / 10}°C`,
+        maxTemp: `${Math.round(max * 10) / 10}°C`,
+        avgTemp: `${Math.round(avg * 10) / 10}°C`,
         meetsLimits
       };
-    });
-  }, [files, data, zoomState, limits]);
-
-  // Вычисление глобальных минимума и максимума
-  const globalMinMax = useMemo(() => {
-    const validTemps = resultsTableData
-      .map(row => [row.minTemp, row.maxTemp])
-      .flat()
-      .filter(temp => typeof temp === 'number') as number[];
-    
-    return {
-      globalMin: validTemps.length > 0 ? Math.min(...validTemps) : null,
-      globalMax: validTemps.length > 0 ? Math.max(...validTemps) : null
-    };
   }, [resultsTableData]);
 
   // Генерация рекомендаций
