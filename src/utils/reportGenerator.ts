@@ -90,15 +90,14 @@ export class ReportGenerator {
         templateBuffer = await templateFile.arrayBuffer();
       }
       
-      // Проверяем, что это действительно ZIP-архив (DOCX)
-      const uint8Array = new Uint8Array(templateBuffer);
-      const zipSignature = uint8Array[0] === 0x50 && uint8Array[1] === 0x4B;
-      
-      if (!zipSignature) {
-        throw new Error('Файл не является корректным DOCX документом. Убедитесь, что загружен правильный файл шаблона.');
+      let zip: PizZip;
+      try {
+        zip = new PizZip(templateBuffer);
+      } catch (zipError) {
+        console.error('Ошибка при обработке DOCX файла:', zipError);
+        throw new Error('Загруженный файл не является корректным DOCX документом или поврежден. Пожалуйста, загрузите правильный файл шаблона в формате .docx');
       }
       
-      const zip = new PizZip(templateBuffer);
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
