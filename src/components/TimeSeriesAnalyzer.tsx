@@ -303,7 +303,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       // Вычисляем статистику на основе отфильтрованных данных
       let fileStats = null;
-      if (fileData.length > 0) {
+          zoneNumber: file.zoneNumber || '-',
         const temperatures = fileData.map(p => p.temperature!);
         const min = Math.min(...temperatures);
         const max = Math.max(...temperatures);
@@ -333,7 +333,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         
         meetsLimits = withinLimits ? 'Да' : 'Нет';
       }
-      
+        zoneNumber: file.zoneNumber || '-',
       return {
         fileId: fileName,
         zoneNumber: file.order,
