@@ -921,105 +921,118 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
             showLegend={false}
           />
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    № зоны измерения
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Уровень измерения (м.)
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Наименование логгера
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Серийный № логгера
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Мин. t°С
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Макс. t°С
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Среднее t°С
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Соответствует заданным критериям
-                  </th>
+        </div>
+      </div>
+
+      {/* Таблица результатов */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Settings className="w-6 h-6 text-gray-600" />
+          <h3 className="text-lg font-semibold text-gray-900">Результаты анализа</h3>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  № зоны измерения
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Уровень измерения (м.)
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Наименование логгера
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Серийный № логгера
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Мин. t°С
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Макс. t°С
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Среднее t°С
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Соответствует заданным критериям
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {resultsTableData.map((row, index) => (
+                <tr key={row.fileId} className="hover:bg-gray-50">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {row.zoneNumber}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {row.measurementLevel}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                    {row.loggerName}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                    {row.serialNumber}
+                  </td>
+                  <td className={`px-4 py-4 whitespace-nowrap text-sm text-gray-900 ${
+                    typeof row.minTemp === 'number' && row.minTemp === globalMinMax.globalMin 
+                      ? 'bg-blue-100 text-blue-900 font-semibold' 
+                      : ''
+                  }`}>
+                    {typeof row.minTemp === 'number' ? `${row.minTemp}°C` : row.minTemp}
+                  </td>
+                  <td className={`px-4 py-4 whitespace-nowrap text-sm text-gray-900 ${
+                    typeof row.maxTemp === 'number' && row.maxTemp === globalMinMax.globalMax 
+                      ? 'bg-red-100 text-red-900 font-semibold' 
+                      : ''
+                  }`}>
+                    {typeof row.maxTemp === 'number' ? `${row.maxTemp}°C` : row.maxTemp}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {typeof row.avgTemp === 'number' ? `${row.avgTemp}°C` : row.avgTemp}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      row.meetsLimits === 'Да' 
+                        ? 'bg-green-100 text-green-800'
+                        : row.meetsLimits === 'Нет'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {row.meetsLimits}
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {resultsTableData.map((row, index) => (
-                  <tr key={row.fileId} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {row.zoneNumber}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {row.measurementLevel}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                      {row.loggerName}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                      {row.serialNumber}
-                    </td>
-                    <td className={`px-4 py-4 whitespace-nowrap text-sm text-gray-900 ${
-                      typeof row.minTemp === 'number' && row.minTemp === globalMinMax.globalMin 
-                        ? 'bg-blue-100 text-blue-900 font-semibold' 
-                        : ''
-                    }`}>
-                      {typeof row.minTemp === 'number' ? `${row.minTemp}°C` : row.minTemp}
-                    </td>
-                    <td className={`px-4 py-4 whitespace-nowrap text-sm text-gray-900 ${
-                      typeof row.maxTemp === 'number' && row.maxTemp === globalMinMax.globalMax 
-                        ? 'bg-red-100 text-red-900 font-semibold' 
-                        : ''
-                    }`}>
-                      {typeof row.maxTemp === 'number' ? `${row.maxTemp}°C` : row.maxTemp}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {typeof row.avgTemp === 'number' ? `${row.avgTemp}°C` : row.avgTemp}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        row.meetsLimits === 'Да' 
-                          ? 'bg-green-100 text-green-800'
-                          : row.meetsLimits === 'Нет'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {row.meetsLimits}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Легенда для таблицы */}
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Обозначения:</h4>
-            <div className="flex flex-wrap gap-4 text-xs">
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-blue-100 rounded"></div>
-                <span>Глобальное минимальное значение температуры</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-red-100 rounded"></div>
-                <span>Глобальное максимальное значение температуры</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Да</span>
-                <span>Соответствует лимитам</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Нет</span>
-                <span>Не соответствует лимитам</span>
-              </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        {/* Легенда для таблицы */}
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Обозначения:</h4>
+          <div className="flex flex-wrap gap-4 text-xs">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-blue-100 rounded"></div>
+              <span>Глобальное минимальное значение температуры</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-red-100 rounded"></div>
+              <span>Глобальное максимальное значение температуры</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Да</span>
+              <span>Соответствует лимитам</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Нет</span>
+              <span>Не соответствует лимитам</span>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Блок рекомендаций - только для температуры */}
       {dataType === 'temperature' && recommendations && (
