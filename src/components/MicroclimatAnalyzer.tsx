@@ -2,8 +2,7 @@ import React from 'react';
 import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { databaseService } from '../utils/database';
-import { Testo174HBinaryParser } from '../utils/testo174hBinaryParser';
-import { Testo174TBinaryParser } from '../utils/testo174tBinaryParser';
+import { VI2ParsingService } from '../utils/vi2Parser';
 import { DataVisualization } from './DataVisualization';
 
 interface MicroclimatAnalyzerProps {
@@ -66,16 +65,9 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         // Читаем файл как ArrayBuffer
         const arrayBuffer = await file.arrayBuffer();
         
-        let parsedData;
-        if (file.name.includes('DL-019') || file.name.includes('174T')) {
-          // Одноканальный логгер (Testo 174T)
-          const parser = new Testo174TBinaryParser(arrayBuffer);
-          parsedData = parser.parse(file.name);
-        } else {
-          // Двухканальный логгер (Testo 174H) - по умолчанию
-          const parser = new Testo174HBinaryParser(arrayBuffer);
-          parsedData = parser.parse(file.name);
-        }
+        // Используем универсальный парсер VI2
+        const parsingService = new VI2ParsingService();
+        const parsedData = await parsingService.parseFile(file);
         
         // Сохраняем в базу данных
         await databaseService.saveParsedFileData(parsedData, fileRecord.id);
