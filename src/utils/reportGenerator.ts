@@ -1,9 +1,6 @@
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import PizZip from 'pizzip';
-import Docxtemplater from 'docxtemplater';
-import ImageModule from 'docxtemplater-image-module-free';
 import { saveAs } from 'file-saver';
+import html2canvas from 'html2canvas';
+import { createReport } from 'docx-templates';
 import { UploadedFile } from '../types/FileData';
 import { AuthUser } from '../types/User';
 import { ChartLimits, VerticalMarker } from '../types/TimeSeriesData';
@@ -39,7 +36,7 @@ export class ReportGenerator {
   }
 
   /**
-   * Генерация отчета на основе шаблона DOCX
+   * Генерация отчета на основе шаблона DOCX с использованием docx-templates
    */
   async generateReport(
     templateFile: File,
@@ -47,7 +44,7 @@ export class ReportGenerator {
     chartElement?: HTMLElement
   ): Promise<{ success: boolean; fileName: string; error?: string }> {
     try {
-      console.log('Начинаем генерацию отчета...');
+      console.log('Начинаем генерацию отчета с docx-templates...');
       console.log('Размер файла шаблона:', templateFile.size, 'байт');
       console.log('Тип файла:', templateFile.type);
       console.log('Имя файла:', templateFile.name);
@@ -62,8 +59,9 @@ export class ReportGenerator {
       }
 
       // Получаем изображение графика если элемент предоставлен
-      let chartImageData = '';
+      let chartImageBuffer: Buffer | null = null;
       let chartFileName = '';
+      
       if (chartElement) {
         try {
           const canvas = await html2canvas(chartElement, {
@@ -74,8 +72,8 @@ export class ReportGenerator {
             width: 1200,
             height: 400
           });
-          chartImageData = canvas.toDataURL('image/png');
-          console.log('График успешно конвертирован в изображение');
+          
+          console.log('График успешно конвертирован в canvas');
           
           // Определяем имя файла для графика
           if (this.masterReport && this.masterReportName) {
@@ -84,15 +82,18 @@ export class ReportGenerator {
             chartFileName = `Отчет_${reportData.reportNumber}_${new Date().toISOString().split('T')[0]}_график.png`;
           }
           
-          // Создаем Blob для PNG файла синхронно
+          // Создаем Buffer для PNG файла
           const chartBlob = await new Promise<Blob | null>((resolve) => {
             canvas.toBlob((blob) => {
               resolve(blob);
             }, 'image/png');
           });
           
-          // Сохраняем график если он был создан
           if (chartBlob) {
+            const arrayBuffer = await chartBlob.arrayBuffer();
+            chartImageBuffer = Buffer.from(arrayBuffer);
+            
+            // Сохраняем график для отдельного скачивания
             this.generatedCharts.set(chartFileName, chartBlob);
             console.log('График сохранен как:', chartFileName);
           }
@@ -112,117 +113,39 @@ export class ReportGenerator {
         console.log('Используем новый шаблон');
         templateBuffer = await templateFile.arrayBuffer();
       }
-      
-      let zip: PizZip;
-      try {
-        zip = new PizZip(templateBuffer);
-      } catch (zipError) {
-        console.error('Ошибка при обработке DOCX файла:', zipError);
-        throw new Error('Загруженный файл не является корректным DOCX документом или поврежден. Пожалуйста, загрузите правильный файл шаблона в формате .docx');
-      }
-      
-      // Создаем модуль для обработки изображений с правильной библиотекой
-      const imageModule = new ImageModule({
-        getImage: function(tagValue: string, tagName: string, meta: any) {
-          console.log('getImage called with tagValue:', tagValue, 'tagName:', tagName);
-          console.log('getImage meta:', meta);
-          
-          // Проверяем, что это плейсхолдер chart и у нас есть данные изображения
-          if (tagName === 'chart' && chartImageData) {
-            // Извлекаем base64 данные из chartImageData
-            if (!chartImageData.startsWith('data:image/png;base64,')) {
-              console.warn('Неожиданный формат данных изображения:', chartImageData.substring(0, 50));
-              return null;
-            }
-            
-            const base64Data = chartImageData.split(',')[1];
-            
-            try {
-              const buffer = Buffer.from(base64Data, 'base64');
-              console.log('Создан буфер изображения размером:', buffer.length, 'байт');
-              return buffer;
-            } catch (error) {
-              console.error('Ошибка создания буфера изображения:', error);
-              return null;
-            }
-          }
-          
-          console.warn('Изображение не найдено для тега:', tagName);
-          return null;
-        },
-        getSize: function(img: any, tagValue: string, tagName: string) {
-          console.log('getSize called for tagName:', tagName);
-          // Возвращаем размер в пикселях (ширина, высота)
-          // docxtemplater автоматически конвертирует в нужные единицы
-          return [600, 200]; // Уменьшенный размер для лучшего отображения в документе
-        },
-        centered: false, // Изображение не центрируется
-        getProps: function(img: any, tagValue: string, tagName: string) {
-          console.log('getProps called for tagName:', tagName);
-          return {};
-        }
-      });
-      
-      const doc = new Docxtemplater(zip, {
-        modules: [imageModule],
-        paragraphLoop: true,
-        linebreaks: true,
-        errorLogging: false, // Отключаем для чистоты логов
-        nullGetter: (part) => {
-          if (part.value !== 'chart') {
-            console.warn(`Плейсхолдер не найден: ${part.module}:${part.value}`);
-          }
-          return '';
-        }
-      });
 
       // Подготавливаем данные для замены плейсхолдеров
-      const templateData = this.prepareTemplateData(reportData, chartImageData);
+      const templateData = this.prepareTemplateData(reportData, chartImageBuffer);
       
-      console.log('Данные для шаблона:', templateData);
+      console.log('Данные для шаблона подготовлены');
 
-      // Заполняем шаблон данными
-      doc.setData(templateData);
+      // Генерируем отчет с помощью docx-templates
+      const reportBuffer = await createReport({
+        template: templateBuffer,
+        data: templateData,
+        additionalJsContext: {
+          // Дополнительные функции для обработки данных
+          formatDate: (date: string) => new Date(date).toLocaleDateString('ru-RU'),
+          formatNumber: (num: number) => num.toFixed(1)
+        },
+        cmdDelimiter: ['{', '}'], // Используем стандартные разделители
+        literalXmlDelimiter: '||', // Для вставки сырого XML
+        processLineBreaks: true,
+        noSandBox: false
+      });
 
+      console.log('Отчет успешно сгенерирован с docx-templates');
 
-      try {
-        doc.render();
-      } catch (renderError: any) {
-        console.error('Ошибка рендеринга шаблона:', renderError);
-        
-        // Обработка специфических ошибок docxtemplater
-        if (renderError.name === 'TemplateError') {
-          const errors = renderError.properties?.errors || [];
-          const errorMessages = errors.map((err: any) => 
-            `Строка ${err.line}: ${err.message}`
-          ).join('\n');
-          throw new Error(`Ошибки в шаблоне:\n${errorMessages}`);
-        }
-        
-        if (renderError.properties && renderError.properties.errors) {
-          const errors = renderError.properties.errors;
-          const errorDetails = errors.map((err: any) => {
-            return `Ошибка в позиции ${err.offset}: ${err.message}`;
-          }).join('\n');
-          throw new Error(`Ошибки обработки шаблона:\n${errorDetails}`);
-        }
-        
-        throw new Error(`Ошибка обработки шаблона: ${renderError.message || renderError}`);
-      }
-
-      // Получаем обработанный документ
-      const output = doc.getZip().generate({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      // Создаем Blob из буфера
+      const output = new Blob([reportBuffer], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       });
 
       // Определяем имя файла
       let fileName: string;
       if (this.masterReport && this.masterReportName) {
-        // Используем существующее имя файла
         fileName = this.masterReportName;
       } else {
-        // Создаем новое имя файла
         fileName = `Отчет_${reportData.reportNumber}_${new Date().toISOString().split('T')[0]}.docx`;
         this.masterReportName = fileName;
       }
@@ -244,15 +167,6 @@ export class ReportGenerator {
     } catch (error) {
       console.error('Ошибка генерации отчета:', error);
       
-      // Специальная обработка для ошибок ZIP
-      if (error instanceof Error && error.message.includes('central directory')) {
-        return {
-          success: false,
-          fileName: '',
-          error: 'Загруженный файл не является корректным DOCX документом. Пожалуйста, загрузите правильный файл шаблона в формате .docx'
-        };
-      }
-      
       return {
         success: false,
         fileName: '',
@@ -262,38 +176,9 @@ export class ReportGenerator {
   }
 
   /**
-   * Создание модуля для вставки изображений
-   */
-  private createImageModule(currentImageId: number) {
-    return {
-      name: 'ImageModule',
-      parse: (tag: any) => {
-        if (tag.value === 'chart') {
-          return {
-            type: 'placeholder',
-            value: tag.value,
-            module: 'ImageModule'
-          };
-        }
-        return null;
-      },
-      render: (part: any, options: any) => {
-        if (part.module === 'ImageModule' && part.value === 'chart') {
-          const chartImageData = options.scopeManager.getValue('chart');
-          if (chartImageData && chartImageData.startsWith('data:image/png;base64,')) {
-            // Вместо сложной вставки изображения, используем простой текст-заглушку
-            return { value: '[ГРАФИК БУДЕТ ВСТАВЛЕН ЗДЕСЬ]' };
-          }
-        }
-        return { value: '[ГРАФИК НЕ ДОСТУПЕН]' };
-      }
-    };
-  }
-
-  /**
    * Подготовка данных для замены плейсхолдеров в шаблоне
    */
-  private prepareTemplateData(reportData: ReportData, chartImageData: string) {
+  private prepareTemplateData(reportData: ReportData, chartImageBuffer: Buffer | null) {
     // Получаем информацию о временном периоде
     const testPeriodInfo = this.getTestPeriodInfo(reportData.markers);
     
@@ -313,21 +198,35 @@ export class ReportGenerator {
     };
 
     return {
-      'name of the test': testTypes[reportData.testType as keyof typeof testTypes] || reportData.testType,
-      'name of the object': reportData.objectName || 'Не указано',
-      'name of the air conditioning system': reportData.climateSystemName || 'Не указано',
-      'acceptance criteria': acceptanceCriteria,
-      'Date time of test start': testPeriodInfo?.startTime || 'Не определено',
-      'Date time of test completion': testPeriodInfo?.endTime || 'Не определено',
-      'Duration of the test': testPeriodInfo?.duration || 'Не определено',
-      'Results table': resultsTable,
-      'Result': reportData.conclusion || 'Выводы не указаны',
-      'executor': reportData.user.fullName || 'Не указано',
-      'test date': new Date().toLocaleDateString('ru-RU'),
-      'Report No.': reportData.reportNumber || 'Не указан',
-      'Report date': reportData.reportDate ? new Date(reportData.reportDate).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
-      'director': reportData.director || 'Не назначен',
-      'chart': chartImageData || ''
+      // Основная информация
+      nameOfTheTest: testTypes[reportData.testType as keyof typeof testTypes] || reportData.testType,
+      nameOfTheObject: reportData.objectName || 'Не указано',
+      nameOfTheAirConditioningSystem: reportData.climateSystemName || 'Не указано',
+      acceptanceCriteria: acceptanceCriteria,
+      
+      // Временные данные
+      dateTimeOfTestStart: testPeriodInfo?.startTime || 'Не определено',
+      dateTimeOfTestCompletion: testPeriodInfo?.endTime || 'Не определено',
+      durationOfTheTest: testPeriodInfo?.duration || 'Не определено',
+      
+      // Результаты
+      resultsTable: resultsTable,
+      result: reportData.conclusion || 'Выводы не указаны',
+      
+      // Исполнители и даты
+      executor: reportData.user.fullName || 'Не указано',
+      testDate: new Date().toLocaleDateString('ru-RU'),
+      reportNo: reportData.reportNumber || 'Не указан',
+      reportDate: reportData.reportDate ? new Date(reportData.reportDate).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
+      director: reportData.director || 'Не назначен',
+      
+      // График как изображение
+      chart: chartImageBuffer ? {
+        width: 15, // ширина в см
+        height: 10, // высота в см
+        data: chartImageBuffer,
+        extension: '.png'
+      } : null
     };
   }
 
