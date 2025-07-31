@@ -125,27 +125,28 @@ export class ReportGenerator {
       // Настраиваем модуль изображений
       const imageModule = new ImageModule({
         centered: false,
-        getImage: (tagValue: any, tagName: string, meta: any) => {
+        getImage: (tagValue: any, tagName: string) => {
           console.log('Запрос изображения для тега:', tagName, 'значение:', tagValue);
           
-          if ((tagName === 'chart' || tagName === 'chartImageBuffer') && chartImageBuffer) {
+          // Проверяем тег chart напрямую
+          if (tagName === 'chart' && chartImageBuffer) {
             console.log('Возвращаем буфер изображения графика, размер:', chartImageBuffer.byteLength);
             return chartImageBuffer;
           }
           
-          // Если tagValue содержит 'chart_placeholder', это наш тег для изображения
-          if (typeof tagValue === 'string' && tagValue.includes('chart_placeholder') && chartImageBuffer) {
-            console.log('Найден chart_placeholder, возвращаем изображение графика');
+          // Если tagValue содержит 'chart_image_data', это наш тег для изображения
+          if (typeof tagValue === 'string' && tagValue.includes('chart_image_data') && chartImageBuffer) {
+            console.log('Найден chart_image_data, возвращаем изображение графика');
             return chartImageBuffer;
           }
           
           console.warn('Изображение не найдено для тега:', tagName);
-          return null;
+          return chartImageBuffer; // Возвращаем изображение по умолчанию если есть
         },
         getSize: (img: ArrayBuffer, tagValue: any, tagName: string) => {
           console.log('Запрос размера изображения для тега:', tagName);
           
-          if (tagName === 'chart' || tagName === 'chartImageBuffer' || (typeof tagValue === 'string' && tagValue.includes('chart_placeholder'))) {
+          if (tagName === 'chart' || (typeof tagValue === 'string' && tagValue.includes('chart_image_data'))) {
             // Возвращаем размер в пикселях (600x200)
             return [600, 200];
           }
@@ -158,6 +159,7 @@ export class ReportGenerator {
       const templateData = this.prepareTemplateData(reportData, chartImageBuffer);
       
       console.log('Данные для шаблона подготовлены');
+      console.log('Значение chart в templateData:', templateData.chart);
 
       // Создаем docxtemplater с модулем изображений
       const doc = new Docxtemplater(zip, {
@@ -253,7 +255,10 @@ export class ReportGenerator {
       director: reportData.director || 'Не назначен',
       
       // График как изображение (специальный тег для модуля изображений)
-      chart: chartImageBuffer ? 'chart_image_data' : '' // Указываем что есть данные изображения
+      chart: chartImageBuffer ? 'chart_image_data' : '', // Указываем что есть данные изображения
+      
+      // Добавляем сам буфер изображения для использования в getImage
+      chartImageBuffer: chartImageBuffer
     };
   }
 
