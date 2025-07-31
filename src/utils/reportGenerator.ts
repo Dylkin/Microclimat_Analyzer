@@ -102,12 +102,7 @@ export class ReportGenerator {
         getImage: function(tagValue: string, tagName: string) {
           if (tagName === 'chart' && chartImageData && chartImageData.startsWith('data:image/png;base64,')) {
             const base64Data = chartImageData.split(',')[1];
-            const binaryString = atob(base64Data);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-            return bytes.buffer;
+            return Buffer.from(base64Data, 'base64'); // Используем Buffer напрямую
           }
           return null;
         },
