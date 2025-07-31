@@ -39,6 +39,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [generatedReports, setGeneratedReports] = useState<string[]>([]);
   
   const chartRef = useRef<HTMLDivElement>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
@@ -213,12 +214,22 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           limits,
           markers,
           resultsTableData: analysisResults,
-          user: user!
+          user: user!,
+          dataType,
+          chartImageData: ''
         },
         chartRef.current || undefined
       );
 
       if (result.success) {
+        // Добавляем отчет в список сгенерированных
+        setGeneratedReports(prev => {
+          if (!prev.includes(result.fileName)) {
+            return [...prev, result.fileName];
+          }
+          return prev;
+        });
+        
         setReportStatus({ 
           type: 'success', 
           message: `Отчет "${result.fileName}" успешно сгенерирован и скачан` 
@@ -236,6 +247,39 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       });
     } finally {
       setGeneratingReport(false);
+    }
+  };
+
+  const handleDeleteReport = (fileName: string) => {
+    if (confirm(`Вы уверены, что хотите удалить отчет "${fileName}"?`)) {
+      const reportGenerator = ReportGenerator.getInstance();
+      if (reportGenerator.deleteReport(fileName)) {
+        setGeneratedReports(prev => prev.filter(name => name !== fileName));
+        setReportStatus({ 
+          type: 'success', 
+          message: `Отчет "${fileName}" удален` 
+        });
+      } else {
+        setReportStatus({ 
+          type: 'error', 
+          message: `Не удалось удалить отчет "${fileName}"` 
+        });
+      }
+    }
+  };
+
+  const handleDownloadReport = (fileName: string) => {
+    const reportGenerator = ReportGenerator.getInstance();
+    if (reportGenerator.downloadReport(fileName)) {
+      setReportStatus({ 
+        type: 'success', 
+        message: `Отчет "${fileName}" скачан повторно` 
+      });
+    } else {
+      setReportStatus({ 
+        type: 'error', 
+        message: `Не удалось скачать отчет "${fileName}"` 
+      });
     }
   };
 
@@ -843,6 +887,39 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               : 'bg-red-50 text-red-800 border border-red-200'
           }`}>
             {reportStatus.message}
+          </div>
+        )}
+
+        {/* Список сгенерированных отчетов */}
+        {generatedReports.length > 0 && (
+          <div className="mb-6">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Сгенерированные отчеты:</h4>
+            <div className="space-y-2">
+              {generatedReports.map((fileName) => (
+                <div key={fileName} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="w-4 h-4 text-indigo-600" />
+                    <span className="text-sm font-medium text-gray-900">{fileName}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleDownloadReport(fileName)}
+                      className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                      title="Скачать повторно"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteReport(fileName)}
+                      className="text-red-600 hover:text-red-800 transition-colors"
+                      title="Удалить отчет"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

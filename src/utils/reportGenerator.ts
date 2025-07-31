@@ -19,12 +19,15 @@ interface ReportData {
   conclusion: string;
   user: AuthUser;
   director?: string;
-  chartImageData?: string;
+  dataType: 'temperature' | 'humidity';
+  chartImageData: string;
 }
 
 export class ReportGenerator {
   private static instance: ReportGenerator;
   private generatedReports: Map<string, Blob> = new Map();
+  private masterReport: Blob | null = null;
+  private masterReportName: string | null = null;
 
   static getInstance(): ReportGenerator {
     if (!ReportGenerator.instance) {
@@ -64,7 +67,9 @@ export class ReportGenerator {
             backgroundColor: '#ffffff',
             scale: 2,
             useCORS: true,
-            allowTaint: true
+            allowTaint: true,
+            width: 1200,
+            height: 400
           });
           chartImageData = canvas.toDataURL('image/png');
           console.log('График успешно конвертирован в изображение');
@@ -73,8 +78,16 @@ export class ReportGenerator {
         }
       }
 
-      // Читаем шаблон DOCX
-      const templateBuffer = await templateFile.arrayBuffer();
+      let templateBuffer: ArrayBuffer;
+      
+      // Если есть мастер-отчет, используем его как основу
+      if (this.masterReport) {
+        console.log('Используем существующий мастер-отчет как основу');
+        templateBuffer = await this.masterReport.arrayBuffer();
+      } else {
+        console.log('Используем новый шаблон');
+        templateBuffer = await templateFile.arrayBuffer();
+      }
       
       // Проверяем, что это действительно ZIP-архив (DOCX)
       const uint8Array = new Uint8Array(templateBuffer);
@@ -89,6 +102,7 @@ export class ReportGenerator {
         paragraphLoop: true,
         linebreaks: true,
         errorLogging: true,
+        modules: [this.createImageModule()],
         nullGetter: (part) => {
           console.warn(`Плейсхолдер не найден: ${part.module}:${part.value}`);
           return '';
