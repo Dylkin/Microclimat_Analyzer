@@ -128,7 +128,7 @@ export class ReportGenerator {
         getImage: (tagValue: any, tagName: string, meta: any) => {
           console.log('Запрос изображения для тега:', tagName, 'значение:', tagValue);
           
-          if (tagName === 'chart' && chartImageBuffer) {
+          if ((tagName === 'chart' || tagName === 'chartImageBuffer') && chartImageBuffer) {
             console.log('Возвращаем буфер изображения графика, размер:', chartImageBuffer.byteLength);
             return chartImageBuffer;
           }
@@ -145,7 +145,7 @@ export class ReportGenerator {
         getSize: (img: ArrayBuffer, tagValue: any, tagName: string) => {
           console.log('Запрос размера изображения для тега:', tagName);
           
-          if (tagName === 'chart' || (typeof tagValue === 'string' && tagValue.includes('chart_placeholder'))) {
+          if (tagName === 'chart' || tagName === 'chartImageBuffer' || (typeof tagValue === 'string' && tagValue.includes('chart_placeholder'))) {
             // Возвращаем размер в пикселях (600x200)
             return [600, 200];
           }
@@ -155,7 +155,7 @@ export class ReportGenerator {
       });
 
       // Подготавливаем данные для замены плейсхолдеров
-      const templateData = this.prepareTemplateData(reportData);
+      const templateData = this.prepareTemplateData(reportData, chartImageBuffer);
       
       console.log('Данные для шаблона подготовлены');
 
@@ -199,7 +199,10 @@ export class ReportGenerator {
       return {
         success: false,
         fileName: '',
-        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+        chart: chartImageBuffer ? 'chart_image_data' : '', // Указываем что есть данные изображения
+        
+        // Добавляем сам буфер изображения для использования в getImage
+        chartImageBuffer: chartImageBuffer
       };
     }
   }
@@ -207,7 +210,7 @@ export class ReportGenerator {
   /**
    * Подготовка данных для замены плейсхолдеров в шаблоне
    */
-  private prepareTemplateData(reportData: ReportData) {
+  private prepareTemplateData(reportData: ReportData, chartImageBuffer: ArrayBuffer | null) {
     // Получаем информацию о временном периоде
     const testPeriodInfo = this.getTestPeriodInfo(reportData.markers);
     
