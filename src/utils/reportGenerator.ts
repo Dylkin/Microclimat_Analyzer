@@ -117,7 +117,6 @@ export class ReportGenerator {
             }
             
             console.log('Обрабатываем base64 данные изображения, длина:', base64Data.length);
-            const base64Data = chartImageData.split(',')[1];
             return Buffer.from(base64Data, 'base64'); // Используем Buffer напрямую
           }
           
