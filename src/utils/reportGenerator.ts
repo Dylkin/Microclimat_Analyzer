@@ -101,10 +101,26 @@ export class ReportGenerator {
       // Создаем модуль для обработки изображений с правильной библиотекой
       const imageModule = new ImageModule({
         getImage: function(tagValue: string, tagName: string) {
-          if (tagName === 'chart' && chartImageData && chartImageData.startsWith('data:image/png;base64,')) {
+          console.log('getImage called with tagValue:', tagValue, 'tagName:', tagName);
+          
+          // Проверяем, что это плейсхолдер chart и у нас есть данные изображения
+          if (tagName === 'chart' && chartImageData) {
+            // Если tagValue содержит data URL, извлекаем base64 часть
+            let base64Data;
+            if (tagValue && tagValue.startsWith('data:image/png;base64,')) {
+              base64Data = tagValue.split(',')[1];
+            } else if (chartImageData.startsWith('data:image/png;base64,')) {
+              base64Data = chartImageData.split(',')[1];
+            } else {
+              console.warn('Неожиданный формат данных изображения');
+              return null;
+            }
+            
+            console.log('Обрабатываем base64 данные изображения, длина:', base64Data.length);
             const base64Data = chartImageData.split(',')[1];
             return Buffer.from(base64Data, 'base64'); // Используем Buffer напрямую
           }
+          
           return null;
         },
         getSize: function() {
