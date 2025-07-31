@@ -122,58 +122,31 @@ export class ReportGenerator {
       }
       
       // Создаем модуль для обработки изображений с правильной библиотекой
-      const imageModule = new ImageModule({
+      const imageOpts = {
+        centered: false,
         getImage: function(tagValue: string, tagName: string, meta: any) {
-          console.log('getImage called with tagValue:', tagValue, 'tagName:', tagName);
-          console.log('getImage meta:', meta);
+          console.log('getImage called with tagValue:', tagValue);
           
-          // Проверяем, что это плейсхолдер chart и у нас есть данные изображения
-          if (tagName === 'chart' && chartImageData) {
-            // Извлекаем base64 данные из chartImageData
-            if (!chartImageData.startsWith('data:image/png;base64,')) {
-              console.warn('Неожиданный формат данных изображения:', chartImageData.substring(0, 50));
-              return null;
-            }
-            
-            const base64Data = chartImageData.split(',')[1];
-            
-            try {
-              const buffer = Buffer.from(base64Data, 'base64');
-              console.log('Создан буфер изображения размером:', buffer.length, 'байт');
-              return buffer;
-            } catch (error) {
-              console.error('Ошибка создания буфера изображения:', error);
-              return null;
-            }
+          // Если тег содержит Base64 данные изображения
+          if (tagValue && tagValue.startsWith('data:image')) {
+            console.log('Обрабатываем base64 данные изображения');
+            const base64Data = tagValue.split(',')[1];
+            return Buffer.from(base64Data, 'base64');
           }
           
-          console.warn('Изображение не найдено для тега:', tagName);
+          console.warn('Изображение не найдено для tagValue:', tagValue);
           return null;
         },
-        getSize: function(img: any, tagValue: string, tagName: string) {
-          console.log('getSize called for tagName:', tagName);
-          // Возвращаем размер в пикселях (ширина, высота)
-          // docxtemplater автоматически конвертирует в нужные единицы
-          return [600, 200]; // Уменьшенный размер для лучшего отображения в документе
-        },
-        centered: false, // Изображение не центрируется
-        getProps: function(img: any, tagValue: string, tagName: string) {
-          console.log('getProps called for tagName:', tagName);
-          return {};
+        getSize: function() {
+          return [600, 200]; // Ширина и высота в пикселях
         }
-      });
+      };
       
       const doc = new Docxtemplater(zip, {
-        modules: [imageModule],
+        modules: [new ImageModule(imageOpts)],
         paragraphLoop: true,
         linebreaks: true,
         errorLogging: false, // Отключаем для чистоты логов
-        nullGetter: (part) => {
-          if (part.value !== 'chart') {
-            console.warn(`Плейсхолдер не найден: ${part.module}:${part.value}`);
-          }
-          return '';
-        }
       });
 
       // Подготавливаем данные для замены плейсхолдеров
@@ -327,7 +300,7 @@ export class ReportGenerator {
       'Report No.': reportData.reportNumber || 'Не указан',
       'Report date': reportData.reportDate ? new Date(reportData.reportDate).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
       'director': reportData.director || 'Не назначен',
-      'chart': chartImageData || ''
+      'chart': chartImageData // Передаем base64 данные напрямую
     };
   }
 
