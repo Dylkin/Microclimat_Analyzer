@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+import ImageModule from 'docxtemplater-image-module-free';
 import { saveAs } from 'file-saver';
 import { UploadedFile } from '../types/FileData';
 import { AuthUser } from '../types/User';
@@ -119,35 +120,38 @@ export class ReportGenerator {
         console.error('Ошибка при обработке DOCX файла:', zipError);
         throw new Error('Загруженный файл не является корректным DOCX документом или поврежден. Пожалуйста, загрузите правильный файл шаблона в формате .docx');
       }
-      // Если есть изображение графика, добавляем его в ZIP архив
-      if (chartImageData) {
-        try {
-          const base64Data = chartImageData.split(',')[1];
-          const imageBuffer = Buffer.from(base64Data, 'base64');
+      
+      // Создаем модуль для обработки изображений с правильной библиотекой
+      const imageModule = new ImageModule({
+        getImage: function(tagValue: string, tagName: string) {
+          console.log('getImage called with tagValue:', tagValue, 'tagName:', tagName);
           
-          // Добавляем изображение в медиа папку DOCX
-          zip.file('word/media/image1.png', imageBuffer);
-          
-          // Обновляем content types для PNG
-          const contentTypesXml = zip.file('[Content_Types].xml');
-          if (contentTypesXml) {
-            let contentTypesContent = contentTypesXml.asText();
-            if (!contentTypesContent.includes('image/png')) {
-              contentTypesContent = contentTypesContent.replace(
-                '</Types>',
-                '<Default Extension="png" ContentType="image/png"/></Types>'
-              );
-              zip.file('[Content_Types].xml', contentTypesContent);
+          // Проверяем, что это плейсхолдер chart и у нас есть данные изображения
+          if (tagName === 'chart' && chartImageData) {
+            // Если tagValue содержит data URL, извлекаем base64 часть
+            let base64Data;
+            if (tagValue && tagValue.startsWith('data:image/png;base64,')) {
+              base64Data = tagValue.split(',')[1];
+            } else if (chartImageData.startsWith('data:image/png;base64,')) {
+              base64Data = chartImageData.split(',')[1];
+            } else {
+              console.warn('Неожиданный формат данных изображения');
+              return null;
             }
+            
+            console.log('Обрабатываем base64 данные изображения, длина:', base64Data.length);
+            return Buffer.from(base64Data, 'base64'); // Используем Buffer напрямую
           }
           
-          console.log('Изображение добавлено в DOCX архив');
-        } catch (error) {
-          console.warn('Ошибка добавления изображения в DOCX:', error);
+          return null;
+        },
+        getSize: function() {
+          return [1200, 400]; // Размер изображения в пикселях
         }
-      }
+      });
       
       const doc = new Docxtemplater(zip, {
+        modules: [imageModule],
         paragraphLoop: true,
         linebreaks: true,
         errorLogging: true,
