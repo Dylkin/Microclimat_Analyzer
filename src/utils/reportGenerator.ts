@@ -125,11 +125,17 @@ export class ReportGenerator {
       // Настраиваем модуль изображений
       const imageModule = new ImageModule({
         centered: false,
-        getImage: (tagValue: any, tagName: string) => {
+        getImage: (tagValue: any, tagName: string, meta: any) => {
           console.log('Запрос изображения для тега:', tagName, 'значение:', tagValue);
           
           if (tagName === 'chart' && chartImageBuffer) {
             console.log('Возвращаем буфер изображения графика, размер:', chartImageBuffer.byteLength);
+            return chartImageBuffer;
+          }
+          
+          // Если tagValue содержит 'chart_placeholder', это наш тег для изображения
+          if (typeof tagValue === 'string' && tagValue.includes('chart_placeholder') && chartImageBuffer) {
+            console.log('Найден chart_placeholder, возвращаем изображение графика');
             return chartImageBuffer;
           }
           
@@ -139,7 +145,7 @@ export class ReportGenerator {
         getSize: (img: ArrayBuffer, tagValue: any, tagName: string) => {
           console.log('Запрос размера изображения для тега:', tagName);
           
-          if (tagName === 'chart') {
+          if (tagName === 'chart' || (typeof tagValue === 'string' && tagValue.includes('chart_placeholder'))) {
             // Возвращаем размер в пикселях (600x200)
             return [600, 200];
           }
@@ -244,7 +250,7 @@ export class ReportGenerator {
       director: reportData.director || 'Не назначен',
       
       // График как изображение (специальный тег для модуля изображений)
-      chart: 'chart_placeholder' // Это значение будет обработано модулем изображений
+      chart: chartImageBuffer ? 'chart_image_data' : '' // Указываем что есть данные изображения
     };
   }
 
