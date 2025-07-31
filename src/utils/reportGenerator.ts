@@ -63,6 +63,7 @@ export class ReportGenerator {
 
       // Получаем изображение графика если элемент предоставлен
       let chartImageData = '';
+      let chartFileName = '';
       if (chartElement) {
         try {
           const canvas = await html2canvas(chartElement, {
@@ -76,6 +77,13 @@ export class ReportGenerator {
           chartImageData = canvas.toDataURL('image/png');
           console.log('График успешно конвертирован в изображение');
           
+          // Определяем имя файла для графика
+          if (this.masterReport && this.masterReportName) {
+            chartFileName = this.masterReportName.replace('.docx', '_график.png');
+          } else {
+            chartFileName = `Отчет_${reportData.reportNumber}_${new Date().toISOString().split('T')[0]}_график.png`;
+          }
+          
           // Создаем Blob для PNG файла синхронно
           const chartBlob = await new Promise<Blob | null>((resolve) => {
             canvas.toBlob((blob) => {
@@ -85,7 +93,6 @@ export class ReportGenerator {
           
           // Сохраняем график если он был создан
           if (chartBlob) {
-            const chartFileName = fileName.replace('.docx', '_график.png');
             this.generatedCharts.set(chartFileName, chartBlob);
             console.log('График сохранен как:', chartFileName);
           }
