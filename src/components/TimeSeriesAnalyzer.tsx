@@ -919,19 +919,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             onMarkerAdd={handleMarkerAdd}
             color={dataType === 'temperature' ? '#ef4444' : '#3b82f6'}
             yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
-            showLegend={true}
+            showLegend={false}
           />
-        </div>
-      </div>
-
-      {/* Таблица результатов - только для температуры */}
-      {dataType === 'temperature' && resultsTableData.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Таблица результатов</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     № зоны измерения
                   </th>
