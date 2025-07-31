@@ -102,7 +102,6 @@ export class ReportGenerator {
         paragraphLoop: true,
         linebreaks: true,
         errorLogging: true,
-        modules: [this.createImageModule(this.nextImageId)],
         nullGetter: (part) => {
           console.warn(`Плейсхолдер не найден: ${part.module}:${part.value}`);
           return '';
@@ -117,8 +116,6 @@ export class ReportGenerator {
       // Заполняем шаблон данными
       doc.setData(templateData);
 
-      // Увеличиваем счетчик изображений для следующего использования
-      this.nextImageId++;
 
       try {
         doc.render();
@@ -216,74 +213,8 @@ export class ReportGenerator {
         if (part.module === 'ImageModule' && part.value === 'chart') {
           const chartImageData = options.scopeManager.getValue('chart');
           if (chartImageData && chartImageData.startsWith('data:image/png;base64,')) {
-            // Извлекаем base64 данные
-            const base64Data = chartImageData.split(',')[1];
-            const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-            
-            const imageFileName = `image${currentImageId}.png`;
-            const relationshipId = `rId${currentImageId + 10000}`;
-            
-            // Создаем упрощенный XML для вставки изображения
-            const imageXml = `<w:p>
-              <w:r>
-                <w:drawing>
-                  <wp:inline distT="0" distB="0" distL="0" distR="0">
-                    <wp:extent cx="6096000" cy="2032000"/>
-                    <wp:effectExtent l="0" t="0" r="0" b="0"/>
-                    <wp:docPr id="${currentImageId + 20000}" name="График"/>
-                    <wp:cNvGraphicFramePr>
-                      <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
-                    </wp:cNvGraphicFramePr>
-                    <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-                      <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                        <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                          <pic:nvPicPr>
-                            <pic:cNvPr id="${currentImageId + 30000}" name="График"/>
-                            <pic:cNvPicPr/>
-                          </pic:nvPicPr>
-                          <pic:blipFill>
-                            <a:blip r:embed="${relationshipId}"/>
-                            <a:stretch>
-                              <a:fillRect/>
-                            </a:stretch>
-                          </pic:blipFill>
-                          <pic:spPr>
-                            <a:xfrm>
-                              <a:off x="0" y="0"/>
-                              <a:ext cx="6096000" cy="2032000"/>
-                            </a:xfrm>
-                            <a:prstGeom prst="rect">
-                              <a:avLst/>
-                            </a:prstGeom>
-                          </pic:spPr>
-                        </pic:pic>
-                      </a:graphicData>
-                    </a:graphic>
-                  </wp:inline>
-                </w:drawing>
-              </w:r>
-            </w:p>`;
-            
-            // Добавляем изображение в архив
-            const zip = options.filePath ? options.filePath.zip : options.zip;
-            if (zip) {
-              zip.file(`word/media/${imageFileName}`, imageBuffer);
-              
-              // Обновляем relationships
-              const relsContent = zip.file('word/_rels/document.xml.rels');
-              if (relsContent) {
-                let relsXml = relsContent.asText();
-                if (!relsXml.includes(imageFileName)) {
-                  relsXml = relsXml.replace(
-                    '</Relationships>',
-                    `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageFileName}"/></Relationships>`
-                  );
-                  zip.file('word/_rels/document.xml.rels', relsXml);
-                }
-              }
-            }
-            
-            return { value: imageXml };
+            // Вместо сложной вставки изображения, используем простой текст-заглушку
+            return { value: '[ГРАФИК БУДЕТ ВСТАВЛЕН ЗДЕСЬ]' };
           }
         }
         return { value: '[ГРАФИК НЕ ДОСТУПЕН]' };
@@ -328,7 +259,7 @@ export class ReportGenerator {
       'Report No.': reportData.reportNumber || 'Не указан',
       'Report date': reportData.reportDate ? new Date(reportData.reportDate).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
       'director': reportData.director || 'Не назначен',
-      'chart': chartImageData
+      'chart': '[ГРАФИК ТЕМПЕРАТУРЫ/ВЛАЖНОСТИ]'
     };
   }
 
