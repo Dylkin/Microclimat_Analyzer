@@ -123,30 +123,43 @@ export class ReportGenerator {
       
       // Создаем модуль для обработки изображений с правильной библиотекой
       const imageModule = new ImageModule({
-        getImage: function(tagValue: string, tagName: string) {
+        getImage: function(tagValue: string, tagName: string, meta: any) {
           console.log('getImage called with tagValue:', tagValue, 'tagName:', tagName);
+          console.log('getImage meta:', meta);
           
           // Проверяем, что это плейсхолдер chart и у нас есть данные изображения
           if (tagName === 'chart' && chartImageData) {
-            // Если tagValue содержит data URL, извлекаем base64 часть
-            let base64Data;
-            if (tagValue && tagValue.startsWith('data:image/png;base64,')) {
-              base64Data = tagValue.split(',')[1];
-            } else if (chartImageData.startsWith('data:image/png;base64,')) {
-              base64Data = chartImageData.split(',')[1];
-            } else {
-              console.warn('Неожиданный формат данных изображения');
+            // Извлекаем base64 данные из chartImageData
+            if (!chartImageData.startsWith('data:image/png;base64,')) {
+              console.warn('Неожиданный формат данных изображения:', chartImageData.substring(0, 50));
               return null;
             }
             
-            console.log('Обрабатываем base64 данные изображения, длина:', base64Data.length);
-            return Buffer.from(base64Data, 'base64'); // Используем Buffer напрямую
+            const base64Data = chartImageData.split(',')[1];
+            
+            try {
+              const buffer = Buffer.from(base64Data, 'base64');
+              console.log('Создан буфер изображения размером:', buffer.length, 'байт');
+              return buffer;
+            } catch (error) {
+              console.error('Ошибка создания буфера изображения:', error);
+              return null;
+            }
           }
           
+          console.warn('Изображение не найдено для тега:', tagName);
           return null;
         },
-        getSize: function() {
-          return [1200, 400]; // Размер изображения в пикселях
+        getSize: function(img: any, tagValue: string, tagName: string) {
+          console.log('getSize called for tagName:', tagName);
+          // Возвращаем размер в пикселях (ширина, высота)
+          // docxtemplater автоматически конвертирует в нужные единицы
+          return [600, 200]; // Уменьшенный размер для лучшего отображения в документе
+        },
+        centered: false, // Изображение не центрируется
+        getProps: function(img: any, tagValue: string, tagName: string) {
+          console.log('getProps called for tagName:', tagName);
+          return {};
         }
       });
       
@@ -154,9 +167,11 @@ export class ReportGenerator {
         modules: [imageModule],
         paragraphLoop: true,
         linebreaks: true,
-        errorLogging: true,
+        errorLogging: false, // Отключаем для чистоты логов
         nullGetter: (part) => {
-          console.warn(`Плейсхолдер не найден: ${part.module}:${part.value}`);
+          if (part.value !== 'chart') {
+            console.warn(`Плейсхолдер не найден: ${part.module}:${part.value}`);
+          }
           return '';
         }
       });
