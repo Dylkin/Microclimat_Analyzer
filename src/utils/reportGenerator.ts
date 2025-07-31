@@ -63,7 +63,6 @@ export class ReportGenerator {
 
       // Получаем изображение графика если элемент предоставлен
       let chartImageData = '';
-      let chartBlob: Blob | null = null;
       if (chartElement) {
         try {
           const canvas = await html2canvas(chartElement, {
@@ -77,12 +76,19 @@ export class ReportGenerator {
           chartImageData = canvas.toDataURL('image/png');
           console.log('График успешно конвертирован в изображение');
           
-          // Создаем Blob для PNG файла
-          canvas.toBlob((blob) => {
-            if (blob) {
-              chartBlob = blob;
-            }
-          }, 'image/png');
+          // Создаем Blob для PNG файла синхронно
+          const chartBlob = await new Promise<Blob | null>((resolve) => {
+            canvas.toBlob((blob) => {
+              resolve(blob);
+            }, 'image/png');
+          });
+          
+          // Сохраняем график если он был создан
+          if (chartBlob) {
+            const chartFileName = fileName.replace('.docx', '_график.png');
+            this.generatedCharts.set(chartFileName, chartBlob);
+            console.log('График сохранен как:', chartFileName);
+          }
           
         } catch (error) {
           console.warn('Ошибка конвертации графика:', error);
@@ -202,12 +208,6 @@ export class ReportGenerator {
       // Сохраняем как мастер-отчет для последующих добавлений
       this.masterReport = output;
       this.generatedReports.set(fileName, output);
-      
-      // Сохраняем график если он был создан
-      if (chartBlob) {
-        const chartFileName = fileName.replace('.docx', '_график.png');
-        this.generatedCharts.set(chartFileName, chartBlob);
-      }
 
       // Скачиваем файл
       saveAs(output, fileName);
