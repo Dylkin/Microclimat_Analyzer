@@ -16,6 +16,7 @@
     "d3-time-format": "^4.1.0",
     "d3-zoom": "^3.0.0",
     "docxtemplater": "^3.65.2",
+    "docxtemplater-image-module-free": "^1.1.1",
     "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
