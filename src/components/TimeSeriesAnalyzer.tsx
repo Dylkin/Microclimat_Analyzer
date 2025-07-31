@@ -52,9 +52,17 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const analysisResults = useMemo(() => {
     if (!data || !data.points.length) return [];
 
+    // Фильтруем данные по времени если применен зум
+    let filteredPoints = data.points;
+    if (zoomState) {
+      filteredPoints = data.points.filter(point => 
+        point.timestamp >= zoomState.startTime && point.timestamp <= zoomState.endTime
+      );
+    }
+
     return files.map((file) => {
       // Find data points for this file
-      const filePoints = data.points.filter(point => point.fileId === file.name);
+      const filePoints = filteredPoints.filter(point => point.fileId === file.name);
       
       if (filePoints.length === 0) {
         return {
@@ -125,7 +133,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return {
         zoneNumber: file.zoneNumber || '-',
         measurementLevel: file.measurementLevel || '-',
-        loggerName: file.parsedData?.deviceMetadata?.deviceModel || 'Unknown',
+        loggerName: file.name.substring(0, 6), // Первые 6 символов названия файла
         serialNumber: file.parsedData?.deviceMetadata?.serialNumber || 'Unknown',
         minTemp: tempStats.min,
         maxTemp: tempStats.max,
@@ -136,7 +144,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         meetsLimits
       };
     });
-  }, [data, files, limits]);
+  }, [data, files, limits, zoomState]); // Добавляем zoomState в зависимости
 
   const handleLimitChange = (type: DataType, limitType: 'min' | 'max', value: string) => {
     const numValue = value === '' ? undefined : parseFloat(value);
@@ -385,6 +393,37 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
       )}
 
+      {/* Рекомендации */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-blue-900 mb-4">💡 Рекомендации по работе</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800">
+          <div className="space-y-2">
+            <h4 className="font-medium">Анализ данных:</h4>
+            <ul className="space-y-1 list-disc list-inside">
+              <li>Выделите область на графике для увеличения масштаба</li>
+              <li>Двойной клик для добавления временных маркеров</li>
+              <li>Установите лимиты для автоматической проверки соответствия</li>
+              <li>Переключайтесь между температурой и влажностью</li>
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-medium">Генерация отчетов:</h4>
+            <ul className="space-y-1 list-disc list-inside">
+              <li>Загрузите DOCX шаблон с плейсхолдерами</li>
+              <li>Заполните информацию об исследовании</li>
+              <li>Добавьте выводы по результатам анализа</li>
+              <li>График автоматически включается в отчет</li>
+            </ul>
+          </div>
+        </div>
+        <div className="mt-4 p-3 bg-blue-100 rounded-lg">
+          <p className="text-xs text-blue-700">
+            <strong>Совет:</strong> При изменении масштаба графика таблица результатов автоматически обновляется, 
+            показывая статистику только для выбранного временного периода.
+          </p>
+        </div>
+      </div>
+
       {/* Chart */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="mb-4">
@@ -483,7 +522,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                   Уровень измерения (м.)
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Наименование логгера
+                  Наименование логгера (6 символов)
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Серийный № логгера
@@ -546,14 +585,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         {/* Legend */}
         <div className="mt-4 p-4 bg-gray-50 rounded-lg">
           <h4 className="text-sm font-medium text-gray-700 mb-2">Обозначения:</h4>
-          <div className="flex flex-wrap gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-blue-200 rounded"></div>
-              <span>Глобальное минимальное значение температуры</span>
+              <span>Минимальное значение в выбранном периоде</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-red-200 rounded"></div>
-              <span>Глобальное максимальное значение температуры</span>
+              <span>Максимальное значение в выбранном периоде</span>
             </div>
             <div className="flex items-center space-x-2">
               <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
@@ -567,6 +606,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </span>
               <span>Не соответствует лимитам</span>
             </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs bg-gray-200 px-2 py-1 rounded font-mono">DL-023</span>
+              <span>Наименование логгера (первые 6 символов файла)</span>
+            </div>
+          </div>
+          <div className="mt-3 text-xs text-gray-600">
+            <strong>Примечание:</strong> При изменении масштаба графика статистика пересчитывается только для выбранного временного периода.
           </div>
         </div>
       </div>
