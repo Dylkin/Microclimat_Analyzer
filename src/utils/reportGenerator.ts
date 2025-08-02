@@ -159,7 +159,7 @@ export class ReportGenerator {
           })
         ],
         heading: HeadingLevel.TITLE,
-        alignment: AlignmentType.CENTER
+        alignment: AlignmentType.CENTER,
         spacing: {
           after: 200
         }
@@ -422,54 +422,47 @@ export class ReportGenerator {
   }
 
   /**
-            width: { size: 10, type: WidthType.PERCENTAGE },
-            verticalAlign: "center"
+   * Создание таблицы результатов
    */
   private createResultsTable(resultsTableData: any[]): Table {
     const rows = [];
 
-              alignment: AlignmentType.CENTER
     // Заголовок таблицы
-            width: { size: 15, type: WidthType.PERCENTAGE },
-            verticalAlign: "center"
+    rows.push(
       new TableRow({
         children: [
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: '№ зоны', bold: true })] })],
-              alignment: AlignmentType.CENTER
-            width: { size: 10, type: WidthType.PERCENTAGE }
+            children: [new Paragraph({ children: [new TextRun({ text: '№ зоны', bold: true })], alignment: AlignmentType.CENTER })],
+            width: { size: 10, type: WidthType.PERCENTAGE },
+            verticalAlign: "center"
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: 'Уровень (м.)', bold: true })], alignment: AlignmentType.CENTER })],
             width: { size: 15, type: WidthType.PERCENTAGE },
             verticalAlign: "center"
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Уровень (м.)', bold: true })] })],
-            width: { size: 15, type: WidthType.PERCENTAGE }
-              alignment: AlignmentType.CENTER
-          }),
-            width: { size: 15, type: WidthType.PERCENTAGE },
-            verticalAlign: "center"
-            children: [new Paragraph({ children: [new TextRun({ text: 'Логгер', bold: true })] })],
-            width: { size: 15, type: WidthType.PERCENTAGE }
-          }),
-          new TableCell({
-              alignment: AlignmentType.CENTER
-            children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true })] })],
+            children: [new Paragraph({ children: [new TextRun({ text: 'Логгер', bold: true })], alignment: AlignmentType.CENTER })],
             width: { size: 15, type: WidthType.PERCENTAGE },
             verticalAlign: "center"
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Мин. t°C', bold: true })] })],
-            width: { size: 15, type: WidthType.PERCENTAGE }
-              alignment: AlignmentType.CENTER
-          }),
+            children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true })], alignment: AlignmentType.CENTER })],
             width: { size: 15, type: WidthType.PERCENTAGE },
             verticalAlign: "center"
-            children: [new Paragraph({ children: [new TextRun({ text: 'Макс. t°C', bold: true })] })],
-            width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-              alignment: AlignmentType.CENTER
-            children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true })] })],
+            children: [new Paragraph({ children: [new TextRun({ text: 'Мин. t°C', bold: true })], alignment: AlignmentType.CENTER })],
+            width: { size: 15, type: WidthType.PERCENTAGE },
+            verticalAlign: "center"
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: 'Макс. t°C', bold: true })], alignment: AlignmentType.CENTER })],
+            width: { size: 15, type: WidthType.PERCENTAGE },
+            verticalAlign: "center"
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true })], alignment: AlignmentType.CENTER })],
             width: { size: 15, type: WidthType.PERCENTAGE },
             verticalAlign: "center"
           })
