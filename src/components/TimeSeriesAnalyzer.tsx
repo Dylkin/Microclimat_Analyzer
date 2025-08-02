@@ -328,6 +328,30 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
   };
 
+  const handleDownloadExampleTemplate = async () => {
+    try {
+      const reportGenerator = ReportGenerator.getInstance();
+      const success = await reportGenerator.generateExampleTemplate();
+      
+      if (success) {
+        setReportStatus({ 
+          type: 'success', 
+          message: 'Пример шаблона успешно скачан' 
+        });
+      } else {
+        setReportStatus({ 
+          type: 'error', 
+          message: 'Ошибка создания примера шаблона' 
+        });
+      }
+    } catch (error) {
+      setReportStatus({ 
+        type: 'error', 
+        message: 'Ошибка создания примера шаблона' 
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -698,15 +722,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <Upload className="w-4 h-4" />
               <span>Загрузить шаблон</span>
             </button>
-            <a
-              href="/template-example.docx"
-              download="Шаблон_отчета_пример.docx"
+            <button
+              onClick={handleDownloadExampleTemplate}
               className="text-indigo-600 hover:text-indigo-800 underline text-sm flex items-center space-x-1"
               title="Скачать пример шаблона отчета"
             >
               <Download className="w-4 h-4" />
               <span>Скачать пример шаблона</span>
-            </a>
+            </button>
             {templateFile && (
               <span className="text-sm text-green-600">
                 Загружен: {templateFile.name}

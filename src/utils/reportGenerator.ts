@@ -797,4 +797,163 @@ export class ReportGenerator {
     }
     return false;
   }
+
+  /**
+   * Генерация примера шаблона отчета
+   */
+  async generateExampleTemplate(): Promise<boolean> {
+    try {
+      // Создаем базовый DOCX документ с примером шаблона
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "ОТЧЕТ № {Report No.}",
+                  bold: true,
+                  size: 32
+                })
+              ],
+              heading: HeadingLevel.TITLE,
+              alignment: AlignmentType.CENTER
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "от {Report date}",
+                  size: 24
+                })
+              ],
+              alignment: AlignmentType.CENTER
+            }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "О РЕЗУЛЬТАТАХ ИСПЫТАНИЙ МИКРОКЛИМАТА",
+                  bold: true,
+                  size: 28
+                })
+              ],
+              alignment: AlignmentType.CENTER
+            }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            new Paragraph({
+              children: [new TextRun({ text: "1. ОБЩИЕ СВЕДЕНИЯ", bold: true })],
+              heading: HeadingLevel.HEADING_2
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Объект исследования: ", bold: true }),
+                new TextRun({ text: "{name of the object}" })
+              ]
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Климатическая установка: ", bold: true }),
+                new TextRun({ text: "{name of the air conditioning system}" })
+              ]
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Вид испытания: ", bold: true }),
+                new TextRun({ text: "{name of the test}" })
+              ]
+            }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            new Paragraph({
+              children: [new TextRun({ text: "2. КРИТЕРИИ ПРИЕМКИ", bold: true })],
+              heading: HeadingLevel.HEADING_2
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "{acceptance criteria}" })]
+            }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            new Paragraph({
+              children: [new TextRun({ text: "3. ПЕРИОД ПРОВЕДЕНИЯ ИСПЫТАНИЙ", bold: true })],
+              heading: HeadingLevel.HEADING_2
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Начало испытания: ", bold: true }),
+                new TextRun({ text: "{Date time of test start}" })
+              ]
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Завершение испытания: ", bold: true }),
+                new TextRun({ text: "{Date time of test completion}" })
+              ]
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Длительность испытания: ", bold: true }),
+                new TextRun({ text: "{Duration of the test}" })
+              ]
+            }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            new Paragraph({
+              children: [new TextRun({ text: "4. РЕЗУЛЬТАТЫ ИЗМЕРЕНИЙ", bold: true })],
+              heading: HeadingLevel.HEADING_2
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "{Results table}" })]
+            }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            new Paragraph({
+              children: [new TextRun({ text: "5. ГРАФИЧЕСКОЕ ПРЕДСТАВЛЕНИЕ ДАННЫХ", bold: true })],
+              heading: HeadingLevel.HEADING_2
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "{chart}" })]
+            }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            new Paragraph({
+              children: [new TextRun({ text: "6. ЗАКЛЮЧЕНИЕ", bold: true })],
+              heading: HeadingLevel.HEADING_2
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "{Result}" })]
+            }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            new Paragraph({
+              children: [new TextRun({ text: "7. ИСПОЛНИТЕЛИ", bold: true })],
+              heading: HeadingLevel.HEADING_2
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Исполнитель: ", bold: true }),
+                new TextRun({ text: "{executor}" })
+              ]
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Руководитель: ", bold: true }),
+                new TextRun({ text: "{director}" })
+              ]
+            }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Дата составления отчета: ", bold: true }),
+                new TextRun({ text: "{test date}" })
+              ]
+            })
+          ]
+        }]
+      });
+
+      // Генерируем и скачиваем файл
+      const output = await Packer.toBlob(doc);
+      saveAs(output, 'Пример_шаблона_отчета.docx');
+      
+      return true;
+    } catch (error) {
+      console.error('Ошибка создания примера шаблона:', error);
+      return false;
+    }
+  }
 }
