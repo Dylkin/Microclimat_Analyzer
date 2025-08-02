@@ -63,25 +63,51 @@ export class ReportGenerator {
       
       if (chartElement) {
         try {
-          const canvas = await html2canvas(chartElement, {
+          // Определяем область для захвата
+          let captureOptions: any = {
             backgroundColor: '#ffffff',
-            scale: 2,
+            scale: 1,
             useCORS: true,
-            allowTaint: true,
-            width: 600,
-            height: 200
-          });
+            allowTaint: true
+          };
+
+          // Если есть зум (выделенная область), захватываем только её
+          if (reportData.markers && reportData.markers.length >= 2) {
+            // Находим область графика внутри элемента
+            const chartSvg = chartElement.querySelector('svg');
+            if (chartSvg) {
+              const svgRect = chartSvg.getBoundingClientRect();
+              const containerRect = chartElement.getBoundingClientRect();
+              
+              // Вычисляем относительные координаты SVG внутри контейнера
+              const svgLeft = svgRect.left - containerRect.left;
+              const svgTop = svgRect.top - containerRect.top;
+              
+              captureOptions = {
+                ...captureOptions,
+                x: svgLeft,
+                y: svgTop,
+                width: svgRect.width,
+                height: svgRect.height
+              };
+            }
+          }
+
+          const canvas = await html2canvas(chartElement, captureOptions);
           
           console.log('График успешно конвертирован в canvas');
+          console.log('Размер исходного canvas:', canvas.width, 'x', canvas.height);
           
-          // Создаем новый canvas для поворота изображения на 90 градусов против часовой стрелки  
+          // Создаем новый canvas для поворота изображения на 90 градусов против часовой стрелки
           const rotatedCanvas = document.createElement('canvas');
           const rotatedCtx = rotatedCanvas.getContext('2d');
           
           if (rotatedCtx) {
-            // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
+            // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту без изменения пропорций)
             rotatedCanvas.width = canvas.height; // Высота становится шириной
             rotatedCanvas.height = canvas.width;  // Ширина становится высотой
+            
+            console.log('Размер повернутого canvas:', rotatedCanvas.width, 'x', rotatedCanvas.height);
             
             // Перемещаем точку отсчета в центр canvas
             rotatedCtx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
@@ -89,7 +115,7 @@ export class ReportGenerator {
             // Поворачиваем на -90 градусов (против часовой стрелки)
             rotatedCtx.rotate(-Math.PI / 2);
             
-            // Рисуем исходное изображение с центрированием
+            // Рисуем исходное изображение с центрированием (без масштабирования)
             rotatedCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
             
             console.log('График повернут на 90 градусов против часовой стрелки');
@@ -342,8 +368,8 @@ export class ReportGenerator {
             new ImageRun({
               data: chartImageBuffer,
               transformation: {
-                width: 400,
-                height: 600
+                width: Math.min(500, rotatedCanvas?.width || 400),
+                height: Math.min(700, rotatedCanvas?.height || 600)
               }
             })
           ],
