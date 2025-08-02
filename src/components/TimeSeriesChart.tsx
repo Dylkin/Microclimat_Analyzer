@@ -279,7 +279,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                     style={{ backgroundColor: color }}
                   ></div>
                   <span className="text-gray-700">
-                    {shortName}
+                    {shortName} ({pointCount.toLocaleString()} точек)
                   </span>
                 </div>
               );
