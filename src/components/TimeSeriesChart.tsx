@@ -73,6 +73,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
       colors.set(file, schemeCategory10[index % schemeCategory10.length]);
     });
     return colors;
+  }, [dataByFile]);
 
   // Создаем шкалы
   const xScale = scaleTime()
