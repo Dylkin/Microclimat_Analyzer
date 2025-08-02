@@ -698,6 +698,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <Upload className="w-4 h-4" />
               <span>Загрузить шаблон</span>
             </button>
+            <a
+              href="/template-example.docx"
+              download="Шаблон_отчета_пример.docx"
+              className="text-indigo-600 hover:text-indigo-800 underline text-sm flex items-center space-x-1"
+              title="Скачать пример шаблона отчета"
+            >
+              <Download className="w-4 h-4" />
+              <span>Скачать пример шаблона</span>
+            </a>
             {templateFile && (
               <span className="text-sm text-green-600">
                 Загружен: {templateFile.name}
