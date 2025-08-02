@@ -352,29 +352,37 @@ export class ReportGenerator {
 
     // График
     if (chartImageBuffer) {
-      children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
-      
-      children.push(
-        new Paragraph({
-          children: [new TextRun({ text: 'График:', bold: true })],
-          heading: HeadingLevel.HEADING_2
-        })
-      );
-
-      children.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: chartImageBuffer,
-              transformation: {
-                width: Math.min(500, 400),
-                height: Math.min(700, 600)
-              }
-            })
-          ],
-          alignment: AlignmentType.CENTER
-        })
-      );
+      // Создаем новую секцию для графика на отдельной странице
+      const chartSection = {
+        properties: {
+          page: {
+            pageNumbers: {
+              start: 1,
+              formatType: "decimal"
+            }
+          }
+        },
+        children: [
+          new Paragraph({
+            children: [new TextRun({ text: 'График:', bold: true })],
+            heading: HeadingLevel.HEADING_2,
+            alignment: AlignmentType.CENTER
+          }),
+          new Paragraph({ children: [new TextRun({ text: '' })] }),
+          new Paragraph({
+            children: [
+              new ImageRun({
+                data: chartImageBuffer,
+                transformation: {
+                  width: 675,
+                  height: 900
+                }
+              })
+            ],
+            alignment: AlignmentType.CENTER
+          })
+        ]
+      };
     }
 
     // Заключение
@@ -427,7 +435,42 @@ export class ReportGenerator {
     );
 
     return new Document({
-      sections: [
+      sections: chartImageBuffer ? [
+        {
+          properties: {},
+          children: children
+        },
+        {
+          properties: {
+            page: {
+              pageNumbers: {
+                start: 1,
+                formatType: "decimal"
+              }
+            }
+          },
+          children: [
+            new Paragraph({
+              children: [new TextRun({ text: 'График:', bold: true })],
+              heading: HeadingLevel.HEADING_2,
+              alignment: AlignmentType.CENTER
+            }),
+            new Paragraph({ children: [new TextRun({ text: '' })] }),
+            new Paragraph({
+              children: [
+                new ImageRun({
+                  data: chartImageBuffer,
+                  transformation: {
+                    width: 675,
+                    height: 900
+                  }
+                })
+              ],
+              alignment: AlignmentType.CENTER
+            })
+          ]
+        }
+      ] : [
         {
           properties: {},
           children: children
