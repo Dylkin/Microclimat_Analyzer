@@ -1,8 +1,4 @@
 import { saveAs } from 'file-saver';
-import html2canvas from 'html2canvas';
-import Docxtemplater from 'docxtemplater';
-import PizZip from 'pizzip';
-import ImageModule from 'docxtemplater-image-module-free';
 import { UploadedFile } from '../types/FileData';
 import { AuthUser } from '../types/User';
 import { ChartLimits, VerticalMarker } from '../types/TimeSeriesData';
@@ -20,7 +16,6 @@ interface ReportData {
   user: AuthUser;
   director?: string;
   dataType: 'temperature' | 'humidity';
-  chartImageData: string;
 }
 
 export class ReportGenerator {
@@ -42,14 +37,10 @@ export class ReportGenerator {
    */
   async generateReport(
     templateFile: File,
-    reportData: ReportData,
-    chartElement?: HTMLElement
+    reportData: ReportData
   ): Promise<{ success: boolean; fileName: string; error?: string }> {
     try {
-      console.log('Начинаем генерацию отчета с docxtemplater...');
-      console.log('Размер файла шаблона:', templateFile.size, 'байт');
-      console.log('Тип файла:', templateFile.type);
-      console.log('Имя файла:', templateFile.name);
+      console.log('Начинаем генерацию отчета...');
 
       // Проверяем, что файл действительно DOCX
       if (!templateFile.name.toLowerCase().endsWith('.docx')) {
@@ -69,117 +60,21 @@ export class ReportGenerator {
         this.masterReportName = fileName;
       }
 
-      // Определяем имя файла для графика
-      const chartFileName = fileName.replace('.docx', '_график.png');
-
-      // Получаем изображение графика если элемент предоставлен
-      let chartImageBuffer: ArrayBuffer | null = null;
-      
-      if (chartElement) {
-        try {
-          const canvas = await html2canvas(chartElement, {
-            backgroundColor: '#ffffff',
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            width: 1200,
-            height: 400
-          });
-          
-          console.log('График успешно конвертирован в canvas');
-          
-          // Создаем Buffer для PNG файла
-          const chartBlob = await new Promise<Blob | null>((resolve) => {
-            canvas.toBlob((blob) => {
-              resolve(blob);
-            }, 'image/png');
-          });
-          
-          if (chartBlob) {
-            chartImageBuffer = await chartBlob.arrayBuffer();
-            
-            // Сохраняем график для отдельного скачивания
-            this.generatedCharts.set(chartFileName, chartBlob);
-            console.log('График сохранен как:', chartFileName);
-          }
-          
-        } catch (error) {
-          console.warn('Ошибка конвертации графика:', error);
-        }
-      }
-
       let templateBuffer: ArrayBuffer;
       
       // Если есть мастер-отчет, используем его как основу
       if (this.masterReport) {
         console.log('Используем существующий мастер-отчет как основу');
-        templateBuffer = await this.masterReport.arrayBuffer();
-      } else {
-        console.log('Используем новый шаблон');
-        templateBuffer = await templateFile.arrayBuffer();
-      }
-
-      // Создаем ZIP из шаблона
-      const zip = new PizZip(templateBuffer);
-
-      // Настраиваем модуль изображений
-      const imageModule = new ImageModule({
-        centered: false,
-        getImage: (tagValue: any, tagName: string) => {
-          console.log('Запрос изображения для тега:', tagName, 'значение:', tagValue);
-          
-          // Проверяем тег chart напрямую
-          if (tagName === 'chart' && chartImageBuffer) {
-            console.log('Возвращаем буфер изображения графика, размер:', chartImageBuffer.byteLength);
-            return chartImageBuffer;
-          }
-          
-          // Если tagValue содержит 'chart_image_data', это наш тег для изображения
-          if (typeof tagValue === 'string' && tagValue.includes('chart_image_data') && chartImageBuffer) {
-            console.log('Найден chart_image_data, возвращаем изображение графика');
-            return chartImageBuffer;
-          }
-          
-          console.warn('Изображение не найдено для тега:', tagName);
-          return chartImageBuffer; // Возвращаем изображение по умолчанию если есть
-        },
-        getSize: (img: ArrayBuffer, tagValue: any, tagName: string) => {
-          console.log('Запрос размера изображения для тега:', tagName);
-          
-          if (tagName === 'chart' || (typeof tagValue === 'string' && tagValue.includes('chart_image_data'))) {
-            // Возвращаем размер в пикселях (600x200)
-            return [600, 200];
-          }
-          
-          return [300, 200]; // размер по умолчанию
-        }
-      });
-
       // Подготавливаем данные для замены плейсхолдеров
-      const templateData = this.prepareTemplateData(reportData, chartImageBuffer);
+      const templateData = this.prepareTemplateData(reportData);
       
       console.log('Данные для шаблона подготовлены');
-      console.log('Значение chart в templateData:', templateData.chart);
 
-      // Создаем docxtemplater с модулем изображений
-      const doc = new Docxtemplater(zip, {
-        modules: [imageModule],
-        paragraphLoop: true,
-        linebreaks: true
+      // TODO: Здесь будет логика генерации отчета без изображений
+      // Пока создаем простой текстовый файл как заглушку
+      const output = new Blob([JSON.stringify(templateData, null, 2)], { 
+        type: 'application/json' 
       });
-
-      // Заполняем шаблон данными
-      doc.render(templateData);
-
-      console.log('Шаблон успешно заполнен данными');
-
-      // Генерируем итоговый документ
-      const output = doc.getZip().generate({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      });
-
-      console.log('Отчет успешно сгенерирован с docxtemplater');
       
       // Сохраняем как мастер-отчет для последующих добавлений
       this.masterReport = output;
@@ -201,10 +96,7 @@ export class ReportGenerator {
       return {
         success: false,
         fileName: '',
-        chart: chartImageBuffer ? 'chart_image_data' : '', // Указываем что есть данные изображения
-        
-        // Добавляем сам буфер изображения для использования в getImage
-        chartImageBuffer: chartImageBuffer
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
       };
     }
   }
@@ -212,7 +104,7 @@ export class ReportGenerator {
   /**
    * Подготовка данных для замены плейсхолдеров в шаблоне
    */
-  private prepareTemplateData(reportData: ReportData, chartImageBuffer: ArrayBuffer | null) {
+  private prepareTemplateData(reportData: ReportData) {
     // Получаем информацию о временном периоде
     const testPeriodInfo = this.getTestPeriodInfo(reportData.markers);
     
@@ -252,13 +144,7 @@ export class ReportGenerator {
       testDate: new Date().toLocaleDateString('ru-RU'),
       reportNo: reportData.reportNumber || 'Не указан',
       reportDate: reportData.reportDate ? new Date(reportData.reportDate).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
-      director: reportData.director || 'Не назначен',
-      
-      // График как изображение (специальный тег для модуля изображений)
-      chart: chartImageBuffer ? 'chart_image_data' : '', // Указываем что есть данные изображения
-      
-      // Добавляем сам буфер изображения для использования в getImage
-      chartImageBuffer: chartImageBuffer
+      director: reportData.director || 'Не назначен'
     };
   }
 
@@ -378,19 +264,8 @@ export class ReportGenerator {
   /**
    * Получение списка сгенерированных графиков
    */
-  getGeneratedCharts(): string[] {
-    return Array.from(this.generatedCharts.keys());
-  }
-
-  /**
-   * Удаление сгенерированного отчета
-   */
   deleteReport(fileName: string): boolean {
-    const reportDeleted = this.generatedReports.delete(fileName);
-    // Также удаляем соответствующий график
-    const chartFileName = fileName.replace('.docx', '_график.png');
-    this.generatedCharts.delete(chartFileName);
-    return reportDeleted;
+    return this.generatedReports.delete(fileName);
   }
 
   /**
@@ -401,31 +276,12 @@ export class ReportGenerator {
   }
 
   /**
-   * Проверка существования графика
-   */
-  hasChart(fileName: string): boolean {
-    return this.generatedCharts.has(fileName);
-  }
-
-  /**
    * Получение отчета для повторного скачивания
    */
   downloadReport(fileName: string): boolean {
     const report = this.generatedReports.get(fileName);
     if (report) {
       saveAs(report, fileName);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Получение графика для повторного скачивания
-   */
-  downloadChart(fileName: string): boolean {
-    const chart = this.generatedCharts.get(fileName);
-    if (chart) {
-      saveAs(chart, fileName);
       return true;
     }
     return false;
