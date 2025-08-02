@@ -133,7 +133,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
 
       return {
-        zoneNumber: file.zoneNumber || '-',
+        zoneNumber: file.zoneNumber === 999 ? 'Внешний' : (file.zoneNumber || '-'),
         measurementLevel: file.measurementLevel || '-',
         loggerName: file.name.substring(0, 6), // Первые 6 символов названия файла
         serialNumber: file.parsedData?.deviceMetadata?.serialNumber || 'Unknown',
@@ -148,6 +148,22 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       };
     });
   }, [data, files, limits, zoomState]); // Добавляем zoomState в зависимости
+
+  // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
+  const { globalMinTemp, globalMaxTemp } = useMemo(() => {
+    const nonExternalResults = analysisResults.filter(result => !result.isExternal);
+    const minTempValues = nonExternalResults
+      .map(result => parseFloat(result.minTemp))
+      .filter(val => !isNaN(val));
+    const maxTempValues = nonExternalResults
+      .map(result => parseFloat(result.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    return {
+      globalMinTemp: minTempValues.length > 0 ? Math.min(...minTempValues) : null,
+      globalMaxTemp: maxTempValues.length > 0 ? Math.max(...maxTempValues) : null
+    };
+  }, [analysisResults]);
 
   const handleLimitChange = (type: DataType, limitType: 'min' | 'max', value: string) => {
     const numValue = value === '' ? undefined : parseFloat(value);
@@ -587,10 +603,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {result.serialNumber}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
+                    !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
+                    globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp
+                      ? 'bg-blue-200' 
+                      : ''
+                  }`}>
                     {result.minTemp}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
+                    !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
+                    globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp
+                      ? 'bg-red-200' 
+                      : ''
+                  }`}>
                     {result.maxTemp}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
