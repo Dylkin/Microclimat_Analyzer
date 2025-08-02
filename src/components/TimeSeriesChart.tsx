@@ -282,13 +282,15 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             {Array.from(dataByFile.keys()).map(fileId => {
               const shortName = fileId.substring(0, 6);
               const color = fileColors.get(fileId);
-              // Проверяем, является ли это внешним датчиком
-              const isExternal = data.some(d => d.fileId === fileId && d.zoneNumber === 999);
+              // Проверяем, является ли это внешним датчиком по zoneNumber
+              const fileData = data.find(d => d.fileId === fileId);
+              const isExternal = fileData?.zoneNumber === 999;
+              const displayColor = isExternal ? '#6B7280' : color;
               return (
                 <span key={fileId} className="inline-flex items-center space-x-1 mr-3">
                   <div 
                     className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: color }}
+                    style={{ backgroundColor: displayColor }}
                   ></div>
                   <span>{shortName}{isExternal ? ' (Внешний)' : ''}</span>
                 </span>
