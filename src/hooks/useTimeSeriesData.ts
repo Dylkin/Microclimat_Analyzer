@@ -27,7 +27,8 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
         temperature: measurement.temperature,
         humidity: measurement.humidity,
         fileId: file.name, // Используем имя файла для связи
-        originalIndex: index
+        originalIndex: index,
+        zoneNumber: file.zoneNumber
       }));
 
       return points;

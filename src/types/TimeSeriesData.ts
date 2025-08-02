@@ -4,6 +4,7 @@ export interface TimeSeriesPoint {
   humidity?: number;
   fileId: string;
   originalIndex: number;
+  zoneNumber?: number;
 }
 
 export interface ProcessedTimeSeriesData {

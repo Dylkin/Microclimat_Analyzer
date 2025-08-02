@@ -434,8 +434,9 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             </clipPath>
           </defs>
           {Array.from(dataByFile.entries()).map(([fileId, fileData]) => {
-            // Проверяем, является ли это внешним датчиком (зона 999)
-            const isExternal = data.some(d => d.fileId === fileId && d.zoneNumber === 999);
+            // Проверяем, является ли это внешним датчиком по zoneNumber
+            const fileDataPoint = data.find(d => d.fileId === fileId);
+            const isExternal = fileDataPoint?.zoneNumber === 999;
             let pathColor = dataByFile.size > 1 ? fileColors.get(fileId) : color;
             
             // Для внешнего датчика всегда используем серый цвет
