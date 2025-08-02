@@ -266,22 +266,19 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
       {/* Легенда */}
       {showLegend && dataByFile.size > 1 && (
         <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Файлы данных:</h4>
-          <div className="flex flex-wrap gap-3">
+          <div className="text-sm text-gray-700">
+            <span className="font-medium">Файлы данных: </span>
             {Array.from(dataByFile.keys()).map(fileId => {
               const shortName = fileId.substring(0, 6);
               const color = fileColors.get(fileId);
-              const pointCount = dataByFile.get(fileId)?.length || 0;
               return (
-                <div key={fileId} className="flex items-center space-x-2 text-xs">
+                <span key={fileId} className="inline-flex items-center space-x-1 mr-3">
                   <div 
-                    className="w-3 h-3 rounded-full"
+                    className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: color }}
                   ></div>
-                  <span className="text-gray-700">
-                    {shortName} ({pointCount.toLocaleString()} точек)
-                  </span>
-                </div>
+                  <span>{shortName}</span>
+                </span>
               );
             })}
           </div>
