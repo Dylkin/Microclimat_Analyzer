@@ -1,8 +1,6 @@
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas';
-import Docxtemplater from 'docxtemplater';
-import PizZip from 'pizzip';
-import ImageModule from 'docxtemplater-image-module-free';
+import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } from 'docx';
 import { UploadedFile } from '../types/FileData';
 import { AuthUser } from '../types/User';
 import { ChartLimits, VerticalMarker } from '../types/TimeSeriesData';
@@ -38,7 +36,7 @@ export class ReportGenerator {
   }
 
   /**
-   * Генерация отчета на основе шаблона DOCX с использованием docxtemplater
+   * Генерация отчета с использованием docx.js
    */
   async generateReport(
     templateFile: File,
@@ -46,19 +44,7 @@ export class ReportGenerator {
     chartElement?: HTMLElement
   ): Promise<{ success: boolean; fileName: string; error?: string }> {
     try {
-      console.log('Начинаем генерацию отчета с docxtemplater...');
-      console.log('Размер файла шаблона:', templateFile.size, 'байт');
-      console.log('Тип файла:', templateFile.type);
-      console.log('Имя файла:', templateFile.name);
-
-      // Проверяем, что файл действительно DOCX
-      if (!templateFile.name.toLowerCase().endsWith('.docx')) {
-        throw new Error('Файл должен иметь расширение .docx');
-      }
-
-      if (templateFile.size === 0) {
-        throw new Error('Файл шаблона пустой');
-      }
+      console.log('Начинаем генерацию отчета с docx.js...');
 
       // Определяем имя файла для отчета
       let fileName: string;
@@ -108,78 +94,13 @@ export class ReportGenerator {
         }
       }
 
-      let templateBuffer: ArrayBuffer;
-      
-      // Если есть мастер-отчет, используем его как основу
-      if (this.masterReport) {
-        console.log('Используем существующий мастер-отчет как основу');
-        templateBuffer = await this.masterReport.arrayBuffer();
-      } else {
-        console.log('Используем новый шаблон');
-        templateBuffer = await templateFile.arrayBuffer();
-      }
-
-      // Создаем ZIP из шаблона
-      const zip = new PizZip(templateBuffer);
-
-      // Настраиваем модуль изображений
-      const imageModule = new ImageModule({
-        centered: false,
-        getImage: (tagValue: any, tagName: string) => {
-          console.log('Запрос изображения для тега:', tagName, 'значение:', tagValue);
-          
-          // Проверяем тег chart напрямую
-          if (tagName === 'chart' && chartImageBuffer) {
-            console.log('Возвращаем буфер изображения графика, размер:', chartImageBuffer.byteLength);
-            return chartImageBuffer;
-          }
-          
-          // Если tagValue содержит 'chart_image_data', это наш тег для изображения
-          if (typeof tagValue === 'string' && tagValue.includes('chart_image_data') && chartImageBuffer) {
-            console.log('Найден chart_image_data, возвращаем изображение графика');
-            return chartImageBuffer;
-          }
-          
-          console.warn('Изображение не найдено для тега:', tagName);
-          return chartImageBuffer; // Возвращаем изображение по умолчанию если есть
-        },
-        getSize: (img: ArrayBuffer, tagValue: any, tagName: string) => {
-          console.log('Запрос размера изображения для тега:', tagName);
-          
-          if (tagName === 'chart' || (typeof tagValue === 'string' && tagValue.includes('chart_image_data'))) {
-            // Возвращаем размер в пикселях (600x200)
-            return [600, 200];
-          }
-          
-          return [300, 200]; // размер по умолчанию
-        }
-      });
-
-      // Подготавливаем данные для замены плейсхолдеров
-      const templateData = this.prepareTemplateData(reportData, chartImageBuffer);
-      
-      console.log('Данные для шаблона подготовлены');
-      console.log('Значение chart в templateData:', templateData.chart);
-
-      // Создаем docxtemplater с модулем изображений
-      const doc = new Docxtemplater(zip, {
-        modules: [imageModule],
-        paragraphLoop: true,
-        linebreaks: true
-      });
-
-      // Заполняем шаблон данными
-      doc.render(templateData);
-
-      console.log('Шаблон успешно заполнен данными');
+      // Создаем документ с помощью docx.js
+      const doc = await this.createDocxDocument(reportData, chartImageBuffer);
 
       // Генерируем итоговый документ
-      const output = doc.getZip().generate({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      });
+      const output = await Packer.toBlob(doc);
 
-      console.log('Отчет успешно сгенерирован с docxtemplater');
+      console.log('Отчет успешно сгенерирован с docx.js');
       
       // Сохраняем как мастер-отчет для последующих добавлений
       this.masterReport = output;
@@ -201,26 +122,20 @@ export class ReportGenerator {
       return {
         success: false,
         fileName: '',
-        chart: chartImageBuffer ? 'chart_image_data' : '', // Указываем что есть данные изображения
-        
-        // Добавляем сам буфер изображения для использования в getImage
-        chartImageBuffer: chartImageBuffer
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
       };
     }
   }
 
   /**
-   * Подготовка данных для замены плейсхолдеров в шаблоне
+   * Создание DOCX документа с помощью docx.js
    */
-  private prepareTemplateData(reportData: ReportData, chartImageBuffer: ArrayBuffer | null) {
+  private async createDocxDocument(reportData: ReportData, chartImageBuffer: ArrayBuffer | null): Promise<Document> {
     // Получаем информацию о временном периоде
     const testPeriodInfo = this.getTestPeriodInfo(reportData.markers);
     
     // Формируем критерии приемки
     const acceptanceCriteria = this.formatAcceptanceCriteria(reportData.limits);
-    
-    // Формируем таблицу результатов
-    const resultsTable = this.formatResultsTable(reportData.resultsTableData);
 
     // Получаем тип испытания
     const testTypes = {
@@ -231,35 +146,302 @@ export class ReportGenerator {
       'power-on': 'Включение электропитания'
     };
 
-    return {
-      // Основная информация
-      nameOfTheTest: testTypes[reportData.testType as keyof typeof testTypes] || reportData.testType,
-      nameOfTheObject: reportData.objectName || 'Не указано',
-      nameOfTheAirConditioningSystem: reportData.climateSystemName || 'Не указано',
-      acceptanceCriteria: acceptanceCriteria,
+    const children = [];
+
+    // Заголовок отчета
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `ОТЧЕТ № ${reportData.reportNumber || 'Не указан'}`,
+            bold: true,
+            size: 32
+          })
+        ],
+        heading: HeadingLevel.TITLE,
+        alignment: AlignmentType.CENTER
+      })
+    );
+
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `от ${reportData.reportDate ? new Date(reportData.reportDate).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU')}`,
+            size: 24
+          })
+        ],
+        alignment: AlignmentType.CENTER
+      })
+    );
+
+    // Пустая строка
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+
+    // Основная информация
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'Объект исследования: ', bold: true }),
+          new TextRun({ text: reportData.objectName || 'Не указано' })
+        ]
+      })
+    );
+
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'Климатическая установка: ', bold: true }),
+          new TextRun({ text: reportData.climateSystemName || 'Не указано' })
+        ]
+      })
+    );
+
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'Вид испытания: ', bold: true }),
+          new TextRun({ text: testTypes[reportData.testType as keyof typeof testTypes] || reportData.testType })
+        ]
+      })
+    );
+
+    // Пустая строка
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+
+    // Критерии приемки
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: 'Критерии приемки:', bold: true })],
+        heading: HeadingLevel.HEADING_2
+      })
+    );
+
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: acceptanceCriteria })]
+      })
+    );
+
+    // Временные данные
+    if (testPeriodInfo) {
+      children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
       
-      // Временные данные
-      dateTimeOfTestStart: testPeriodInfo?.startTime || 'Не определено',
-      dateTimeOfTestCompletion: testPeriodInfo?.endTime || 'Не определено',
-      durationOfTheTest: testPeriodInfo?.duration || 'Не определено',
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'Период испытания:', bold: true })],
+          heading: HeadingLevel.HEADING_2
+        })
+      );
+
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: 'Начало: ', bold: true }),
+            new TextRun({ text: testPeriodInfo.startTime })
+          ]
+        })
+      );
+
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: 'Завершение: ', bold: true }),
+            new TextRun({ text: testPeriodInfo.endTime })
+          ]
+        })
+      );
+
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: 'Длительность: ', bold: true }),
+            new TextRun({ text: testPeriodInfo.duration })
+          ]
+        })
+      );
+    }
+
+    // Таблица результатов
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+    
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: 'Результаты измерений:', bold: true })],
+        heading: HeadingLevel.HEADING_2
+      })
+    );
+
+    // Создаем таблицу результатов
+    const resultsTable = this.createResultsTable(reportData.resultsTableData);
+    children.push(resultsTable);
+
+    // График
+    if (chartImageBuffer) {
+      children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
       
-      // Результаты
-      resultsTable: resultsTable,
-      result: reportData.conclusion || 'Выводы не указаны',
-      
-      // Исполнители и даты
-      executor: reportData.user.fullName || 'Не указано',
-      testDate: new Date().toLocaleDateString('ru-RU'),
-      reportNo: reportData.reportNumber || 'Не указан',
-      reportDate: reportData.reportDate ? new Date(reportData.reportDate).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
-      director: reportData.director || 'Не назначен',
-      
-      // График как изображение (специальный тег для модуля изображений)
-      chart: chartImageBuffer ? 'chart_image_data' : '', // Указываем что есть данные изображения
-      
-      // Добавляем сам буфер изображения для использования в getImage
-      chartImageBuffer: chartImageBuffer
-    };
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'График:', bold: true })],
+          heading: HeadingLevel.HEADING_2
+        })
+      );
+
+      children.push(
+        new Paragraph({
+          children: [
+            new ImageRun({
+              data: chartImageBuffer,
+              transformation: {
+                width: 600,
+                height: 200
+              }
+            })
+          ],
+          alignment: AlignmentType.CENTER
+        })
+      );
+    }
+
+    // Заключение
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+    
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: 'Заключение:', bold: true })],
+        heading: HeadingLevel.HEADING_2
+      })
+    );
+
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: reportData.conclusion || 'Выводы не указаны' })]
+      })
+    );
+
+    // Подписи
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'Исполнитель: ', bold: true }),
+          new TextRun({ text: reportData.user.fullName || 'Не указано' })
+        ]
+      })
+    );
+
+    if (reportData.director) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: 'Руководитель: ', bold: true }),
+            new TextRun({ text: reportData.director })
+          ]
+        })
+      );
+    }
+
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'Дата: ', bold: true }),
+          new TextRun({ text: new Date().toLocaleDateString('ru-RU') })
+        ]
+      })
+    );
+
+    return new Document({
+      sections: [
+        {
+          properties: {},
+          children: children
+        }
+      ]
+    });
+  }
+
+  /**
+   * Создание таблицы результатов
+   */
+  private createResultsTable(resultsTableData: any[]): Table {
+    const rows = [];
+
+    // Заголовок таблицы
+    rows.push(
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: '№ зоны', bold: true })] })],
+            width: { size: 10, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: 'Уровень (м.)', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: 'Логгер', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: 'Мин. t°C', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: 'Макс. t°C', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          })
+        ]
+      })
+    );
+
+    // Данные таблицы
+    resultsTableData.forEach(row => {
+      rows.push(
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.zoneNumber || '-') })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.measurementLevel || '-') })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.loggerName || '-') })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.serialNumber || '-') })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: typeof row.minTemp === 'number' ? `${row.minTemp}°C` : '-' })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: typeof row.maxTemp === 'number' ? `${row.maxTemp}°C` : '-' })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: typeof row.avgTemp === 'number' ? `${row.avgTemp}°C` : '-' })] })]
+            })
+          ]
+        })
+      );
+    });
+
+    return new Table({
+      rows: rows,
+      width: {
+        size: 100,
+        type: WidthType.PERCENTAGE
+      }
+    });
   }
 
   /**
@@ -327,45 +509,6 @@ export class ReportGenerator {
     }
 
     return criteria.length > 0 ? criteria.join('\n') : 'Критерии не установлены';
-  }
-
-  /**
-   * Форматирование таблицы результатов
-   */
-  private formatResultsTable(resultsTableData: any[]): string {
-    if (!resultsTableData || resultsTableData.length === 0) {
-      return 'Данные отсутствуют';
-    }
-
-    const headers = [
-      '№ зоны',
-      'Уровень (м.)',
-      'Логгер',
-      'S/N',
-      'Мин. t°C',
-      'Макс. t°C',
-      'Среднее t°C',
-      'Соответствие'
-    ];
-
-    let table = headers.join('\t') + '\n';
-    table += headers.map(() => '---').join('\t') + '\n';
-
-    resultsTableData.forEach(row => {
-      const tableRow = [
-        row.zoneNumber || '-',
-        row.measurementLevel || '-',
-        row.loggerName || '-',
-        row.serialNumber || '-',
-        typeof row.minTemp === 'number' ? `${row.minTemp}°C` : '-',
-        typeof row.maxTemp === 'number' ? `${row.maxTemp}°C` : '-',
-        typeof row.avgTemp === 'number' ? `${row.avgTemp}°C` : '-',
-        row.meetsLimits || '-'
-      ];
-      table += tableRow.join('\t') + '\n';
-    });
-
-    return table;
   }
 
   /**
