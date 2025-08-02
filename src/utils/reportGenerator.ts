@@ -501,6 +501,17 @@ export class ReportGenerator {
    * Создание таблицы результатов
    */
   private createResultsTable(resultsTableData: any[]): Table {
+    // Находим минимальное и максимальное значения температуры
+    const minTempValues = resultsTableData
+      .map(row => parseFloat(row.minTemp))
+      .filter(val => !isNaN(val));
+    const maxTempValues = resultsTableData
+      .map(row => parseFloat(row.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
+    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
+
     const rows = [];
 
     // Заголовок таблицы
@@ -508,35 +519,59 @@ export class ReportGenerator {
       new TableRow({
         children: [
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: '№ зоны измерения', bold: true })] })],
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: '№ зоны измерения', bold: true })],
+              alignment: AlignmentType.CENTER
+            })],
             width: { size: 10, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Уровень измерения (м.)', bold: true })] })],
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: 'Уровень измерения (м.)', bold: true })],
+              alignment: AlignmentType.CENTER
+            })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Наименование логгера (6 символов)', bold: true })] })],
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: 'Наименование логгера (6 символов)', bold: true })],
+              alignment: AlignmentType.CENTER
+            })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Серийный № логгера', bold: true })] })],
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: 'Серийный № логгера', bold: true })],
+              alignment: AlignmentType.CENTER
+            })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Мин. t°C', bold: true })] })],
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: 'Мин. t°C', bold: true })],
+              alignment: AlignmentType.CENTER
+            })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Макс. t°C', bold: true })] })],
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: 'Макс. t°C', bold: true })],
+              alignment: AlignmentType.CENTER
+            })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true })] })],
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: 'Среднее t°C', bold: true })],
+              alignment: AlignmentType.CENTER
+            })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Соответствие лимитам', bold: true })] })],
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: 'Соответствие лимитам', bold: true })],
+              alignment: AlignmentType.CENTER
+            })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           })
         ]
@@ -545,32 +580,69 @@ export class ReportGenerator {
 
     // Данные таблицы
     resultsTableData.forEach(row => {
+      // Определяем цвета для ячеек с минимальными и максимальными значениями
+      const minTempValue = parseFloat(row.minTemp);
+      const maxTempValue = parseFloat(row.maxTemp);
+      
+      const isGlobalMin = !isNaN(minTempValue) && globalMinTemp !== null && minTempValue === globalMinTemp;
+      const isGlobalMax = !isNaN(maxTempValue) && globalMaxTemp !== null && maxTempValue === globalMaxTemp;
+
       rows.push(
         new TableRow({
           children: [
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(row.zoneNumber || '-') })] })]
+              children: [new Paragraph({ 
+                children: [new TextRun({ text: String(row.zoneNumber || '-') })],
+                alignment: AlignmentType.CENTER
+              })]
             }),
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(row.measurementLevel || '-') })] })]
+              children: [new Paragraph({ 
+                children: [new TextRun({ text: String(row.measurementLevel || '-') })],
+                alignment: AlignmentType.CENTER
+              })]
             }),
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(row.loggerName || '-') })] })]
+              children: [new Paragraph({ 
+                children: [new TextRun({ text: String(row.loggerName || '-') })],
+                alignment: AlignmentType.CENTER
+              })]
             }),
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(row.serialNumber || '-') })] })]
+              children: [new Paragraph({ 
+                children: [new TextRun({ text: String(row.serialNumber || '-') })],
+                alignment: AlignmentType.CENTER
+              })]
             }),
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(row.minTemp) })] })]
+              children: [new Paragraph({ 
+                children: [new TextRun({ text: String(row.minTemp) })],
+                alignment: AlignmentType.CENTER
+              })],
+              shading: isGlobalMin ? {
+                fill: "ADD8E6" // Светло-синий цвет
+              } : undefined
             }),
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(row.maxTemp) })] })]
+              children: [new Paragraph({ 
+                children: [new TextRun({ text: String(row.maxTemp) })],
+                alignment: AlignmentType.CENTER
+              })],
+              shading: isGlobalMax ? {
+                fill: "FFB6C1" // Светло-красный цвет
+              } : undefined
             }),
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(row.avgTemp) })] })]
+              children: [new Paragraph({ 
+                children: [new TextRun({ text: String(row.avgTemp) })],
+                alignment: AlignmentType.CENTER
+              })]
             }),
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(row.meetsLimits || '-') })] })]
+              children: [new Paragraph({ 
+                children: [new TextRun({ text: String(row.meetsLimits || '-') })],
+                alignment: AlignmentType.CENTER
+              })]
             })
           ]
         })
