@@ -65,6 +65,7 @@ export class ReportGenerator {
       // Если есть мастер-отчет, используем его как основу
       if (this.masterReport) {
         console.log('Используем существующий мастер-отчет как основу');
+      }
       // Подготавливаем данные для замены плейсхолдеров
       const templateData = this.prepareTemplateData(reportData);
       
