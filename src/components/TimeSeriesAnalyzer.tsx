@@ -46,8 +46,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const templateInputRef = useRef<HTMLInputElement>(null);
 
   // Chart dimensions
-  const chartWidth = 1200;
-  const chartHeight = 400;
+  const chartWidth = 1500;
+  const chartHeight = 500;
   const chartMargin = { top: 20, right: 60, bottom: 60, left: 80 };
 
   // Generate analysis results table data
