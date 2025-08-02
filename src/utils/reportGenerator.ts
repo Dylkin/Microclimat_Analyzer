@@ -361,20 +361,6 @@ export class ReportGenerator {
         })
       );
 
-      children.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: chartImageBuffer,
-              transformation: {
-                width: Math.min(500, 400),
-                height: Math.min(700, 600)
-              }
-            })
-          ],
-          alignment: AlignmentType.CENTER
-        })
-      );
     }
 
     // Заключение
@@ -431,6 +417,25 @@ export class ReportGenerator {
         {
           properties: {},
           children: children
+        },
+        // Новая секция для графика на отдельной странице
+        ...(chartImageBuffer ? [{
+          properties: {},
+          children: [
+            new Paragraph({
+              children: [
+                new ImageRun({
+                  data: chartImageBuffer,
+                  transformation: {
+                    width: 750, // Почти вся ширина страницы A4 (210мм = ~794 пикселя, минус поля)
+                    height: 1000 // Почти вся высота страницы A4 (297мм = ~1123 пикселя, минус поля)
+                  }
+                })
+              ],
+              alignment: AlignmentType.CENTER
+            })
+          ]
+        }] : [])
         }
       ]
     });
