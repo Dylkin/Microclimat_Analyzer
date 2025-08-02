@@ -348,7 +348,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           ))}
 
           {/* Вертикальные линии сетки */}
-          {xScale.ticks(6).map(tick => (
+          {xScale.ticks(10).map(tick => (
             <g key={tick.getTime()}>
               <line
                 x1={xScale(tick)}
@@ -364,6 +364,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                 textAnchor="middle"
                 fontSize="12"
                 fill="#6b7280"
+                transform={`rotate(-45, ${xScale(tick)}, ${innerHeight + 15})`}
               >
                 {formatTime(tick)}
               </text>
@@ -478,21 +479,6 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           {/* Ось X */}
           <line x1={0} y1={innerHeight} x2={innerWidth} y2={innerHeight} stroke="#374151" strokeWidth={1} />
         </g>
-
-        {/* Подпись оси Y */}
-        {yAxisLabel && (
-          <text
-            x={15}
-            y={margin.top + innerHeight / 2}
-            textAnchor="middle"
-            fontSize="14"
-            fill="#374151"
-            fontWeight="bold"
-            transform={`rotate(-90, 15, ${margin.top + innerHeight / 2})`}
-          >
-            {yAxisLabel}
-          </text>
-        )}
       </svg>
 
       {/* Tooltip */}
