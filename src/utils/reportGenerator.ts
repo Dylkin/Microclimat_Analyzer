@@ -453,72 +453,13 @@ export class ReportGenerator {
     );
 
     return new Document({
-      sections: chartImageBuffer ? [
-        {
-          properties: {},
-          children: children
-        },
-        {
-          properties: {
-            page: {
-              pageNumbers: {
-                start: 1,
-                formatType: "decimal"
-              }
-            }
-          },
-          children: [
-            new Paragraph({
-              children: [new TextRun({ text: 'График:', bold: true })],
-              heading: HeadingLevel.HEADING_2,
-              alignment: AlignmentType.CENTER
-            }),
-            new Paragraph({ children: [new TextRun({ text: '' })] }),
-            new Paragraph({
-              children: [
-                new ImageRun({
-                  data: chartImageBuffer,
-                  transformation: {
-                    width: 675,
-                    height: 900
-                  }
-                })
-              ],
-              alignment: AlignmentType.CENTER
-            })
-          ]
-        }
-      ] : [
+      sections: [
         {
           properties: {},
           children: children
         }
       ]
     });
-  }
-
-  /**
-   * Создание таблицы результатов
-   */
-  private createResultsTable(resultsTableData: any[]): Table {
-    // Находим минимальное и максимальное значения температуры (исключая внешние датчики)
-    const nonExternalData = resultsTableData.filter(row => !row.isExternal);
-    const minTempValues = resultsTableData
-      .map(row => parseFloat(row.minTemp))
-      .filter(val => !isNaN(val));
-    const maxTempValues = resultsTableData
-      .map(row => parseFloat(row.maxTemp))
-      .filter(val => !isNaN(val));
-    
-    // Исключаем внешние датчики при определении глобальных минимума и максимума
-    const nonExternalMinValues = nonExternalData
-      .map(row => parseFloat(row.minTemp))
-      .filter(val => !isNaN(val));
-    const nonExternalMaxValues = nonExternalData
-      .map(row => parseFloat(row.maxTemp))
-      .filter(val => !isNaN(val));
-    
-    const globalMinTemp = nonExternalMinValues.length > 0 ? Math.min(...nonExternalMinValues) : null;
     const globalMaxTemp = nonExternalMaxValues.length > 0 ? Math.max(...nonExternalMaxValues) : null;
 
     const rows = [];
