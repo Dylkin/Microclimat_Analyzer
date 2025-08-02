@@ -143,7 +143,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         minHumidity: humidityStats.min,
         maxHumidity: humidityStats.max,
         avgHumidity: humidityStats.avg,
-        meetsLimits
+        meetsLimits,
+        isExternal: file.zoneNumber === 999
       };
     });
   }, [data, files, limits, zoomState]); // Добавляем zoomState в зависимости

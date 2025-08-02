@@ -73,7 +73,6 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
       colors.set(file, schemeCategory10[index % schemeCategory10.length]);
     });
     return colors;
-  }, [dataByFile]);
 
   // Создаем шкалы
   const xScale = scaleTime()
@@ -282,13 +281,16 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             {Array.from(dataByFile.keys()).map(fileId => {
               const shortName = fileId.substring(0, 6);
               const color = fileColors.get(fileId);
+              // Проверяем, является ли это внешним датчиком (зона 999)
+              const isExternal = data.some(d => d.fileId === fileId && d.zoneNumber === 999);
+              const displayColor = isExternal ? '#6B7280' : color;
               return (
                 <span key={fileId} className="inline-flex items-center space-x-1 mr-3">
                   <div 
                     className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: color }}
+                    style={{ backgroundColor: displayColor }}
                   ></div>
-                  <span>{shortName}</span>
+                  <span>{shortName}{isExternal ? ' (Внешний)' : ''}</span>
                 </span>
               );
             })}
@@ -430,7 +432,15 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             </clipPath>
           </defs>
           {Array.from(dataByFile.entries()).map(([fileId, fileData]) => {
-            const pathColor = dataByFile.size > 1 ? fileColors.get(fileId) : color;
+            // Проверяем, является ли это внешним датчиком (зона 999)
+            const isExternal = data.some(d => d.fileId === fileId && d.zoneNumber === 999);
+            let pathColor = dataByFile.size > 1 ? fileColors.get(fileId) : color;
+            
+            // Для внешнего датчика всегда используем серый цвет
+            if (isExternal) {
+              pathColor = '#6B7280';
+            }
+            
             return (
               <path
                 key={fileId}

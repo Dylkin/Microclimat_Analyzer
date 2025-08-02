@@ -501,7 +501,8 @@ export class ReportGenerator {
    * Создание таблицы результатов
    */
   private createResultsTable(resultsTableData: any[]): Table {
-    // Находим минимальное и максимальное значения температуры
+    // Находим минимальное и максимальное значения температуры (исключая внешние датчики)
+    const nonExternalData = resultsTableData.filter(row => !row.isExternal);
     const minTempValues = resultsTableData
       .map(row => parseFloat(row.minTemp))
       .filter(val => !isNaN(val));
@@ -509,8 +510,16 @@ export class ReportGenerator {
       .map(row => parseFloat(row.maxTemp))
       .filter(val => !isNaN(val));
     
-    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
-    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
+    // Исключаем внешние датчики при определении глобальных минимума и максимума
+    const nonExternalMinValues = nonExternalData
+      .map(row => parseFloat(row.minTemp))
+      .filter(val => !isNaN(val));
+    const nonExternalMaxValues = nonExternalData
+      .map(row => parseFloat(row.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    const globalMinTemp = nonExternalMinValues.length > 0 ? Math.min(...nonExternalMinValues) : null;
+    const globalMaxTemp = nonExternalMaxValues.length > 0 ? Math.max(...nonExternalMaxValues) : null;
 
     const rows = [];
 
@@ -584,8 +593,9 @@ export class ReportGenerator {
       const minTempValue = parseFloat(row.minTemp);
       const maxTempValue = parseFloat(row.maxTemp);
       
-      const isGlobalMin = !isNaN(minTempValue) && globalMinTemp !== null && minTempValue === globalMinTemp;
-      const isGlobalMax = !isNaN(maxTempValue) && globalMaxTemp !== null && maxTempValue === globalMaxTemp;
+      // Выделяем только если это не внешний датчик
+      const isGlobalMin = !row.isExternal && !isNaN(minTempValue) && globalMinTemp !== null && minTempValue === globalMinTemp;
+      const isGlobalMax = !row.isExternal && !isNaN(maxTempValue) && globalMaxTemp !== null && maxTempValue === globalMaxTemp;
 
       rows.push(
         new TableRow({
