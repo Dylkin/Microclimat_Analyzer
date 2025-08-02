@@ -151,6 +151,7 @@ export class ReportGenerator {
         } catch (error) {
           console.warn('Ошибка поворота графика, используем исходный:', error);
           // Создаем Buffer для PNG файла
+          const canvas = await html2canvas(chartElement, captureOptions);
           const chartBlob = await new Promise<Blob | null>((resolve) => {
             canvas.toBlob((blob) => {
               resolve(blob);
@@ -163,17 +164,7 @@ export class ReportGenerator {
             // Сохраняем график для отдельного скачивания
             this.generatedCharts.set(chartFileName, chartBlob);
             console.log('График сохранен как:', chartFileName);
-            // Fallback: используем исходный canvas
-            const canvas = await html2canvas(chartElement, captureOptions);
-            const chartBlob = await new Promise<Blob | null>((resolve) => {
-              canvas.toBlob((blob) => {
-                resolve(blob);
-              }, 'image/png');
-            });
-            
-            if (chartBlob) {
-              chartImageBuffer = await chartBlob.arrayBuffer();
-                }
+          }
         }
       }
 
@@ -376,8 +367,8 @@ export class ReportGenerator {
             new ImageRun({
               data: chartImageBuffer,
               transformation: {
-                width: Math.min(500, rotatedCanvas?.width || 400),
-                height: Math.min(700, rotatedCanvas?.height || 600)
+                width: Math.min(500, 400),
+                height: Math.min(700, 600)
               }
             })
           ],
