@@ -163,6 +163,18 @@ export class ReportGenerator {
             // Сохраняем график для отдельного скачивания
             this.generatedCharts.set(chartFileName, chartBlob);
             console.log('График сохранен как:', chartFileName);
+            // Fallback: используем исходный canvas
+            const canvas = await html2canvas(chartElement, captureOptions);
+            const chartBlob = await new Promise<Blob | null>((resolve) => {
+              canvas.toBlob((blob) => {
+                resolve(blob);
+              }, 'image/png');
+            });
+            
+            if (chartBlob) {
+              chartImageBuffer = await chartBlob.arrayBuffer();
+              this.generatedCharts.set(chartFileName, chartBlob);
+            }
           }
         } catch (error) {
           console.warn('Ошибка конвертации графика:', error);
