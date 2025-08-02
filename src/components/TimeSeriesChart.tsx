@@ -391,7 +391,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                 y2={yScale(limits[dataType]!.max!)}
                 stroke="#ef4444"
                 strokeWidth={2}
-          const isExternal = data.some(d => d.fileId === fileId && d.zoneNumber === 999);
+                strokeDasharray="5,5"
               />
             )}
           </g>
@@ -445,7 +445,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               <path
                 key={fileId}
                 d={createPathForFile(fileData)}
-                  style={{ backgroundColor: isExternal ? '#6B7280' : color }}
+                fill="none"
                 stroke={pathColor}
                 strokeWidth={1.5}
                 opacity={0.8}
