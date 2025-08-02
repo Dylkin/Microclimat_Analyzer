@@ -436,7 +436,6 @@ export class ReportGenerator {
             })
           ]
         }] : [])
-        }
       ]
     });
   }
