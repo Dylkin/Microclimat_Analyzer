@@ -122,7 +122,7 @@ export class ReportGenerator {
             
             if (chartBlob) {
               chartImageBuffer = await chartBlob.arrayBuffer();
-        } catch (error) {
+                    } catch (error) {
           console.warn('Ошибка поворота графика, используем исходный:', error);
           // Создаем Buffer для PNG файла
           const chartBlob = await new Promise<Blob | null>((resolve) => {
@@ -140,6 +140,8 @@ export class ReportGenerator {
           }
         } catch (error) {
           console.warn('Ошибка конвертации графика:', error);
+        }
+                }
         }
       }
 
