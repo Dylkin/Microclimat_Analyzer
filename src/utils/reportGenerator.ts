@@ -508,19 +508,19 @@ export class ReportGenerator {
       new TableRow({
         children: [
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: '№ зоны', bold: true })] })],
+            children: [new Paragraph({ children: [new TextRun({ text: '№ зоны измерения', bold: true })] })],
             width: { size: 10, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Уровень (м.)', bold: true })] })],
+            children: [new Paragraph({ children: [new TextRun({ text: 'Уровень измерения (м.)', bold: true })] })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Логгер', bold: true })] })],
+            children: [new Paragraph({ children: [new TextRun({ text: 'Наименование логгера (6 символов)', bold: true })] })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true })] })],
+            children: [new Paragraph({ children: [new TextRun({ text: 'Серийный № логгера', bold: true })] })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
@@ -533,6 +533,10 @@ export class ReportGenerator {
           }),
           new TableCell({
             children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: 'Соответствие лимитам', bold: true })] })],
             width: { size: 15, type: WidthType.PERCENTAGE }
           })
         ]
@@ -557,13 +561,16 @@ export class ReportGenerator {
               children: [new Paragraph({ children: [new TextRun({ text: String(row.serialNumber || '-') })] })]
             }),
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: typeof row.minTemp === 'number' ? `${row.minTemp}°C` : '-' })] })]
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.minTemp) })] })]
             }),
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: typeof row.maxTemp === 'number' ? `${row.maxTemp}°C` : '-' })] })]
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.maxTemp) })] })]
             }),
             new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: typeof row.avgTemp === 'number' ? `${row.avgTemp}°C` : '-' })] })]
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.avgTemp) })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.meetsLimits || '-') })] })]
             })
           ]
         })
