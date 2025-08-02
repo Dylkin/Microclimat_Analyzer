@@ -63,18 +63,43 @@ export class ReportGenerator {
       
       if (chartElement) {
         try {
-          const canvas = await html2canvas(chartElement, {
+          // Определяем область для захвата (выделенная область или весь график)
+          let captureOptions: any = {
             backgroundColor: '#ffffff',
-            scale: 2,
+            scale: 1,
             useCORS: true,
-            allowTaint: true,
-            width: 600,
-            height: 200
-          });
+            allowTaint: true
+          };
+
+          // Если есть зум (выделенная область), захватываем только её
+          if (reportData.markers && reportData.markers.length >= 2) {
+            // Находим область графика внутри элемента
+            const chartSvg = chartElement.querySelector('svg');
+            if (chartSvg) {
+              const svgRect = chartSvg.getBoundingClientRect();
+              const elementRect = chartElement.getBoundingClientRect();
+              
+              // Вычисляем относительные координаты SVG внутри элемента
+              const svgLeft = svgRect.left - elementRect.left;
+              const svgTop = svgRect.top - elementRect.top;
+              
+              // Устанавливаем область захвата на SVG
+              captureOptions = {
+                ...captureOptions,
+                x: svgLeft,
+                y: svgTop,
+                width: svgRect.width,
+                height: svgRect.height
+              };
+            }
+          }
+
+          const canvas = await html2canvas(chartElement, captureOptions);
           
           console.log('График успешно конвертирован в canvas');
+          console.log('Размер исходного canvas:', canvas.width, 'x', canvas.height);
           
-          // Создаем новый canvas для поворота изображения на 90 градусов против часовой стрелки  
+          // Создаем новый canvas для поворота изображения на 90 градусов против часовой стрелки
           const rotatedCanvas = document.createElement('canvas');
           const rotatedCtx = rotatedCanvas.getContext('2d');
           
@@ -82,6 +107,8 @@ export class ReportGenerator {
             // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
             rotatedCanvas.width = canvas.height; // Высота становится шириной
             rotatedCanvas.height = canvas.width;  // Ширина становится высотой
+            
+            console.log('Размер повернутого canvas:', rotatedCanvas.width, 'x', rotatedCanvas.height);
             
             // Перемещаем точку отсчета в центр canvas
             rotatedCtx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
@@ -110,33 +137,8 @@ export class ReportGenerator {
             }
           } else {
             console.warn('Не удалось получить контекст для поворота изображения, используем исходный график');
-            // Fallback: используем исходный canvas
-            const chartBlob = await new Promise<Blob | null>((resolve) => {
-              canvas.toBlob((blob) => {
-                resolve(blob);
-              }, 'image/png');
-            });
-            
-            if (chartBlob) {
-              chartImageBuffer = await chartBlob.arrayBuffer();
-              this.generatedCharts.set(chartFileName, chartBlob);
-            }
-          }
-        } catch (error) {
-          console.warn('Ошибка поворота графика, используем исходный:', error);
-          // Создаем Buffer для PNG файла
-          const chartBlob = await new Promise<Blob | null>((resolve) => {
-            canvas.toBlob((blob) => {
-              resolve(blob);
-            }, 'image/png');
-          });
-          
-          if (chartBlob) {
-            chartImageBuffer = await chartBlob.arrayBuffer();
-            
-            // Сохраняем график для отдельного скачивания
-            this.generatedCharts.set(chartFileName, chartBlob);
-            console.log('График сохранен как:', chartFileName);
+            // Fallback: используем исходный canvas без поворота
+            await this.saveOriginalCanvas(canvas, chartFileName, chartImageBuffer);
           }
         } catch (error) {
           console.warn('Ошибка конвертации графика:', error);
@@ -342,8 +344,8 @@ export class ReportGenerator {
             new ImageRun({
               data: chartImageBuffer,
               transformation: {
-                width: 400,
-                height: 600
+                width: 500,
+                height: 400
               }
             })
           ],
@@ -558,6 +560,23 @@ export class ReportGenerator {
     }
 
     return criteria.length > 0 ? criteria.join('\n') : 'Критерии не установлены';
+  }
+
+  /**
+   * Сохранение исходного canvas (fallback метод)
+   */
+  private async saveOriginalCanvas(canvas: HTMLCanvasElement, chartFileName: string, chartImageBuffer: ArrayBuffer | null): Promise<void> {
+    const chartBlob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, 'image/png');
+    });
+    
+    if (chartBlob) {
+      const buffer = await chartBlob.arrayBuffer();
+      this.generatedCharts.set(chartFileName, chartBlob);
+      console.log('Исходный график сохранен как:', chartFileName);
+    }
   }
 
   /**
