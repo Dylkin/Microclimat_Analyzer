@@ -376,6 +376,24 @@ export class ReportGenerator {
                 transformation: {
                   width: 675,
                   height: 900
+                },
+                floating: {
+                  horizontalPosition: {
+                    align: "center"
+                  },
+                  verticalPosition: {
+                    align: "center"
+                  },
+                  wrap: {
+                    type: "square",
+                    side: "bothSides"
+                  },
+                  margins: {
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0
+                  }
                 }
               })
             ],
