@@ -79,9 +79,9 @@ export class ReportGenerator {
           const rotatedCtx = rotatedCanvas.getContext('2d');
           
           if (rotatedCtx) {
-            // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту, увеличиваем в 2 раза)
-            rotatedCanvas.width = canvas.height * 2; // Высота становится шириной и увеличивается в 2 раза
-            rotatedCanvas.height = canvas.width * 2;  // Ширина становится высотой и увеличивается в 2 раза
+            // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
+            rotatedCanvas.width = canvas.height; // Высота становится шириной
+            rotatedCanvas.height = canvas.width;  // Ширина становится высотой
             
             // Перемещаем точку отсчета в центр canvas
             rotatedCtx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
@@ -89,13 +89,10 @@ export class ReportGenerator {
             // Поворачиваем на -90 градусов (против часовой стрелки)
             rotatedCtx.rotate(-Math.PI / 2);
             
-            // Масштабируем в 2 раза
-            rotatedCtx.scale(2, 2);
-            
             // Рисуем исходное изображение с центрированием
             rotatedCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
             
-            console.log('График повернут на 90 градусов против часовой стрелки и увеличен в 2 раза');
+            console.log('График повернут на 90 градусов против часовой стрелки');
             
             // Создаем Buffer для PNG файла из повернутого canvas
             const chartBlob = await new Promise<Blob | null>((resolve) => {
