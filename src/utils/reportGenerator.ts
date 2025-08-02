@@ -124,7 +124,7 @@ export class ReportGenerator {
           }
         } catch (error) {
           console.warn('Ошибка поворота графика, используем исходный:', error);
-          // Создаем Buffer для PNG файла
+          // Fallback: используем исходный canvas
           const chartBlob = await new Promise<Blob | null>((resolve) => {
             canvas.toBlob((blob) => {
               resolve(blob);
@@ -133,13 +133,9 @@ export class ReportGenerator {
           
           if (chartBlob) {
             chartImageBuffer = await chartBlob.arrayBuffer();
-            
-            // Сохраняем график для отдельного скачивания
             this.generatedCharts.set(chartFileName, chartBlob);
             console.log('График сохранен как:', chartFileName);
           }
-        } catch (error) {
-          console.warn('Ошибка конвертации графика:', error);
         }
       }
 
