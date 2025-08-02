@@ -401,6 +401,15 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         )}
       </div>
 
+      {/* Примечание о внешнем датчике */}
+      {uploadedFiles.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600 text-sm font-medium">
+            <strong>Примечание:</strong> Для внешнего датчика указать № зоны измерения 999.
+          </p>
+        </div>
+      )}
+
     </div>
   );
 };
