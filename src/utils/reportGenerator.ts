@@ -173,8 +173,10 @@ export class ReportGenerator {
             
             if (chartBlob) {
               chartImageBuffer = await chartBlob.arrayBuffer();
-        } catch (error) {
+                    } catch (error) {
           console.warn('Ошибка конвертации графика:', error);
+        }
+                }
         }
       }
 
