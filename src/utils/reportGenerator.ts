@@ -155,14 +155,11 @@ export class ReportGenerator {
           new TextRun({
             text: `ОТЧЕТ № ${reportData.reportNumber || 'Не указан'}`,
             bold: true,
-            size: 28
+            size: 32
           })
         ],
         heading: HeadingLevel.TITLE,
-        alignment: AlignmentType.CENTER,
-        spacing: {
-          after: 200
-        }
+        alignment: AlignmentType.CENTER
       })
     );
 
@@ -171,15 +168,15 @@ export class ReportGenerator {
         children: [
           new TextRun({
             text: `от ${reportData.reportDate ? new Date(reportData.reportDate).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU')}`,
-            size: 22
+            size: 24
           })
         ],
-        alignment: AlignmentType.CENTER,
-        spacing: {
-          after: 400
-        }
+        alignment: AlignmentType.CENTER
       })
     );
+
+    // Пустая строка
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
 
     // Основная информация
     children.push(
@@ -187,10 +184,7 @@ export class ReportGenerator {
         children: [
           new TextRun({ text: 'Объект исследования: ', bold: true }),
           new TextRun({ text: reportData.objectName || 'Не указано' })
-        ],
-        spacing: {
-          after: 120
-        }
+        ]
       })
     );
 
@@ -199,10 +193,7 @@ export class ReportGenerator {
         children: [
           new TextRun({ text: 'Климатическая установка: ', bold: true }),
           new TextRun({ text: reportData.climateSystemName || 'Не указано' })
-        ],
-        spacing: {
-          after: 120
-        }
+        ]
       })
     );
 
@@ -211,44 +202,35 @@ export class ReportGenerator {
         children: [
           new TextRun({ text: 'Вид испытания: ', bold: true }),
           new TextRun({ text: testTypes[reportData.testType as keyof typeof testTypes] || reportData.testType })
-        ],
-        spacing: {
-          after: 300
-        }
+        ]
       })
     );
+
+    // Пустая строка
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
 
     // Критерии приемки
     children.push(
       new Paragraph({
         children: [new TextRun({ text: 'Критерии приемки:', bold: true })],
-        heading: HeadingLevel.HEADING_2,
-        spacing: {
-          before: 200,
-          after: 120
-        }
+        heading: HeadingLevel.HEADING_2
       })
     );
 
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: acceptanceCriteria })],
-        spacing: {
-          after: 300
-        }
+        children: [new TextRun({ text: acceptanceCriteria })]
       })
     );
 
     // Временные данные
     if (testPeriodInfo) {
+      children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+      
       children.push(
         new Paragraph({
           children: [new TextRun({ text: 'Период испытания:', bold: true })],
-          heading: HeadingLevel.HEADING_2,
-          spacing: {
-            before: 200,
-            after: 120
-          }
+          heading: HeadingLevel.HEADING_2
         })
       );
 
@@ -257,10 +239,7 @@ export class ReportGenerator {
           children: [
             new TextRun({ text: 'Начало: ', bold: true }),
             new TextRun({ text: testPeriodInfo.startTime })
-          ],
-          spacing: {
-            after: 120
-          }
+          ]
         })
       );
 
@@ -269,10 +248,7 @@ export class ReportGenerator {
           children: [
             new TextRun({ text: 'Завершение: ', bold: true }),
             new TextRun({ text: testPeriodInfo.endTime })
-          ],
-          spacing: {
-            after: 120
-          }
+          ]
         })
       );
 
@@ -281,23 +257,18 @@ export class ReportGenerator {
           children: [
             new TextRun({ text: 'Длительность: ', bold: true }),
             new TextRun({ text: testPeriodInfo.duration })
-          ],
-          spacing: {
-            after: 300
-          }
+          ]
         })
       );
     }
 
     // Таблица результатов
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+    
     children.push(
       new Paragraph({
         children: [new TextRun({ text: 'Результаты измерений:', bold: true })],
-        heading: HeadingLevel.HEADING_2,
-        spacing: {
-          before: 200,
-          after: 120
-        }
+        heading: HeadingLevel.HEADING_2
       })
     );
 
@@ -307,14 +278,12 @@ export class ReportGenerator {
 
     // График
     if (chartImageBuffer) {
+      children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+      
       children.push(
         new Paragraph({
           children: [new TextRun({ text: 'График:', bold: true })],
-          heading: HeadingLevel.HEADING_2,
-          spacing: {
-            before: 300,
-            after: 120
-          }
+          heading: HeadingLevel.HEADING_2
         })
       );
 
@@ -324,52 +293,42 @@ export class ReportGenerator {
             new ImageRun({
               data: chartImageBuffer,
               transformation: {
-                width: 550,
-                height: 180
+                width: 600,
+                height: 200
               }
             })
           ],
-          alignment: AlignmentType.CENTER,
-          spacing: {
-            after: 300
-          }
+          alignment: AlignmentType.CENTER
         })
       );
     }
 
     // Заключение
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+    
     children.push(
       new Paragraph({
         children: [new TextRun({ text: 'Заключение:', bold: true })],
-        heading: HeadingLevel.HEADING_2,
-        spacing: {
-          before: 200,
-          after: 120
-        }
+        heading: HeadingLevel.HEADING_2
       })
     );
 
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: reportData.conclusion || 'Выводы не указаны' })],
-        spacing: {
-          after: 400
-        }
+        children: [new TextRun({ text: reportData.conclusion || 'Выводы не указаны' })]
       })
     );
 
     // Подписи
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
 
     children.push(
       new Paragraph({
         children: [
           new TextRun({ text: 'Исполнитель: ', bold: true }),
           new TextRun({ text: reportData.user.fullName || 'Не указано' })
-        ],
-        spacing: {
-          before: 200,
-          after: 120
-        }
+        ]
       })
     );
 
@@ -379,10 +338,7 @@ export class ReportGenerator {
           children: [
             new TextRun({ text: 'Руководитель: ', bold: true }),
             new TextRun({ text: reportData.director })
-          ],
-          spacing: {
-            after: 120
-          }
+          ]
         })
       );
     }
@@ -392,29 +348,14 @@ export class ReportGenerator {
         children: [
           new TextRun({ text: 'Дата: ', bold: true }),
           new TextRun({ text: new Date().toLocaleDateString('ru-RU') })
-        ],
-        spacing: {
-          after: 120
-        }
+        ]
       })
     );
 
     return new Document({
-      creator: "Microclimat Analyzer",
-      title: `Отчет № ${reportData.reportNumber}`,
-      description: "Отчет анализа микроклимата",
       sections: [
         {
-          properties: {
-            page: {
-              margin: {
-                top: 1440,    // 1 inch = 1440 twips
-                right: 1440,
-                bottom: 1440,
-                left: 1440
-              }
-            }
-          },
+          properties: {},
           children: children
         }
       ]
@@ -432,42 +373,34 @@ export class ReportGenerator {
       new TableRow({
         children: [
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: '№ зоны', bold: true })], alignment: AlignmentType.CENTER })],
-            width: { size: 10, type: WidthType.PERCENTAGE },
-            verticalAlign: "center"
+            children: [new Paragraph({ children: [new TextRun({ text: '№ зоны', bold: true })] })],
+            width: { size: 10, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Уровень (м.)', bold: true })], alignment: AlignmentType.CENTER })],
-            width: { size: 15, type: WidthType.PERCENTAGE },
-            verticalAlign: "center"
+            children: [new Paragraph({ children: [new TextRun({ text: 'Уровень (м.)', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Логгер', bold: true })], alignment: AlignmentType.CENTER })],
-            width: { size: 15, type: WidthType.PERCENTAGE },
-            verticalAlign: "center"
+            children: [new Paragraph({ children: [new TextRun({ text: 'Логгер', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true })], alignment: AlignmentType.CENTER })],
-            width: { size: 15, type: WidthType.PERCENTAGE },
-            verticalAlign: "center"
+            children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Мин. t°C', bold: true })], alignment: AlignmentType.CENTER })],
-            width: { size: 15, type: WidthType.PERCENTAGE },
-            verticalAlign: "center"
+            children: [new Paragraph({ children: [new TextRun({ text: 'Мин. t°C', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Макс. t°C', bold: true })], alignment: AlignmentType.CENTER })],
-            width: { size: 15, type: WidthType.PERCENTAGE },
-            verticalAlign: "center"
+            children: [new Paragraph({ children: [new TextRun({ text: 'Макс. t°C', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
           }),
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true })], alignment: AlignmentType.CENTER })],
-            width: { size: 15, type: WidthType.PERCENTAGE },
-            verticalAlign: "center"
+            children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
           })
-        ],
-        tableHeader: true
+        ]
       })
     );
 
@@ -477,53 +410,25 @@ export class ReportGenerator {
         new TableRow({
           children: [
             new TableCell({
-              children: [new Paragraph({ 
-                children: [new TextRun({ text: String(row.zoneNumber || '-') })],
-                alignment: AlignmentType.CENTER
-              })],
-              verticalAlign: "center"
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.zoneNumber || '-') })] })]
             }),
             new TableCell({
-              children: [new Paragraph({ 
-                children: [new TextRun({ text: String(row.measurementLevel || '-') })],
-                alignment: AlignmentType.CENTER
-              })],
-              verticalAlign: "center"
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.measurementLevel || '-') })] })]
             }),
             new TableCell({
-              children: [new Paragraph({ 
-                children: [new TextRun({ text: String(row.loggerName || '-') })],
-                alignment: AlignmentType.CENTER
-              })],
-              verticalAlign: "center"
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.loggerName || '-') })] })]
             }),
             new TableCell({
-              children: [new Paragraph({ 
-                children: [new TextRun({ text: String(row.serialNumber || '-') })],
-                alignment: AlignmentType.CENTER
-              })],
-              verticalAlign: "center"
+              children: [new Paragraph({ children: [new TextRun({ text: String(row.serialNumber || '-') })] })]
             }),
             new TableCell({
-              children: [new Paragraph({ 
-                children: [new TextRun({ text: typeof row.minTemp === 'number' ? `${row.minTemp}°C` : '-' })],
-                alignment: AlignmentType.CENTER
-              })],
-              verticalAlign: "center"
+              children: [new Paragraph({ children: [new TextRun({ text: typeof row.minTemp === 'number' ? `${row.minTemp}°C` : '-' })] })]
             }),
             new TableCell({
-              children: [new Paragraph({ 
-                children: [new TextRun({ text: typeof row.maxTemp === 'number' ? `${row.maxTemp}°C` : '-' })],
-                alignment: AlignmentType.CENTER
-              })],
-              verticalAlign: "center"
+              children: [new Paragraph({ children: [new TextRun({ text: typeof row.maxTemp === 'number' ? `${row.maxTemp}°C` : '-' })] })]
             }),
             new TableCell({
-              children: [new Paragraph({ 
-                children: [new TextRun({ text: typeof row.avgTemp === 'number' ? `${row.avgTemp}°C` : '-' })],
-                alignment: AlignmentType.CENTER
-              })],
-              verticalAlign: "center"
+              children: [new Paragraph({ children: [new TextRun({ text: typeof row.avgTemp === 'number' ? `${row.avgTemp}°C` : '-' })] })]
             })
           ]
         })
@@ -535,14 +440,6 @@ export class ReportGenerator {
       width: {
         size: 100,
         type: WidthType.PERCENTAGE
-      },
-      borders: {
-        top: { style: "single", size: 1 },
-        bottom: { style: "single", size: 1 },
-        left: { style: "single", size: 1 },
-        right: { style: "single", size: 1 },
-        insideHorizontal: { style: "single", size: 1 },
-        insideVertical: { style: "single", size: 1 }
       }
     });
   }
