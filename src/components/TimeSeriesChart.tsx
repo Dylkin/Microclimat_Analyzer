@@ -99,11 +99,22 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   // Применяем пользовательские лимиты если они установлены
   if (limits && limits[dataType]) {
     const userLimits = limits[dataType]!;
-    if (userLimits.min !== undefined) {
-      yDomain[0] = Math.min(yDomain[0], userLimits.min);
-    }
-    if (userLimits.max !== undefined) {
-      yDomain[1] = Math.max(yDomain[1], userLimits.max);
+    if (userLimits.min !== undefined && userLimits.max !== undefined) {
+      // Если установлены оба лимита, используем их как основу для домена
+      const range = userLimits.max - userLimits.min;
+      const padding = range * 0.1; // 10% отступ
+      yDomain[0] = Math.min(yDomain[0], userLimits.min - padding);
+      yDomain[1] = Math.max(yDomain[1], userLimits.max + padding);
+    } else {
+      // Если установлен только один лимит, добавляем отступ
+      if (userLimits.min !== undefined) {
+        const padding = Math.abs(yDomain[1] - yDomain[0]) * 0.1;
+        yDomain[0] = Math.min(yDomain[0], userLimits.min - padding);
+      }
+      if (userLimits.max !== undefined) {
+        const padding = Math.abs(yDomain[1] - yDomain[0]) * 0.1;
+        yDomain[1] = Math.max(yDomain[1], userLimits.max + padding);
+      }
     }
   }
   
