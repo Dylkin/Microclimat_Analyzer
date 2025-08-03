@@ -160,6 +160,11 @@ export class ReportGenerator {
               rotatedCanvas.toBlob((blob) => {
                 resolve(blob);
               }, 'image/png');
+            }
+            )
+          }
+        }
+      }
       // Создаем новый отчет на основе шаблона
       const newReportResult = await this.generateFromTemplate(templateFile, reportData, chartElement);
       
