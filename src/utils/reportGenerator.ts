@@ -50,13 +50,21 @@ export class ReportGenerator {
       const templateBuffer = await templateFile.arrayBuffer();
       console.log('Шаблон загружен, размер:', templateBuffer.byteLength, 'байт');
 
-      // Определяем имя файла для отчета
+      // Определяем имя файла для отчета - всегда используем мастер-отчет если он существует
       let fileName: string;
+      let baseDocument: ArrayBuffer;
+      
       if (this.masterReport && this.masterReportName) {
+        // Используем существующий мастер-отчет как основу
         fileName = this.masterReportName;
+        baseDocument = await this.masterReport.arrayBuffer();
+        console.log('Добавляем данные в существующий отчет:', fileName);
       } else {
+        // Создаем новый отчет
         fileName = `Отчет_${reportData.reportNumber}_${new Date().toISOString().split('T')[0]}.docx`;
         this.masterReportName = fileName;
+        baseDocument = templateBuffer;
+        console.log('Создаем новый отчет:', fileName);
       }
 
       // Определяем имя файла для графика
@@ -196,7 +204,7 @@ export class ReportGenerator {
       }
 
       // Обрабатываем шаблон и заменяем плейсхолдеры
-      const processedDoc = await this.processTemplate(templateBuffer, reportData, chartImageBuffer);
+      const processedDoc = await this.processTemplate(baseDocument, reportData, chartImageBuffer);
 
       // Генерируем итоговый документ
       const output = processedDoc;
@@ -231,11 +239,11 @@ export class ReportGenerator {
   /**
    * Обработка шаблона DOCX и замена плейсхолдеров
    */
-  private async processTemplate(templateBuffer: ArrayBuffer, reportData: ReportData, chartImageBuffer: ArrayBuffer | null): Promise<Blob> {
+  private async processTemplate(documentBuffer: ArrayBuffer, reportData: ReportData, chartImageBuffer: ArrayBuffer | null): Promise<Blob> {
     try {
       // Читаем шаблон как ZIP архив
       const JSZip = (await import('jszip')).default;
-      const zip = await JSZip.loadAsync(templateBuffer);
+      const zip = await JSZip.loadAsync(documentBuffer);
       
       // Получаем основной документ
       const documentXml = await zip.file('word/document.xml')?.async('text');
@@ -243,6 +251,314 @@ export class ReportGenerator {
         throw new Error('Не удалось найти document.xml в шаблоне');
       }
 
+      // Если это существующий отчет, добавляем новую секцию
+      let processedXml = documentXml;
+      
+      if (this.masterReport && this.masterReportName) {
+        // Добавляем разрыв страницы и новую секцию отчета
+        processedXml = this.addNewReportSection(processedXml, reportData, chartImageBuffer, zip);
+      } else {
+        // Обычная обработка для нового отчета
+        processedXml = await this.processNewReport(processedXml, reportData, chartImageBuffer, zip);
+      }
+
+      // Обновляем document.xml в архиве
+      zip.file('word/document.xml', processedXml);
+
+      // Генерируем итоговый файл
+      return await zip.generateAsync({ type: 'blob' });
+      
+    } catch (error) {
+      console.error('Ошибка обработки шаблона:', error);
+      // Fallback: создаем документ с нуля
+      return await this.createFallbackDocument(reportData, chartImageBuffer);
+    }
+  }
+
+  /**
+   * Добавление новой секции отчета в существующий документ
+   */
+  private addNewReportSection(documentXml: string, reportData: ReportData, chartImageBuffer: ArrayBuffer | null, zip: any): string {
+    try {
+      // Находим конец документа (перед закрывающим тегом </w:body>)
+      const bodyEndIndex = documentXml.lastIndexOf('</w:body>');
+      
+      if (bodyEndIndex === -1) {
+        throw new Error('Не удалось найти конец документа');
+      }
+
+      // Создаем новую секцию отчета
+      const newSectionXml = this.generateNewReportSectionXml(reportData, chartImageBuffer, zip);
+      
+      // Вставляем новую секцию перед закрывающим тегом body
+      const beforeBody = documentXml.substring(0, bodyEndIndex);
+      const afterBody = documentXml.substring(bodyEndIndex);
+      
+      return beforeBody + newSectionXml + afterBody;
+      
+    } catch (error) {
+      console.error('Ошибка добавления новой секции:', error);
+      // Fallback: обрабатываем как новый отчет
+      return this.processNewReport(documentXml, reportData, chartImageBuffer, zip);
+    }
+  }
+
+  /**
+   * Генерация XML для новой секции отчета
+   */
+  private generateNewReportSectionXml(reportData: ReportData, chartImageBuffer: ArrayBuffer | null, zip: any): string {
+    const replacements = this.prepareReplacements(reportData);
+    
+    let sectionXml = `
+      <!-- Разрыв страницы -->
+      <w:p>
+        <w:r>
+          <w:br w:type="page"/>
+        </w:r>
+      </w:p>
+      
+      <!-- Заголовок нового отчета -->
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="center"/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:b/>
+            <w:sz w:val="32"/>
+          </w:rPr>
+          <w:t>ОТЧЕТ № ${this.escapeXml(replacements['Report No.'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="center"/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:sz w:val="24"/>
+          </w:rPr>
+          <w:t>от ${this.escapeXml(replacements['Report date'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <!-- Основная информация -->
+      <w:p><w:r><w:t></w:t></w:r></w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Объект исследования: </w:t>
+        </w:r>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['name of the object'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Климатическая установка: </w:t>
+        </w:r>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['name of the air conditioning system'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Вид испытания: </w:t>
+        </w:r>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['name of the test'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <!-- Критерии приемки -->
+      <w:p><w:r><w:t></w:t></w:r></w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Критерии приемки:</w:t>
+        </w:r>
+      </w:p>
+      
+      <w:p>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['acceptance criteria'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <!-- Временные данные -->
+      <w:p><w:r><w:t></w:t></w:r></w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Период проведения испытаний:</w:t>
+        </w:r>
+      </w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Начало: </w:t>
+        </w:r>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['Date time of test start'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Завершение: </w:t>
+        </w:r>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['Date time of test completion'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Длительность: </w:t>
+        </w:r>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['Duration of the test'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <!-- Результаты измерений -->
+      <w:p><w:r><w:t></w:t></w:r></w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Результаты измерений:</w:t>
+        </w:r>
+      </w:p>
+      
+      ${this.generateTableXml(reportData.resultsTableData)}
+      
+      <!-- График -->
+      <w:p><w:r><w:t></w:t></w:r></w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>График:</w:t>
+        </w:r>
+      </w:p>
+      
+      ${chartImageBuffer ? this.generateChartXml(chartImageBuffer, zip) : '<w:p><w:r><w:t>График не был сгенерирован</w:t></w:r></w:p>'}
+      
+      <!-- Заключение -->
+      <w:p><w:r><w:t></w:t></w:r></w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Заключение:</w:t>
+        </w:r>
+      </w:p>
+      
+      <w:p>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['Result'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <!-- Исполнители -->
+      <w:p><w:r><w:t></w:t></w:r></w:p>
+      <w:p><w:r><w:t></w:t></w:r></w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Исполнитель: </w:t>
+        </w:r>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['executor'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Руководитель: </w:t>
+        </w:r>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['director'])}</w:t>
+        </w:r>
+      </w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>Дата: </w:t>
+        </w:r>
+        <w:r>
+          <w:t>${this.escapeXml(replacements['test date'])}</w:t>
+        </w:r>
+      </w:p>
+    `;
+    
+    return sectionXml;
+  }
+
+  /**
+   * Обработка нового отчета (обычная замена плейсхолдеров)
+   */
+  private async processNewReport(documentXml: string, reportData: ReportData, chartImageBuffer: ArrayBuffer | null, zip: any): Promise<string> {
+    // Подготавливаем данные для замены
+    const replacements = this.prepareReplacements(reportData);
+    
+    // Заменяем плейсхолдеры в XML
+    let processedXml = documentXml;
+    for (const [placeholder, value] of Object.entries(replacements)) {
+      const regex = new RegExp(`\\{${placeholder}\\}`, 'g');
+      processedXml = processedXml.replace(regex, this.escapeXml(value));
+    }
+
+    // Обрабатываем специальные плейсхолдеры
+    processedXml = await this.processSpecialPlaceholders(processedXml, reportData, chartImageBuffer, zip);
+
+    return processedXml;
+  }
+
+  /**
+   * Обработка специальных плейсхолдеров (таблица и график) - восстановленный метод
+   */
+  private async processSpecialPlaceholders(
+    xml: string, 
+    reportData: ReportData, 
+    chartImageBuffer: ArrayBuffer | null, 
+    zip: any
+  ): Promise<string> {
+    let processedXml = xml;
+
+    // Замена плейсхолдера таблицы результатов
+    if (reportData.resultsTableData && reportData.resultsTableData.length > 0) {
+      const tableXml = this.generateTableXml(reportData.resultsTableData);
+      processedXml = processedXml.replace(/\{Results table\}/g, tableXml);
+    } else {
+      processedXml = processedXml.replace(/\{Results table\}/g, 'Данные для таблицы результатов отсутствуют');
+    }
+
+    // Замена плейсхолдера графика
+    if (chartImageBuffer) {
+      const chartXml = await this.generateChartXml(chartImageBuffer, zip);
+      processedXml = processedXml.replace(/\{chart\}/g, chartXml);
+    } else {
+      processedXml = processedXml.replace(/\{chart\}/g, 'График не был сгенерирован');
+    }
+
+    return processedXml;
+  }
       // Подготавливаем данные для замены
       const replacements = this.prepareReplacements(reportData);
       
