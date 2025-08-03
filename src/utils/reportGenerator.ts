@@ -352,55 +352,31 @@ export class ReportGenerator {
 
     // График
     if (chartImageBuffer) {
-      // Создаем новую секцию для графика на отдельной странице
-      const chartSection = {
-        properties: {
-          page: {
-            pageNumbers: {
-              start: 1,
-              formatType: "decimal"
-            }
-          }
-        },
-        children: [
-          new Paragraph({
-            children: [new TextRun({ text: 'График:', bold: true })],
-            heading: HeadingLevel.HEADING_2,
-            alignment: AlignmentType.CENTER
-          }),
-          new Paragraph({ children: [new TextRun({ text: '' })] }),
-          new Paragraph({
-            children: [
-              new ImageRun({
-                data: chartImageBuffer,
-                transformation: {
-                  width: 675,
-                  height: 900
-                },
-                floating: {
-                  horizontalPosition: {
-                    align: "center"
-                  },
-                  verticalPosition: {
-                    align: "center"
-                  },
-                  wrap: {
-                    type: "square",
-                    side: "bothSides"
-                  },
-                  margins: {
-                    top: 0,
-                    bottom: 0,
-                    left: 0,
-                    right: 0
-                  }
-                }
-              })
-            ],
-            alignment: AlignmentType.CENTER
-          })
-        ]
-      };
+      children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+      
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'График:', bold: true })],
+          heading: HeadingLevel.HEADING_2
+        })
+      );
+      
+      children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+      
+      children.push(
+        new Paragraph({
+          children: [
+            new ImageRun({
+              data: chartImageBuffer,
+              transformation: {
+                width: 675,
+                height: 450
+              }
+            })
+          ],
+          alignment: AlignmentType.CENTER
+        })
+      );
     }
 
     // Заключение
