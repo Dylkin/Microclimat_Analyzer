@@ -36,7 +36,7 @@ export class ReportGenerator {
   }
 
   /**
-   * Генерация отчета с использованием docx.js
+   * Генерация отчета на основе загруженного DOCX шаблона
    */
   async generateReport(
     templateFile: File,
@@ -45,6 +45,10 @@ export class ReportGenerator {
   ): Promise<{ success: boolean; fileName: string; error?: string }> {
     try {
       console.log('Начинаем генерацию отчета с docx.js...');
+
+      // Читаем содержимое шаблона
+      const templateBuffer = await templateFile.arrayBuffer();
+      console.log('Шаблон загружен, размер:', templateBuffer.byteLength, 'байт');
 
       // Определяем имя файла для отчета
       let fileName: string;
@@ -103,9 +107,9 @@ export class ReportGenerator {
           const rotatedCtx = rotatedCanvas.getContext('2d');
           
           if (rotatedCtx) {
-            // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту без изменения пропорций)
-            rotatedCanvas.width = canvas.height; // Высота становится шириной
-            rotatedCanvas.height = canvas.width;  // Ширина становится высотой
+            // Устанавливаем размеры повернутого canvas 675x900 пикселей
+            rotatedCanvas.width = 675;
+            rotatedCanvas.height = 900;
             
             console.log('Размер повернутого canvas:', rotatedCanvas.width, 'x', rotatedCanvas.height);
             
@@ -115,8 +119,12 @@ export class ReportGenerator {
             // Поворачиваем на -90 градусов (против часовой стрелки)
             rotatedCtx.rotate(-Math.PI / 2);
             
-            // Рисуем исходное изображение с центрированием (без масштабирования)
-            rotatedCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+            // Масштабируем и рисуем исходное изображение с центрированием
+            const scale = Math.min(675 / canvas.height, 900 / canvas.width);
+            const scaledWidth = canvas.width * scale;
+            const scaledHeight = canvas.height * scale;
+            
+            rotatedCtx.drawImage(canvas, -scaledWidth / 2, -scaledHeight / 2, scaledWidth, scaledHeight);
             
             console.log('График повернут на 90 градусов против часовой стрелки');
             
@@ -168,11 +176,11 @@ export class ReportGenerator {
         }
       }
 
-      // Создаем документ с помощью docx.js
-      const doc = await this.createDocxDocument(reportData, chartImageBuffer);
+      // Обрабатываем шаблон и заменяем плейсхолдеры
+      const processedDoc = await this.processTemplate(templateBuffer, reportData, chartImageBuffer);
 
       // Генерируем итоговый документ
-      const output = await Packer.toBlob(doc);
+      const output = processedDoc;
 
       console.log('Отчет успешно сгенерирован с docx.js');
       
@@ -202,9 +210,262 @@ export class ReportGenerator {
   }
 
   /**
-   * Создание DOCX документа с помощью docx.js
+   * Обработка шаблона DOCX и замена плейсхолдеров
    */
-  private async createDocxDocument(reportData: ReportData, chartImageBuffer: ArrayBuffer | null): Promise<Document> {
+  private async processTemplate(templateBuffer: ArrayBuffer, reportData: ReportData, chartImageBuffer: ArrayBuffer | null): Promise<Blob> {
+    try {
+      // Читаем шаблон как ZIP архив
+      const JSZip = (await import('jszip')).default;
+      const zip = await JSZip.loadAsync(templateBuffer);
+      
+      // Получаем основной документ
+      const documentXml = await zip.file('word/document.xml')?.async('text');
+      if (!documentXml) {
+        throw new Error('Не удалось найти document.xml в шаблоне');
+      }
+
+      // Подготавливаем данные для замены
+      const replacements = this.prepareReplacements(reportData);
+      
+      // Заменяем плейсхолдеры в XML
+      let processedXml = documentXml;
+      for (const [placeholder, value] of Object.entries(replacements)) {
+        const regex = new RegExp(`\\{${placeholder}\\}`, 'g');
+        processedXml = processedXml.replace(regex, this.escapeXml(value));
+      }
+
+      // Обрабатываем специальные плейсхолдеры
+      processedXml = await this.processSpecialPlaceholders(processedXml, reportData, chartImageBuffer, zip);
+
+      // Обновляем document.xml в архиве
+      zip.file('word/document.xml', processedXml);
+
+      // Генерируем итоговый файл
+      return await zip.generateAsync({ type: 'blob' });
+      
+    } catch (error) {
+      console.error('Ошибка обработки шаблона:', error);
+      // Fallback: создаем документ с нуля
+      return await this.createFallbackDocument(reportData, chartImageBuffer);
+    }
+  }
+
+  /**
+   * Подготовка данных для замены плейсхолдеров
+   */
+  private prepareReplacements(reportData: ReportData): Record<string, string> {
+    const testTypes = {
+      'empty-object': 'Соответствие критериям в пустом объекте',
+      'loaded-object': 'Соответствие критериям в загруженном объекте',
+      'door-opening': 'Открытие двери',
+      'power-off': 'Отключение электропитания',
+      'power-on': 'Включение электропитания'
+    };
+
+    const testPeriodInfo = this.getTestPeriodInfo(reportData.markers);
+    const acceptanceCriteria = this.formatAcceptanceCriteria(reportData.limits);
+
+    return {
+      'Report No.': reportData.reportNumber || 'Не указан',
+      'Report date': reportData.reportDate ? new Date(reportData.reportDate).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU'),
+      'name of the object': reportData.objectName || 'Не указано',
+      'name of the air conditioning system': reportData.climateSystemName || 'Не указано',
+      'name of the test': testTypes[reportData.testType as keyof typeof testTypes] || reportData.testType,
+      'acceptance criteria': acceptanceCriteria,
+      'Date time of test start': testPeriodInfo?.startTime || 'Не указано',
+      'Date time of test completion': testPeriodInfo?.endTime || 'Не указано',
+      'Duration of the test': testPeriodInfo?.duration || 'Не указано',
+      'Result': reportData.conclusion || 'Выводы не указаны',
+      'executor': reportData.user.fullName || 'Не указано',
+      'director': reportData.director || 'Не указано',
+      'test date': new Date().toLocaleDateString('ru-RU')
+    };
+  }
+
+  /**
+   * Обработка специальных плейсхолдеров (таблица и график)
+   */
+  private async processSpecialPlaceholders(
+    xml: string, 
+    reportData: ReportData, 
+    chartImageBuffer: ArrayBuffer | null, 
+    zip: any
+  ): Promise<string> {
+    let processedXml = xml;
+
+    // Замена плейсхолдера таблицы результатов
+    if (reportData.resultsTableData && reportData.resultsTableData.length > 0) {
+      const tableXml = this.generateTableXml(reportData.resultsTableData);
+      processedXml = processedXml.replace(/\{Results table\}/g, tableXml);
+    } else {
+      processedXml = processedXml.replace(/\{Results table\}/g, 'Данные для таблицы результатов отсутствуют');
+    }
+
+    // Замена плейсхолдера графика
+    if (chartImageBuffer) {
+      const chartXml = await this.generateChartXml(chartImageBuffer, zip);
+      processedXml = processedXml.replace(/\{chart\}/g, chartXml);
+    } else {
+      processedXml = processedXml.replace(/\{chart\}/g, 'График не был сгенерирован');
+    }
+
+    return processedXml;
+  }
+
+  /**
+   * Генерация XML для таблицы результатов
+   */
+  private generateTableXml(resultsTableData: any[]): string {
+    // Находим глобальные минимальные и максимальные значения (исключая внешние датчики)
+    const nonExternalMinValues = resultsTableData
+      .filter(row => !row.isExternal)
+      .map(row => parseFloat(row.minTemp))
+      .filter(val => !isNaN(val));
+    
+    const nonExternalMaxValues = resultsTableData
+      .filter(row => !row.isExternal)
+      .map(row => parseFloat(row.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    const globalMinTemp = nonExternalMinValues.length > 0 ? Math.min(...nonExternalMinValues) : null;
+    const globalMaxTemp = nonExternalMaxValues.length > 0 ? Math.max(...nonExternalMaxValues) : null;
+
+    let tableXml = `
+      <w:tbl>
+        <w:tblPr>
+          <w:tblW w:w="0" w:type="auto"/>
+          <w:tblBorders>
+            <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          </w:tblBorders>
+        </w:tblPr>
+        <w:tr>
+          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>№ зоны измерения</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Уровень измерения (м.)</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Наименование логгера</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Серийный № логгера</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Мин. t°C</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Макс. t°C</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Среднее t°C</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Соответствие лимитам</w:t></w:r></w:p></w:tc>
+        </w:tr>`;
+
+    resultsTableData.forEach(row => {
+      const minTempValue = parseFloat(row.minTemp);
+      const maxTempValue = parseFloat(row.maxTemp);
+      
+      const isGlobalMin = !row.isExternal && !isNaN(minTempValue) && globalMinTemp !== null && minTempValue === globalMinTemp;
+      const isGlobalMax = !row.isExternal && !isNaN(maxTempValue) && globalMaxTemp !== null && maxTempValue === globalMaxTemp;
+
+      const minTempShading = isGlobalMin ? '<w:shd w:val="clear" w:color="auto" w:fill="ADD8E6"/>' : '';
+      const maxTempShading = isGlobalMax ? '<w:shd w:val="clear" w:color="auto" w:fill="FFB6C1"/>' : '';
+
+      tableXml += `
+        <w:tr>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(String(row.zoneNumber || '-'))}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(String(row.measurementLevel || '-'))}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(String(row.loggerName || '-'))}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(String(row.serialNumber || '-'))}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr>${minTempShading}</w:tcPr><w:p><w:r><w:t>${this.escapeXml(String(row.minTemp))}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr>${maxTempShading}</w:tcPr><w:p><w:r><w:t>${this.escapeXml(String(row.maxTemp))}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(String(row.avgTemp))}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(String(row.meetsLimits || '-'))}</w:t></w:r></w:p></w:tc>
+        </w:tr>`;
+    });
+
+    tableXml += '</w:tbl>';
+    return tableXml;
+  }
+
+  /**
+   * Генерация XML для вставки графика
+   */
+  private async generateChartXml(chartImageBuffer: ArrayBuffer, zip: any): Promise<string> {
+    // Добавляем изображение в архив
+    const imageId = 'chart1';
+    const imagePath = `word/media/${imageId}.png`;
+    zip.file(imagePath, chartImageBuffer);
+
+    // Обновляем relationships
+    const relsPath = 'word/_rels/document.xml.rels';
+    let relsXml = await zip.file(relsPath)?.async('text') || '';
+    
+    if (!relsXml.includes(`media/${imageId}.png`)) {
+      const relationshipId = `rId${Date.now()}`;
+      const newRelationship = `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageId}.png"/>`;
+      relsXml = relsXml.replace('</Relationships>', newRelationship + '</Relationships>');
+      zip.file(relsPath, relsXml);
+    }
+
+    // Генерируем XML для изображения с размером 675x900 пикселей
+    const widthEmu = 675 * 9525; // Конвертация пикселей в EMU
+    const heightEmu = 900 * 9525;
+
+    return `
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="center"/>
+        </w:pPr>
+        <w:r>
+          <w:drawing>
+            <wp:inline distT="0" distB="0" distL="0" distR="0">
+              <wp:extent cx="${widthEmu}" cy="${heightEmu}"/>
+              <wp:effectExtent l="0" t="0" r="0" b="0"/>
+              <wp:docPr id="1" name="График"/>
+              <wp:cNvGraphicFramePr>
+                <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+              </wp:cNvGraphicFramePr>
+              <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                    <pic:nvPicPr>
+                      <pic:cNvPr id="1" name="График"/>
+                      <pic:cNvPicPr/>
+                    </pic:nvPicPr>
+                    <pic:blipFill>
+                      <a:blip r:embed="rId${Date.now()}"/>
+                      <a:stretch>
+                        <a:fillRect/>
+                      </a:stretch>
+                    </pic:blipFill>
+                    <pic:spPr>
+                      <a:xfrm>
+                        <a:off x="0" y="0"/>
+                        <a:ext cx="${widthEmu}" cy="${heightEmu}"/>
+                      </a:xfrm>
+                      <a:prstGeom prst="rect">
+                        <a:avLst/>
+                      </a:prstGeom>
+                    </pic:spPr>
+                  </pic:pic>
+                </a:graphicData>
+              </a:graphic>
+            </wp:inline>
+          </w:drawing>
+        </w:r>
+      </w:p>`;
+  }
+
+  /**
+   * Экранирование XML символов
+   */
+  private escapeXml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  /**
+   * Создание документа с нуля (fallback)
+   */
+  private async createFallbackDocument(reportData: ReportData, chartImageBuffer: ArrayBuffer | null): Promise<Blob> {
     // Получаем информацию о временном периоде
     const testPeriodInfo = this.getTestPeriodInfo(reportData.markers);
     
@@ -378,8 +639,8 @@ export class ReportGenerator {
             new ImageRun({
               data: chartImageBuffer,
               transformation: {
-                width: 600,  // Ширина в пикселях
-                height: 400  // Высота в пикселях (соотношение 3:2)
+                width: 675,  // Ширина в пикселях
+                height: 900  // Высота в пикселях
               }
             })
           ],
@@ -452,7 +713,7 @@ export class ReportGenerator {
       })
     );
 
-    return new Document({
+    const doc = new Document({
       sections: [
         {
           properties: {},
@@ -460,6 +721,26 @@ export class ReportGenerator {
         }
       ]
     });
+
+    return await Packer.toBlob(doc);
+  }
+
+  /**
+   * Создание таблицы результатов
+   */
+  private createResultsTable(resultsTableData: any[]): Table {
+    // Находим глобальные минимальные и максимальные значения (исключая внешние датчики)
+    const nonExternalMinValues = resultsTableData
+      .filter(row => !row.isExternal)
+      .map(row => parseFloat(row.minTemp))
+      .filter(val => !isNaN(val));
+    
+    const nonExternalMaxValues = resultsTableData
+      .filter(row => !row.isExternal)
+      .map(row => parseFloat(row.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    const globalMinTemp = nonExternalMinValues.length > 0 ? Math.min(...nonExternalMinValues) : null;
     const globalMaxTemp = nonExternalMaxValues.length > 0 ? Math.max(...nonExternalMaxValues) : null;
 
     const rows = [];
@@ -609,23 +890,6 @@ export class ReportGenerator {
     });
   }
 
-  /**
-   * Создание таблицы результатов
-   */
-  private createResultsTable(resultsTableData: any[]): Table {
-    // Находим глобальные минимальные и максимальные значения (исключая внешние датчики)
-    const nonExternalMinValues = resultsTableData
-      .filter(row => !row.isExternal)
-      .map(row => parseFloat(row.minTemp))
-      .filter(val => !isNaN(val));
-    
-    const nonExternalMaxValues = resultsTableData
-      .filter(row => !row.isExternal)
-      .map(row => parseFloat(row.maxTemp))
-      .filter(val => !isNaN(val));
-    
-    const globalMinTemp = nonExternalMinValues.length > 0 ? Math.min(...nonExternalMinValues) : null;
-  }
   /**
    * Получение информации о временном периоде испытания
    */
