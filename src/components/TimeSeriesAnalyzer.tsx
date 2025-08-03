@@ -501,9 +501,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <h3 className="text-lg font-semibold text-gray-900">
             График {dataType === 'temperature' ? 'температуры' : 'влажности'}
           </h3>
-          <p className="text-sm text-gray-600">
-            Двойной клик для добавления маркера, выделение области для увеличения
-          </p>
         </div>
         
         <div ref={chartRef}>

@@ -67,37 +67,56 @@ export class ReportGenerator {
       
       if (chartElement) {
         try {
-          // Определяем область для захвата
-          let captureOptions: any = {
+          // Создаем контейнер для графика с заголовком и легендой
+          const chartContainer = document.createElement('div');
+          chartContainer.style.width = '900px';
+          chartContainer.style.height = '675px';
+          chartContainer.style.backgroundColor = '#ffffff';
+          chartContainer.style.padding = '20px';
+          chartContainer.style.fontFamily = 'Arial, sans-serif';
+          
+          // Добавляем заголовок
+          const title = document.createElement('div');
+          title.style.fontSize = '18px';
+          title.style.fontWeight = 'bold';
+          title.style.textAlign = 'center';
+          title.style.marginBottom = '15px';
+          title.style.color = '#333333';
+          title.textContent = `График ${reportData.dataType === 'temperature' ? 'температуры' : 'влажности'}`;
+          chartContainer.appendChild(title);
+          
+          // Клонируем оригинальный график
+          const chartClone = chartElement.cloneNode(true) as HTMLElement;
+          chartClone.style.width = '860px';
+          chartClone.style.height = '580px';
+          chartContainer.appendChild(chartClone);
+          
+          // Добавляем легенду (если есть несколько файлов)
+          const legendElement = chartElement.querySelector('.mb-4.p-3.bg-gray-50.rounded-lg');
+          if (legendElement) {
+            const legendClone = legendElement.cloneNode(true) as HTMLElement;
+            legendClone.style.marginTop = '10px';
+            legendClone.style.fontSize = '12px';
+            chartContainer.appendChild(legendClone);
+          }
+          
+          // Временно добавляем контейнер в DOM
+          document.body.appendChild(chartContainer);
+          
+          // Захватываем изображение контейнера
+          const captureOptions = {
             backgroundColor: '#ffffff',
             scale: 1,
             useCORS: true,
-            allowTaint: true
+            allowTaint: true,
+            width: 900,
+            height: 675
           };
 
-          // Если есть зум (выделенная область), захватываем только её
-          if (reportData.markers && reportData.markers.length >= 2) {
-            // Находим область графика внутри элемента
-            const chartSvg = chartElement.querySelector('svg');
-            if (chartSvg) {
-              const svgRect = chartSvg.getBoundingClientRect();
-              const containerRect = chartElement.getBoundingClientRect();
-              
-              // Вычисляем относительные координаты SVG внутри контейнера
-              const svgLeft = svgRect.left - containerRect.left;
-              const svgTop = svgRect.top - containerRect.top;
-              
-              captureOptions = {
-                ...captureOptions,
-                x: svgLeft,
-                y: svgTop,
-                width: svgRect.width,
-                height: svgRect.height
-              };
-            }
-          }
-
-          const canvas = await html2canvas(chartElement, captureOptions);
+          const canvas = await html2canvas(chartContainer, captureOptions);
+          
+          // Удаляем временный контейнер
+          document.body.removeChild(chartContainer);
           
           console.log('График успешно конвертирован в canvas');
           console.log('Размер исходного canvas:', canvas.width, 'x', canvas.height);
