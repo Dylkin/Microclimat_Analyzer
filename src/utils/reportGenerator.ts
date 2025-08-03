@@ -290,35 +290,211 @@ export class ReportGenerator {
       return xml.replace('{Results table}', 'Нет данных для отображения');
     }
 
-    // Создаем HTML таблицу
+    // Создаем DOCX таблицу с правильными границами
     let tableHtml = `
       <w:tbl>
         <w:tblPr>
           <w:tblStyle w:val="TableGrid"/>
           <w:tblW w:w="0" w:type="auto"/>
+          <w:tblBorders>
+            <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          </w:tblBorders>
         </w:tblPr>
         <w:tr>
-          <w:tc><w:p><w:r><w:t>№ зоны</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>Логгер</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>S/N</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>Мин. t°C</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>Макс. t°C</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>Среднее t°C</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>Соответствие</w:t></w:r></w:p></w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>№ зоны</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Логгер</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>S/N</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Мин. t°C</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Макс. t°C</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Среднее t°C</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Соответствие</w:t></w:r></w:p>
+          </w:tc>
         </w:tr>`;
 
     tableData.forEach(row => {
       tableHtml += `
         <w:tr>
-          <w:tc><w:p><w:r><w:t>${row.zoneNumber || ''}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.measurementLevel || ''}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.loggerName || ''}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.serialNumber || ''}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.minTemp || ''}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.maxTemp || ''}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.avgTemp || ''}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.meetsLimits || ''}</w:t></w:r></w:p></w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${row.zoneNumber || ''}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${row.measurementLevel || ''}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${row.loggerName || ''}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${row.serialNumber || ''}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${row.minTemp || ''}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${row.maxTemp || ''}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${row.avgTemp || ''}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${row.meetsLimits || ''}</w:t></w:r></w:p>
+          </w:tc>
         </w:tr>`;
     });
 
@@ -334,13 +510,16 @@ export class ReportGenerator {
 
     const base64Data = chartImageData.split(',')[1];
     
-    // Создаем XML для изображения
+    // Создаем правильный XML для изображения с корректными размерами
     const imageXml = `
       <w:p>
+        <w:pPr>
+          <w:jc w:val="center"/>
+        </w:pPr>
         <w:r>
           <w:drawing>
             <wp:inline distT="0" distB="0" distL="0" distR="0">
-              <wp:extent cx="6096000" cy="2286000"/>
+              <wp:extent cx="5486400" cy="2286000"/>
               <wp:effectExtent l="0" t="0" r="0" b="0"/>
               <wp:docPr id="1" name="График"/>
               <wp:cNvGraphicFramePr/>
@@ -360,7 +539,7 @@ export class ReportGenerator {
                     <pic:spPr>
                       <a:xfrm>
                         <a:off x="0" y="0"/>
-                        <a:ext cx="6096000" cy="2286000"/>
+                        <a:ext cx="5486400" cy="2286000"/>
                       </a:xfrm>
                       <a:prstGeom prst="rect">
                         <a:avLst/>
@@ -387,12 +566,43 @@ export class ReportGenerator {
 
       let relsXml = await relsFile.async('text');
       
-      // Добавляем связь с изображением если её нет
-      if (!relsXml.includes('rId1')) {
-        const imageRel = '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>';
+      // Находим максимальный rId и добавляем новый
+      const rIdMatches = relsXml.match(/rId(\d+)/g);
+      let maxRId = 0;
+      if (rIdMatches) {
+        rIdMatches.forEach(match => {
+          const num = parseInt(match.replace('rId', ''));
+          if (num > maxRId) maxRId = num;
+        });
+      }
+      
+      const newRId = `rId${maxRId + 1}`;
+      
+      // Добавляем связь с изображением
+      if (!relsXml.includes('Target="media/image1.png"')) {
+        const imageRel = `<Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>`;
         relsXml = relsXml.replace('</Relationships>', `${imageRel}</Relationships>`);
         zip.file('word/_rels/document.xml.rels', relsXml);
+        
+        // Обновляем ссылку в XML документа
+        const documentXml = await zip.file('word/document.xml')?.async('text');
+        if (documentXml) {
+          const updatedDocumentXml = documentXml.replace(/r:embed="rId1"/g, `r:embed="${newRId}"`);
+          zip.file('word/document.xml', updatedDocumentXml);
+        }
       }
+      
+      // Обновляем [Content_Types].xml для поддержки PNG изображений
+      const contentTypesFile = zip.file('[Content_Types].xml');
+      if (contentTypesFile) {
+        let contentTypesXml = await contentTypesFile.async('text');
+        if (!contentTypesXml.includes('Extension="png"')) {
+          const pngType = '<Default Extension="png" ContentType="image/png"/>';
+          contentTypesXml = contentTypesXml.replace('</Types>', `${pngType}</Types>`);
+          zip.file('[Content_Types].xml', contentTypesXml);
+        }
+      }
+      
     } catch (error) {
       console.warn('Ошибка обновления relationships:', error);
     }
