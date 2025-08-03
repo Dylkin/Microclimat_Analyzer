@@ -610,6 +610,22 @@ export class ReportGenerator {
   }
 
   /**
+   * Создание таблицы результатов
+   */
+  private createResultsTable(resultsTableData: any[]): Table {
+    // Находим глобальные минимальные и максимальные значения (исключая внешние датчики)
+    const nonExternalMinValues = resultsTableData
+      .filter(row => !row.isExternal)
+      .map(row => parseFloat(row.minTemp))
+      .filter(val => !isNaN(val));
+    
+    const nonExternalMaxValues = resultsTableData
+      .filter(row => !row.isExternal)
+      .map(row => parseFloat(row.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    const globalMinTemp = nonExternalMinValues.length > 0 ? Math.min(...nonExternalMinValues) : null;
+  /**
    * Получение информации о временном периоде испытания
    */
   private getTestPeriodInfo(markers: VerticalMarker[]) {
