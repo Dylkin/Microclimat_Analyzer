@@ -161,110 +161,48 @@ export class ReportGenerator {
               rotatedCanvas.toBlob((blob) => {
                 resolve(blob);
               }, 'image/png');
+            });
+
+            if (chartBlob) {
+              chartImageBuffer = await chartBlob.arrayBuffer();
+              console.log('График конвертирован в ArrayBuffer, размер:', chartImageBuffer.byteLength, 'байт');
+              
+              // Сохраняем график для повторного скачивания
+              this.generatedCharts.set(chartFileName, chartBlob);
             }
-            )
           }
         } catch (error) {
-          console.error('Ошибка при добавлении отчета к существующему файлу:', error);
-          return {
-            success: false,
-            fileName: '',
-            error: error instanceof Error ? error.message : 'Неизвестная ошибка при добавлении отчета'
-          };
+          console.error('Ошибка при создании изображения графика:', error);
+          // Продолжаем без графика
         }
       }
-      // Создаем новый отчет на основе шаблона
-      const newReportResult = await this.generateFromTemplate(templateFile, reportData, chartElement);
+
+      // Обрабатываем шаблон и создаем отчет
+      const reportBlob = await this.processTemplate(baseDocument, reportData, chartImageBuffer);
       
-      if (!newReportResult.success) {
-        throw new Error(newReportResult.error || 'Ошибка создания нового отчета');
-      }
+      // Сохраняем мастер-отчет
+      this.masterReport = reportBlob;
       
-      // Читаем существующий файл
-      const existingZip = new JSZip();
-      await existingZip.loadAsync(existingDocx);
+      // Сохраняем отчет для повторного скачивания
+      this.generatedReports.set(fileName, reportBlob);
       
-      // Читаем новый отчет
-      const newReportZip = new JSZip();
-      await newReportZip.loadAsync(this.reports[newReportResult.fileName]);
+      // Скачиваем файл
+      saveAs(reportBlob, fileName);
       
-      // Получаем содержимое документов
-      const existingDocXml = await existingZip.file('word/document.xml')?.async('text');
-      const newReportDocXml = await newReportZip.file('word/document.xml')?.async('text');
+      console.log('Отчет успешно сгенерирован и сохранен:', fileName);
       
-      if (!existingDocXml || !newReportDocXml) {
-        throw new Error('Не удалось прочитать содержимое документов');
-      }
+      return {
+        success: true,
+        fileName: fileName
+      };
       
-      // Извлекаем содержимое body из нового отчета
-      const newBodyMatch = newReportDocXml.match(/<w:body[^>]*>(.*?)<\/w:body>/s);
-      if (!newBodyMatch) {
-        throw new Error('Не удалось найти содержимое body в новом отчете');
-      }
-      
-      const newBodyContent = newBodyMatch[1];
-      
-      // Добавляем разрыв страницы и новое содержимое в существующий документ
-      const pageBreak = `
-        <w:p>
-          <w:r>
-            <w:br w:type="page"/>
-          </w:r>
-        </w:p>
-      `;
-      
-      const updatedDocXml = existingDocXml.replace(
-        '</w:body>',
-        pageBreak + newBodyContent + '</w:body>'
-      );
-      
-      // Обновляем document.xml
-      existingZip.file('word/document.xml', updatedDocXml);
-      
-      // Копируем медиа файлы из нового отчета (изображения графиков)
-      const mediaFiles = newReportZip.folder('word/media');
-      if (mediaFiles) {
-        mediaFiles.forEach((relativePath, file) => {
-          if (!file.dir) {
-            existingZip.file(`word/media/${relativePath}`, file.async('arraybuffer'));
-          }
-        });
-      }
-      
-      // Обновляем relationships если нужно
-      const newRelsXml = await newReportZip.file('word/_rels/document.xml.rels')?.async('text');
-      const existingRelsXml = await existingZip.file('word/_rels/document.xml.rels')?.async('text');
-      
-      if (newRelsXml && existingRelsXml) {
-        // Объединяем relationships
-        const mergedRels = this.mergeRelationships(existingRelsXml, newRelsXml);
-        existingZip.file('word/_rels/document.xml.rels', mergedRels);
-      }
-      
-      // Генерируем обновленный файл
-      const updatedBuffer = await existingZip.generateAsync({ 
-        type: 'arraybuffer',
-        compression: 'DEFLATE',
-        compressionOptions: { level: 6 }
-      });
-      
-      // Сохраняем обновленный мастер-отчет
-      this.masterReport = updatedBuffer;
-      
-      // Удаляем временный новый отчет из хранилища
-      delete this.reports[newReportResult.fileName];
-      
-      // Скачиваем обновленный файл
-      this.downloadBuffer(updatedBuffer, this.masterReportFileName);
-      
+    } catch (error) {
+      console.error('Ошибка при добавлении отчета к существующему файлу:', error);
       return {
         success: false,
         fileName: '',
-        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка при добавлении отчета'
       };
-    } catch (error) {
-      console.error('Error adding report to existing file:', error);
-      throw error;
     }
   }
 
@@ -314,37 +252,11 @@ export class ReportGenerator {
         error: error instanceof Error ? error.message : 'Неизвестная ошибка'
       };
     }
-  private replacePlaceholders(content: string, data: any): string {
-    let result = content;
-    
-    // Основные плейсхолдеры
-    const placeholders = {
-      '{Report No.}': data.reportNumber || '',
-      '{Report date}': data.reportDate ? new Date(data.reportDate).toLocaleDateString('ru-RU') : '',
-      '{name of the object}': data.objectName || '',
-      '{name of the air conditioning system}': data.climateSystemName || '',
-      '{name of the test}': this.getTestTypeName(data.testType) || '',
-      '{acceptance criteria}': this.formatAcceptanceCriteria(data.limits) || 'Критерии не установлены',
-      '{Result}': data.conclusion || '',
-      '{executor}': data.user?.fullName || '',
-      '{director}': data.director || '',
-      '{test date}': new Date().toLocaleDateString('ru-RU'),
-      '{Date time of test start}': this.getTestStartTime(data.markers),
-      '{Date time of test completion}': this.getTestEndTime(data.markers),
-      '{Duration of the test}': this.getTestDuration(data.markers)
-    };
-
-    // Заменяем обычные плейсхолдеры
-    Object.entries(placeholders).forEach(([placeholder, value]) => {
-      result = result.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), String(value));
-    });
-
-    // Специальные плейсхолдеры
-    result = this.replaceResultsTable(result, data.resultsTableData || []);
-    result = this.replaceChart(result, data.chartImageData || '');
-
-    return result;
+  } catch (error) {
+    console.error('Error in generateFromTemplate:', error);
+    throw error;
   }
+}
 
   private replacePlaceholders(content: string, reportData: any): string {
     let result = content;
@@ -477,152 +389,6 @@ export class ReportGenerator {
           <w:tc><w:p><w:r><w:t>${row.meetsLimits || '-'}</w:t></w:r></w:p></w:tc>
         </w:tr>`;
     });
-  private getTestTypeName(testType: string): string {
-    const testTypes: { [key: string]: string } = {
-      'empty-object': 'Соответствие критериям в пустом объекте',
-      'loaded-object': 'Соответствие критериям в загруженном объекте',
-      'door-opening': 'Открытие двери',
-      'power-off': 'Отключение электропитания',
-      'power-on': 'Включение электропитания'
-    };
-    return testTypes[testType] || testType;
-  }
-
-  private formatAcceptanceCriteria(limits: any): string {
-    if (!limits) return 'Критерии не установлены';
-    
-    const criteria: string[] = [];
-    
-    if (limits.temperature) {
-      const temp = limits.temperature;
-      if (temp.min !== undefined && temp.max !== undefined) {
-        criteria.push(`Температура: от ${temp.min}°C до ${temp.max}°C`);
-      } else if (temp.min !== undefined) {
-        criteria.push(`Температура: не менее ${temp.min}°C`);
-      } else if (temp.max !== undefined) {
-        criteria.push(`Температура: не более ${temp.max}°C`);
-      }
-    }
-    
-    if (limits.humidity) {
-      const hum = limits.humidity;
-      if (hum.min !== undefined && hum.max !== undefined) {
-        criteria.push(`Влажность: от ${hum.min}% до ${hum.max}%`);
-      } else if (hum.min !== undefined) {
-        criteria.push(`Влажность: не менее ${hum.min}%`);
-      } else if (hum.max !== undefined) {
-        criteria.push(`Влажность: не более ${hum.max}%`);
-      }
-    }
-    
-    return criteria.length > 0 ? criteria.join('; ') : 'Критерии не установлены';
-  }
-
-  private getTestStartTime(markers: any[]): string {
-    if (!markers || markers.length === 0) return '';
-    const startMarker = markers.find(m => m.label?.toLowerCase().includes('начало'));
-    return startMarker ? new Date(startMarker.timestamp).toLocaleString('ru-RU') : '';
-  }
-
-  private getTestEndTime(markers: any[]): string {
-    if (!markers || markers.length === 0) return '';
-    const endMarker = markers.find(m => m.label?.toLowerCase().includes('конец'));
-    return endMarker ? new Date(endMarker.timestamp).toLocaleString('ru-RU') : '';
-  }
-
-  private getTestDuration(markers: any[]): string {
-    if (!markers || markers.length < 2) return '';
-    const startMarker = markers.find(m => m.label?.toLowerCase().includes('начало'));
-    const endMarker = markers.find(m => m.label?.toLowerCase().includes('конец'));
-    
-    if (!startMarker || !endMarker) return '';
-    
-    const duration = endMarker.timestamp - startMarker.timestamp;
-    const hours = Math.floor(duration / (1000 * 60 * 60));
-    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
-    
-    return `${hours} ч ${minutes} мин`;
-  }
-
-  private replaceResultsTable(content: string, tableData: any[]): string {
-    const tableXml = this.generateTableXml(tableData);
-    return content.replace(/{Results table}/g, tableXml);
-  }
-
-  private replaceChart(content: string, chartImageData: string): string {
-    if (!chartImageData) {
-      return content.replace(/{chart}/g, '<w:p><w:r><w:t>График не доступен</w:t></w:r></w:p>');
-    }
-    
-    const chartXml = this.generateChartXml(chartImageData);
-    return content.replace(/{chart}/g, chartXml);
-  }
-
-  private generateTableXml(tableData: any[]): string {
-    if (!tableData || tableData.length === 0) {
-      return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
-    }
-
-    let tableXml = `
-      <w:tbl>
-        <w:tblPr>
-          <w:tblStyle w:val="TableGrid"/>
-          <w:tblW w:w="0" w:type="auto"/>
-          <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
-        </w:tblPr>
-        <w:tblGrid>
-          <w:gridCol w:w="1000"/>
-          <w:gridCol w:w="1200"/>
-          <w:gridCol w:w="1200"/>
-          <w:gridCol w:w="1200"/>
-          <w:gridCol w:w="800"/>
-          <w:gridCol w:w="800"/>
-          <w:gridCol w:w="800"/>
-          <w:gridCol w:w="1000"/>
-        </w:tblGrid>
-        <w:tr>
-          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>№ зоны</w:t></w:r></w:p></w:tc>
-          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
-          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>Логгер</w:t></w:r></w:p></w:tc>
-          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>S/N</w:t></w:r></w:p></w:tc>
-          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>Мин. t°C</w:t></w:r></w:p></w:tc>
-          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>Макс. t°C</w:t></w:r></w:p></w:tc>
-          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>Среднее t°C</w:t></w:r></w:p></w:tc>
-          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>Соответствие</w:t></w:r></w:p></w:tc>
-        </w:tr>`;
-  }
-    tableData.forEach(row => {
-      tableXml += `
-        <w:tr>
-          <w:tc><w:p><w:r><w:t>${row.zoneNumber || '-'}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.measurementLevel || '-'}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.loggerName || '-'}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.serialNumber || '-'}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.minTemp || '-'}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.maxTemp || '-'}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.avgTemp || '-'}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${row.meetsLimits || '-'}</w:t></w:r></w:p></w:tc>
-        </w:tr>`;
-    });
-
-    tableXml += '</w:tbl>';
-    return tableXml;
-  }
-
-  private generateChartXml(chartImageData: string): string {
-    // Простая заглушка для изображения графика
-    return `
-      <w:p>
-        <w:r>
-          <w:t>График температуры/влажности</w:t>
-        </w:r>
-      </w:p>
-      <w:p>
-        <w:r>
-          <w:t>[Изображение графика будет вставлено здесь]</w:t>
-        </w:r>
-      </w:p>`;
-  }
 
     tableXml += '</w:tbl>';
     return tableXml;
