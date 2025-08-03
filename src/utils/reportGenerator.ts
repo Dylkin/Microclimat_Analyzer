@@ -254,8 +254,6 @@ export class ReportGenerator {
     }
   }
 
-  }
-
   private replacePlaceholders(content: string, reportData: any): string {
     let result = content;
     
