@@ -163,6 +163,13 @@ export class ReportGenerator {
             }
             )
           }
+        } catch (error) {
+          console.error('Ошибка при добавлении отчета к существующему файлу:', error);
+          return {
+            success: false,
+            fileName: '',
+            error: error instanceof Error ? error.message : 'Неизвестная ошибка при добавлении отчета'
+          };
         }
       }
       // Создаем новый отчет на основе шаблона
