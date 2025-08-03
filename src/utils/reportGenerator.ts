@@ -21,8 +21,6 @@ interface ReportData {
   user: AuthUser;
   director?: string;
   dataType: 'temperature' | 'humidity';
-  chartImageData: string;
-}
 
 export class ReportGenerator {
   private static instance: ReportGenerator;
