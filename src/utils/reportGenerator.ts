@@ -261,6 +261,9 @@ export class ReportGenerator {
         fileName: '',
         error: error instanceof Error ? error.message : 'Неизвестная ошибка'
       };
+    } catch (error) {
+      console.error('Error adding report to existing file:', error);
+      throw error;
     }
   }
 
