@@ -625,6 +625,7 @@ export class ReportGenerator {
       .filter(val => !isNaN(val));
     
     const globalMinTemp = nonExternalMinValues.length > 0 ? Math.min(...nonExternalMinValues) : null;
+  }
   /**
    * Получение информации о временном периоде испытания
    */
