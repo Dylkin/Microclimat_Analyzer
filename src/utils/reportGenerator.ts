@@ -267,6 +267,54 @@ export class ReportGenerator {
     }
   }
 
+  private async generateFromTemplate(
+    templateFile: File,
+    reportData: any,
+    chartElement?: HTMLElement
+  ): Promise<{ success: boolean; fileName: string; error?: string }> {
+    try {
+      // Читаем шаблон
+      const templateBuffer = await templateFile.arrayBuffer();
+      const zip = new JSZip();
+      await zip.loadAsync(templateBuffer);
+
+      // Получаем содержимое document.xml
+      const documentXml = await zip.file('word/document.xml')?.async('string');
+      if (!documentXml) {
+        throw new Error('Не удалось найти document.xml в шаблоне');
+      }
+
+      // Заменяем плейсхолдеры
+      let processedXml = await this.replacePlaceholders(documentXml, reportData);
+      
+      // Обрабатываем специальные плейсхолдеры
+      processedXml = await this.processSpecialPlaceholders(processedXml, reportData, zip, chartElement);
+
+      // Сохраняем обновленный document.xml
+      zip.file('word/document.xml', processedXml);
+
+      // Генерируем имя файла
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const fileName = `Отчет_${reportData.reportNumber || timestamp}.docx`;
+
+      // Генерируем и сохраняем файл
+      const blob = await zip.generateAsync({ type: 'blob' });
+      this.saveBlob(blob, fileName);
+
+      // Сохраняем в памяти для повторного скачивания
+      this.generatedReports.set(fileName, blob);
+
+      return { success: true, fileName };
+    } catch (error) {
+      console.error('Ошибка генерации отчета из шаблона:', error);
+      return {
+        success: false,
+        fileName: '',
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+      };
+    }
+  }
+
   private mergeRelationships(existingRels: string, newRels: string): string {
     try {
       // Извлекаем все Relationship элементы из нового файла
