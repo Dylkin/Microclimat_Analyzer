@@ -186,6 +186,14 @@ export class ReportGenerator {
         } catch (error) {
           console.warn('Ошибка поворота графика, используем исходный:', error);
           // Создаем Buffer для PNG файла
+          const captureOptions = {
+            backgroundColor: '#ffffff',
+            scale: 1,
+            useCORS: true,
+            allowTaint: true,
+            width: 900,
+            height: 675
+          };
           const canvas = await html2canvas(chartElement, captureOptions);
           const chartBlob = await new Promise<Blob | null>((resolve) => {
             canvas.toBlob((blob) => {
@@ -559,31 +567,6 @@ export class ReportGenerator {
 
     return processedXml;
   }
-      // Подготавливаем данные для замены
-      const replacements = this.prepareReplacements(reportData);
-      
-      // Заменяем плейсхолдеры в XML
-      let processedXml = documentXml;
-      for (const [placeholder, value] of Object.entries(replacements)) {
-        const regex = new RegExp(`\\{${placeholder}\\}`, 'g');
-        processedXml = processedXml.replace(regex, this.escapeXml(value));
-      }
-
-      // Обрабатываем специальные плейсхолдеры
-      processedXml = await this.processSpecialPlaceholders(processedXml, reportData, chartImageBuffer, zip);
-
-      // Обновляем document.xml в архиве
-      zip.file('word/document.xml', processedXml);
-
-      // Генерируем итоговый файл
-      return await zip.generateAsync({ type: 'blob' });
-      
-    } catch (error) {
-      console.error('Ошибка обработки шаблона:', error);
-      // Fallback: создаем документ с нуля
-      return await this.createFallbackDocument(reportData, chartImageBuffer);
-    }
-  }
 
   /**
    * Подготовка данных для замены плейсхолдеров
@@ -615,36 +598,6 @@ export class ReportGenerator {
       'director': reportData.director || 'Не указано',
       'test date': new Date().toLocaleDateString('ru-RU')
     };
-  }
-
-  /**
-   * Обработка специальных плейсхолдеров (таблица и график)
-   */
-  private async processSpecialPlaceholders(
-    xml: string, 
-    reportData: ReportData, 
-    chartImageBuffer: ArrayBuffer | null, 
-    zip: any
-  ): Promise<string> {
-    let processedXml = xml;
-
-    // Замена плейсхолдера таблицы результатов
-    if (reportData.resultsTableData && reportData.resultsTableData.length > 0) {
-      const tableXml = this.generateTableXml(reportData.resultsTableData);
-      processedXml = processedXml.replace(/\{Results table\}/g, tableXml);
-    } else {
-      processedXml = processedXml.replace(/\{Results table\}/g, 'Данные для таблицы результатов отсутствуют');
-    }
-
-    // Замена плейсхолдера графика
-    if (chartImageBuffer) {
-      const chartXml = await this.generateChartXml(chartImageBuffer, zip);
-      processedXml = processedXml.replace(/\{chart\}/g, chartXml);
-    } else {
-      processedXml = processedXml.replace(/\{chart\}/g, 'График не был сгенерирован');
-    }
-
-    return processedXml;
   }
 
   /**
