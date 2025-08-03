@@ -286,7 +286,7 @@ export class ReportGenerator {
   /**
    * Добавление новой секции отчета в существующий документ
    */
-  private addNewReportSection(documentXml: string, reportData: ReportData, chartImageBuffer: ArrayBuffer | null, zip: any): string {
+  private async addNewReportSection(documentXml: string, reportData: ReportData, chartImageBuffer: ArrayBuffer | null, zip: any): Promise<string> {
     try {
       // Находим конец документа (перед закрывающим тегом </w:body>)
       const bodyEndIndex = documentXml.lastIndexOf('</w:body>');
@@ -295,8 +295,8 @@ export class ReportGenerator {
         throw new Error('Не удалось найти конец документа');
       }
 
-      // Создаем новую секцию отчета
-      const newSectionXml = this.generateNewReportSectionXml(reportData, chartImageBuffer, zip);
+      // Создаем новую секцию отчета на основе шаблона
+      const newSectionXml = await this.generateNewReportSectionFromTemplate(reportData, chartImageBuffer, zip);
       
       // Вставляем новую секцию перед закрывающим тегом body
       const beforeBody = documentXml.substring(0, bodyEndIndex);
@@ -307,16 +307,17 @@ export class ReportGenerator {
     } catch (error) {
       console.error('Ошибка добавления новой секции:', error);
       // Fallback: обрабатываем как новый отчет
-      return this.processNewReport(documentXml, reportData, chartImageBuffer, zip);
+      return await this.processNewReport(documentXml, reportData, chartImageBuffer, zip);
     }
   }
 
   /**
-   * Генерация XML для новой секции отчета
+   * Генерация XML для новой секции отчета на основе шаблона
    */
-  private generateNewReportSectionXml(reportData: ReportData, chartImageBuffer: ArrayBuffer | null, zip: any): string {
+  private async generateNewReportSectionFromTemplate(reportData: ReportData, chartImageBuffer: ArrayBuffer | null, zip: any): Promise<string> {
     const replacements = this.prepareReplacements(reportData);
     
+    // Создаем базовую структуру секции с плейсхолдерами
     let sectionXml = `
       <!-- Разрыв страницы -->
       <w:p>
@@ -325,7 +326,7 @@ export class ReportGenerator {
         </w:r>
       </w:p>
       
-      <!-- Заголовок нового отчета -->
+      <!-- Новая секция отчета -->
       <w:p>
         <w:pPr>
           <w:jc w:val="center"/>
@@ -335,7 +336,7 @@ export class ReportGenerator {
             <w:b/>
             <w:sz w:val="32"/>
           </w:rPr>
-          <w:t>ОТЧЕТ № ${this.escapeXml(replacements['Report No.'])}</w:t>
+          <w:t>ОТЧЕТ № {Report No.}</w:t>
         </w:r>
       </w:p>
       
@@ -347,12 +348,31 @@ export class ReportGenerator {
           <w:rPr>
             <w:sz w:val="24"/>
           </w:rPr>
-          <w:t>от ${this.escapeXml(replacements['Report date'])}</w:t>
+          <w:t>от {Report date}</w:t>
         </w:r>
       </w:p>
       
-      <!-- Основная информация -->
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="center"/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:b/>
+            <w:sz w:val="28"/>
+          </w:rPr>
+          <w:t>О РЕЗУЛЬТАТАХ ИСПЫТАНИЙ МИКРОКЛИМАТА</w:t>
+        </w:r>
+      </w:p>
+      
       <w:p><w:r><w:t></w:t></w:r></w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>1. ОБЩИЕ СВЕДЕНИЯ</w:t>
+        </w:r>
+      </w:p>
       
       <w:p>
         <w:r>
@@ -360,7 +380,7 @@ export class ReportGenerator {
           <w:t>Объект исследования: </w:t>
         </w:r>
         <w:r>
-          <w:t>${this.escapeXml(replacements['name of the object'])}</w:t>
+          <w:t>{name of the object}</w:t>
         </w:r>
       </w:p>
       
@@ -370,7 +390,7 @@ export class ReportGenerator {
           <w:t>Климатическая установка: </w:t>
         </w:r>
         <w:r>
-          <w:t>${this.escapeXml(replacements['name of the air conditioning system'])}</w:t>
+          <w:t>{name of the air conditioning system}</w:t>
         </w:r>
       </w:p>
       
@@ -380,109 +400,110 @@ export class ReportGenerator {
           <w:t>Вид испытания: </w:t>
         </w:r>
         <w:r>
-          <w:t>${this.escapeXml(replacements['name of the test'])}</w:t>
+          <w:t>{name of the test}</w:t>
         </w:r>
       </w:p>
       
-      <!-- Критерии приемки -->
       <w:p><w:r><w:t></w:t></w:r></w:p>
       
       <w:p>
         <w:r>
           <w:rPr><w:b/></w:rPr>
-          <w:t>Критерии приемки:</w:t>
+          <w:t>2. КРИТЕРИИ ПРИЕМКИ</w:t>
         </w:r>
       </w:p>
       
       <w:p>
         <w:r>
-          <w:t>${this.escapeXml(replacements['acceptance criteria'])}</w:t>
+          <w:t>{acceptance criteria}</w:t>
         </w:r>
       </w:p>
       
-      <!-- Временные данные -->
       <w:p><w:r><w:t></w:t></w:r></w:p>
       
       <w:p>
         <w:r>
           <w:rPr><w:b/></w:rPr>
-          <w:t>Период проведения испытаний:</w:t>
+          <w:t>3. ПЕРИОД ПРОВЕДЕНИЯ ИСПЫТАНИЙ</w:t>
         </w:r>
       </w:p>
       
       <w:p>
         <w:r>
           <w:rPr><w:b/></w:rPr>
-          <w:t>Начало: </w:t>
+          <w:t>Начало испытания: </w:t>
         </w:r>
         <w:r>
-          <w:t>${this.escapeXml(replacements['Date time of test start'])}</w:t>
+          <w:t>{Date time of test start}</w:t>
         </w:r>
       </w:p>
       
       <w:p>
         <w:r>
           <w:rPr><w:b/></w:rPr>
-          <w:t>Завершение: </w:t>
+          <w:t>Завершение испытания: </w:t>
         </w:r>
         <w:r>
-          <w:t>${this.escapeXml(replacements['Date time of test completion'])}</w:t>
+          <w:t>{Date time of test completion}</w:t>
         </w:r>
       </w:p>
       
       <w:p>
         <w:r>
           <w:rPr><w:b/></w:rPr>
-          <w:t>Длительность: </w:t>
+          <w:t>Длительность испытания: </w:t>
         </w:r>
         <w:r>
-          <w:t>${this.escapeXml(replacements['Duration of the test'])}</w:t>
+          <w:t>{Duration of the test}</w:t>
         </w:r>
       </w:p>
       
-      <!-- Результаты измерений -->
       <w:p><w:r><w:t></w:t></w:r></w:p>
       
       <w:p>
         <w:r>
           <w:rPr><w:b/></w:rPr>
-          <w:t>Результаты измерений:</w:t>
+          <w:t>4. РЕЗУЛЬТАТЫ ИЗМЕРЕНИЙ</w:t>
         </w:r>
       </w:p>
       
-      ${this.generateTableXml(reportData.resultsTableData)}
+      {Results table}
       
-      <!-- График -->
       <w:p><w:r><w:t></w:t></w:r></w:p>
       
       <w:p>
         <w:r>
           <w:rPr><w:b/></w:rPr>
-          <w:t>График:</w:t>
+          <w:t>5. ГРАФИЧЕСКОЕ ПРЕДСТАВЛЕНИЕ ДАННЫХ</w:t>
         </w:r>
       </w:p>
       
-      ${chartImageBuffer ? this.generateChartXml(chartImageBuffer, zip) : '<w:p><w:r><w:t>График не был сгенерирован</w:t></w:r></w:p>'}
+      {chart}
       
-      <!-- Заключение -->
       <w:p><w:r><w:t></w:t></w:r></w:p>
       
       <w:p>
         <w:r>
           <w:rPr><w:b/></w:rPr>
-          <w:t>Заключение:</w:t>
+          <w:t>6. ЗАКЛЮЧЕНИЕ</w:t>
         </w:r>
       </w:p>
       
       <w:p>
         <w:r>
-          <w:t>${this.escapeXml(replacements['Result'])}</w:t>
+          <w:t>{Result}</w:t>
         </w:r>
       </w:p>
       
-      <!-- Исполнители -->
       <w:p><w:r><w:t></w:t></w:r></w:p>
       <w:p><w:r><w:t></w:t></w:r></w:p>
+      
+      <w:p>
+        <w:r>
+          <w:rPr><w:b/></w:rPr>
+          <w:t>7. ИСПОЛНИТЕЛИ</w:t>
+        </w:r>
+      </w:p>
       
       <w:p>
         <w:r>
@@ -490,7 +511,7 @@ export class ReportGenerator {
           <w:t>Исполнитель: </w:t>
         </w:r>
         <w:r>
-          <w:t>${this.escapeXml(replacements['executor'])}</w:t>
+          <w:t>{executor}</w:t>
         </w:r>
       </w:p>
       
@@ -500,20 +521,31 @@ export class ReportGenerator {
           <w:t>Руководитель: </w:t>
         </w:r>
         <w:r>
-          <w:t>${this.escapeXml(replacements['director'])}</w:t>
+          <w:t>{director}</w:t>
         </w:r>
       </w:p>
+      
+      <w:p><w:r><w:t></w:t></w:r></w:p>
       
       <w:p>
         <w:r>
           <w:rPr><w:b/></w:rPr>
-          <w:t>Дата: </w:t>
+          <w:t>Дата составления отчета: </w:t>
         </w:r>
         <w:r>
-          <w:t>${this.escapeXml(replacements['test date'])}</w:t>
+          <w:t>{test date}</w:t>
         </w:r>
       </w:p>
     `;
+    
+    // Теперь заменяем плейсхолдеры на реальные данные
+    for (const [placeholder, value] of Object.entries(replacements)) {
+      const regex = new RegExp(`\\{${placeholder}\\}`, 'g');
+      sectionXml = sectionXml.replace(regex, this.escapeXml(value));
+    }
+
+    // Обрабатываем специальные плейсхолдеры
+    sectionXml = await this.processSpecialPlaceholders(sectionXml, reportData, chartImageBuffer, zip);
     
     return sectionXml;
   }
