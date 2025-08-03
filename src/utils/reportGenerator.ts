@@ -190,7 +190,7 @@ export class ReportGenerator {
       
       if (imageData) {
         // Добавляем изображение в архив
-        zip.file('word/media/image1.png', imageData, { base64: true });
+        zip.file('word/media/media.png', imageData, { base64: true });
         
         // Обновляем relationships
         await this.updateRelationships(zip);
@@ -510,7 +510,7 @@ export class ReportGenerator {
 
     const base64Data = chartImageData.split(',')[1];
     
-    // Создаем правильный XML для изображения с корректными размерами
+    // Создаем правильный XML для изображения с корректными размерами и namespace
     const imageXml = `
       <w:p>
         <w:pPr>
@@ -518,20 +518,20 @@ export class ReportGenerator {
         </w:pPr>
         <w:r>
           <w:drawing>
-            <wp:inline distT="0" distB="0" distL="0" distR="0">
-              <wp:extent cx="5486400" cy="2286000"/>
+            <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+              <wp:extent cx="4572000" cy="2286000"/>
               <wp:effectExtent l="0" t="0" r="0" b="0"/>
-              <wp:docPr id="1" name="График"/>
+              <wp:docPr id="1" name="График" descr="График температуры"/>
               <wp:cNvGraphicFramePr/>
               <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
                 <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
                   <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
                     <pic:nvPicPr>
-                      <pic:cNvPr id="1" name="График"/>
+                      <pic:cNvPr id="0" name="График"/>
                       <pic:cNvPicPr/>
                     </pic:nvPicPr>
                     <pic:blipFill>
-                      <a:blip r:embed="rId1"/>
+                      <a:blip r:embed="rId999" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
                       <a:stretch>
                         <a:fillRect/>
                       </a:stretch>
@@ -539,7 +539,7 @@ export class ReportGenerator {
                     <pic:spPr>
                       <a:xfrm>
                         <a:off x="0" y="0"/>
-                        <a:ext cx="5486400" cy="2286000"/>
+                        <a:ext cx="4572000" cy="2286000"/>
                       </a:xfrm>
                       <a:prstGeom prst="rect">
                         <a:avLst/>
@@ -555,7 +555,8 @@ export class ReportGenerator {
 
     return {
       xml: xml.replace('{chart}', imageXml),
-      imageData: base64Data
+      imageData: base64Data,
+      imageId: 'rId999'
     };
   }
 
@@ -566,30 +567,14 @@ export class ReportGenerator {
 
       let relsXml = await relsFile.async('text');
       
-      // Находим максимальный rId и добавляем новый
-      const rIdMatches = relsXml.match(/rId(\d+)/g);
-      let maxRId = 0;
-      if (rIdMatches) {
-        rIdMatches.forEach(match => {
-          const num = parseInt(match.replace('rId', ''));
-          if (num > maxRId) maxRId = num;
-        });
-      }
-      
-      const newRId = `rId${maxRId + 1}`;
+      // Используем фиксированный rId для изображения
+      const imageRId = 'rId999';
       
       // Добавляем связь с изображением
-      if (!relsXml.includes('Target="media/image1.png"')) {
-        const imageRel = `<Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>`;
+      if (!relsXml.includes('Target="media/media.png"')) {
+        const imageRel = `  <Relationship Id="${imageRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/media.png"/>`;
         relsXml = relsXml.replace('</Relationships>', `${imageRel}</Relationships>`);
         zip.file('word/_rels/document.xml.rels', relsXml);
-        
-        // Обновляем ссылку в XML документа
-        const documentXml = await zip.file('word/document.xml')?.async('text');
-        if (documentXml) {
-          const updatedDocumentXml = documentXml.replace(/r:embed="rId1"/g, `r:embed="${newRId}"`);
-          zip.file('word/document.xml', updatedDocumentXml);
-        }
       }
       
       // Обновляем [Content_Types].xml для поддержки PNG изображений
@@ -597,8 +582,8 @@ export class ReportGenerator {
       if (contentTypesFile) {
         let contentTypesXml = await contentTypesFile.async('text');
         if (!contentTypesXml.includes('Extension="png"')) {
-          const pngType = '<Default Extension="png" ContentType="image/png"/>';
-          contentTypesXml = contentTypesXml.replace('</Types>', `${pngType}</Types>`);
+          const pngType = '  <Default Extension="png" ContentType="image/png"/>';
+          contentTypesXml = contentTypesXml.replace('</Types>', `${pngType}\n</Types>`);
           zip.file('[Content_Types].xml', contentTypesXml);
         }
       }
