@@ -348,7 +348,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           ))}
 
           {/* Вертикальные линии сетки */}
-          {xScale.ticks(20).map(tick => (
+          {xScale.ticks(15).map(tick => (
             <g key={tick.getTime()}>
               <line
                 x1={xScale(tick)}
@@ -361,7 +361,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               <text
                 x={xScale(tick)}
                 y={innerHeight + 25}
-                textAnchor="start"
+                textAnchor="middle"
                 fontSize="12"
                 fill="#6b7280"
                 transform={`rotate(-45, ${xScale(tick)}, ${innerHeight + 25})`}
