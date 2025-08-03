@@ -252,11 +252,9 @@ export class ReportGenerator {
         error: error instanceof Error ? error.message : 'Неизвестная ошибка'
       };
     }
-  } catch (error) {
-    console.error('Error in generateFromTemplate:', error);
-    throw error;
   }
-}
+
+  }
 
   private replacePlaceholders(content: string, reportData: any): string {
     let result = content;
