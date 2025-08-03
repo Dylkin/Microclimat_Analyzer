@@ -185,16 +185,15 @@ export class ReportGenerator {
 
     // Добавляем график если есть
     if (chartImageData) {
-      const { xml: xmlWithChart, imageData, imageId, imageName } = await this.insertChart(processedXml, chartImageData);
+      const { xml: xmlWithChart, imageData } = await this.insertChart(processedXml, chartImageData);
       processedXml = xmlWithChart;
       
       if (imageData) {
         // Добавляем изображение в архив
-        const fileName = imageName || 'media.png';
-        zip.file(`word/media/${fileName}`, imageData, { base64: true });
+        zip.file('word/media/media.png', imageData, { base64: true });
         
         // Обновляем relationships
-        await this.updateRelationships(zip, imageId, fileName);
+        await this.updateRelationships(zip);
       }
     }
 
@@ -236,45 +235,15 @@ export class ReportGenerator {
       // Копируем медиа файлы из нового документа если есть
       const mediaFolder = newZip.folder('word/media');
       if (mediaFolder) {
-        // Получаем список уже существующих медиа файлов в объединенном документе
-        const existingMediaFolder = mergedZip.folder('word/media');
-        const existingFiles = existingMediaFolder ? Object.keys(existingMediaFolder.files) : [];
-        
         await Promise.all(
           Object.keys(mediaFolder.files).map(async (fileName) => {
             const file = mediaFolder.files[fileName];
             if (!file.dir) {
               const content = await file.async('arraybuffer');
-              
-              // Генерируем уникальное имя файла если такой уже существует
-              let uniqueFileName = fileName;
-              let counter = 1;
-              while (existingFiles.includes(`word/media/${uniqueFileName}`)) {
-                const fileExtension = fileName.split('.').pop();
-                const baseName = fileName.replace(`.${fileExtension}`, '');
-                uniqueFileName = `${baseName}_${counter}.${fileExtension}`;
-                counter++;
-              }
-              
-              mergedZip.file(`word/media/${uniqueFileName}`, content);
-              
-              // Обновляем ссылки в document.xml если имя файла изменилось
-              if (uniqueFileName !== fileName) {
-                const docXml = await mergedZip.file('word/document.xml')?.async('text');
-                if (docXml) {
-                  const updatedDocXml = docXml.replace(
-                    new RegExp(`media/${fileName}`, 'g'),
-                    `media/${uniqueFileName}`
-                  );
-                  mergedZip.file('word/document.xml', updatedDocXml);
-                }
-              }
+              mergedZip.file(`word/media/${fileName}`, content);
             }
           })
         );
-        
-        // Обновляем relationships для объединенного документа
-        await this.updateRelationships(mergedZip);
       }
 
       return mergedZip;
@@ -541,11 +510,6 @@ export class ReportGenerator {
 
     const base64Data = chartImageData.split(',')[1];
     
-    // Генерируем уникальный ID для изображения на основе времени
-    const uniqueId = Date.now().toString();
-    const imageRId = `rId${uniqueId}`;
-    const imageName = `media${uniqueId}.png`;
-    
     // Создаем правильный XML для изображения с корректными размерами и namespace
     const imageXml = `
       <w:p>
@@ -557,17 +521,17 @@ export class ReportGenerator {
             <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
               <wp:extent cx="4572000" cy="2286000"/>
               <wp:effectExtent l="0" t="0" r="0" b="0"/>
-              <wp:docPr id="${uniqueId}" name="График${uniqueId}" descr="График температуры"/>
+              <wp:docPr id="1" name="График" descr="График температуры"/>
               <wp:cNvGraphicFramePr/>
               <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
                 <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
                   <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
                     <pic:nvPicPr>
-                      <pic:cNvPr id="${uniqueId}" name="График${uniqueId}"/>
+                      <pic:cNvPr id="0" name="График"/>
                       <pic:cNvPicPr/>
                     </pic:nvPicPr>
                     <pic:blipFill>
-                      <a:blip r:embed="${imageRId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+                      <a:blip r:embed="rId999" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
                       <a:stretch>
                         <a:fillRect/>
                       </a:stretch>
@@ -592,25 +556,23 @@ export class ReportGenerator {
     return {
       xml: xml.replace('{chart}', imageXml),
       imageData: base64Data,
-      imageId: imageRId,
-      imageName: imageName
+      imageId: 'rId999'
     };
   }
 
-  private async updateRelationships(zip: JSZip, imageId?: string, imageName?: string): Promise<void> {
+  private async updateRelationships(zip: JSZip): Promise<void> {
     try {
       const relsFile = zip.file('word/_rels/document.xml.rels');
       if (!relsFile) return;
 
       let relsXml = await relsFile.async('text');
       
-      // Используем переданные ID и имя файла или значения по умолчанию
-      const imageRId = imageId || 'rId999';
-      const imageFileName = imageName || 'media.png';
+      // Используем фиксированный rId для изображения
+      const imageRId = 'rId999';
       
       // Добавляем связь с изображением
-      if (!relsXml.includes(`Target="media/${imageFileName}"`)) {
-        const imageRel = `  <Relationship Id="${imageRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageFileName}"/>`;
+      if (!relsXml.includes('Target="media/media.png"')) {
+        const imageRel = `  <Relationship Id="${imageRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/media.png"/>`;
         relsXml = relsXml.replace('</Relationships>', `${imageRel}</Relationships>`);
         zip.file('word/_rels/document.xml.rels', relsXml);
       }
