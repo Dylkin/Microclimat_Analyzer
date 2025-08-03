@@ -5,6 +5,8 @@ import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, Table, Ta
 import { UploadedFile } from '../types/FileData';
 import { AuthUser } from '../types/User';
 import { ChartLimits, VerticalMarker } from '../types/TimeSeriesData';
+import { merge } from 'docx-merger';
+import { createReport } from 'docx-templates';
 
 interface ReportData {
   reportNumber: string;
@@ -1700,6 +1702,241 @@ export class ReportGenerator {
     } catch (error) {
       console.error('Ошибка создания примера шаблона:', error);
       return false;
+    }
+  }
+
+  // Добавление отчета к существующему файлу
+  private async addReportToExistingFile(
+    templateFile: File, 
+    reportData: ReportData, 
+    existingFileName: string
+  ): Promise<{ success: boolean; fileName: string; error?: string }> {
+    try {
+      console.log('Объединение отчетов с использованием docx-merger:', existingFileName);
+      
+      // Получаем существующий файл
+      const existingFile = this.generatedReports.get(existingFileName);
+      if (!existingFile) {
+        throw new Error('Существующий файл не найден');
+      }
+
+      // Создаем новый отчет из шаблона
+      const templateBuffer = await templateFile.arrayBuffer();
+      
+      // Подготавливаем данные для шаблона
+      const templateData = this.prepareTemplateData(reportData);
+      
+      // Генерируем новый отчет с помощью docx-templates
+      const newReportBuffer = await createReport({
+        template: templateBuffer,
+        data: templateData,
+        cmdDelimiter: ['{', '}'],
+        literalXmlDelimiter: ['{', '}'],
+        processLineBreaks: true,
+        noSandBox: true
+      });
+
+      // Объединяем существующий файл с новым отчетом
+      const existingBuffer = await existingFile.arrayBuffer();
+      
+      // Используем docx-merger для объединения документов
+      const mergedBuffer = await merge([
+        existingBuffer,
+        newReportBuffer
+      ], {
+        pageBreak: true, // Добавляем разрыв страницы между документами
+        spacing: true    // Добавляем отступы
+      });
+
+      // Создаем новый blob из объединенного буфера
+      const mergedBlob = new Blob([mergedBuffer], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+
+      // Обновляем сохраненный файл
+      this.generatedReports.set(existingFileName, mergedBlob);
+      
+      console.log('Отчеты успешно объединены');
+      return { success: true, fileName: existingFileName };
+
+    } catch (error) {
+      console.error('Ошибка объединения отчетов с docx-merger:', error);
+      
+      // Fallback: используем простое объединение
+      return await this.addReportToExistingFileSimple(templateFile, reportData, existingFileName);
+    }
+  }
+
+  // Простое объединение как fallback
+  private async addReportToExistingFileSimple(
+    templateFile: File, 
+    reportData: ReportData, 
+    existingFileName: string
+  ): Promise<{ success: boolean; fileName: string; error?: string }> {
+    try {
+      console.log('Использование простого объединения для:', existingFileName);
+      
+      // Получаем существующий файл
+      const existingFile = this.generatedReports.get(existingFileName);
+      if (!existingFile) {
+        throw new Error('Существующий файл не найден');
+      }
+
+      // Генерируем новый отчет
+      const newReportResult = await this.generateFromTemplate(templateFile, reportData);
+      if (!newReportResult.success || !newReportResult.docxBlob) {
+        throw new Error('Ошибка генерации нового отчета');
+      }
+
+      // Простое объединение через JSZip
+      const mergedBlob = await this.simpleDocxMerge(existingFile, newReportResult.docxBlob);
+      
+      // Сохраняем объединенный файл
+      this.generatedReports.set(existingFileName, mergedBlob);
+      
+      console.log('Отчет успешно добавлен к существующему файлу');
+      return { success: true, fileName: existingFileName };
+
+    } catch (error) {
+      console.error('Ошибка простого объединения отчетов:', error);
+      return { 
+        success: false, 
+        fileName: existingFileName, 
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка объединения' 
+      };
+    }
+  }
+
+  // Подготовка данных для шаблона docx-templates
+  private prepareTemplateData(reportData: ReportData): any {
+    const data = {
+      'Report No.': reportData.reportNumber,
+      'Report date': new Date(reportData.reportDate).toLocaleDateString('ru-RU'),
+      'name of the object': reportData.objectName,
+      'name of the air conditioning system': reportData.climateSystemName || '',
+      'name of the test': this.getTestTypeName(reportData.testType),
+      'executor': reportData.user.fullName,
+      'director': reportData.director || '',
+      'test date': new Date().toLocaleDateString('ru-RU'),
+      'Result': reportData.conclusion || '',
+      'acceptance criteria': this.formatAcceptanceCriteria(reportData.limits, reportData.dataType)
+    };
+
+    // Добавляем временные данные если есть маркеры
+    if (reportData.markers && reportData.markers.length >= 2) {
+      const sortedMarkers = [...reportData.markers].sort((a, b) => a.timestamp - b.timestamp);
+      const startMarker = sortedMarkers[0];
+      const endMarker = sortedMarkers[sortedMarkers.length - 1];
+      
+      data['Date time of test start'] = new Date(startMarker.timestamp).toLocaleString('ru-RU');
+      data['Date time of test completion'] = new Date(endMarker.timestamp).toLocaleString('ru-RU');
+      
+      const duration = endMarker.timestamp - startMarker.timestamp;
+      const hours = Math.floor(duration / (1000 * 60 * 60));
+      const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+      data['Duration of the test'] = `${hours} ч ${minutes} мин`;
+    } else {
+      data['Date time of test start'] = '';
+      data['Date time of test completion'] = '';
+      data['Duration of the test'] = '';
+    }
+
+    // Добавляем таблицу результатов
+    if (reportData.resultsTableData && reportData.resultsTableData.length > 0) {
+      data['Results table'] = this.formatResultsTableForTemplate(reportData.resultsTableData);
+    } else {
+      data['Results table'] = 'Нет данных для отображения';
+    }
+
+    return data;
+  }
+
+  // Форматирование таблицы результатов для docx-templates
+  private formatResultsTableForTemplate(resultsData: any[]): string {
+    let table = `
+      <w:tbl>
+        <w:tblPr>
+          <w:tblStyle w:val="TableGrid"/>
+          <w:tblW w:w="0" w:type="auto"/>
+        </w:tblPr>
+        <w:tr>
+          <w:tc><w:p><w:r><w:t>№ зоны</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>Логгер</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>S/N</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>Мин. t°C</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>Макс. t°C</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>Среднее t°C</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>Соответствие</w:t></w:r></w:p></w:tc>
+        </w:tr>`;
+
+    resultsData.forEach(row => {
+      table += `
+        <w:tr>
+          <w:tc><w:p><w:r><w:t>${row.zoneNumber}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.measurementLevel}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.loggerName}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.serialNumber}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.minTemp}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.maxTemp}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.avgTemp}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.meetsLimits}</w:t></w:r></w:p></w:tc>
+        </w:tr>`;
+    });
+
+    table += `</w:tbl>`;
+    return table;
+  }
+
+  // Простое объединение DOCX файлов через JSZip (fallback)
+  private async simpleDocxMerge(existingFile: Blob, newFile: Blob): Promise<Blob> {
+    try {
+      // Читаем существующий файл
+      const existingZip = await JSZip.loadAsync(existingFile);
+      const newZip = await JSZip.loadAsync(newFile);
+      
+      // Создаем новый ZIP для объединенного файла
+      const mergedZip = new JSZip();
+      
+      // Копируем все файлы из существующего архива
+      existingZip.forEach((relativePath, file) => {
+        if (!file.dir) {
+          mergedZip.file(relativePath, file.async('arraybuffer'));
+        }
+      });
+      
+      // Читаем содержимое документов
+      const existingDocContent = await existingZip.file('word/document.xml')?.async('text');
+      const newDocContent = await newZip.file('word/document.xml')?.async('text');
+      
+      if (!existingDocContent || !newDocContent) {
+        throw new Error('Не удалось прочитать содержимое документов для простого объединения');
+      }
+
+      // Простое объединение содержимого
+      const mergedContent = existingDocContent.replace(
+        '</w:body>',
+        '<w:p><w:r><w:br w:type="page"/></w:r></w:p>' + 
+        newDocContent.replace(/.*<w:body[^>]*>/, '').replace('</w:body>', '') +
+        '</w:body>'
+      );
+      
+      // Сохраняем объединенное содержимое
+      mergedZip.file('word/document.xml', mergedContent);
+      
+      // Генерируем новый DOCX файл
+      const mergedBuffer = await mergedZip.generateAsync({ 
+        type: 'arraybuffer',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
+      
+      return new Blob([mergedBuffer], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+
+    } catch (error) {
+      throw new Error(`Ошибка простого объединения DOCX: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   }
 }
