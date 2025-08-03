@@ -20,6 +20,7 @@ interface ReportData {
   conclusion: string;
   user: AuthUser;
   director?: string;
+}
 
 export class ReportGenerator {
   private static instance: ReportGenerator;
