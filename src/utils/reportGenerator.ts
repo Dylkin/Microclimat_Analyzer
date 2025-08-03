@@ -346,6 +346,137 @@ export class ReportGenerator {
     return result;
   }
 
+  private replacePlaceholders(content: string, reportData: any): string {
+    let result = content;
+    
+    // Basic placeholders
+    result = result.replace(/{Report No\.}/g, reportData.reportNumber || '');
+    result = result.replace(/{Report date}/g, reportData.reportDate || '');
+    result = result.replace(/{name of the object}/g, reportData.objectName || '');
+    result = result.replace(/{name of the air conditioning system}/g, reportData.climateSystemName || '');
+    result = result.replace(/{name of the test}/g, this.getTestTypeName(reportData.testType) || '');
+    result = result.replace(/{executor}/g, reportData.user?.fullName || '');
+    result = result.replace(/{director}/g, reportData.director || '');
+    result = result.replace(/{test date}/g, reportData.reportDate || '');
+    result = result.replace(/{Result}/g, reportData.conclusion || '');
+    
+    // Time-based placeholders (using markers if available)
+    if (reportData.markers && reportData.markers.length >= 2) {
+      const startMarker = reportData.markers[0];
+      const endMarker = reportData.markers[reportData.markers.length - 1];
+      const startTime = new Date(startMarker.timestamp);
+      const endTime = new Date(endMarker.timestamp);
+      const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60)); // hours
+      
+      result = result.replace(/{Date time of test start}/g, startTime.toLocaleString('ru-RU'));
+      result = result.replace(/{Date time of test completion}/g, endTime.toLocaleString('ru-RU'));
+      result = result.replace(/{Duration of the test}/g, `${duration} часов`);
+    } else {
+      result = result.replace(/{Date time of test start}/g, 'Не установлено');
+      result = result.replace(/{Date time of test completion}/g, 'Не установлено');
+      result = result.replace(/{Duration of the test}/g, 'Не установлено');
+    }
+    
+    // Acceptance criteria
+    const criteria = this.formatAcceptanceCriteria(reportData.limits, reportData.dataType);
+    result = result.replace(/{acceptance criteria}/g, criteria);
+    
+    // Results table placeholder
+    if (result.includes('{Results table}')) {
+      const tableXml = this.generateResultsTable(reportData.resultsTableData || []);
+      result = result.replace(/{Results table}/g, tableXml);
+    }
+    
+    // Chart placeholder
+    if (result.includes('{chart}')) {
+      const chartXml = this.generateChartPlaceholder();
+      result = result.replace(/{chart}/g, chartXml);
+    }
+    
+    return result;
+  }
+
+  private getTestTypeName(testType: string): string {
+    const testTypes: { [key: string]: string } = {
+      'empty-object': 'Соответствие критериям в пустом объекте',
+      'loaded-object': 'Соответствие критериям в загруженном объекте',
+      'door-opening': 'Открытие двери',
+      'power-off': 'Отключение электропитания',
+      'power-on': 'Включение электропитания'
+    };
+    return testTypes[testType] || testType;
+  }
+
+  private formatAcceptanceCriteria(limits: any, dataType: string): string {
+    if (!limits || !limits[dataType]) {
+      return 'Критерии не установлены';
+    }
+    
+    const limit = limits[dataType];
+    const unit = dataType === 'temperature' ? '°C' : '%';
+    const parameter = dataType === 'temperature' ? 'Температура' : 'Влажность';
+    
+    let criteria = `${parameter}: `;
+    
+    if (limit.min !== undefined && limit.max !== undefined) {
+      criteria += `от ${limit.min}${unit} до ${limit.max}${unit}`;
+    } else if (limit.min !== undefined) {
+      criteria += `не менее ${limit.min}${unit}`;
+    } else if (limit.max !== undefined) {
+      criteria += `не более ${limit.max}${unit}`;
+    } else {
+      criteria = 'Критерии не установлены';
+    }
+    
+    return criteria;
+  }
+
+  private generateResultsTable(resultsData: any[]): string {
+    if (!resultsData || resultsData.length === 0) {
+      return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
+    }
+
+    let tableXml = `
+      <w:tbl>
+        <w:tblPr>
+          <w:tblStyle w:val="TableGrid"/>
+          <w:tblW w:w="0" w:type="auto"/>
+          <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
+        </w:tblPr>
+        <w:tblGrid>
+          <w:gridCol w:w="1000"/>
+          <w:gridCol w:w="1200"/>
+          <w:gridCol w:w="1200"/>
+          <w:gridCol w:w="1200"/>
+          <w:gridCol w:w="800"/>
+          <w:gridCol w:w="800"/>
+          <w:gridCol w:w="800"/>
+          <w:gridCol w:w="1000"/>
+        </w:tblGrid>
+        <w:tr>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Логгер</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>S/N</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Мин. t°C</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Макс. t°C</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Среднее t°C</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Соответствие</w:t></w:r></w:p></w:tc>
+        </w:tr>`;
+
+    resultsData.forEach(row => {
+      tableXml += `
+        <w:tr>
+          <w:tc><w:p><w:r><w:t>${row.zoneNumber || '-'}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.measurementLevel || '-'}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.loggerName || '-'}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.serialNumber || '-'}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.minTemp || '-'}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.maxTemp || '-'}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.avgTemp || '-'}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${row.meetsLimits || '-'}</w:t></w:r></w:p></w:tc>
+        </w:tr>`;
+    });
   private getTestTypeName(testType: string): string {
     const testTypes: { [key: string]: string } = {
       'empty-object': 'Соответствие критериям в пустом объекте',
@@ -489,6 +620,19 @@ export class ReportGenerator {
       <w:p>
         <w:r>
           <w:t>[Изображение графика будет вставлено здесь]</w:t>
+        </w:r>
+      </w:p>`;
+  }
+
+    tableXml += '</w:tbl>';
+    return tableXml;
+  }
+
+  private generateChartPlaceholder(): string {
+    return `
+      <w:p>
+        <w:r>
+          <w:t>[График будет вставлен здесь]</w:t>
         </w:r>
       </w:p>`;
   }
