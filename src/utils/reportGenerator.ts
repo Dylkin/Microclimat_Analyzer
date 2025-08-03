@@ -399,6 +399,40 @@ export class ReportGenerator {
       </w:p>`;
   }
 
+  private mergeRelationships(existingRels: string, newRels: string): string {
+    try {
+      // Извлекаем все Relationship элементы из нового файла
+      const newRelMatches = newRels.match(/<Relationship[^>]*\/>/g) || [];
+      
+      // Находим максимальный Id в существующем файле
+      const existingIdMatches = existingRels.match(/Id="rId(\d+)"/g) || [];
+      let maxId = 0;
+      
+      existingIdMatches.forEach(match => {
+        const id = parseInt(match.match(/\d+/)?.[0] || '0');
+        if (id > maxId) maxId = id;
+      });
+      
+      // Обновляем Id в новых relationships
+      let updatedNewRels = '';
+      newRelMatches.forEach(rel => {
+        const idMatch = rel.match(/Id="rId(\d+)"/);
+        if (idMatch) {
+          maxId++;
+          const updatedRel = rel.replace(/Id="rId\d+"/, `Id="rId${maxId}"`);
+          updatedNewRels += updatedRel + '\n';
+        }
+      });
+      
+      // Вставляем новые relationships перед закрывающим тегом
+      return existingRels.replace('</Relationships>', updatedNewRels + '</Relationships>');
+      
+    } catch (error) {
+      console.error('Ошибка объединения relationships:', error);
+      return existingRels;
+    }
+  }
+
   private downloadBuffer(buffer: ArrayBuffer, fileName: string): void {
     const blob = new Blob([buffer], { 
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
