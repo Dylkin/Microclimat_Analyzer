@@ -346,9 +346,17 @@ export class ReportGenerator {
       })
     );
 
-    // Создаем таблицу результатов
-    const resultsTable = this.createResultsTable(reportData.resultsTableData);
-    children.push(resultsTable);
+    // Создаем и добавляем таблицу результатов
+    if (reportData.resultsTableData && reportData.resultsTableData.length > 0) {
+      const resultsTable = this.createResultsTable(reportData.resultsTableData);
+      children.push(resultsTable);
+    } else {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'Данные для таблицы результатов отсутствуют' })]
+        })
+      );
+    }
 
     // График
     if (chartImageBuffer) {
@@ -363,18 +371,34 @@ export class ReportGenerator {
       
       children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
       
+      // Вставляем изображение с сохранением пропорций
       children.push(
         new Paragraph({
           children: [
             new ImageRun({
               data: chartImageBuffer,
               transformation: {
-                width: 675,
-                height: 450
+                width: 600,  // Ширина в пикселях
+                height: 400  // Высота в пикселях (соотношение 3:2)
               }
             })
           ],
           alignment: AlignmentType.CENTER
+        })
+      );
+    } else {
+      children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+      
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'График:', bold: true })],
+          heading: HeadingLevel.HEADING_2
+        })
+      );
+      
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'График не был сгенерирован' })]
         })
       );
     }
