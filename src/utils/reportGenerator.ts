@@ -160,81 +160,89 @@ export class ReportGenerator {
               rotatedCanvas.toBlob((blob) => {
                 resolve(blob);
               }, 'image/png');
-            });
-            
-            if (chartBlob) {
-              chartImageBuffer = await chartBlob.arrayBuffer();
-              
-              // Сохраняем график для отдельного скачивания
-              this.generatedCharts.set(chartFileName, chartBlob);
-              console.log('Повернутый график сохранен как:', chartFileName);
-            }
-          } else {
-            console.warn('Не удалось получить контекст для поворота изображения, используем исходный график');
-            // Fallback: используем исходный canvas
-            const chartBlob = await new Promise<Blob | null>((resolve) => {
-              canvas.toBlob((blob) => {
-                resolve(blob);
-              }, 'image/png');
-            });
-            
-            if (chartBlob) {
-              chartImageBuffer = await chartBlob.arrayBuffer();
-              this.generatedCharts.set(chartFileName, chartBlob);
-            }
-          }
-        } catch (error) {
-          console.warn('Ошибка поворота графика, используем исходный:', error);
-          // Создаем Buffer для PNG файла
-          const captureOptions = {
-            backgroundColor: '#ffffff',
-            scale: 1,
-            useCORS: true,
-            allowTaint: true,
-            width: 900,
-            height: 675
-          };
-          const canvas = await html2canvas(chartElement, captureOptions);
-          const chartBlob = await new Promise<Blob | null>((resolve) => {
-            canvas.toBlob((blob) => {
-              resolve(blob);
-            }, 'image/png');
-          });
-          
-          if (chartBlob) {
-            chartImageBuffer = await chartBlob.arrayBuffer();
-            
-            // Сохраняем график для отдельного скачивания
-            this.generatedCharts.set(chartFileName, chartBlob);
-            console.log('График сохранен как:', chartFileName);
-          }
-        }
-      }
-
-      // Обрабатываем шаблон и заменяем плейсхолдеры
-      const processedDoc = await this.processTemplate(baseDocument, reportData, chartImageBuffer);
-
-      // Генерируем итоговый документ
-      const output = processedDoc;
-
-      console.log('Отчет успешно сгенерирован с docx.js');
+      // Создаем новый отчет на основе шаблона
+      const newReportResult = await this.generateFromTemplate(templateFile, reportData, chartElement);
       
-      // Сохраняем как мастер-отчет для последующих добавлений
-      this.masterReport = output;
-      this.generatedReports.set(fileName, output);
-
-      // Скачиваем файл
-      saveAs(output, fileName);
-
-      console.log('Отчет успешно сгенерирован:', fileName);
-
-      return {
-        success: true,
-        fileName
-      };
-
-    } catch (error) {
-      console.error('Ошибка генерации отчета:', error);
+      if (!newReportResult.success) {
+        throw new Error(newReportResult.error || 'Ошибка создания нового отчета');
+      }
+      
+      // Читаем существующий файл
+      const existingZip = new JSZip();
+      await existingZip.loadAsync(existingDocx);
+      
+      // Читаем новый отчет
+      const newReportZip = new JSZip();
+      await newReportZip.loadAsync(this.reports[newReportResult.fileName]);
+      
+      // Получаем содержимое документов
+      const existingDocXml = await existingZip.file('word/document.xml')?.async('text');
+      const newReportDocXml = await newReportZip.file('word/document.xml')?.async('text');
+      
+      if (!existingDocXml || !newReportDocXml) {
+        throw new Error('Не удалось прочитать содержимое документов');
+      }
+      
+      // Извлекаем содержимое body из нового отчета
+      const newBodyMatch = newReportDocXml.match(/<w:body[^>]*>(.*?)<\/w:body>/s);
+      if (!newBodyMatch) {
+        throw new Error('Не удалось найти содержимое body в новом отчете');
+      }
+      
+      const newBodyContent = newBodyMatch[1];
+      
+      // Добавляем разрыв страницы и новое содержимое в существующий документ
+      const pageBreak = `
+        <w:p>
+          <w:r>
+            <w:br w:type="page"/>
+          </w:r>
+        </w:p>
+      `;
+      
+      const updatedDocXml = existingDocXml.replace(
+        '</w:body>',
+        pageBreak + newBodyContent + '</w:body>'
+      );
+      
+      // Обновляем document.xml
+      existingZip.file('word/document.xml', updatedDocXml);
+      
+      // Копируем медиа файлы из нового отчета (изображения графиков)
+      const mediaFiles = newReportZip.folder('word/media');
+      if (mediaFiles) {
+        mediaFiles.forEach((relativePath, file) => {
+          if (!file.dir) {
+            existingZip.file(`word/media/${relativePath}`, file.async('arraybuffer'));
+          }
+        });
+      }
+      
+      // Обновляем relationships если нужно
+      const newRelsXml = await newReportZip.file('word/_rels/document.xml.rels')?.async('text');
+      const existingRelsXml = await existingZip.file('word/_rels/document.xml.rels')?.async('text');
+      
+      if (newRelsXml && existingRelsXml) {
+        // Объединяем relationships
+        const mergedRels = this.mergeRelationships(existingRelsXml, newRelsXml);
+        existingZip.file('word/_rels/document.xml.rels', mergedRels);
+      }
+      
+      // Генерируем обновленный файл
+      const updatedBuffer = await existingZip.generateAsync({ 
+        type: 'arraybuffer',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
+      
+      // Сохраняем обновленный мастер-отчет
+      this.masterReport = updatedBuffer;
+      
+      // Удаляем временный новый отчет из хранилища
+      delete this.reports[newReportResult.fileName];
+      
+      // Скачиваем обновленный файл
+      this.downloadBuffer(updatedBuffer, this.masterReportFileName);
       
       return {
         success: false,
@@ -242,6 +250,55 @@ export class ReportGenerator {
         error: error instanceof Error ? error.message : 'Неизвестная ошибка'
       };
     }
+  }
+
+  private mergeRelationships(existingRels: string, newRels: string): string {
+    try {
+      // Извлекаем все Relationship элементы из нового файла
+      const newRelMatches = newRels.match(/<Relationship[^>]*\/>/g) || [];
+      
+      // Находим максимальный Id в существующем файле
+      const existingIdMatches = existingRels.match(/Id="rId(\d+)"/g) || [];
+      let maxId = 0;
+      
+      existingIdMatches.forEach(match => {
+        const id = parseInt(match.match(/\d+/)?.[0] || '0');
+        if (id > maxId) maxId = id;
+      });
+      
+      // Обновляем Id в новых relationships
+      let updatedNewRels = '';
+      newRelMatches.forEach(rel => {
+        const idMatch = rel.match(/Id="rId(\d+)"/);
+        if (idMatch) {
+          maxId++;
+          const updatedRel = rel.replace(/Id="rId\d+"/, `Id="rId${maxId}"`);
+          updatedNewRels += updatedRel + '\n';
+        }
+      });
+      
+      // Вставляем новые relationships перед закрывающим тегом
+      return existingRels.replace('</Relationships>', updatedNewRels + '</Relationships>');
+      
+    } catch (error) {
+      console.error('Ошибка объединения relationships:', error);
+      return existingRels;
+    }
+  }
+
+  private downloadBuffer(buffer: ArrayBuffer, fileName: string): void {
+    const blob = new Blob([buffer], { 
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+    });
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   /**
