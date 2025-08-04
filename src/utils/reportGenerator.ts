@@ -81,6 +81,15 @@ export class ReportGenerator {
         // Объединяем с существующим отчетом
         console.log('Объединяем с существующим отчетом:', existingFileName);
         
+        const result = await this.mergeWithExistingReport(
+          existingFileName,
+          templateZip,
+          reportData,
+          chartImageData
+        );
+        finalBlob = result.blob;
+        finalFileName = result.fileName;
+        
         // Для объединенного отчета используем новое имя для графика
         if (chartFileName) {
           const newChartFileName = finalFileName.replace('.docx', '_график.png');
@@ -91,15 +100,6 @@ export class ReportGenerator {
             console.log('График переименован с', chartFileName, 'на', newChartFileName);
           }
         }
-        
-        const result = await this.mergeWithExistingReport(
-          existingFileName,
-          templateZip,
-          reportData,
-          chartImageData
-        );
-        finalBlob = result.blob;
-        finalFileName = result.fileName;
       } else {
         // Создаем новый отчет
         console.log('Создаем новый отчет');
