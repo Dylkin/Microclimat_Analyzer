@@ -152,8 +152,12 @@ export class ReportGenerator {
       // Читаем существующий отчет
       const existingZip = await JSZip.loadAsync(existingBlob);
       
+      // Определяем следующий номер для изображения
+      const nextImageNumber = await this.getNextImageNumber(existingZip);
+      const newImageFileName = `media${nextImageNumber}.png`;
+      
       // Создаем новый отчет из шаблона
-      const newReportZip = await this.processTemplate(newTemplateZip, reportData, chartImageData);
+      const newReportZip = await this.processTemplate(newTemplateZip, reportData, chartImageData, newImageFileName);
       
       // Простое объединение: добавляем содержимое нового отчета к существующему
       const mergedZip = await this.simpleMergeDocuments(existingZip, newReportZip);
@@ -185,6 +189,29 @@ export class ReportGenerator {
     }
   }
 
+  private async getNextImageNumber(existingZip: JSZip): Promise<number> {
+    try {
+      const mediaFolder = existingZip.folder('word/media');
+      if (!mediaFolder) {
+        return 1; // Если папки media нет, начинаем с 1
+      }
+
+      let maxNumber = 0;
+      Object.keys(mediaFolder.files).forEach(fileName => {
+        const match = fileName.match(/media(\d+)?\.png$/);
+        if (match) {
+          const number = match[1] ? parseInt(match[1]) : 1;
+          maxNumber = Math.max(maxNumber, number);
+        }
+      });
+
+      return maxNumber + 1;
+    } catch (error) {
+      console.warn('Ошибка определения номера изображения:', error);
+      return 1;
+    }
+  }
+
   private async createNewReport(
     templateZip: JSZip,
     reportData: any,
@@ -203,7 +230,8 @@ export class ReportGenerator {
   private async processTemplate(
     templateZip: JSZip,
     reportData: any,
-    chartImageData: string
+    chartImageData: string,
+    imageFileName: string = 'media.png'
   ): Promise<JSZip> {
     const zip = templateZip.clone();
 
@@ -218,15 +246,15 @@ export class ReportGenerator {
 
     // Добавляем график если есть
     if (chartImageData) {
-      const { xml: xmlWithChart, imageData } = await this.insertChart(processedXml, chartImageData);
+      const { xml: xmlWithChart, imageData, imageId } = await this.insertChart(processedXml, chartImageData, imageFileName);
       processedXml = xmlWithChart;
       
       if (imageData) {
         // Добавляем изображение в архив
-        zip.file('word/media/media.png', imageData, { base64: true });
+        zip.file(`word/media/${imageFileName}`, imageData, { base64: true });
         
         // Обновляем relationships
-        await this.updateRelationships(zip);
+        await this.updateRelationships(zip, imageId, imageFileName);
       }
     }
 
@@ -268,15 +296,41 @@ export class ReportGenerator {
       // Копируем медиа файлы из нового документа если есть
       const mediaFolder = newZip.folder('word/media');
       if (mediaFolder) {
+        // Копируем все медиа файлы, включая новые с уникальными именами
         await Promise.all(
           Object.keys(mediaFolder.files).map(async (fileName) => {
             const file = mediaFolder.files[fileName];
             if (!file.dir) {
               const content = await file.async('arraybuffer');
-              mergedZip.file(`word/media/${fileName}`, content);
+              // Используем полный путь файла из новой структуры
+              const relativePath = fileName.replace('word/media/', '');
+              mergedZip.file(`word/media/${relativePath}`, content);
             }
           })
         );
+      }
+      
+      // Объединяем relationships из нового документа
+      const newRelsFile = newZip.file('word/_rels/document.xml.rels');
+      if (newRelsFile) {
+        const newRelsXml = await newRelsFile.async('text');
+        const existingRelsFile = mergedZip.file('word/_rels/document.xml.rels');
+        
+        if (existingRelsFile) {
+          let existingRelsXml = await existingRelsFile.async('text');
+          
+          // Извлекаем новые relationships из нового документа
+          const newRelationships = newRelsXml.match(/<Relationship[^>]*\/>/g) || [];
+          
+          newRelationships.forEach(rel => {
+            // Добавляем только если такой связи еще нет
+            if (!existingRelsXml.includes(rel)) {
+              existingRelsXml = existingRelsXml.replace('</Relationships>', `  ${rel}\n</Relationships>`);
+            }
+          });
+          
+          mergedZip.file('word/_rels/document.xml.rels', existingRelsXml);
+        }
       }
 
       return mergedZip;
@@ -536,12 +590,16 @@ export class ReportGenerator {
     return xml.replace('{Results table}', tableHtml);
   }
 
-  private async insertChart(xml: string, chartImageData: string): Promise<{ xml: string; imageData?: string }> {
+  private async insertChart(xml: string, chartImageData: string, imageFileName: string = 'media.png'): Promise<{ xml: string; imageData?: string; imageId?: string }> {
     if (!chartImageData || !chartImageData.startsWith('data:image/png;base64,')) {
       return { xml: xml.replace('{chart}', 'График недоступен') };
     }
 
     const base64Data = chartImageData.split(',')[1];
+    
+    // Генерируем уникальный rId на основе имени файла
+    const imageNumber = imageFileName.match(/media(\d+)?\.png$/)?.[1] || '';
+    const rId = `rId99${imageNumber || '9'}`;
     
     // Создаем правильный XML для изображения с корректными размерами и namespace
     const imageXml = `
@@ -564,7 +622,7 @@ export class ReportGenerator {
                       <pic:cNvPicPr/>
                     </pic:nvPicPr>
                     <pic:blipFill>
-                      <a:blip r:embed="rId999" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+                      <a:blip r:embed="${rId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
                       <a:stretch>
                         <a:fillRect/>
                       </a:stretch>
@@ -589,23 +647,20 @@ export class ReportGenerator {
     return {
       xml: xml.replace('{chart}', imageXml),
       imageData: base64Data,
-      imageId: 'rId999'
+      imageId: rId
     };
   }
 
-  private async updateRelationships(zip: JSZip): Promise<void> {
+  private async updateRelationships(zip: JSZip, imageId: string = 'rId999', imageFileName: string = 'media.png'): Promise<void> {
     try {
       const relsFile = zip.file('word/_rels/document.xml.rels');
       if (!relsFile) return;
 
       let relsXml = await relsFile.async('text');
       
-      // Используем фиксированный rId для изображения
-      const imageRId = 'rId999';
-      
       // Добавляем связь с изображением
-      if (!relsXml.includes('Target="media/media.png"')) {
-        const imageRel = `  <Relationship Id="${imageRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/media.png"/>`;
+      if (!relsXml.includes(`Target="media/${imageFileName}"`)) {
+        const imageRel = `  <Relationship Id="${imageId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageFileName}"/>`;
         relsXml = relsXml.replace('</Relationships>', `${imageRel}</Relationships>`);
         zip.file('word/_rels/document.xml.rels', relsXml);
       }
