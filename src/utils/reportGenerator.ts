@@ -369,6 +369,9 @@ export class ReportGenerator {
   private replacePlaceholders(xml: string, data: any): string {
     let result = xml;
 
+    // Сначала нормализуем XML, объединяя разбитые плейсхолдеры
+    result = this.normalizePlaceholders(result);
+
     // Основные плейсхолдеры
     const placeholders = {
       '{Report No.}': data.reportNumber || '',
@@ -393,6 +396,65 @@ export class ReportGenerator {
 
     // Заменяем таблицу результатов
     result = this.replaceResultsTable(result, data.resultsTableData || []);
+
+    return result;
+  }
+
+  private normalizePlaceholders(xml: string): string {
+    // Список всех плейсхолдеров для нормализации
+    const placeholders = [
+      'Report No.',
+      'Report date',
+      'name of the object',
+      'name of the air conditioning system',
+      'name of the test',
+      'acceptance criteria',
+      'executor',
+      'director',
+      'test date',
+      'Result',
+      'Date time of test start',
+      'Date time of test completion',
+      'Duration of the test',
+      'Results table',
+      'chart'
+    ];
+
+    let result = xml;
+
+    placeholders.forEach(placeholder => {
+      // Создаем регулярное выражение для поиска разбитых плейсхолдеров
+      // Ищем {, затем любые XML теги, затем части плейсхолдера, затем }
+      const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const parts = escapedPlaceholder.split(' ');
+      
+      if (parts.length > 1) {
+        // Для многословных плейсхолдеров создаем более сложный паттерн
+        let pattern = '\\{';
+        for (let i = 0; i < parts.length; i++) {
+          if (i > 0) {
+            pattern += '(?:<[^>]*>)*\\s*(?:<[^>]*>)*';
+          }
+          pattern += parts[i];
+        }
+        pattern += '(?:<[^>]*>)*\\}';
+        
+        const regex = new RegExp(pattern, 'gi');
+        result = result.replace(regex, `{${placeholder}}`);
+      } else {
+        // Для односложных плейсхолдеров
+        const pattern = `\\{(?:<[^>]*>)*${escapedPlaceholder}(?:<[^>]*>)*\\}`;
+        const regex = new RegExp(pattern, 'gi');
+        result = result.replace(regex, `{${placeholder}}`);
+      }
+    });
+
+    // Дополнительная очистка: удаляем XML теги внутри плейсхолдеров
+    result = result.replace(/\{([^}]*)<[^>]*>([^}]*)\}/g, (match, before, after) => {
+      // Если внутри плейсхолдера есть XML теги, удаляем их
+      const cleanContent = (before + after).replace(/<[^>]*>/g, '');
+      return `{${cleanContent}}`;
+    });
 
     return result;
   }
