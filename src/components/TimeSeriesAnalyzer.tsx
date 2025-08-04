@@ -215,6 +215,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return;
     }
 
+    console.log('Генерируем отчет с шаблоном:', templateFile.name);
+    console.log('Размер шаблона:', templateFile.size, 'байт');
+
     if (!reportData.reportNumber || !reportData.objectName) {
       setReportStatus({ type: 'error', message: 'Пожалуйста, заполните обязательные поля' });
       return;

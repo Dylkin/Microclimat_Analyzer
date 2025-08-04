@@ -24,6 +24,7 @@ export class ReportGenerator {
   ): Promise<{ success: boolean; fileName: string; error?: string }> {
     try {
       console.log('Начинаем генерацию отчета...');
+      console.log('Используем шаблон:', templateFile.name);
       
       // Генерируем имя файла
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -32,6 +33,7 @@ export class ReportGenerator {
       // Читаем шаблон
       const templateBuffer = await templateFile.arrayBuffer();
       const templateZip = await JSZip.loadAsync(templateBuffer);
+      console.log('Шаблон успешно загружен и распакован');
 
       // Генерируем график если есть элемент
       let chartImageData = '';
