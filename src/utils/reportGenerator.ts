@@ -733,7 +733,12 @@ export class ReportGenerator {
     const imageNumber = imageFileName.match(/media(\d+)?\.png$/)?.[1] || '';
     const rId = `rId99${imageNumber || '9'}`;
     
-    // Создаем правильный XML для изображения с корректными размерами и namespace
+    // Размеры изображения: 934x1420 пикселей
+    // Конвертируем в EMU (English Metric Units): 1 пиксель = 9525 EMU
+    const widthEMU = 934 * 9525; // 8,896,550 EMU
+    const heightEMU = 1420 * 9525; // 13,525,500 EMU
+    
+    // Создаем XML для изображения с размерами 934x1420 пикселей, по центру, обтекание "в тексте"
     const imageXml = `
       <w:p>
         <w:pPr>
@@ -742,7 +747,7 @@ export class ReportGenerator {
         <w:r>
           <w:drawing>
             <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
-              <wp:extent cx="9144000" cy="6858000"/>
+              <wp:extent cx="${widthEMU}" cy="${heightEMU}"/>
               <wp:effectExtent l="0" t="0" r="0" b="0"/>
               <wp:docPr id="1" name="График" descr="График температуры"/>
               <wp:cNvGraphicFramePr/>
@@ -762,7 +767,7 @@ export class ReportGenerator {
                     <pic:spPr>
                       <a:xfrm>
                         <a:off x="0" y="0"/>
-                        <a:ext cx="9144000" cy="6858000"/>
+                        <a:ext cx="${widthEMU}" cy="${heightEMU}"/>
                       </a:xfrm>
                       <a:prstGeom prst="rect">
                         <a:avLst/>
