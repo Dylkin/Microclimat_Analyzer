@@ -1,7 +1,6 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import html2canvas from "html2canvas";
-import html2canvas from "html2canvas";
 import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } from "docx";
 
 export class ReportGenerator {
@@ -59,58 +58,12 @@ export class ReportGenerator {
       } else {
         // Создаем новый отчет
         console.log('Создаем новый отчет');
-        finalBlob = await this.createNewReport(templateZip, reportData, chartElement);
+        finalBlob = await this.createNewReport(templateZip, reportData);
         finalFileName = fileName;
       }
 
       // Сохраняем отчет
       this.generatedReports.set(finalFileName, finalBlob);
-      
-      // Генерируем и сохраняем изображение графика для скачивания
-      if (chartElement) {
-        try {
-          const canvas = await html2canvas(chartElement, {
-            backgroundColor: '#ffffff',
-            scale: 2,
-            useCORS: true,
-            allowTaint: true
-          });
-          
-          // Создаем новый canvas для поворота изображения на 90 градусов против часовой стрелки
-          const rotatedCanvas = document.createElement('canvas');
-          const rotatedCtx = rotatedCanvas.getContext('2d');
-          
-          if (rotatedCtx) {
-            // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
-            rotatedCanvas.width = canvas.height;
-            rotatedCanvas.height = canvas.width;
-            
-            // Перемещаем точку отсчета в центр нового canvas
-            rotatedCtx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
-            
-            // Поворачиваем на -90 градусов (против часовой стрелки)
-            rotatedCtx.rotate(-Math.PI / 2);
-            
-            // Рисуем исходное изображение с учетом смещения центра
-            rotatedCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-            
-            // Создаем blob из повернутого canvas
-            const chartBlob = await new Promise<Blob>((resolve) => {
-              rotatedCanvas.toBlob((blob) => {
-                resolve(blob!);
-              }, 'image/png', 0.9);
-            });
-            
-            const chartFileName = finalFileName.replace('.docx', '_график.png');
-            this.generatedCharts.set(chartFileName, chartBlob);
-            console.log('График сохранен с поворотом на 90°:', chartFileName);
-          } else {
-            console.warn('Не удалось получить контекст для поворота изображения');
-          }
-        } catch (error) {
-          console.warn('Ошибка генерации графика для скачивания:', error);
-        }
-      }
       
       // Скачиваем файл
       saveAs(finalBlob, finalFileName);
@@ -130,8 +83,7 @@ export class ReportGenerator {
   private async mergeWithExistingReport(
     existingFileName: string,
     newTemplateZip: JSZip,
-    reportData: any,
-    chartElement?: HTMLElement
+    reportData: any
   ): Promise<{ blob: Blob; fileName: string }> {
     try {
       // Получаем существующий отчет
@@ -144,7 +96,7 @@ export class ReportGenerator {
       const existingZip = await JSZip.loadAsync(existingBlob);
       
       // Создаем новый отчет из шаблона
-      const newReportZip = await this.processTemplate(newTemplateZip, reportData, chartElement);
+      const newReportZip = await this.processTemplate(newTemplateZip, reportData);
       
       // Простое объединение: добавляем содержимое нового отчета к существующему
       const mergedZip = await this.simpleMergeDocuments(existingZip, newReportZip);
@@ -169,7 +121,7 @@ export class ReportGenerator {
     } catch (error) {
       console.error('Ошибка объединения отчетов:', error);
       // Fallback: создаем новый отчет
-      const blob = await this.createNewReport(newTemplateZip, reportData, chartElement);
+      const blob = await this.createNewReport(newTemplateZip, reportData);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const fileName = `Отчет_${reportData.reportNumber || 'без_номера'}_${timestamp}.docx`;
       return { blob, fileName };
@@ -179,10 +131,9 @@ export class ReportGenerator {
 
   private async createNewReport(
     templateZip: JSZip,
-    reportData: any,
-    chartElement?: HTMLElement
+    reportData: any
   ): Promise<Blob> {
-    const processedZip = await this.processTemplate(templateZip, reportData, chartElement);
+    const processedZip = await this.processTemplate(templateZip, reportData);
     
     return await processedZip.generateAsync({
       type: 'blob',
@@ -192,48 +143,10 @@ export class ReportGenerator {
     });
   }
 
-  private async generateChartImage(chartElement: HTMLElement): Promise<string | null> {
-    try {
-      const canvas = await html2canvas(chartElement, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
-        allowTaint: true
-      });
-      
-      // Создаем новый canvas для поворота изображения на 90 градусов против часовой стрелки
-      const rotatedCanvas = document.createElement('canvas');
-      const rotatedCtx = rotatedCanvas.getContext('2d');
-      
-      if (rotatedCtx) {
-        // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
-        rotatedCanvas.width = canvas.height;
-        rotatedCanvas.height = canvas.width;
-        
-        // Перемещаем точку отсчета в центр нового canvas
-        rotatedCtx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
-        
-        // Поворачиваем на -90 градусов (против часовой стрелки)
-        rotatedCtx.rotate(-Math.PI / 2);
-        
-        // Рисуем исходное изображение с учетом смещения центра
-        rotatedCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-        
-        // Конвертируем в base64
-        return rotatedCanvas.toDataURL('image/png').split(',')[1];
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Ошибка генерации изображения графика:', error);
-      return null;
-    }
-  }
-
   private async processTemplate(
     templateZip: JSZip,
     reportData: any,
-    chartElement?: HTMLElement
+    imageFileName: string = 'media.png'
   ): Promise<JSZip> {
     const zip = templateZip.clone();
 
@@ -246,13 +159,6 @@ export class ReportGenerator {
     // Заменяем плейсхолдеры
     let processedXml = this.replacePlaceholders(documentXml, reportData);
 
-    // Генерируем и вставляем график если есть chartElement
-    if (chartElement) {
-      const chartImageData = await this.generateChartImage(chartElement);
-      if (chartImageData) {
-        processedXml = await this.insertChart(processedXml, chartImageData, zip);
-      }
-    }
 
     // Сохраняем обновленный document.xml
     zip.file('word/document.xml', processedXml);
@@ -399,11 +305,8 @@ export class ReportGenerator {
     // Заменяем таблицу результатов
     result = this.replaceResultsTable(result, data.resultsTableData || []);
 
-    // Плейсхолдер {chart} будет заменен в insertChart() если есть изображение
-    // Если изображения нет, заменяем на текст
-    if (result.includes('{chart}')) {
-      result = result.replace('{chart}', 'График недоступен');
-    }
+    // Заменяем плейсхолдер графика на текст
+    result = result.replace('{chart}', 'График недоступен');
 
     return result;
   }
