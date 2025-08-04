@@ -601,7 +601,10 @@ export class ReportGenerator {
     const imageNumber = imageFileName.match(/media(\d+)?\.png$/)?.[1] || '';
     const rId = `rId99${imageNumber || '9'}`;
     
-    // Создаем правильный XML для изображения с корректными размерами и namespace
+    // Создаем правильный XML для изображения с увеличенными размерами, поворотом на 90° и namespace
+    // Размеры для 80% листа A4 в альбомной ориентации: ширина ~19см, высота ~13см
+    // В EMU: 1 см = 360000 EMU
+    // Ширина: 19 см = 6840000 EMU, Высота: 13 см = 4680000 EMU
     const imageXml = `
       <w:p>
         <w:pPr>
@@ -610,7 +613,7 @@ export class ReportGenerator {
         <w:r>
           <w:drawing>
             <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
-              <wp:extent cx="4572000" cy="2286000"/>
+              <wp:extent cx="6840000" cy="4680000"/>
               <wp:effectExtent l="0" t="0" r="0" b="0"/>
               <wp:docPr id="1" name="График" descr="График температуры"/>
               <wp:cNvGraphicFramePr/>
@@ -630,7 +633,8 @@ export class ReportGenerator {
                     <pic:spPr>
                       <a:xfrm>
                         <a:off x="0" y="0"/>
-                        <a:ext cx="4572000" cy="2286000"/>
+                        <a:ext cx="6840000" cy="4680000"/>
+                        <a:rot rot="5400000"/>
                       </a:xfrm>
                       <a:prstGeom prst="rect">
                         <a:avLst/>
