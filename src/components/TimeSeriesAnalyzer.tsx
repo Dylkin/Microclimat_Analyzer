@@ -254,8 +254,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           resultsTableData: analysisResults,
           user: user!,
           dataType
-        },
-        data.points // Передаем данные графика
+        }
       );
 
       if (result.success) {
