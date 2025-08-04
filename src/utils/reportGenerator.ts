@@ -605,7 +605,7 @@ export class ReportGenerator {
     const imageNumber = imageFileName.match(/media(\d+)?\.png$/)?.[1] || '';
     const rId = `rId99${imageNumber || '9'}`;
     
-    // Создаем правильный XML для изображения с корректными размерами и namespace
+    // Создаем XML для изображения с поворотом на 90 градусов против часовой стрелки
     const imageXml = `
       <w:p>
         <w:pPr>
@@ -614,7 +614,7 @@ export class ReportGenerator {
         <w:r>
           <w:drawing>
             <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
-              <wp:extent cx="5486400" cy="3048000"/>
+              <wp:extent cx="3048000" cy="5486400"/>
               <wp:effectExtent l="0" t="0" r="0" b="0"/>
               <wp:docPr id="1" name="График" descr="График температуры"/>
               <wp:cNvGraphicFramePr/>
@@ -634,7 +634,7 @@ export class ReportGenerator {
                     <pic:spPr>
                       <a:xfrm>
                         <a:off x="0" y="0"/>
-                        <a:ext cx="5486400" cy="3048000"/>
+                        <a:ext cx="3048000" cy="5486400"/>
                       </a:xfrm>
                       <a:prstGeom prst="rect">
                         <a:avLst/>
