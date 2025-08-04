@@ -35,64 +35,6 @@ export class ReportGenerator {
       const templateZip = await JSZip.loadAsync(templateBuffer);
       console.log('Шаблон успешно загружен и распакован');
 
-      // Генерируем график если есть элемент
-      let chartImageData = '';
-      let chartFileName = '';
-      if (chartElement) {
-        try {
-          // Создаем canvas с исходным изображением
-          const originalCanvas = await html2canvas(chartElement, {
-            backgroundColor: '#ffffff',
-            scale: 1.5,
-            useCORS: true,
-            allowTaint: true,
-            width: chartElement.offsetWidth || 1200,
-            height: chartElement.offsetHeight || 500,
-            scrollX: 0,
-            scrollY: 0,
-            windowWidth: chartElement.offsetWidth || 1200,
-            windowHeight: chartElement.offsetHeight || 500
-          });
-          
-          // Создаем новый canvas для повернутого изображения
-          const rotatedCanvas = document.createElement('canvas');
-          const ctx = rotatedCanvas.getContext('2d');
-          
-          if (ctx) {
-            // Меняем размеры canvas местами для поворота на 90°
-            rotatedCanvas.width = originalCanvas.height;
-            rotatedCanvas.height = originalCanvas.width;
-            
-            // Поворачиваем на 90 градусов против часовой стрелки
-            ctx.translate(0, originalCanvas.width);
-            ctx.rotate(-Math.PI / 2);
-            
-            // Рисуем исходное изображение на повернутом canvas
-            ctx.drawImage(originalCanvas, 0, 0);
-          }
-          
-          chartImageData = rotatedCanvas.toDataURL('image/png');
-          
-          // Генерируем имя файла графика ЗАРАНЕЕ
-          chartFileName = fileName.replace('.docx', '_график.png');
-          
-          // Сохраняем график отдельно синхронно
-          const chartBlob = await new Promise<Blob>((resolve) => {
-            rotatedCanvas.toBlob((blob) => {
-              if (blob) {
-                resolve(blob);
-              }
-            }, 'image/png');
-          });
-          
-          if (chartBlob) {
-            this.generatedCharts.set(chartFileName, chartBlob);
-            console.log('График сохранен с именем:', chartFileName);
-          }
-        } catch (error) {
-          console.warn('Ошибка генерации графика:', error);
-        }
-      }
 
       // Проверяем, существует ли уже файл с таким именем (без timestamp)
       const baseFileName = `Отчет_${reportData.reportNumber || 'без_номера'}`;
@@ -109,38 +51,15 @@ export class ReportGenerator {
         const result = await this.mergeWithExistingReport(
           existingFileName,
           templateZip,
-          reportData,
-          chartImageData
+          reportData
         );
         finalBlob = result.blob;
         finalFileName = result.fileName;
-        
-        // Для объединенного отчета используем новое имя для графика
-        if (chartFileName) {
-          const newChartFileName = finalFileName.replace('.docx', '_график.png');
-          const chartBlob = this.generatedCharts.get(chartFileName);
-          if (chartBlob) {
-            this.generatedCharts.delete(chartFileName);
-            this.generatedCharts.set(newChartFileName, chartBlob);
-            console.log('График переименован с', chartFileName, 'на', newChartFileName);
-          }
-        }
       } else {
         // Создаем новый отчет
         console.log('Создаем новый отчет');
-        finalBlob = await this.createNewReport(templateZip, reportData, chartImageData);
+        finalBlob = await this.createNewReport(templateZip, reportData);
         finalFileName = fileName;
-        
-        // Для нового отчета обновляем имя графика если нужно
-        if (chartFileName && chartFileName !== fileName.replace('.docx', '_график.png')) {
-          const correctChartFileName = fileName.replace('.docx', '_график.png');
-          const chartBlob = this.generatedCharts.get(chartFileName);
-          if (chartBlob) {
-            this.generatedCharts.delete(chartFileName);
-            this.generatedCharts.set(correctChartFileName, chartBlob);
-            console.log('График переименован с', chartFileName, 'на', correctChartFileName);
-          }
-        }
       }
 
       // Сохраняем отчет
@@ -164,8 +83,7 @@ export class ReportGenerator {
   private async mergeWithExistingReport(
     existingFileName: string,
     newTemplateZip: JSZip,
-    reportData: any,
-    chartImageData: string
+    reportData: any
   ): Promise<{ blob: Blob; fileName: string }> {
     try {
       // Получаем существующий отчет
@@ -177,12 +95,8 @@ export class ReportGenerator {
       // Читаем существующий отчет
       const existingZip = await JSZip.loadAsync(existingBlob);
       
-      // Определяем следующий номер для изображения
-      const nextImageNumber = await this.getNextImageNumber(existingZip);
-      const newImageFileName = `media${nextImageNumber}.png`;
-      
       // Создаем новый отчет из шаблона
-      const newReportZip = await this.processTemplate(newTemplateZip, reportData, chartImageData, newImageFileName);
+      const newReportZip = await this.processTemplate(newTemplateZip, reportData);
       
       // Простое объединение: добавляем содержимое нового отчета к существующему
       const mergedZip = await this.simpleMergeDocuments(existingZip, newReportZip);
@@ -207,42 +121,19 @@ export class ReportGenerator {
     } catch (error) {
       console.error('Ошибка объединения отчетов:', error);
       // Fallback: создаем новый отчет
-      const blob = await this.createNewReport(newTemplateZip, reportData, chartImageData);
+      const blob = await this.createNewReport(newTemplateZip, reportData);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const fileName = `Отчет_${reportData.reportNumber || 'без_номера'}_${timestamp}.docx`;
       return { blob, fileName };
     }
   }
 
-  private async getNextImageNumber(existingZip: JSZip): Promise<number> {
-    try {
-      const mediaFolder = existingZip.folder('word/media');
-      if (!mediaFolder) {
-        return 1; // Если папки media нет, начинаем с 1
-      }
-
-      let maxNumber = 0;
-      Object.keys(mediaFolder.files).forEach(fileName => {
-        const match = fileName.match(/media(\d+)?\.png$/);
-        if (match) {
-          const number = match[1] ? parseInt(match[1]) : 1;
-          maxNumber = Math.max(maxNumber, number);
-        }
-      });
-
-      return maxNumber + 1;
-    } catch (error) {
-      console.warn('Ошибка определения номера изображения:', error);
-      return 1;
-    }
-  }
 
   private async createNewReport(
     templateZip: JSZip,
-    reportData: any,
-    chartImageData: string
+    reportData: any
   ): Promise<Blob> {
-    const processedZip = await this.processTemplate(templateZip, reportData, chartImageData);
+    const processedZip = await this.processTemplate(templateZip, reportData);
     
     return await processedZip.generateAsync({
       type: 'blob',
@@ -255,7 +146,6 @@ export class ReportGenerator {
   private async processTemplate(
     templateZip: JSZip,
     reportData: any,
-    chartImageData: string,
     imageFileName: string = 'media.png'
   ): Promise<JSZip> {
     const zip = templateZip.clone();
@@ -269,19 +159,6 @@ export class ReportGenerator {
     // Заменяем плейсхолдеры
     let processedXml = this.replacePlaceholders(documentXml, reportData);
 
-    // Добавляем график если есть
-    if (chartImageData) {
-      const { xml: xmlWithChart, imageData, imageId } = await this.insertChart(processedXml, chartImageData, imageFileName);
-      processedXml = xmlWithChart;
-      
-      if (imageData) {
-        // Добавляем изображение в архив
-        zip.file(`word/media/${imageFileName}`, imageData, { base64: true });
-        
-        // Обновляем relationships
-        await this.updateRelationships(zip, imageId, imageFileName);
-      }
-    }
 
     // Сохраняем обновленный document.xml
     zip.file('word/document.xml', processedXml);
@@ -427,6 +304,9 @@ export class ReportGenerator {
 
     // Заменяем таблицу результатов
     result = this.replaceResultsTable(result, data.resultsTableData || []);
+
+    // Заменяем плейсхолдер графика на текст
+    result = result.replace('{chart}', 'График недоступен');
 
     return result;
   }
@@ -708,96 +588,6 @@ export class ReportGenerator {
     return xml.replace('{Results table}', tableHtml);
   }
 
-  private async insertChart(xml: string, chartImageData: string, imageFileName: string = 'media.png'): Promise<{ xml: string; imageData?: string; imageId?: string }> {
-    if (!chartImageData || !chartImageData.startsWith('data:image/png;base64,')) {
-      return { xml: xml.replace('{chart}', 'График недоступен') };
-    }
-
-    const base64Data = chartImageData.split(',')[1];
-    
-    // Генерируем уникальный rId на основе имени файла
-    const imageNumber = imageFileName.match(/media(\d+)?\.png$/)?.[1] || '';
-    const rId = `rId99${imageNumber || '9'}`;
-    
-    // Создаем правильный XML для изображения с корректными размерами и namespace
-    const imageXml = `
-      <w:p>
-        <w:pPr>
-          <w:jc w:val="center"/>
-        </w:pPr>
-        <w:r>
-          <w:drawing>
-            <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
-              <wp:extent cx="6858000" cy="4572000"/>
-              <wp:effectExtent l="0" t="0" r="0" b="0"/>
-              <wp:docPr id="1" name="График" descr="График температуры"/>
-              <wp:cNvGraphicFramePr/>
-              <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-                <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                  <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                    <pic:nvPicPr>
-                      <pic:cNvPr id="0" name="График"/>
-                      <pic:cNvPicPr/>
-                    </pic:nvPicPr>
-                    <pic:blipFill>
-                      <a:blip r:embed="${rId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
-                      <a:stretch>
-                        <a:fillRect/>
-                      </a:stretch>
-                    </pic:blipFill>
-                    <pic:spPr>
-                      <a:xfrm>
-                        <a:off x="0" y="0"/>
-                        <a:ext cx="6858000" cy="4572000"/>
-                      </a:xfrm>
-                      <a:prstGeom prst="rect">
-                        <a:avLst/>
-                      </a:prstGeom>
-                    </pic:spPr>
-                  </pic:pic>
-                </a:graphicData>
-              </a:graphic>
-            </wp:inline>
-          </w:drawing>
-        </w:r>
-      </w:p>`;
-
-    return {
-      xml: xml.replace('{chart}', imageXml),
-      imageData: base64Data,
-      imageId: rId
-    };
-  }
-
-  private async updateRelationships(zip: JSZip, imageId: string = 'rId999', imageFileName: string = 'media.png'): Promise<void> {
-    try {
-      const relsFile = zip.file('word/_rels/document.xml.rels');
-      if (!relsFile) return;
-
-      let relsXml = await relsFile.async('text');
-      
-      // Добавляем связь с изображением
-      if (!relsXml.includes(`Target="media/${imageFileName}"`)) {
-        const imageRel = `  <Relationship Id="${imageId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageFileName}"/>`;
-        relsXml = relsXml.replace('</Relationships>', `${imageRel}</Relationships>`);
-        zip.file('word/_rels/document.xml.rels', relsXml);
-      }
-      
-      // Обновляем [Content_Types].xml для поддержки PNG изображений
-      const contentTypesFile = zip.file('[Content_Types].xml');
-      if (contentTypesFile) {
-        let contentTypesXml = await contentTypesFile.async('text');
-        if (!contentTypesXml.includes('Extension="png"')) {
-          const pngType = '  <Default Extension="png" ContentType="image/png"/>';
-          contentTypesXml = contentTypesXml.replace('</Types>', `${pngType}\n</Types>`);
-          zip.file('[Content_Types].xml', contentTypesXml);
-        }
-      }
-      
-    } catch (error) {
-      console.warn('Ошибка обновления relationships:', error);
-    }
-  }
 
   private getTestTypeName(testType: string): string {
     const types: { [key: string]: string } = {
