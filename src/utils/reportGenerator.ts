@@ -40,11 +40,15 @@ export class ReportGenerator {
         try {
           const canvas = await html2canvas(chartElement, {
             backgroundColor: '#ffffff',
-            scale: 2,
+            scale: 1.5,
             useCORS: true,
             allowTaint: true,
-            width: 1200,
-            height: 400
+            width: chartElement.offsetWidth || 1200,
+            height: chartElement.offsetHeight || 500,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: chartElement.offsetWidth || 1200,
+            windowHeight: chartElement.offsetHeight || 500
           });
           chartImageData = canvas.toDataURL('image/png');
           
@@ -610,7 +614,7 @@ export class ReportGenerator {
         <w:r>
           <w:drawing>
             <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
-              <wp:extent cx="4572000" cy="2286000"/>
+              <wp:extent cx="5486400" cy="3048000"/>
               <wp:effectExtent l="0" t="0" r="0" b="0"/>
               <wp:docPr id="1" name="График" descr="График температуры"/>
               <wp:cNvGraphicFramePr/>
@@ -630,7 +634,7 @@ export class ReportGenerator {
                     <pic:spPr>
                       <a:xfrm>
                         <a:off x="0" y="0"/>
-                        <a:ext cx="4572000" cy="2286000"/>
+                        <a:ext cx="5486400" cy="3048000"/>
                       </a:xfrm>
                       <a:prstGeom prst="rect">
                         <a:avLst/>
