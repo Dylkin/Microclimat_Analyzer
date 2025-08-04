@@ -41,6 +41,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [generatedReports, setGeneratedReports] = useState<string[]>([]);
+  const chartRef = useRef<HTMLDivElement>(null);
   
   const templateInputRef = useRef<HTMLInputElement>(null);
 
@@ -245,6 +246,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
     try {
       const reportGenerator = ReportGenerator.getInstance();
+      
+      // Получаем элемент графика для захвата изображения
+      const chartElement = chartRef.current?.querySelector('svg') as HTMLElement;
+      
       const result = await reportGenerator.generateReport(
         templateFile,
         {
@@ -254,7 +259,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           resultsTableData: analysisResults,
           user: user!,
           dataType
-        }
+        },
+        chartElement
       );
 
       if (result.success) {
@@ -488,7 +494,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       </div>
 
       {/* Chart */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div ref={chartRef} className="bg-white rounded-lg shadow p-6">
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-gray-900">
             График {dataType === 'temperature' ? 'температуры' : 'влажности'}

@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } from "docx";
-import officegen from 'officegen';
+import html2canvas from 'html2canvas';
 
 // Типы для данных графика
 interface ChartDataPoint {
@@ -22,6 +22,7 @@ interface ChartGenerationOptions {
 export class ReportGenerator {
   private static instance: ReportGenerator;
   private generatedReports: Map<string, Blob> = new Map();
+  private generatedCharts: Map<string, string> = new Map(); // Хранение base64 изображений графиков
 
   private constructor() {}
 
@@ -35,6 +36,7 @@ export class ReportGenerator {
   async generateReport(
     templateFile: File,
     reportData: any,
+    chartElement?: HTMLElement
   ): Promise<{ success: boolean; fileName: string; error?: string }> {
     try {
       console.log('Начинаем генерацию отчета...');
@@ -66,14 +68,14 @@ export class ReportGenerator {
           existingFileName,
           templateZip,
           reportData,
-          chartData
+          chartElement
         );
         finalBlob = result.blob;
         finalFileName = result.fileName;
       } else {
         // Создаем новый отчет
         console.log('Создаем новый отчет');
-        finalBlob = await this.createNewReport(templateZip, reportData);
+        finalBlob = await this.createNewReport(templateZip, reportData, chartElement);
         finalFileName = fileName;
       }
 
@@ -99,7 +101,7 @@ export class ReportGenerator {
     existingFileName: string,
     newTemplateZip: JSZip,
     reportData: any,
-    chartData?: any
+    chartElement?: HTMLElement
   ): Promise<{ blob: Blob; fileName: string }> {
     try {
       // Получаем существующий отчет
@@ -112,7 +114,7 @@ export class ReportGenerator {
       const existingZip = await JSZip.loadAsync(existingBlob);
       
       // Создаем новый отчет из шаблона
-      const newReportZip = await this.processTemplate(newTemplateZip, reportData);
+      const newReportZip = await this.processTemplate(newTemplateZip, reportData, chartElement);
       // Простое объединение: добавляем содержимое нового отчета к существующему
       const mergedZip = await this.simpleMergeDocuments(existingZip, newReportZip);
       
@@ -136,7 +138,7 @@ export class ReportGenerator {
     } catch (error) {
       console.error('Ошибка объединения отчетов:', error);
       // Fallback: создаем новый отчет
-      const blob = await this.createNewReport(newTemplateZip, reportData);
+      const blob = await this.createNewReport(newTemplateZip, reportData, chartElement);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const fileName = `Отчет_${reportData.reportNumber || 'без_номера'}_${timestamp}.docx`;
       return { blob, fileName };
@@ -147,14 +149,9 @@ export class ReportGenerator {
   private async createNewReport(
     templateZip: JSZip,
     reportData: any,
-    chartData?: ChartDataPoint[]
+    chartElement?: HTMLElement
   ): Promise<Blob> {
-    const processedZip = await this.processTemplate(templateZip, reportData);
-    
-    // Добавляем график если есть данные
-    if (chartData && chartData.length > 0) {
-      await this.addChartToZip(processedZip, chartData, reportData.dataType || 'temperature');
-    }
+    const processedZip = await this.processTemplate(templateZip, reportData, chartElement);
     
     return await processedZip.generateAsync({
       type: 'blob',
@@ -167,6 +164,7 @@ export class ReportGenerator {
   private async processTemplate(
     templateZip: JSZip,
     reportData: any,
+    chartElement?: HTMLElement
   ): Promise<JSZip> {
     const zip = templateZip.clone();
 
@@ -177,7 +175,7 @@ export class ReportGenerator {
     }
 
     // Заменяем плейсхолдеры
-    let processedXml = this.replacePlaceholders(documentXml, reportData);
+    let processedXml = await this.replacePlaceholders(documentXml, reportData, chartElement);
 
 
     // Сохраняем обновленный document.xml
@@ -295,7 +293,7 @@ export class ReportGenerator {
     }
   }
 
-  private replacePlaceholders(xml: string, data: any): string {
+  private async replacePlaceholders(xml: string, data: any, chartElement?: HTMLElement): Promise<string> {
     let result = xml;
 
     // Сначала нормализуем XML, объединяя разбитые плейсхолдеры
@@ -326,8 +324,13 @@ export class ReportGenerator {
     // Заменяем таблицу результатов
     result = this.replaceResultsTable(result, data.resultsTableData || []);
 
-    // Заменяем плейсхолдер графика на текст
-    result = result.replace('{chart}', 'График недоступен');
+    // Заменяем плейсхолдер графика
+    if (chartElement) {
+      const chartImageXml = await this.generateChartImageXml(chartElement);
+      result = result.replace('{chart}', chartImageXml);
+    } else {
+      result = result.replace('{chart}', 'График недоступен');
+    }
 
     return result;
   }
@@ -389,6 +392,109 @@ export class ReportGenerator {
     });
 
     return result;
+  }
+
+  /**
+   * Генерация XML для вставки изображения графика
+   */
+  private async generateChartImageXml(chartElement: HTMLElement): Promise<string> {
+    try {
+      // Захватываем изображение графика
+      const canvas = await html2canvas(chartElement, {
+        backgroundColor: 'white',
+        scale: 2, // Увеличиваем разрешение
+        useCORS: true,
+        allowTaint: true
+      });
+
+      // Поворачиваем изображение на 90° против часовой стрелки
+      const rotatedCanvas = this.rotateCanvas(canvas, -90);
+      
+      // Получаем base64 данные
+      const imageData = rotatedCanvas.toDataURL('image/png');
+      const base64Data = imageData.split(',')[1];
+      
+      // Сохраняем изображение для использования в ZIP
+      const imageKey = `chart_${Date.now()}`;
+      this.generatedCharts.set(imageKey, base64Data);
+      
+      // Размеры повернутого изображения (меняем местами ширину и высоту)
+      const width = Math.round(rotatedCanvas.height * 0.75); // Конвертируем в EMU (English Metric Units)
+      const height = Math.round(rotatedCanvas.width * 0.75);
+      
+      // Генерируем XML для вставки изображения
+      return `
+        <w:p>
+          <w:r>
+            <w:drawing>
+              <wp:inline distT="0" distB="0" distL="0" distR="0">
+                <wp:extent cx="${width * 9525}" cy="${height * 9525}"/>
+                <wp:effectExtent l="0" t="0" r="0" b="0"/>
+                <wp:docPr id="1" name="График"/>
+                <wp:cNvGraphicFramePr>
+                  <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+                </wp:cNvGraphicFramePr>
+                <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                  <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                    <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                      <pic:nvPicPr>
+                        <pic:cNvPr id="1" name="График"/>
+                        <pic:cNvPicPr/>
+                      </pic:nvPicPr>
+                      <pic:blipFill>
+                        <a:blip r:embed="rId${imageKey}"/>
+                        <a:stretch>
+                          <a:fillRect/>
+                        </a:stretch>
+                      </pic:blipFill>
+                      <pic:spPr>
+                        <a:xfrm>
+                          <a:off x="0" y="0"/>
+                          <a:ext cx="${width * 9525}" cy="${height * 9525}"/>
+                        </a:xfrm>
+                        <a:prstGeom prst="rect">
+                          <a:avLst/>
+                        </a:prstGeom>
+                      </pic:spPr>
+                    </pic:pic>
+                  </a:graphicData>
+                </a:graphic>
+              </wp:inline>
+            </w:drawing>
+          </w:r>
+        </w:p>`;
+    } catch (error) {
+      console.error('Ошибка генерации изображения графика:', error);
+      return 'График недоступен (ошибка генерации изображения)';
+    }
+  }
+
+  /**
+   * Поворот canvas на заданный угол
+   */
+  private rotateCanvas(canvas: HTMLCanvasElement, degrees: number): HTMLCanvasElement {
+    const rotatedCanvas = document.createElement('canvas');
+    const ctx = rotatedCanvas.getContext('2d')!;
+    
+    // Для поворота на 90° или -90° меняем размеры местами
+    if (Math.abs(degrees) === 90) {
+      rotatedCanvas.width = canvas.height;
+      rotatedCanvas.height = canvas.width;
+    } else {
+      rotatedCanvas.width = canvas.width;
+      rotatedCanvas.height = canvas.height;
+    }
+    
+    // Перемещаем точку поворота в центр
+    ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
+    
+    // Поворачиваем
+    ctx.rotate((degrees * Math.PI) / 180);
+    
+    // Рисуем исходное изображение
+    ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+    
+    return rotatedCanvas;
   }
 
   private replaceResultsTable(xml: string, tableData: any[]): string {
