@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { ArrowLeft, Download, Upload, Settings, Plus, Trash2, Edit2, Save, X, BarChart, FileText, Thermometer, Droplets } from 'lucide-react';
+import JSZip from 'jszip';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -202,9 +203,27 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.name.toLowerCase().endsWith('.docx')) {
-      setTemplateFile(file);
-      setReportStatus({ type: 'success', message: `Шаблон "${file.name}" загружен успешно` });
+      // Валидируем DOCX файл
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          await JSZip.loadAsync(arrayBuffer);
+          // Если JSZip успешно загрузил файл, это валидный DOCX
+          setTemplateFile(file);
+          setReportStatus({ type: 'success', message: `Шаблон "${file.name}" загружен успешно` });
+        } catch (error) {
+          // Файл не является валидным DOCX архивом
+          setTemplateFile(null);
+          setReportStatus({ 
+            type: 'error', 
+            message: `Файл "${file.name}" не является валидным DOCX шаблоном. Пожалуйста, загрузите корректный файл.` 
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
     } else {
+      setTemplateFile(null);
       setReportStatus({ type: 'error', message: 'Пожалуйста, загрузите файл в формате .docx' });
     }
   };
