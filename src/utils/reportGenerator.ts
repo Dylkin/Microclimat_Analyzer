@@ -60,9 +60,9 @@ export class ReportGenerator {
             throw new Error('Не удалось получить контекст canvas');
           }
           
-          // Устанавливаем фиксированные размеры повернутого canvas
-          rotatedCanvas.width = 934;
-          rotatedCanvas.height = 1420;
+          // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
+          rotatedCanvas.width = originalCanvas.height;
+          rotatedCanvas.height = originalCanvas.width;
           
           // Перемещаем точку отсчета в центр нового canvas
           ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
@@ -70,20 +70,11 @@ export class ReportGenerator {
           // Поворачиваем на 90 градусов против часовой стрелки (-90 градусов)
           ctx.rotate(-Math.PI / 2);
           
-          // Рисуем исходное изображение с масштабированием и центрированием
-          const scaleX = 934 / originalCanvas.height;
-          const scaleY = 1420 / originalCanvas.width;
-          const scale = Math.min(scaleX, scaleY); // Сохраняем пропорции
-          
-          const scaledWidth = originalCanvas.width * scale;
-          const scaledHeight = originalCanvas.height * scale;
-          
+          // Рисуем исходное изображение с центрированием
           ctx.drawImage(
             originalCanvas, 
-            -scaledWidth / 2, 
-            -scaledHeight / 2,
-            scaledWidth,
-            scaledHeight
+            -originalCanvas.width / 2, 
+            -originalCanvas.height / 2
           );
           
           chartImageData = rotatedCanvas.toDataURL('image/png');
