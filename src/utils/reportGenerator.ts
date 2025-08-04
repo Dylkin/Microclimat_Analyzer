@@ -47,13 +47,19 @@ export class ReportGenerator {
           });
           chartImageData = canvas.toDataURL('image/png');
           
-          // Сохраняем график отдельно
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const chartFileName = fileName.replace('.docx', '_график.png');
-              this.generatedCharts.set(chartFileName, blob);
-            }
-          }, 'image/png');
+          // Сохраняем график отдельно синхронно
+          const chartBlob = await new Promise<Blob>((resolve) => {
+            canvas.toBlob((blob) => {
+              if (blob) {
+                resolve(blob);
+              }
+            }, 'image/png');
+          });
+          
+          if (chartBlob) {
+            const chartFileName = fileName.replace('.docx', '_график.png');
+            this.generatedCharts.set(chartFileName, chartBlob);
+          }
         } catch (error) {
           console.warn('Ошибка генерации графика:', error);
         }
