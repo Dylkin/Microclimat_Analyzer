@@ -361,8 +361,11 @@ export class ReportGenerator {
     // Заменяем таблицу результатов
     result = this.replaceResultsTable(result, data.resultsTableData || []);
 
-    // Заменяем плейсхолдер графика на текст
-    result = result.replace('{chart}', 'График недоступен');
+    // Плейсхолдер {chart} будет заменен в insertChart() если есть изображение
+    // Если изображения нет, заменяем на текст
+    if (result.includes('{chart}')) {
+      result = result.replace('{chart}', 'График недоступен');
+    }
 
     return result;
   }
