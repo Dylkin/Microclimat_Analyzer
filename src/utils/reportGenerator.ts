@@ -38,7 +38,8 @@ export class ReportGenerator {
       let chartFileName = '';
       if (chartElement) {
         try {
-          const canvas = await html2canvas(chartElement, {
+          // Создаем исходный canvas
+          const originalCanvas = await html2canvas(chartElement, {
             backgroundColor: '#ffffff',
             scale: 1.5,
             useCORS: true,
@@ -50,14 +51,40 @@ export class ReportGenerator {
             windowWidth: chartElement.offsetWidth || 1200,
             windowHeight: chartElement.offsetHeight || 500
           });
-          chartImageData = canvas.toDataURL('image/png');
+          
+          // Создаем новый canvas для повернутого изображения
+          const rotatedCanvas = document.createElement('canvas');
+          const ctx = rotatedCanvas.getContext('2d');
+          
+          if (!ctx) {
+            throw new Error('Не удалось получить контекст canvas');
+          }
+          
+          // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
+          rotatedCanvas.width = originalCanvas.height;
+          rotatedCanvas.height = originalCanvas.width;
+          
+          // Перемещаем точку отсчета в центр нового canvas
+          ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
+          
+          // Поворачиваем на 90 градусов против часовой стрелки (-90 градусов)
+          ctx.rotate(-Math.PI / 2);
+          
+          // Рисуем исходное изображение с центрированием
+          ctx.drawImage(
+            originalCanvas, 
+            -originalCanvas.width / 2, 
+            -originalCanvas.height / 2
+          );
+          
+          chartImageData = rotatedCanvas.toDataURL('image/png');
           
           // Генерируем имя файла графика ЗАРАНЕЕ
           chartFileName = fileName.replace('.docx', '_график.png');
           
           // Сохраняем график отдельно синхронно
           const chartBlob = await new Promise<Blob>((resolve) => {
-            canvas.toBlob((blob) => {
+            rotatedCanvas.toBlob((blob) => {
               if (blob) {
                 resolve(blob);
               }
@@ -605,7 +632,7 @@ export class ReportGenerator {
     const imageNumber = imageFileName.match(/media(\d+)?\.png$/)?.[1] || '';
     const rId = `rId99${imageNumber || '9'}`;
     
-    // Создаем правильный XML для изображения с корректными размерами и namespace
+    // Создаем правильный XML для изображения (уже повернутого) с корректными размерами
     const imageXml = `
       <w:p>
         <w:pPr>
