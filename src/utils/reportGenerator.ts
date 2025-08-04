@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import html2canvas from "html2canvas";
+import html2canvas from "html2canvas";
 import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } from "docx";
 
 export class ReportGenerator {
@@ -64,6 +65,30 @@ export class ReportGenerator {
 
       // Сохраняем отчет
       this.generatedReports.set(finalFileName, finalBlob);
+      
+      // Генерируем и сохраняем изображение графика для скачивания
+      if (chartElement) {
+        try {
+          const canvas = await html2canvas(chartElement, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            useCORS: true,
+            allowTaint: true
+          });
+          
+          const chartBlob = await new Promise<Blob>((resolve) => {
+            canvas.toBlob((blob) => {
+              resolve(blob!);
+            }, 'image/png', 0.9);
+          });
+          
+          const chartFileName = finalFileName.replace('.docx', '_график.png');
+          this.generatedCharts.set(chartFileName, chartBlob);
+          console.log('График сохранен:', chartFileName);
+        } catch (error) {
+          console.warn('Ошибка генерации графика для скачивания:', error);
+        }
+      }
       
       // Скачиваем файл
       saveAs(finalBlob, finalFileName);
