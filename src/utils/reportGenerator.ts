@@ -54,49 +54,19 @@ export class ReportGenerator {
             windowHeight: chartElement.offsetHeight || 500
           });
           
-          // Создаем новый canvas для поворота изображения на 90 градусов против часовой стрелки
-          const rotatedCanvas = document.createElement('canvas');
-          const rotatedCtx = rotatedCanvas.getContext('2d');
-          
-          if (rotatedCtx) {
-            // Меняем размеры местами для поворота
-            rotatedCanvas.width = canvas.height;
-            rotatedCanvas.height = canvas.width;
-            
-            // Перемещаем точку отсчета в центр нового canvas
-            rotatedCtx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
-            
-            // Поворачиваем на 90 градусов против часовой стрелки
-            rotatedCtx.rotate(-Math.PI / 2);
-            
-            // Рисуем исходное изображение с центрированием
-            rotatedCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-            
-            // Получаем повернутое изображение
-            chartImageData = rotatedCanvas.toDataURL('image/png');
-          } else {
-            // Fallback: используем исходное изображение если не удалось создать контекст
-            chartImageData = canvas.toDataURL('image/png');
-          }
+          // Получаем изображение без изменений
+          chartImageData = canvas.toDataURL('image/png');
           
           // Генерируем имя файла графика ЗАРАНЕЕ
           chartFileName = fileName.replace('.docx', '_график.png');
           
           // Сохраняем график отдельно синхронно
           const chartBlob = await new Promise<Blob>((resolve) => {
-            if (rotatedCtx) {
-              rotatedCanvas.toBlob((blob) => {
-                if (blob) {
-                  resolve(blob);
-                }
-              }, 'image/png');
-            } else {
-              canvas.toBlob((blob) => {
-                if (blob) {
-                  resolve(blob);
-                }
-              }, 'image/png');
-            }
+            canvas.toBlob((blob) => {
+              if (blob) {
+                resolve(blob);
+              }
+            }, 'image/png');
           });
           
           if (chartBlob) {
