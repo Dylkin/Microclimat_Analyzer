@@ -2,7 +2,6 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import html2canvas from "html2canvas";
 import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } from "docx";
-import officegen from 'officegen';
 
 export class ReportGenerator {
   private static instance: ReportGenerator;
@@ -109,7 +108,7 @@ export class ReportGenerator {
       } else {
         // Создаем новый отчет
         console.log('Создаем новый отчет');
-        finalBlob = await this.createNewReportWithOfficegen(templateZip, reportData, rotatedChartBlob);
+        finalBlob = await this.createNewReport(templateZip, reportData, chartImageData);
         finalFileName = fileName;
         
         // Для нового отчета обновляем имя графика если нужно
@@ -190,117 +189,6 @@ export class ReportGenerator {
     });
   }
 
-  /**
-   * Создание нового отчета с использованием officegen для вставки изображения
-   */
-  private async createNewReportWithOfficegen(
-    templateZip: JSZip,
-    reportData: any,
-    chartBlob: Blob | null
-  ): Promise<Blob> {
-    try {
-      // Сначала обрабатываем шаблон стандартным способом
-      const processedZip = await this.processTemplate(templateZip, reportData, '', 'chart.png');
-      
-      // Если есть график, используем officegen для его вставки
-      if (chartBlob) {
-        return await this.insertImageWithOfficegen(processedZip, chartBlob, reportData);
-      }
-      
-      // Если нет графика, возвращаем обработанный шаблон
-      return await processedZip.generateAsync({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        compression: 'DEFLATE',
-        compressionOptions: { level: 6 }
-      });
-      
-    } catch (error) {
-      console.error('Ошибка создания отчета с officegen:', error);
-      // Fallback к стандартному методу
-      return await this.createNewReport(templateZip, reportData, '');
-    }
-  }
-
-  /**
-   * Вставка изображения с использованием officegen
-   */
-  private async insertImageWithOfficegen(
-    processedZip: JSZip,
-    chartBlob: Blob,
-    reportData: any
-  ): Promise<Blob> {
-    return new Promise((resolve, reject) => {
-      try {
-        // Создаем новый документ Word с помощью officegen
-        const docx = officegen('docx');
-        
-        // Настраиваем документ
-        docx.on('finalize', (written: any) => {
-          console.log('Документ создан с помощью officegen, размер:', written);
-        });
-        
-        docx.on('error', (err: any) => {
-          console.error('Ошибка officegen:', err);
-          reject(err);
-        });
-        
-        // Читаем обработанный документ из ZIP
-        const documentXmlFile = processedZip.file('word/document.xml');
-        if (!documentXmlFile) {
-          reject(new Error('Не найден document.xml в обработанном шаблоне'));
-          return;
-        }
-        
-        documentXmlFile.async('text').then(async (documentXml) => {
-          try {
-            // Конвертируем Blob в ArrayBuffer для officegen
-            const chartArrayBuffer = await chartBlob.arrayBuffer();
-            
-            // Создаем параграф с изображением
-            const paragraph = docx.createP();
-            
-            // Добавляем изображение с правильными размерами (80% листа A4)
-            // Размеры в пикселях для 80% листа A4 в портретной ориентации
-            const imageWidth = 480; // ~80% от 600px (ширина A4 в 96 DPI)
-            const imageHeight = 320; // Пропорциональная высота
-            
-            paragraph.addImage(chartArrayBuffer, {
-              cx: imageWidth,
-              cy: imageHeight,
-              type: 'png'
-            });
-            
-            // Заменяем плейсхолдер {chart} на изображение
-            const modifiedXml = documentXml.replace('{chart}', '<!-- Изображение вставлено через officegen -->');
-            
-            // Генерируем финальный документ
-            const output = docx.generate();
-            
-            if (output instanceof Promise) {
-              output.then((buffer) => {
-                resolve(new Blob([buffer], { 
-                  type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-                }));
-              }).catch(reject);
-            } else {
-              resolve(new Blob([output], { 
-                type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-              }));
-            }
-            
-          } catch (error) {
-            console.error('Ошибка обработки документа с officegen:', error);
-            reject(error);
-          }
-        }).catch(reject);
-        
-      } catch (error) {
-        console.error('Ошибка инициализации officegen:', error);
-        reject(error);
-      }
-    });
-  }
 
   private async mergeWithExistingReport(
     existingFileName: string,
