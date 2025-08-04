@@ -1,12 +1,10 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import html2canvas from "html2canvas";
 import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } from "docx";
 
 export class ReportGenerator {
   private static instance: ReportGenerator;
   private generatedReports: Map<string, Blob> = new Map();
-  private generatedCharts: Map<string, Blob> = new Map();
 
   private constructor() {}
 
@@ -19,8 +17,7 @@ export class ReportGenerator {
 
   async generateReport(
     templateFile: File,
-    reportData: any,
-    chartElement?: HTMLElement
+    reportData: any
   ): Promise<{ success: boolean; fileName: string; error?: string }> {
     try {
       console.log('Начинаем генерацию отчета...');
@@ -677,18 +674,6 @@ export class ReportGenerator {
     return false;
   }
 
-  downloadChart(fileName: string): boolean {
-    console.log('Попытка скачать график:', fileName);
-    console.log('Доступные графики:', Array.from(this.generatedCharts.keys()));
-    const blob = this.generatedCharts.get(fileName);
-    if (blob) {
-      saveAs(blob, fileName);
-      console.log('График успешно скачан:', fileName);
-      return true;
-    }
-    console.error('График не найден:', fileName);
-    return false;
-  }
 
   async generateExampleTemplate(): Promise<boolean> {
     try {
