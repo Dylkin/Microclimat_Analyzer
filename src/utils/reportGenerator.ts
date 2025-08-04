@@ -35,6 +35,7 @@ export class ReportGenerator {
 
       // Генерируем график если есть элемент
       let chartImageData = '';
+      let chartFileName = '';
       if (chartElement) {
         try {
           const canvas = await html2canvas(chartElement, {
@@ -47,6 +48,9 @@ export class ReportGenerator {
           });
           chartImageData = canvas.toDataURL('image/png');
           
+          // Генерируем имя файла графика ЗАРАНЕЕ
+          chartFileName = fileName.replace('.docx', '_график.png');
+          
           // Сохраняем график отдельно синхронно
           const chartBlob = await new Promise<Blob>((resolve) => {
             canvas.toBlob((blob) => {
@@ -57,8 +61,8 @@ export class ReportGenerator {
           });
           
           if (chartBlob) {
-            const chartFileName = fileName.replace('.docx', '_график.png');
             this.generatedCharts.set(chartFileName, chartBlob);
+            console.log('График сохранен с именем:', chartFileName);
           }
         } catch (error) {
           console.warn('Ошибка генерации графика:', error);
@@ -76,6 +80,18 @@ export class ReportGenerator {
       if (existingFileName) {
         // Объединяем с существующим отчетом
         console.log('Объединяем с существующим отчетом:', existingFileName);
+        
+        // Для объединенного отчета используем новое имя для графика
+        if (chartFileName) {
+          const newChartFileName = finalFileName.replace('.docx', '_график.png');
+          const chartBlob = this.generatedCharts.get(chartFileName);
+          if (chartBlob) {
+            this.generatedCharts.delete(chartFileName);
+            this.generatedCharts.set(newChartFileName, chartBlob);
+            console.log('График переименован с', chartFileName, 'на', newChartFileName);
+          }
+        }
+        
         const result = await this.mergeWithExistingReport(
           existingFileName,
           templateZip,
@@ -89,6 +105,17 @@ export class ReportGenerator {
         console.log('Создаем новый отчет');
         finalBlob = await this.createNewReport(templateZip, reportData, chartImageData);
         finalFileName = fileName;
+        
+        // Для нового отчета обновляем имя графика если нужно
+        if (chartFileName && chartFileName !== fileName.replace('.docx', '_график.png')) {
+          const correctChartFileName = fileName.replace('.docx', '_график.png');
+          const chartBlob = this.generatedCharts.get(chartFileName);
+          if (chartBlob) {
+            this.generatedCharts.delete(chartFileName);
+            this.generatedCharts.set(correctChartFileName, chartBlob);
+            console.log('График переименован с', chartFileName, 'на', correctChartFileName);
+          }
+        }
       }
 
       // Сохраняем отчет
@@ -688,11 +715,15 @@ export class ReportGenerator {
   }
 
   downloadChart(fileName: string): boolean {
+    console.log('Попытка скачать график:', fileName);
+    console.log('Доступные графики:', Array.from(this.generatedCharts.keys()));
     const blob = this.generatedCharts.get(fileName);
     if (blob) {
       saveAs(blob, fileName);
+      console.log('График успешно скачан:', fileName);
       return true;
     }
+    console.error('График не найден:', fileName);
     return false;
   }
 
