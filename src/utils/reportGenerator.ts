@@ -192,6 +192,44 @@ export class ReportGenerator {
     });
   }
 
+  private async generateChartImage(chartElement: HTMLElement): Promise<string | null> {
+    try {
+      const canvas = await html2canvas(chartElement, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true
+      });
+      
+      // Создаем новый canvas для поворота изображения на 90 градусов против часовой стрелки
+      const rotatedCanvas = document.createElement('canvas');
+      const rotatedCtx = rotatedCanvas.getContext('2d');
+      
+      if (rotatedCtx) {
+        // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
+        rotatedCanvas.width = canvas.height;
+        rotatedCanvas.height = canvas.width;
+        
+        // Перемещаем точку отсчета в центр нового canvas
+        rotatedCtx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
+        
+        // Поворачиваем на -90 градусов (против часовой стрелки)
+        rotatedCtx.rotate(-Math.PI / 2);
+        
+        // Рисуем исходное изображение с учетом смещения центра
+        rotatedCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+        
+        // Конвертируем в base64
+        return rotatedCanvas.toDataURL('image/png').split(',')[1];
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Ошибка генерации изображения графика:', error);
+      return null;
+    }
+  }
+
   private async processTemplate(
     templateZip: JSZip,
     reportData: any,
