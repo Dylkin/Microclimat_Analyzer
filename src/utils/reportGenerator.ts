@@ -286,9 +286,40 @@ export class ReportGenerator {
     // Сохраняем обновленный document.xml
     zip.file('word/document.xml', processedXml);
 
+    // Обрабатываем нижний колонтитул
+    await this.processFooter(zip, reportData);
     return zip;
   }
 
+  private async processFooter(zip: JSZip, reportData: any): Promise<void> {
+    try {
+      // Ищем файлы нижних колонтитулов
+      const footerFiles = Object.keys(zip.files).filter(fileName => 
+        fileName.startsWith('word/footer') && fileName.endsWith('.xml')
+      );
+
+      console.log('Найдены файлы нижних колонтитулов:', footerFiles);
+
+      for (const footerFileName of footerFiles) {
+        const footerFile = zip.file(footerFileName);
+        if (footerFile) {
+          let footerXml = await footerFile.async('text');
+          console.log(`Обрабатываем нижний колонтитул: ${footerFileName}`);
+          
+          // Нормализуем и заменяем плейсхолдеры в нижнем колонтитуле
+          footerXml = this.normalizePlaceholders(footerXml);
+          footerXml = this.replacePlaceholders(footerXml, reportData);
+          
+          // Сохраняем обновленный нижний колонтитул
+          zip.file(footerFileName, footerXml);
+          console.log(`Нижний колонтитул ${footerFileName} обновлен`);
+        }
+      }
+    } catch (error) {
+      console.warn('Ошибка обработки нижнего колонтитула:', error);
+      // Не прерываем процесс, если не удалось обработать колонтитул
+    }
+  }
   private async simpleMergeDocuments(existingZip: JSZip, newZip: JSZip): Promise<JSZip> {
     try {
       // Читаем содержимое обоих документов
