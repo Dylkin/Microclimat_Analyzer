@@ -76,15 +76,37 @@ export class ReportGenerator {
             allowTaint: true
           });
           
-          const chartBlob = await new Promise<Blob>((resolve) => {
-            canvas.toBlob((blob) => {
-              resolve(blob!);
-            }, 'image/png', 0.9);
-          });
+          // Создаем новый canvas для поворота изображения на 90 градусов против часовой стрелки
+          const rotatedCanvas = document.createElement('canvas');
+          const rotatedCtx = rotatedCanvas.getContext('2d');
           
-          const chartFileName = finalFileName.replace('.docx', '_график.png');
-          this.generatedCharts.set(chartFileName, chartBlob);
-          console.log('График сохранен:', chartFileName);
+          if (rotatedCtx) {
+            // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
+            rotatedCanvas.width = canvas.height;
+            rotatedCanvas.height = canvas.width;
+            
+            // Перемещаем точку отсчета в центр нового canvas
+            rotatedCtx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
+            
+            // Поворачиваем на -90 градусов (против часовой стрелки)
+            rotatedCtx.rotate(-Math.PI / 2);
+            
+            // Рисуем исходное изображение с учетом смещения центра
+            rotatedCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+            
+            // Создаем blob из повернутого canvas
+            const chartBlob = await new Promise<Blob>((resolve) => {
+              rotatedCanvas.toBlob((blob) => {
+                resolve(blob!);
+              }, 'image/png', 0.9);
+            });
+            
+            const chartFileName = finalFileName.replace('.docx', '_график.png');
+            this.generatedCharts.set(chartFileName, chartBlob);
+            console.log('График сохранен с поворотом на 90°:', chartFileName);
+          } else {
+            console.warn('Не удалось получить контекст для поворота изображения');
+          }
         } catch (error) {
           console.warn('Ошибка генерации графика для скачивания:', error);
         }
