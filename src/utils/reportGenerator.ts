@@ -1,6 +1,23 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } from "docx";
+import officegen from 'officegen';
+
+// Типы для данных графика
+interface ChartDataPoint {
+  timestamp: number;
+  temperature?: number;
+  humidity?: number;
+  fileId: string;
+}
+
+interface ChartGenerationOptions {
+  width: number;
+  height: number;
+  dataType: 'temperature' | 'humidity';
+  title: string;
+  yAxisLabel: string;
+}
 
 export class ReportGenerator {
   private static instance: ReportGenerator;
@@ -17,7 +34,8 @@ export class ReportGenerator {
 
   async generateReport(
     templateFile: File,
-    reportData: any
+    reportData: any,
+    chartData?: ChartDataPoint[]
   ): Promise<{ success: boolean; fileName: string; error?: string }> {
     try {
       console.log('Начинаем генерацию отчета...');
@@ -55,7 +73,7 @@ export class ReportGenerator {
       } else {
         // Создаем новый отчет
         console.log('Создаем новый отчет');
-        finalBlob = await this.createNewReport(templateZip, reportData);
+        finalBlob = await this.createNewReport(templateZip, reportData, chartData);
         finalFileName = fileName;
       }
 
@@ -95,6 +113,11 @@ export class ReportGenerator {
       // Создаем новый отчет из шаблона
       const newReportZip = await this.processTemplate(newTemplateZip, reportData);
       
+      // Добавляем график если есть данные
+      if (chartData && chartData.length > 0) {
+        await this.addChartToZip(newReportZip, chartData, reportData.dataType || 'temperature');
+      }
+      
       // Простое объединение: добавляем содержимое нового отчета к существующему
       const mergedZip = await this.simpleMergeDocuments(existingZip, newReportZip);
       
@@ -118,7 +141,7 @@ export class ReportGenerator {
     } catch (error) {
       console.error('Ошибка объединения отчетов:', error);
       // Fallback: создаем новый отчет
-      const blob = await this.createNewReport(newTemplateZip, reportData);
+      const blob = await this.createNewReport(newTemplateZip, reportData, chartData);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const fileName = `Отчет_${reportData.reportNumber || 'без_номера'}_${timestamp}.docx`;
       return { blob, fileName };
@@ -128,9 +151,15 @@ export class ReportGenerator {
 
   private async createNewReport(
     templateZip: JSZip,
-    reportData: any
+    reportData: any,
+    chartData?: ChartDataPoint[]
   ): Promise<Blob> {
     const processedZip = await this.processTemplate(templateZip, reportData);
+    
+    // Добавляем график если есть данные
+    if (chartData && chartData.length > 0) {
+      await this.addChartToZip(processedZip, chartData, reportData.dataType || 'temperature');
+    }
     
     return await processedZip.generateAsync({
       type: 'blob',
@@ -303,7 +332,7 @@ export class ReportGenerator {
     result = this.replaceResultsTable(result, data.resultsTableData || []);
 
     // Заменяем плейсхолдер графика на текст
-    result = result.replace('{chart}', 'График недоступен');
+    result = result.replace('{chart}', '<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="6858000" cy="4572000"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="1" name="Chart"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="1" name="chart.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId999"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="6858000" cy="4572000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>');
 
     return result;
   }
