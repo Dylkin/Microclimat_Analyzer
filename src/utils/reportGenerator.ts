@@ -59,7 +59,7 @@ export class ReportGenerator {
       } else {
         // Создаем новый отчет
         console.log('Создаем новый отчет');
-        finalBlob = await this.createNewReport(templateZip, reportData);
+        finalBlob = await this.createNewReport(templateZip, reportData, chartElement);
         finalFileName = fileName;
       }
 
@@ -130,7 +130,8 @@ export class ReportGenerator {
   private async mergeWithExistingReport(
     existingFileName: string,
     newTemplateZip: JSZip,
-    reportData: any
+    reportData: any,
+    chartElement?: HTMLElement
   ): Promise<{ blob: Blob; fileName: string }> {
     try {
       // Получаем существующий отчет
@@ -143,7 +144,7 @@ export class ReportGenerator {
       const existingZip = await JSZip.loadAsync(existingBlob);
       
       // Создаем новый отчет из шаблона
-      const newReportZip = await this.processTemplate(newTemplateZip, reportData);
+      const newReportZip = await this.processTemplate(newTemplateZip, reportData, chartElement);
       
       // Простое объединение: добавляем содержимое нового отчета к существующему
       const mergedZip = await this.simpleMergeDocuments(existingZip, newReportZip);
@@ -168,7 +169,7 @@ export class ReportGenerator {
     } catch (error) {
       console.error('Ошибка объединения отчетов:', error);
       // Fallback: создаем новый отчет
-      const blob = await this.createNewReport(newTemplateZip, reportData);
+      const blob = await this.createNewReport(newTemplateZip, reportData, chartElement);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const fileName = `Отчет_${reportData.reportNumber || 'без_номера'}_${timestamp}.docx`;
       return { blob, fileName };
@@ -178,9 +179,10 @@ export class ReportGenerator {
 
   private async createNewReport(
     templateZip: JSZip,
-    reportData: any
+    reportData: any,
+    chartElement?: HTMLElement
   ): Promise<Blob> {
-    const processedZip = await this.processTemplate(templateZip, reportData);
+    const processedZip = await this.processTemplate(templateZip, reportData, chartElement);
     
     return await processedZip.generateAsync({
       type: 'blob',
@@ -193,7 +195,7 @@ export class ReportGenerator {
   private async processTemplate(
     templateZip: JSZip,
     reportData: any,
-    imageFileName: string = 'media.png'
+    chartElement?: HTMLElement
   ): Promise<JSZip> {
     const zip = templateZip.clone();
 
@@ -206,6 +208,13 @@ export class ReportGenerator {
     // Заменяем плейсхолдеры
     let processedXml = this.replacePlaceholders(documentXml, reportData);
 
+    // Генерируем и вставляем график если есть chartElement
+    if (chartElement) {
+      const chartImageData = await this.generateChartImage(chartElement);
+      if (chartImageData) {
+        processedXml = await this.insertChart(processedXml, chartImageData, zip);
+      }
+    }
 
     // Сохраняем обновленный document.xml
     zip.file('word/document.xml', processedXml);
