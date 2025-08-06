@@ -1112,7 +1112,32 @@ export class ReportGenerator {
 
     tableHtml += '</w:tbl>';
 
-    return xml.replace('{Results table}', tableHtml);
+    // Заменяем плейсхолдер таблицы, убеждаясь что таблица не попадает внутрь <w:t>
+    return xml.replace(
+      /(<w:r[^>]*>)?(<w:t[^>]*>)?([^<]*){Results table}([^<]*?)(<\/w:t>)?(<\/w:r>)?/g,
+      (match, openR, openT, beforeText, afterText, closeT, closeR) => {
+        let result = '';
+        
+        // Если есть текст до плейсхолдера, создаем параграф для него
+        if (beforeText && beforeText.trim()) {
+          result += `</w:p><w:p><w:r><w:t>${beforeText.trim()}</w:t></w:r></w:p>`;
+        } else {
+          result += '</w:p>';
+        }
+        
+        // Добавляем таблицу на уровне параграфа
+        result += tableHtml;
+        
+        // Если есть текст после плейсхолдера, создаем параграф для него
+        if (afterText && afterText.trim()) {
+          result += `<w:p><w:r><w:t>${afterText.trim()}</w:t></w:r></w:p>`;
+        } else {
+          result += '<w:p>';
+        }
+        
+        return result;
+      }
+    );
   }
 
 
