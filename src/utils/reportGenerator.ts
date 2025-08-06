@@ -902,3 +902,6 @@ export class ReportGenerator {
       let contentTypesXml = await contentTypesFile.async('text');
       
       // Проверяем, есть ли уже тип
+    }
+  }
+}
