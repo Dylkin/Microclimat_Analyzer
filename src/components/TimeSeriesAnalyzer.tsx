@@ -247,8 +247,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     try {
       const reportGenerator = ReportGenerator.getInstance();
       
-      // Получаем элемент графика для захвата изображения
-      const chartElement = chartRef.current?.querySelector('svg') as HTMLElement;
+      // Получаем контейнер графика для захвата изображения
+      const chartElement = chartRef.current as HTMLElement;
       
       const result = await reportGenerator.generateReport(
         templateFile,
