@@ -1236,31 +1236,16 @@ export class ReportGenerator {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
-  <Relationship Id="${chartRelId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
 </Relationships>`;
       zip.file(relsPath, newRels);
-      this.chartRelationshipId = 'rId6';
+      this.chartRelationshipId = 'rId3';
       return;
     }
 
     try {
       let relsXml = await relsFile.async('text');
       
-      // Проверяем, есть ли уже связь с изображением
-      if (!relsXml.includes('rIdChart')) {
-        // Находим максимальный ID для создания уникального
-        const existingIds = relsXml.match(/Id="rId(\d+)"/g) || [];
-        let maxId = 0;
-        existingIds.forEach(id => {
-          const num = parseInt(id.match(/\d+/)?.[0] || '0');
-          if (num > maxId) maxId = num;
-        });
-        const newId = `rId${maxId + 1}`;
-        
-        relsXml = relsXml.replace(
-          '</Relationships>',
-        )
-      }
       // Проверяем, есть ли уже связь с изображением графика
       if (!relsXml.includes('Target="media/chart.png"')) {
         // Находим максимальный ID для создания уникального ID для изображения
@@ -1348,9 +1333,9 @@ export class ReportGenerator {
         { partName: '/word/styles.xml', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml' },
         { partName: '/word/settings.xml', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml' }
       ];
-          const updatedContent = beforeOverride + imagesToAdd.join('\n') + '\n  ' + afterOverride;
+      
       requiredOverrides.forEach(override => {
-          const updatedContent = contentTypes.replace('</Types>', imagesToAdd.join('\n') + '\n</Types>');
+        if (!xml.includes(`PartName="${override.partName}"`)) {
           imagesToAdd.push(`  <Override PartName="${override.partName}" ContentType="${override.contentType}"/>`);
         }
       });
@@ -1358,8 +1343,7 @@ export class ReportGenerator {
       // Добавляем недостающие типы перед закрывающим тегом </Types>
       if (imagesToAdd.length > 0) {
         xml = xml.replace(
-        `${imageRelationship}
-</Relationships>`
+          '</Types>',
           imagesToAdd.join('\n') + '\n</Types>'
         );
         zip.file('[Content_Types].xml', xml);
