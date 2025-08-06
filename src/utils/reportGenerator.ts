@@ -842,25 +842,29 @@ export class ReportGenerator {
     if (!this.currentChartImageData) return;
 
     try {
-      // Конвертируем base64 в binary данные
-      const binaryData = atob(this.currentChartImageData);
-      const bytes = new Uint8Array(binaryData.length);
-      for (let i = 0; i < binaryData.length; i++) {
-        bytes[i] = binaryData.charCodeAt(i);
+      // Правильное преобразование base64 в binary данные для браузера
+      const binaryString = atob(this.currentChartImageData);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
       }
 
-      // Создаем папку word/media если её нет
-      if (!zip.folder('word/media')) {
-        zip.folder('word/media');
+      // Создаем структуру папок word/media
+      let wordFolder = zip.folder('word');
+      if (!wordFolder) {
+        wordFolder = zip.folder('word');
+      }
+      
+      let mediaFolder = wordFolder?.folder('media');
+      if (!mediaFolder) {
+        mediaFolder = wordFolder?.folder('media');
       }
 
       // Добавляем изображение в word/media/chart.png
       zip.file('word/media/chart.png', bytes);
 
-      // Обновляем relationships
+      // Обязательно обновляем relationships и content types
       await this.updateDocumentRelationships(zip);
-
-      // Обновляем [Content_Types].xml
       await this.updateContentTypes(zip);
 
     } catch (error) {
@@ -908,7 +912,15 @@ export class ReportGenerator {
 
       let contentTypesXml = await contentTypesFile.async('text');
       
-      // Проверяем, есть ли уже тип
+      // Проверяем, есть ли уже тип PNG
+      if (!contentTypesXml.includes('Extension="png"')) {
+        // Добавляем тип PNG перед закрывающим тегом Types
+        const pngType = '  <Default Extension="png" ContentType="image/png"/>';
+        contentTypesXml = contentTypesXml.replace('</Types>', `${pngType}\n</Types>`);
+        
+        // Сохраняем обновленный файл
+        zip.file('[Content_Types].xml', contentTypesXml);
+      }
     } catch (error) {
       console.error('Ошибка обновления типов контента:', error);
     }
