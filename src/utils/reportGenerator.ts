@@ -24,7 +24,6 @@ export class ReportGenerator {
   private generatedReports: Map<string, Blob> = new Map();
   private generatedCharts: Map<string, string> = new Map(); // Хранение base64 изображений графиков
   private currentChartImageData: string | null = null; // Временное хранение данных изображения для текущего отчета
-  private generatedCharts: Map<string, string> = new Map(); // Хранение base64 изображений графиков
 
   private constructor() {}
 
@@ -829,208 +828,77 @@ export class ReportGenerator {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  // Методы для управления сгенерированными файлами
-  deleteReport(fileName: string): boolean {
-    const reportDeleted = this.generatedReports.delete(fileName);
-    // Также удаляем соответствующий график
-    const chartFileName = fileName.replace('.docx', '_график.png');
-    this.generatedCharts.delete(chartFileName);
-    return reportDeleted;
-  }
+  /**
+   * Добавление изображения графика в структуру DOCX
+   */
+  private async addChartImageToDocx(zip: JSZip): Promise<void> {
+    if (!this.currentChartImageData) return;
 
-  downloadReport(fileName: string): boolean {
-    const blob = this.generatedReports.get(fileName);
-    if (blob) {
-      saveAs(blob, fileName);
-      return true;
-    }
-    return false;
-  }
-
-  downloadChart(fileName: string): boolean {
-    const base64Data = this.generatedCharts.get(fileName);
-    if (base64Data) {
-      // Создаем blob из base64
-      const byteCharacters = atob(base64Data.split(',')[1]);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'image/png' });
-      
-      saveAs(blob, fileName);
-      return true;
-    }
-    return false;
-  }
-
-  getGeneratedCharts(): string[] {
-    return Array.from(this.generatedCharts.keys());
-  }
-
-  async generateExampleTemplate(): Promise<boolean> {
     try {
-      // Создаем простой DOCX документ как пример шаблона
-      const doc = new Document({
-        sections: [{
-          properties: {},
-          children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "ОТЧЕТ № {Report No.}",
-                  bold: true,
-                  size: 28
-                })
-              ],
-              heading: HeadingLevel.TITLE,
-              alignment: AlignmentType.CENTER
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "от {Report date}",
-                  size: 24
-                })
-              ],
-              alignment: AlignmentType.CENTER
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "О РЕЗУЛЬТАТАХ ИСПЫТАНИЙ МИКРОКЛИМАТА",
-                  bold: true,
-                  size: 24
-                })
-              ],
-              alignment: AlignmentType.CENTER
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "1. ОБЩИЕ СВЕДЕНИЯ",
-                  bold: true,
-                  size: 24
-                })
-              ]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [
-                new TextRun("Объект исследования: "),
-                new TextRun("{name of the object}")
-              ]
-            }),
-            new Paragraph({
-              children: [
-                new TextRun("Климатическая установка: "),
-                new TextRun("{name of the air conditioning system}")
-              ]
-            }),
-            new Paragraph({
-              children: [
-                new TextRun("Вид испытания: "),
-                new TextRun("{name of the test}")
-              ]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "2. КРИТЕРИИ ПРИЕМКИ",
-                  bold: true,
-                  size: 24
-                })
-              ]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [new TextRun("{acceptance criteria}")]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "3. РЕЗУЛЬТАТЫ ИЗМЕРЕНИЙ",
-                  bold: true,
-                  size: 24
-                })
-              ]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [new TextRun("{Results table}")]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "4. ГРАФИЧЕСКОЕ ПРЕДСТАВЛЕНИЕ ДАННЫХ",
-                  bold: true,
-                  size: 24
-                })
-              ]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [new TextRun("{chart}")]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "5. ЗАКЛЮЧЕНИЕ",
-                  bold: true,
-                  size: 24
-                })
-              ]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [new TextRun("{Result}")]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "6. ИСПОЛНИТЕЛИ",
-                  bold: true,
-                  size: 24
-                })
-              ]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [
-                new TextRun("Исполнитель: "),
-                new TextRun("{executor}")
-              ]
-            }),
-            new Paragraph({
-              children: [
-                new TextRun("Руководитель: "),
-                new TextRun("{director}")
-              ]
-            }),
-            new Paragraph({ text: "" }),
-            new Paragraph({
-              children: [
-                new TextRun("Дата составления отчета: "),
-                new TextRun("{test date}")
-              ]
-            })
-          ]
-        }]
-      });
+      // Конвертируем base64 в binary данные
+      const binaryData = atob(this.currentChartImageData);
+      const bytes = new Uint8Array(binaryData.length);
+      for (let i = 0; i < binaryData.length; i++) {
+        bytes[i] = binaryData.charCodeAt(i);
+      }
 
-      const blob = await Packer.toBlob(doc);
-      saveAs(blob, 'Пример_шаблона_отчета.docx');
-      return true;
+      // Создаем папку word/media если её нет
+      if (!zip.folder('word/media')) {
+        zip.folder('word/media');
+      }
+
+      // Добавляем изображение в word/media/chart.png
+      zip.file('word/media/chart.png', bytes);
+
+      // Обновляем relationships
+      await this.updateDocumentRelationships(zip);
+
+      // Обновляем [Content_Types].xml
+      await this.updateContentTypes(zip);
+
     } catch (error) {
-      console.error('Ошибка создания примера шаблона:', error);
-      return false;
+      console.error('Ошибка добавления изображения в DOCX:', error);
     }
   }
-}
+
+  /**
+   * Обновление relationships для изображения
+   */
+  private async updateDocumentRelationships(zip: JSZip): Promise<void> {
+    try {
+      const relsFile = zip.file('word/_rels/document.xml.rels');
+      if (!relsFile) {
+        console.warn('Файл relationships не найден');
+        return;
+      }
+
+      let relsXml = await relsFile.async('text');
+      
+      // Проверяем, есть ли уже связь с изображением
+      if (!relsXml.includes('rIdChart')) {
+        // Добавляем новую связь перед закрывающим тегом
+        const newRelationship = '  <Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>';
+        relsXml = relsXml.replace('</Relationships>', `${newRelationship}\n</Relationships>`);
+        
+        // Сохраняем обновленный файл
+        zip.file('word/_rels/document.xml.rels', relsXml);
+      }
+    } catch (error) {
+      console.error('Ошибка обновления relationships:', error);
+    }
+  }
+
+  /**
+   * Обновление [Content_Types].xml для поддержки PNG
+   */
+  private async updateContentTypes(zip: JSZip): Promise<void> {
+    try {
+      const contentTypesFile = zip.file('[Content_Types].xml');
+      if (!contentTypesFile) {
+        console.warn('Файл [Content_Types].xml не найден');
+        return;
+      }
+
+      let contentTypesXml = await contentTypesFile.async('text');
+      
+      // Проверяем, есть ли уже тип
