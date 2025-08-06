@@ -274,8 +274,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         });
         
         // Обновляем список графиков
-        const reportGenerator = ReportGenerator.getInstance();
-        setGeneratedCharts(reportGenerator.getGeneratedCharts());
+        const reportGeneratorInstance = ReportGenerator.getInstance();
+        setGeneratedCharts(reportGeneratorInstance.getGeneratedCharts());
         
         setReportStatus({ 
           type: 'success', 
@@ -299,10 +299,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   const handleDeleteReport = (fileName: string) => {
     if (confirm(`Вы уверены, что хотите удалить отчет "${fileName}"?`)) {
-      const reportGenerator = ReportGenerator.getInstance();
-      if (reportGenerator.deleteReport(fileName)) {
+      const reportGeneratorInstance = ReportGenerator.getInstance();
+      if (reportGeneratorInstance.deleteReport(fileName)) {
         setGeneratedReports(prev => prev.filter(name => name !== fileName));
-        setGeneratedCharts(reportGenerator.getGeneratedCharts());
+        setGeneratedCharts(reportGeneratorInstance.getGeneratedCharts());
         setReportStatus({ 
           type: 'success', 
           message: `Отчет "${fileName}" удален` 
@@ -317,8 +317,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleDownloadReport = (fileName: string) => {
-    const reportGenerator = ReportGenerator.getInstance();
-    if (reportGenerator.downloadReport(fileName)) {
+    const reportGeneratorInstance = ReportGenerator.getInstance();
+    if (reportGeneratorInstance.downloadReport(fileName)) {
       setReportStatus({ 
         type: 'success', 
         message: `Отчет "${fileName}" скачан повторно` 
@@ -348,8 +348,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   const handleDownloadExampleTemplate = async () => {
     try {
-      const reportGenerator = ReportGenerator.getInstance();
-      const success = await reportGenerator.generateExampleTemplate();
+      const reportGeneratorInstance = ReportGenerator.getInstance();
+      const success = await reportGeneratorInstance.generateExampleTemplate();
       
       if (success) {
         setReportStatus({ 
