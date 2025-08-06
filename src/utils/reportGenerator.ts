@@ -917,23 +917,29 @@ export class ReportGenerator {
    * Обновление relationships для изображения
    */
   private async updateDocumentRelationships(zip: JSZip): Promise<void> {
-    try {
-      const relsFile = zip.file('word/_rels/document.xml.rels');
-      if (!relsFile) {
-        console.warn('Файл relationships не найден');
-        return;
-      }
+    const relsPath = 'word/_rels/document.xml.rels';
+    const relsFile = zip.file(relsPath);
+    
+    if (!relsFile) {
+      // Создаем новый файл relationships, если его нет
+      const newRels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
+</Relationships>`;
+      zip.file(relsPath, newRels);
+      return;
+    }
 
+    try {
       let relsXml = await relsFile.async('text');
       
       // Проверяем, есть ли уже связь с изображением
       if (!relsXml.includes('rIdChart')) {
-        // Добавляем новую связь перед закрывающим тегом
-        const newRelationship = '  <Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>';
-        relsXml = relsXml.replace('</Relationships>', `${newRelationship}\n</Relationships>`);
-        
-        // Сохраняем обновленный файл
-        zip.file('word/_rels/document.xml.rels', relsXml);
+        relsXml = relsXml.replace(
+          '</Relationships>',
+          `  <Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>\n</Relationships>`
+        );
+        zip.file(relsPath, relsXml);
       }
     } catch (error) {
       console.error('Ошибка обновления relationships:', error);
