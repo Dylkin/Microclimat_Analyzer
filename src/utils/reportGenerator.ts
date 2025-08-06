@@ -23,6 +23,7 @@ export class ReportGenerator {
   private static instance: ReportGenerator;
   private generatedReports: Map<string, Blob> = new Map();
   private generatedCharts: Map<string, string> = new Map(); // Хранение base64 изображений графиков
+  private generatedCharts: Map<string, string> = new Map(); // Хранение base64 изображений графиков
 
   private constructor() {}
 
@@ -82,6 +83,17 @@ export class ReportGenerator {
       // Сохраняем отчет
       this.generatedReports.set(finalFileName, finalBlob);
       
+      // Сохраняем изображение графика если оно было создано
+      if (chartElement) {
+        try {
+          const chartImageBase64 = await this.generateChartPNG(chartElement);
+          const chartFileName = finalFileName.replace('.docx', '_график.png');
+          this.generatedCharts.set(chartFileName, chartImageBase64);
+        } catch (error) {
+          console.warn('Не удалось сохранить изображение графика:', error);
+        }
+      }
+
       // Скачиваем файл
       saveAs(finalBlob, finalFileName);
 
@@ -470,6 +482,24 @@ export class ReportGenerator {
   }
 
   /**
+   * Генерация PNG изображения графика для отдельного скачивания
+   */
+  private async generateChartPNG(chartElement: HTMLElement): Promise<string> {
+    const canvas = await html2canvas(chartElement, {
+      backgroundColor: 'white',
+      scale: 2,
+      useCORS: true,
+      allowTaint: true
+    });
+
+    // Поворачиваем изображение на 90° против часовой стрелки
+    const rotatedCanvas = this.rotateCanvas(canvas, -90);
+    
+    // Возвращаем base64 данные
+    return rotatedCanvas.toDataURL('image/png');
+  }
+
+  /**
    * Поворот canvas на заданный угол
    */
   private rotateCanvas(canvas: HTMLCanvasElement, degrees: number): HTMLCanvasElement {
@@ -792,7 +822,11 @@ export class ReportGenerator {
 
   // Методы для управления сгенерированными файлами
   deleteReport(fileName: string): boolean {
-    return this.generatedReports.delete(fileName);
+    const reportDeleted = this.generatedReports.delete(fileName);
+    // Также удаляем соответствующий график
+    const chartFileName = fileName.replace('.docx', '_график.png');
+    this.generatedCharts.delete(chartFileName);
+    return reportDeleted;
   }
 
   downloadReport(fileName: string): boolean {
@@ -804,6 +838,27 @@ export class ReportGenerator {
     return false;
   }
 
+  downloadChart(fileName: string): boolean {
+    const base64Data = this.generatedCharts.get(fileName);
+    if (base64Data) {
+      // Создаем blob из base64
+      const byteCharacters = atob(base64Data.split(',')[1]);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/png' });
+      
+      saveAs(blob, fileName);
+      return true;
+    }
+    return false;
+  }
+
+  getGeneratedCharts(): string[] {
+    return Array.from(this.generatedCharts.keys());
+  }
 
   async generateExampleTemplate(): Promise<boolean> {
     try {

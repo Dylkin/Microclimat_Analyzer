@@ -41,6 +41,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportStatus, setReportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [generatedReports, setGeneratedReports] = useState<string[]>([]);
+  const [generatedCharts, setGeneratedCharts] = useState<string[]>([]);
   const chartRef = useRef<HTMLDivElement>(null);
   
   const templateInputRef = useRef<HTMLInputElement>(null);
@@ -272,6 +273,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           return prev;
         });
         
+        // Обновляем список графиков
+        const reportGenerator = ReportGenerator.getInstance();
+        setGeneratedCharts(reportGenerator.getGeneratedCharts());
+        
         setReportStatus({ 
           type: 'success', 
           message: `Отчет "${result.fileName}" успешно сгенерирован и скачан` 
@@ -297,6 +302,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const reportGenerator = ReportGenerator.getInstance();
       if (reportGenerator.deleteReport(fileName)) {
         setGeneratedReports(prev => prev.filter(name => name !== fileName));
+        setGeneratedCharts(reportGenerator.getGeneratedCharts());
         setReportStatus({ 
           type: 'success', 
           message: `Отчет "${fileName}" удален` 
@@ -325,6 +331,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
   };
 
+  const handleDownloadChart = (fileName: string) => {
+    const reportGenerator = ReportGenerator.getInstance();
+    if (reportGenerator.downloadChart(fileName)) {
+      setReportStatus({ 
+        type: 'success', 
+        message: `График "${fileName}" скачан` 
+      });
+    } else {
+      setReportStatus({ 
+        type: 'error', 
+        message: `Не удалось скачать график "${fileName}"` 
+      });
+    }
+  };
 
   const handleDownloadExampleTemplate = async () => {
     try {
@@ -834,9 +854,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         )}
 
         {/* Список сгенерированных отчетов */}
-        {generatedReports.length > 0 && (
+        {(generatedReports.length > 0 || generatedCharts.length > 0) && (
           <div className="mb-6">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Сгенерированные отчеты:</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Сгенерированные файлы:</h4>
             <div className="space-y-2">
               {generatedReports.map((fileName) => (
                 <div key={fileName} className="bg-gray-50 p-3 rounded-lg">
@@ -844,6 +864,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     <div className="flex items-center space-x-3">
                       <FileText className="w-4 h-4 text-indigo-600" />
                       <span className="text-sm font-medium text-gray-900">{fileName}</span>
+                      <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">DOCX</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <button
@@ -859,6 +880,26 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                         title="Удалить отчет"
                       >
                         <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {generatedCharts.map((fileName) => (
+                <div key={fileName} className="bg-gray-50 p-3 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-3">
+                      <BarChart className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-medium text-gray-900">{fileName}</span>
+                      <span className="text-xs text-gray-500 bg-green-100 px-2 py-1 rounded">PNG</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleDownloadChart(fileName)}
+                        className="text-green-600 hover:text-green-800 transition-colors"
+                        title="Скачать график"
+                      >
+                        <Download className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
