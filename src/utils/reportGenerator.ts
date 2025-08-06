@@ -24,7 +24,7 @@ export class ReportGenerator {
   private generatedReports: Map<string, Blob> = new Map();
   private generatedCharts: Map<string, string> = new Map(); // Хранение base64 изображений графиков
   private currentChartImageData: string | null = null; // Временное хранение данных изображения для текущего отчета
-  private chartRelationshipId: string = 'rIdChart'; // ID для связи с изображением графика
+  private chartRelationshipId: string = 'rId3'; // ID для связи с изображением графика (по умолчанию)
 
   private constructor() {}
 
@@ -487,7 +487,7 @@ export class ReportGenerator {
                         <pic:cNvPicPr/>
                       </pic:nvPicPr>
                       <pic:blipFill>
-                        <a:blip r:embed="${this.chartRelationshipId}"/>
+                        <a:blip r:embed="${this.chartRelationshipId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
                         <a:stretch>
                           <a:fillRect/>
                         </a:stretch>
@@ -1236,10 +1236,10 @@ export class ReportGenerator {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
-  <Relationship Id="rId11" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
 </Relationships>`;
       zip.file(relsPath, newRels);
-      this.chartRelationshipId = 'rId11';
+      this.chartRelationshipId = 'rId3';
       return;
     }
 
@@ -1283,11 +1283,13 @@ export class ReportGenerator {
         this.chartRelationshipId = newId;
         
         zip.file(relsPath, relsXml);
+        console.log(`Создана связь для изображения с ID: ${newId}`);
       } else {
         // Если связь уже существует, находим её ID
         const existingRelMatch = relsXml.match(/Id="(rId\d+)"[^>]*Target="media\/chart\.png"/);
         if (existingRelMatch) {
           this.chartRelationshipId = existingRelMatch[1];
+          console.log(`Найдена существующая связь с ID: ${this.chartRelationshipId}`);
         }
       }
     } catch (error) {
