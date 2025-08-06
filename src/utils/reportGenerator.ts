@@ -24,6 +24,7 @@ export class ReportGenerator {
   private generatedReports: Map<string, Blob> = new Map();
   private generatedCharts: Map<string, string> = new Map(); // Хранение base64 изображений графиков
   private currentChartImageData: string | null = null; // Временное хранение данных изображения для текущего отчета
+  private chartRelationshipId: string = 'rIdChart'; // ID для связи с изображением графика
 
   private constructor() {}
 
@@ -47,38 +48,9 @@ export class ReportGenerator {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const fileName = `Отчет_${reportData.reportNumber || 'без_номера'}_${timestamp}.docx`;
 
-      // Читаем шаблон
-      const templateBuffer = await templateFile.arrayBuffer();
-      const templateZip = await JSZip.loadAsync(templateBuffer);
-      console.log('Шаблон успешно загружен и распакован');
-
-
-      // Проверяем, существует ли уже файл с таким именем (без timestamp)
-      const baseFileName = `Отчет_${reportData.reportNumber || 'без_номера'}`;
-      const existingFileName = Array.from(this.generatedReports.keys())
-        .find(name => name.startsWith(baseFileName) && name.endsWith('.docx'));
-
-      let finalBlob: Blob;
-      let finalFileName: string;
-
-      if (existingFileName) {
-        // Объединяем с существующим отчетом
-        console.log('Объединяем с существующим отчетом:', existingFileName);
-        
-        const result = await this.mergeWithExistingReport(
-          existingFileName,
-          templateZip,
-          reportData,
-          chartElement
-        );
-        finalBlob = result.blob;
-        finalFileName = result.fileName;
-      } else {
-        // Создаем новый отчет
-        console.log('Создаем новый отчет');
-        finalBlob = await this.createNewReport(templateZip, reportData, chartElement);
-        finalFileName = fileName;
-      }
+      // Создаем новый отчет с использованием библиотеки docx
+      const finalBlob = await this.createReportFromTemplate(templateFile, reportData, chartElement);
+      const finalFileName = fileName;
 
       // Сохраняем отчет
       this.generatedReports.set(finalFileName, finalBlob);
@@ -106,6 +78,59 @@ export class ReportGenerator {
         fileName: '',
         error: error instanceof Error ? error.message : 'Неизвестная ошибка'
       };
+    }
+  }
+
+  /**
+   * Создание отчета на основе шаблона с использованием библиотеки docx
+   */
+  private async createReportFromTemplate(
+    templateFile: File,
+    reportData: any,
+    chartElement?: HTMLElement
+  ): Promise<Blob> {
+    try {
+      // Читаем шаблон как текст для извлечения плейсхолдеров
+      const templateBuffer = await templateFile.arrayBuffer();
+      const templateZip = await JSZip.loadAsync(templateBuffer);
+      
+      // Читаем document.xml из шаблона
+      const documentXml = await templateZip.file('word/document.xml')?.async('text');
+      if (!documentXml) {
+        throw new Error('Не найден document.xml в шаблоне');
+      }
+
+      // Заменяем плейсхолдеры в XML
+      let processedXml = await this.replacePlaceholders(documentXml, reportData, chartElement);
+
+      // Создаем новый ZIP архив на основе шаблона
+      const newZip = templateZip.clone();
+      
+      // Обновляем document.xml
+      newZip.file('word/document.xml', processedXml);
+
+      // Добавляем изображение графика если есть
+      if (this.currentChartImageData) {
+        await this.addChartImageToDocx(newZip);
+      }
+
+      // Обрабатываем нижний колонтитул
+      await this.processFooter(newZip, reportData);
+      
+      // Очищаем временные данные
+      this.currentChartImageData = null;
+      
+      // Генерируем DOCX файл
+      return await newZip.generateAsync({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
+
+    } catch (error) {
+      console.error('Ошибка создания отчета из шаблона:', error);
+      throw error;
     }
   }
 
@@ -462,7 +487,7 @@ export class ReportGenerator {
                         <pic:cNvPicPr/>
                       </pic:nvPicPr>
                       <pic:blipFill>
-                        <a:blip r:embed="rIdChart"/>
+                        <a:blip r:embed="${this.chartRelationshipId}"/>
                         <a:stretch>
                           <a:fillRect/>
                         </a:stretch>
@@ -1172,22 +1197,17 @@ export class ReportGenerator {
     if (!this.currentChartImageData) return;
 
     try {
-      // Правильное преобразование base64 в binary данные для браузера
-      const binaryString = atob(this.currentChartImageData);
+      // Преобразуем base64 в binary данные
+      const base64Data = this.currentChartImageData.split(',')[1] || this.currentChartImageData;
+      const binaryString = atob(base64Data);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      // Создаем структуру папок word/media
-      let wordFolder = zip.folder('word');
-      if (!wordFolder) {
-        wordFolder = zip.folder('word');
-      }
-      
-      let mediaFolder = wordFolder?.folder('media');
-      if (!mediaFolder) {
-        mediaFolder = wordFolder?.folder('media');
+      // Проверяем существование папки word/media и создаем если нужно
+      if (!zip.folder('word/media')) {
+        zip.folder('word')?.folder('media');
       }
 
       // Добавляем изображение в word/media/chart.png
@@ -1199,6 +1219,7 @@ export class ReportGenerator {
 
     } catch (error) {
       console.error('Ошибка добавления изображения в DOCX:', error);
+      throw error;
     }
   }
 
@@ -1224,14 +1245,28 @@ export class ReportGenerator {
       
       // Проверяем, есть ли уже связь с изображением
       if (!relsXml.includes('rIdChart')) {
+        // Находим максимальный ID для создания уникального
+        const existingIds = relsXml.match(/Id="rId(\d+)"/g) || [];
+        let maxId = 0;
+        existingIds.forEach(id => {
+          const num = parseInt(id.match(/\d+/)?.[0] || '0');
+          if (num > maxId) maxId = num;
+        });
+        const newId = `rId${maxId + 1}`;
+        
         relsXml = relsXml.replace(
           '</Relationships>',
-          `  <Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>\n</Relationships>`
+          `  <Relationship Id="${newId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>\n</Relationships>`
         );
+        
+        // Обновляем XML в плейсхолдере графика
+        this.chartRelationshipId = newId;
+        
         zip.file(relsPath, relsXml);
       }
     } catch (error) {
       console.error('Ошибка обновления relationships:', error);
+      throw error;
     }
   }
 
