@@ -24,6 +24,7 @@ export class ReportGenerator {
   private generatedReports: Map<string, Blob> = new Map();
   private generatedCharts: Map<string, string> = new Map(); // Хранение base64 изображений графиков
   private currentChartImageData: string | null = null; // Временное хранение данных изображения для текущего отчета
+  private currentChartRId: string | null = null; // Временное хранение rId для текущего изображения
 
   private constructor() {}
 
@@ -203,6 +204,7 @@ export class ReportGenerator {
     
     // Очищаем временные данные
     this.currentChartImageData = null;
+    this.currentChartRId = null;
     
     return zip;
   }
@@ -224,7 +226,7 @@ export class ReportGenerator {
           
           // Нормализуем и заменяем плейсхолдеры в нижнем колонтитуле
           footerXml = this.normalizePlaceholders(footerXml);
-          footerXml = this.replacePlaceholders(footerXml, reportData);
+          footerXml = await this.replacePlaceholders(footerXml, reportData);
           
           // Сохраняем обновленный нижний колонтитул
           zip.file(footerFileName, footerXml);
@@ -442,6 +444,11 @@ export class ReportGenerator {
       // Сохраняем изображение для добавления в ZIP
       this.currentChartImageData = base64Data;
       
+      // Генерируем уникальный ID для изображения
+      const uniqueId = Date.now().toString();
+      const rId = `rIdChart${uniqueId}`;
+      this.currentChartRId = rId;
+      
       // Генерируем XML для вставки изображения
       return `
         <w:p>
@@ -450,7 +457,7 @@ export class ReportGenerator {
               <wp:inline distT="0" distB="0" distL="0" distR="0">
                 <wp:extent cx="${width * 9525}" cy="${height * 9525}"/>
                 <wp:effectExtent l="0" t="0" r="0" b="0"/>
-                <wp:docPr id="1" name="График"/>
+                <wp:docPr id="${uniqueId}" name="График"/>
                 <wp:cNvGraphicFramePr>
                   <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
                 </wp:cNvGraphicFramePr>
@@ -458,11 +465,11 @@ export class ReportGenerator {
                   <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
                     <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
                       <pic:nvPicPr>
-                        <pic:cNvPr id="1" name="График"/>
+                        <pic:cNvPr id="${uniqueId}" name="График"/>
                         <pic:cNvPicPr/>
                       </pic:nvPicPr>
                       <pic:blipFill>
-                        <a:blip r:embed="rIdChart"/>
+                        <a:blip r:embed="${rId}"/>
                         <a:stretch>
                           <a:fillRect/>
                         </a:stretch>
@@ -856,6 +863,7 @@ export class ReportGenerator {
 
       // Добавляем изображение в word/media/chart.png
       zip.file('word/media/chart.png', bytes);
+      console.log('Изображение добавлено в word/media/chart.png');
 
       // Обновляем relationships
       await this.updateDocumentRelationships(zip);
@@ -881,10 +889,24 @@ export class ReportGenerator {
 
       let relsXml = await relsFile.async('text');
       
+      // Используем уникальный rId
+      const rId = this.currentChartRId || 'rIdChart';
+      
       // Проверяем, есть ли уже связь с изображением
-      if (!relsXml.includes('rIdChart')) {
+      if (!relsXml.includes(rId)) {
+        // Находим максимальный существующий rId для генерации уникального
+        const existingIds = relsXml.match(/Id="rId(\d+)"/g) || [];
+        let maxId = 0;
+        existingIds.forEach(match => {
+          const idNum = parseInt(match.match(/\d+/)?.[0] || '0');
+          if (idNum > maxId) maxId = idNum;
+        });
+        
+        // Если не используем уникальный rId, генерируем новый
+        const finalRId = this.currentChartRId || `rId${maxId + 1}`;
+        
         // Добавляем новую связь перед закрывающим тегом
-        const newRelationship = '  <Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>';
+        const newRelationship = `  <Relationship Id="${finalRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>`;
         relsXml = relsXml.replace('</Relationships>', `${newRelationship}\n</Relationships>`);
         
         // Сохраняем обновленный файл
@@ -908,7 +930,16 @@ export class ReportGenerator {
 
       let contentTypesXml = await contentTypesFile.async('text');
       
-      // Проверяем, есть ли уже тип
+      // Проверяем, есть ли уже тип PNG
+      if (!contentTypesXml.includes('image/png')) {
+        // Добавляем описание типа PNG перед закрывающим тегом Types
+        const pngType = '  <Default Extension="png" ContentType="image/png"/>';
+        contentTypesXml = contentTypesXml.replace('</Types>', `${pngType}\n</Types>`);
+        
+        // Сохраняем обновленный файл
+        zip.file('[Content_Types].xml', contentTypesXml);
+        console.log('Добавлен тип PNG в [Content_Types].xml');
+      }
     } catch (error) {
       console.error('Ошибка обновления типов контента:', error);
     }
