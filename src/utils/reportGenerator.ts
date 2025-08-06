@@ -952,20 +952,45 @@ export class ReportGenerator {
   private async updateContentTypes(zip: JSZip): Promise<void> {
     try {
       const contentTypesFile = zip.file('[Content_Types].xml');
-      if (!contentTypesFile) throw new Error('Content Types not found');
-
-      let contentTypesXml = await contentTypesFile.async('text');
       
-      // Добавляем тип PNG, если его нет
-      if (!contentTypesXml.includes('image/png')) {
-        contentTypesXml = contentTypesXml.replace(
-          '</Types>',
-          '  <Default Extension="png" ContentType="image/png"/>\n</Types>'
-        );
-        
-        // Сохраняем обновленный файл
-        zip.file('[Content_Types].xml', contentTypesXml);
+      if (!contentTypesFile) {
+        // Создаем новый Content_Types.xml если его нет
+        const newContentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="png" ContentType="image/png"/>
+  <Default Extension="jpg" ContentType="image/jpeg"/>
+  <Default Extension="jpeg" ContentType="image/jpeg"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+        zip.file('[Content_Types].xml', newContentTypes);
+        return;
       }
+
+      let xml = await contentTypesFile.async('text');
+      
+      // Проверяем и добавляем недостающие типы изображений
+      const imagesToAdd = [];
+      
+      if (!xml.includes('image/png')) {
+        imagesToAdd.push('  <Default Extension="png" ContentType="image/png"/>');
+      }
+      
+      if (!xml.includes('image/jpeg')) {
+        imagesToAdd.push('  <Default Extension="jpg" ContentType="image/jpeg"/>');
+        imagesToAdd.push('  <Default Extension="jpeg" ContentType="image/jpeg"/>');
+      }
+      
+      // Добавляем недостающие типы перед закрывающим тегом </Types>
+      if (imagesToAdd.length > 0) {
+        xml = xml.replace(
+          '</Types>',
+          imagesToAdd.join('\n') + '\n</Types>'
+        );
+        zip.file('[Content_Types].xml', xml);
+      }
+      
     } catch (error) {
       console.error('Content Types update failed:', error);
     }
