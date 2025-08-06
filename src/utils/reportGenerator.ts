@@ -1259,6 +1259,8 @@ export class ReportGenerator {
         
         relsXml = relsXml.replace(
           '</Relationships>',
+        )
+      }
       // Проверяем, есть ли уже связь с изображением графика
       if (!relsXml.includes('Target="media/chart.png"')) {
         // Находим максимальный ID для создания уникального
