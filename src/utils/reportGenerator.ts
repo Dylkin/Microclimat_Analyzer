@@ -1236,31 +1236,59 @@ export class ReportGenerator {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
-  <Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
+  <Relationship Id="rId11" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
 </Relationships>`;
       zip.file(relsPath, newRels);
-      this.chartRelationshipId = 'rIdChart';
+      this.chartRelationshipId = 'rId11';
       return;
     }
 
     try {
       let relsXml = await relsFile.async('text');
       
+      // Проверяем, есть ли уже связь с изображением
+      if (!relsXml.includes('rIdChart')) {
+        // Находим максимальный ID для создания уникального
+        const existingIds = relsXml.match(/Id="rId(\d+)"/g) || [];
+        let maxId = 0;
+        existingIds.forEach(id => {
+          const num = parseInt(id.match(/\d+/)?.[0] || '0');
+          if (num > maxId) maxId = num;
+        });
+        const newId = `rId${maxId + 1}`;
+        
+        relsXml = relsXml.replace(
+          '</Relationships>',
+        )
+      }
       // Проверяем, есть ли уже связь с изображением графика
-      if (!relsXml.includes('Id="rIdChart"')) {
-        // Добавляем связь с фиксированным ID rIdChart
-        const newRelationship = `  <Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>`;
+      if (!relsXml.includes('Target="media/chart.png"')) {
+        // Находим максимальный ID для создания уникального
+        const existingIds = relsXml.match(/Id="rId(\d+)"/g) || [];
+        let maxId = 0;
+        existingIds.forEach(id => {
+          const num = parseInt(id.match(/\d+/)?.[0] || '0');
+          if (num > maxId) maxId = num;
+        });
+        const newId = `rId${maxId + 1}`;
+        
+        // Добавляем новую связь перед закрывающим тегом
+        const newRelationship = `  <Relationship Id="${newId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>`;
         relsXml = relsXml.replace(
           '</Relationships>',
           `${newRelationship}\n</Relationships>`
         );
         
-        this.chartRelationshipId = 'rIdChart';
+        // Обновляем ID для использования в XML графика
+        this.chartRelationshipId = newId;
         
         zip.file(relsPath, relsXml);
       } else {
-        // Связь уже существует, используем rIdChart
-        this.chartRelationshipId = 'rIdChart';
+        // Если связь уже существует, находим её ID
+        const existingRelMatch = relsXml.match(/Id="(rId\d+)"[^>]*Target="media\/chart\.png"/);
+        if (existingRelMatch) {
+          this.chartRelationshipId = existingRelMatch[1];
+        }
       }
     } catch (error) {
       console.error('Ошибка обновления relationships:', error);
