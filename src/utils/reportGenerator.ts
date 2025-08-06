@@ -490,6 +490,13 @@ export class ReportGenerator {
   }
 
   /**
+   * Получение списка сгенерированных графиков
+   */
+  getGeneratedCharts(): string[] {
+    return Array.from(this.generatedCharts.keys());
+  }
+
+  /**
    * Генерация PNG изображения графика для отдельного скачивания
    */
   private async generateChartPNG(chartElement: HTMLElement): Promise<string> {
