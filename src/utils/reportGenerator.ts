@@ -1236,10 +1236,7 @@ export class ReportGenerator {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings" Target="webSettings.xml"/>
-  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
-  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>
-  <Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
+  <Relationship Id="${chartRelId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
 </Relationships>`;
       zip.file(relsPath, newRels);
       this.chartRelationshipId = 'rId6';
@@ -1351,9 +1348,9 @@ export class ReportGenerator {
         { partName: '/word/styles.xml', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml' },
         { partName: '/word/settings.xml', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml' }
       ];
-      
+          const updatedContent = beforeOverride + imagesToAdd.join('\n') + '\n  ' + afterOverride;
       requiredOverrides.forEach(override => {
-        if (!xml.includes(`PartName="${override.partName}"`)) {
+          const updatedContent = contentTypes.replace('</Types>', imagesToAdd.join('\n') + '\n</Types>');
           imagesToAdd.push(`  <Override PartName="${override.partName}" ContentType="${override.contentType}"/>`);
         }
       });
@@ -1361,7 +1358,8 @@ export class ReportGenerator {
       // Добавляем недостающие типы перед закрывающим тегом </Types>
       if (imagesToAdd.length > 0) {
         xml = xml.replace(
-          '</Types>',
+        `${imageRelationship}
+</Relationships>`
           imagesToAdd.join('\n') + '\n</Types>'
         );
         zip.file('[Content_Types].xml', xml);
