@@ -497,6 +497,47 @@ export class ReportGenerator {
   }
 
   /**
+   * Скачивание сгенерированного отчета
+   */
+  downloadReport(fileName: string): boolean {
+    try {
+      const blob = this.generatedReports.get(fileName);
+      if (!blob) {
+        console.error(`Отчет с именем ${fileName} не найден`);
+        return false;
+      }
+
+      saveAs(blob, fileName);
+      return true;
+    } catch (error) {
+      console.error('Ошибка скачивания отчета:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Удаление сгенерированного отчета
+   */
+  deleteReport(fileName: string): boolean {
+    try {
+      const existed = this.generatedReports.has(fileName);
+      if (existed) {
+        this.generatedReports.delete(fileName);
+        
+        // Также удаляем связанный график если есть
+        const chartFileName = fileName.replace('.docx', '_график.png');
+        if (this.generatedCharts.has(chartFileName)) {
+          this.generatedCharts.delete(chartFileName);
+        }
+      }
+      return existed;
+    } catch (error) {
+      console.error('Ошибка удаления отчета:', error);
+      return false;
+    }
+  }
+
+  /**
    * Генерация PNG изображения графика для отдельного скачивания
    */
   private async generateChartPNG(chartElement: HTMLElement): Promise<string> {
