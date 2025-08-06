@@ -23,6 +23,7 @@ export class ReportGenerator {
   private static instance: ReportGenerator;
   private generatedReports: Map<string, Blob> = new Map();
   private generatedCharts: Map<string, string> = new Map(); // Хранение base64 изображений графиков
+  private currentChartImageData: string | null = null; // Временное хранение данных изображения для текущего отчета
   private generatedCharts: Map<string, string> = new Map(); // Хранение base64 изображений графиков
 
   private constructor() {}
@@ -193,8 +194,17 @@ export class ReportGenerator {
     // Сохраняем обновленный document.xml
     zip.file('word/document.xml', processedXml);
 
+    // Добавляем изображение графика в структуру DOCX если оно было создано
+    if (this.currentChartImageData) {
+      await this.addChartImageToDocx(zip);
+    }
+
     // Обрабатываем нижний колонтитул
     await this.processFooter(zip, reportData);
+    
+    // Очищаем временные данные
+    this.currentChartImageData = null;
+    
     return zip;
   }
 
@@ -426,13 +436,12 @@ export class ReportGenerator {
       const imageData = rotatedCanvas.toDataURL('image/png');
       const base64Data = imageData.split(',')[1];
       
-      // Сохраняем изображение для использования в ZIP
-      const imageKey = `chart_${Date.now()}`;
-      this.generatedCharts.set(imageKey, base64Data);
-      
       // Размеры повернутого изображения (меняем местами ширину и высоту)
       const width = Math.round(rotatedCanvas.height * 0.75); // Конвертируем в EMU (English Metric Units)
       const height = Math.round(rotatedCanvas.width * 0.75);
+      
+      // Сохраняем изображение для добавления в ZIP
+      this.currentChartImageData = base64Data;
       
       // Генерируем XML для вставки изображения
       return `
@@ -454,7 +463,7 @@ export class ReportGenerator {
                         <pic:cNvPicPr/>
                       </pic:nvPicPr>
                       <pic:blipFill>
-                        <a:blip r:embed="rId${imageKey}"/>
+                        <a:blip r:embed="rIdChart"/>
                         <a:stretch>
                           <a:fillRect/>
                         </a:stretch>
