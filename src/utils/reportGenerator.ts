@@ -514,6 +514,73 @@ export class ReportGenerator {
     }
   }
 
+  private replaceChartPlaceholder(content: string, chartRelId: string): string {
+    const chartXml = `<w:p>
+  <w:r>
+    <w:drawing>
+      <wp:inline distT="0" distB="0" distL="0" distR="0">
+        <wp:extent cx="5486400" cy="3200400"/>
+        <wp:effectExtent l="0" t="0" r="0" b="0"/>
+        <wp:docPr id="1" name="График"/>
+        <wp:cNvGraphicFramePr/>
+        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+            <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+              <pic:nvPicPr>
+                <pic:cNvPr id="1" name="График"/>
+                <pic:cNvPicPr/>
+              </pic:nvPicPr>
+              <pic:blipFill>
+                <a:blip r:embed="${chartRelId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+                <a:stretch>
+                  <a:fillRect/>
+                </a:stretch>
+              </pic:blipFill>
+              <pic:spPr>
+                <a:xfrm>
+                  <a:off x="0" y="0"/>
+                  <a:ext cx="5486400" cy="3200400"/>
+                </a:xfrm>
+                <a:prstGeom prst="rect">
+                  <a:avLst/>
+                </a:prstGeom>
+              </pic:spPr>
+            </pic:pic>
+          </a:graphicData>
+        </a:graphic>
+      </wp:inline>
+    </w:drawing>
+  </w:r>
+</w:p>`;
+    
+    // Заменяем плейсхолдер графика, убеждаясь что график не попадает внутрь <w:t>
+    return content.replace(
+      /(<w:r[^>]*>)?(<w:t[^>]*>)?([^<]*){chart}([^<]*?)(<\/w:t>)?(<\/w:r>)?/g,
+      (match, openR, openT, beforeText, afterText, closeT, closeR) => {
+        let result = '';
+        
+        // Если есть текст до плейсхолдера, создаем параграф для него
+        if (beforeText && beforeText.trim()) {
+          result += `</w:p><w:p><w:r><w:t>${beforeText.trim()}</w:t></w:r></w:p>`;
+        } else {
+          result += '</w:p>';
+        }
+        
+        // Добавляем график на уровне параграфа
+        result += chartXml;
+        
+        // Если есть текст после плейсхолдера, создаем параграф для него
+        if (afterText && afterText.trim()) {
+          result += `<w:p><w:r><w:t>${afterText.trim()}</w:t></w:r></w:p>`;
+        } else {
+          result += '<w:p>';
+        }
+        
+        return result;
+      }
+    );
+  }
+
   /**
    * Получение списка сгенерированных графиков
    */
@@ -1112,32 +1179,7 @@ export class ReportGenerator {
 
     tableHtml += '</w:tbl>';
 
-    // Заменяем плейсхолдер таблицы, убеждаясь что таблица не попадает внутрь <w:t>
-    return xml.replace(
-      /(<w:r[^>]*>)?(<w:t[^>]*>)?([^<]*){Results table}([^<]*?)(<\/w:t>)?(<\/w:r>)?/g,
-      (match, openR, openT, beforeText, afterText, closeT, closeR) => {
-        let result = '';
-        
-        // Если есть текст до плейсхолдера, создаем параграф для него
-        if (beforeText && beforeText.trim()) {
-          result += `</w:p><w:p><w:r><w:t>${beforeText.trim()}</w:t></w:r></w:p>`;
-        } else {
-          result += '</w:p>';
-        }
-        
-        // Добавляем таблицу на уровне параграфа
-        result += tableHtml;
-        
-        // Если есть текст после плейсхолдера, создаем параграф для него
-        if (afterText && afterText.trim()) {
-          result += `<w:p><w:r><w:t>${afterText.trim()}</w:t></w:r></w:p>`;
-        } else {
-          result += '<w:p>';
-        }
-        
-        return result;
-      }
-    );
+    return xml.replace('{Results table}', tableHtml);
   }
 
 
