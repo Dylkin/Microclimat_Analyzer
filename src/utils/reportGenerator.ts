@@ -538,6 +538,296 @@ export class ReportGenerator {
   }
 
   /**
+   * Скачивание сгенерированного графика
+   */
+  downloadChart(fileName: string): boolean {
+    try {
+      const base64Data = this.generatedCharts.get(fileName);
+      if (!base64Data) {
+        console.error(`График с именем ${fileName} не найден`);
+        return false;
+      }
+
+      // Создаем blob из base64 данных
+      const byteCharacters = atob(base64Data.split(',')[1]);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/png' });
+
+      saveAs(blob, fileName);
+      return true;
+    } catch (error) {
+      console.error('Ошибка скачивания графика:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Генерация примера шаблона DOCX с использованием библиотеки docx
+   */
+  async generateExampleTemplate(): Promise<boolean> {
+    try {
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            // Заголовок документа
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "ОТЧЕТ № {Report No.}",
+                  bold: true,
+                  size: 32
+                })
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 400 }
+            }),
+            
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "от {Report date}",
+                  size: 24
+                })
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 600 }
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "О РЕЗУЛЬТАТАХ ИСПЫТАНИЙ МИКРОКЛИМАТА",
+                  bold: true,
+                  size: 28
+                })
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 800 }
+            }),
+
+            // 1. Общие сведения
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "1. ОБЩИЕ СВЕДЕНИЯ",
+                  bold: true,
+                  size: 24
+                })
+              ],
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            }),
+
+            new Paragraph({
+              children: [new TextRun("Объект исследования: {name of the object}")],
+              spacing: { after: 200 }
+            }),
+
+            new Paragraph({
+              children: [new TextRun("Климатическая установка: {name of the air conditioning system}")],
+              spacing: { after: 200 }
+            }),
+
+            new Paragraph({
+              children: [new TextRun("Вид испытания: {name of the test}")],
+              spacing: { after: 400 }
+            }),
+
+            // 2. Критерии приемки
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "2. КРИТЕРИИ ПРИЕМКИ",
+                  bold: true,
+                  size: 24
+                })
+              ],
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            }),
+
+            new Paragraph({
+              children: [new TextRun("{acceptance criteria}")],
+              spacing: { after: 400 }
+            }),
+
+            // 3. Период проведения испытаний
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "3. ПЕРИОД ПРОВЕДЕНИЯ ИСПЫТАНИЙ",
+                  bold: true,
+                  size: 24
+                })
+              ],
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            }),
+
+            new Paragraph({
+              children: [new TextRun("Начало испытания: {Date time of test start}")],
+              spacing: { after: 200 }
+            }),
+
+            new Paragraph({
+              children: [new TextRun("Завершение испытания: {Date time of test completion}")],
+              spacing: { after: 200 }
+            }),
+
+            new Paragraph({
+              children: [new TextRun("Длительность испытания: {Duration of the test}")],
+              spacing: { after: 400 }
+            }),
+
+            // 4. Результаты измерений
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "4. РЕЗУЛЬТАТЫ ИЗМЕРЕНИЙ",
+                  bold: true,
+                  size: 24
+                })
+              ],
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            }),
+
+            new Paragraph({
+              children: [new TextRun("{Results table}")],
+              spacing: { after: 400 }
+            }),
+
+            // 5. Графическое представление данных
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "5. ГРАФИЧЕСКОЕ ПРЕДСТАВЛЕНИЕ ДАННЫХ",
+                  bold: true,
+                  size: 24
+                })
+              ],
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            }),
+
+            new Paragraph({
+              children: [new TextRun("{chart}")],
+              spacing: { after: 400 }
+            }),
+
+            // 6. Заключение
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "6. ЗАКЛЮЧЕНИЕ",
+                  bold: true,
+                  size: 24
+                })
+              ],
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            }),
+
+            new Paragraph({
+              children: [new TextRun("{Result}")],
+              spacing: { after: 400 }
+            }),
+
+            // 7. Исполнители
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "7. ИСПОЛНИТЕЛИ",
+                  bold: true,
+                  size: 24
+                })
+              ],
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            }),
+
+            // Таблица исполнителей
+            new Table({
+              width: {
+                size: 100,
+                type: WidthType.PERCENTAGE
+              },
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({
+                          text: "Исполнитель:",
+                          bold: true
+                        })]
+                      })],
+                      width: { size: 30, type: WidthType.PERCENTAGE }
+                    }),
+                    new TableCell({
+                      children: [new Paragraph("{executor}")],
+                      width: { size: 70, type: WidthType.PERCENTAGE }
+                    })
+                  ]
+                }),
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({
+                          text: "Руководитель:",
+                          bold: true
+                        })]
+                      })]
+                    }),
+                    new TableCell({
+                      children: [new Paragraph("{director}")]
+                    })
+                  ]
+                }),
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({
+                          text: "Дата составления отчета:",
+                          bold: true
+                        })]
+                      })]
+                    }),
+                    new TableCell({
+                      children: [new Paragraph("{test date}")]
+                    })
+                  ]
+                })
+              ]
+            })
+          ]
+        }]
+      });
+
+      // Генерируем DOCX файл
+      const buffer = await Packer.toBuffer(doc);
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      
+      // Скачиваем файл
+      saveAs(blob, 'Пример_шаблона_отчета.docx');
+      
+      return true;
+    } catch (error) {
+      console.error('Ошибка создания примера шаблона:', error);
+      return false;
+    }
+  }
+
+  /**
    * Генерация PNG изображения графика для отдельного скачивания
    */
   private async generateChartPNG(chartElement: HTMLElement): Promise<string> {
@@ -554,7 +844,6 @@ export class ReportGenerator {
     // Возвращаем base64 данные
     return rotatedCanvas.toDataURL('image/png');
   }
-
   /**
    * Поворот canvas на заданный угол
    */
