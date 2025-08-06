@@ -1231,15 +1231,18 @@ export class ReportGenerator {
     const relsFile = zip.file(relsPath);
     
     if (!relsFile) {
-      // Создаем новый файл relationships, если его нет
+      // Создаем новый файл relationships с полной структурой Word документа
       const newRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings" Target="webSettings.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>
+  <Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>
 </Relationships>`;
       zip.file(relsPath, newRels);
-      this.chartRelationshipId = 'rId3';
+      this.chartRelationshipId = 'rId6';
       return;
     }
 
@@ -1263,7 +1266,7 @@ export class ReportGenerator {
       }
       // Проверяем, есть ли уже связь с изображением графика
       if (!relsXml.includes('Target="media/chart.png"')) {
-        // Находим максимальный ID для создания уникального
+        // Находим максимальный ID для создания уникального ID для изображения
         const existingIds = relsXml.match(/Id="rId(\d+)"/g) || [];
         let maxId = 0;
         existingIds.forEach(id => {
@@ -1272,7 +1275,7 @@ export class ReportGenerator {
         });
         const newId = `rId${maxId + 1}`;
         
-        // Добавляем новую связь перед закрывающим тегом
+        // Добавляем новую связь для изображения перед закрывающим тегом
         const newRelationship = `  <Relationship Id="${newId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>`;
         relsXml = relsXml.replace(
           '</Relationships>',
@@ -1306,7 +1309,7 @@ export class ReportGenerator {
       const contentTypesFile = zip.file('[Content_Types].xml');
       
       if (!contentTypesFile) {
-        // Создаем новый Content_Types.xml если его нет
+        // Создаем новый Content_Types.xml с полной структурой Word документа
         const newContentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -1314,6 +1317,14 @@ export class ReportGenerator {
   <Default Extension="png" ContentType="image/png"/>
   <Default Extension="jpg" ContentType="image/jpeg"/>
   <Default Extension="jpeg" ContentType="image/jpeg"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+  <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
+  <Override PartName="/word/webSettings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml"/>
+  <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>
+  <Override PartName="/word/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 </Types>`;
         zip.file('[Content_Types].xml', newContentTypes);
@@ -1333,6 +1344,19 @@ export class ReportGenerator {
         imagesToAdd.push('  <Default Extension="jpg" ContentType="image/jpeg"/>');
         imagesToAdd.push('  <Default Extension="jpeg" ContentType="image/jpeg"/>');
       }
+      
+      // Проверяем наличие основных Override элементов для Word документа
+      const requiredOverrides = [
+        { partName: '/word/document.xml', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml' },
+        { partName: '/word/styles.xml', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml' },
+        { partName: '/word/settings.xml', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml' }
+      ];
+      
+      requiredOverrides.forEach(override => {
+        if (!xml.includes(`PartName="${override.partName}"`)) {
+          imagesToAdd.push(`  <Override PartName="${override.partName}" ContentType="${override.contentType}"/>`);
+        }
+      });
       
       // Добавляем недостающие типы перед закрывающим тегом </Types>
       if (imagesToAdd.length > 0) {
