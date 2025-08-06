@@ -905,24 +905,22 @@ export class ReportGenerator {
   private async updateContentTypes(zip: JSZip): Promise<void> {
     try {
       const contentTypesFile = zip.file('[Content_Types].xml');
-      if (!contentTypesFile) {
-        console.warn('Файл [Content_Types].xml не найден');
-        return;
-      }
+      if (!contentTypesFile) throw new Error('Content Types not found');
 
       let contentTypesXml = await contentTypesFile.async('text');
       
-      // Проверяем, есть ли уже тип PNG
-      if (!contentTypesXml.includes('Extension="png"')) {
-        // Добавляем тип PNG перед закрывающим тегом Types
-        const pngType = '  <Default Extension="png" ContentType="image/png"/>';
-        contentTypesXml = contentTypesXml.replace('</Types>', `${pngType}\n</Types>`);
+      // Добавляем тип PNG, если его нет
+      if (!contentTypesXml.includes('image/png')) {
+        contentTypesXml = contentTypesXml.replace(
+          '</Types>',
+          '  <Default Extension="png" ContentType="image/png"/>\n</Types>'
+        );
         
         // Сохраняем обновленный файл
         zip.file('[Content_Types].xml', contentTypesXml);
       }
     } catch (error) {
-      console.error('Ошибка обновления типов контента:', error);
+      console.error('Content Types update failed:', error);
     }
   }
 }
