@@ -1,9 +1,13 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets } from 'lucide-react';
+import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, FileText } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
+import { ReportChart, ReportChartRef } from './ReportChart';
+import { ReportForm } from './ReportForm';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
+import { ReportGenerator } from '../utils/reportGenerator';
+import { ReportFormData, AnalysisResult } from '../types/ReportTypes';
 import { useAuth } from '../contexts/AuthContext';
 
 interface TimeSeriesAnalyzerProps {
@@ -23,7 +27,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   
   // UI state
   const [showSettings, setShowSettings] = useState(false);
+  const [showReportSection, setShowReportSection] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  
+  // Report refs
+  const reportChartRef = useRef<ReportChartRef>(null);
   
   // Chart dimensions
   const chartWidth = 1200;
@@ -128,6 +137,47 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       };
     });
   }, [data, files, limits, zoomState]); // Добавляем zoomState в зависимости
+
+  // Генерация отчета
+  const handleGenerateReport = async (reportData: ReportFormData, templateFile: File) => {
+    try {
+      setIsGeneratingReport(true);
+      
+      const reportGenerator = new ReportGenerator();
+      const chartElement = reportChartRef.current?.getChartElement();
+      
+      // Преобразуем analysisResults в формат для отчета
+      const reportAnalysisResults: AnalysisResult[] = analysisResults.map(result => ({
+        zoneNumber: result.zoneNumber,
+        measurementLevel: result.measurementLevel,
+        loggerName: result.loggerName,
+        serialNumber: result.serialNumber,
+        minTemp: result.minTemp,
+        maxTemp: result.maxTemp,
+        avgTemp: result.avgTemp,
+        minHumidity: result.minHumidity,
+        maxHumidity: result.maxHumidity,
+        avgHumidity: result.avgHumidity,
+        meetsLimits: result.meetsLimits,
+        isExternal: result.isExternal,
+      }));
+      
+      await reportGenerator.generateReport(
+        templateFile,
+        reportData,
+        reportAnalysisResults,
+        chartElement
+      );
+      
+      alert('Отчет успешно сгенерирован и сохранен!');
+      
+    } catch (error) {
+      console.error('Ошибка генерации отчета:', error);
+      alert(`Ошибка генерации отчета: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
 
   // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
   const { globalMinTemp, globalMaxTemp } = useMemo(() => {
@@ -240,6 +290,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <BarChart className="w-8 h-8 text-indigo-600" />
           <h1 className="text-2xl font-bold text-gray-900">Анализатор временных рядов</h1>
         </div>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowReportSection(!showReportSection)}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+          >
+            <FileText className="w-4 h-4" />
+            <span>{showReportSection ? 'Скрыть отчет' : 'Генерация отчета'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Settings Panel */}
@@ -344,6 +403,25 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
         />
       </div>
+
+      {/* Скрытый график для отчета */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        <ReportChart
+          ref={reportChartRef}
+          data={data.points}
+          dataType={dataType}
+          width={1200}
+          height={800}
+        />
+      </div>
+
+      {/* Генерация отчета */}
+      {showReportSection && (
+        <ReportForm
+          onSubmit={handleGenerateReport}
+          isGenerating={isGeneratingReport}
+        />
+      )}
 
       {/* Markers */}
       {markers.length > 0 && (
