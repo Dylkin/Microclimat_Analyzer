@@ -1,5 +1,4 @@
 import createReport from 'docx-templates';
-import sharp from 'sharp';
 import { saveAs } from 'file-saver';
 
 export interface ReportData {
@@ -40,26 +39,9 @@ export interface ReportData {
 
 export class ReportGenerator {
   /**
-   * Поворот изображения на 90 градусов против часовой стрелки
-   */
-  private static async rotateImage(imageBuffer: ArrayBuffer): Promise<Buffer> {
-    try {
-      const rotatedBuffer = await sharp(Buffer.from(imageBuffer))
-        .rotate(-90) // Поворот на 90 градусов против часовой стрелки
-        .png()
-        .toBuffer();
-      
-      return rotatedBuffer;
-    } catch (error) {
-      console.error('Ошибка поворота изображения:', error);
-      throw new Error('Не удалось повернуть изображение');
-    }
-  }
-
-  /**
    * Создание изображения графика из SVG элемента
    */
-  private static async createChartImage(svgElement: SVGSVGElement): Promise<Buffer> {
+  private static async createChartImage(svgElement: SVGSVGElement): Promise<Uint8Array> {
     return new Promise((resolve, reject) => {
       try {
         // Создаем canvas для рендеринга SVG
@@ -72,8 +54,11 @@ export class ReportGenerator {
 
         // Получаем размеры SVG
         const svgRect = svgElement.getBoundingClientRect();
-        canvas.width = svgRect.width || 1200;
-        canvas.height = svgRect.height || 400;
+        const originalWidth = svgRect.width || 1200;
+        const originalHeight = svgRect.height || 400;
+        
+        canvas.width = originalWidth;
+        canvas.height = originalHeight;
 
         // Создаем изображение из SVG
         const svgData = new XMLSerializer().serializeToString(svgElement);
@@ -88,10 +73,31 @@ export class ReportGenerator {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0);
 
-            // Конвертируем canvas в blob
-            canvas.toBlob(async (blob) => {
+            // Создаем новый canvas для поворота на 90° против часовой стрелки
+            const rotatedCanvas = document.createElement('canvas');
+            const rotatedCtx = rotatedCanvas.getContext('2d');
+            
+            if (!rotatedCtx) {
+              URL.revokeObjectURL(url);
+              reject(new Error('Не удалось создать контекст для поворота'));
+              return;
+            }
+            
+            // Меняем размеры местами для поворота
+            rotatedCanvas.width = originalHeight;
+            rotatedCanvas.height = originalWidth;
+            
+            // Применяем трансформации для поворота на 90° против часовой стрелки
+            rotatedCtx.translate(0, originalWidth);
+            rotatedCtx.rotate(-Math.PI / 2);
+            
+            // Рисуем оригинальное изображение на повернутый canvas
+            rotatedCtx.drawImage(canvas, 0, 0);
+
+            // Конвертируем повернутый canvas в Uint8Array
+            rotatedCanvas.toBlob(async (blob) => {
               if (!blob) {
-                reject(new Error('Не удалось создать blob из canvas'));
+                reject(new Error('Не удалось создать blob из повернутого canvas'));
                 return;
               }
 
@@ -99,11 +105,11 @@ export class ReportGenerator {
                 // Читаем blob как ArrayBuffer
                 const arrayBuffer = await blob.arrayBuffer();
                 
-                // Поворачиваем изображение на 90 градусов против часовой стрелки
-                const rotatedBuffer = await this.rotateImage(arrayBuffer);
+                // Конвертируем в Uint8Array
+                const uint8Array = new Uint8Array(arrayBuffer);
                 
                 URL.revokeObjectURL(url);
-                resolve(rotatedBuffer);
+                resolve(uint8Array);
               } catch (error) {
                 URL.revokeObjectURL(url);
                 reject(error);
@@ -143,7 +149,7 @@ export class ReportGenerator {
       console.log('Шаблон загружен, размер:', templateBuffer.byteLength, 'байт');
 
       // Создаем изображение графика если передан SVG
-      let chartImageBuffer: Buffer | undefined;
+      let chartImageBuffer: Uint8Array | undefined;
       if (chartSvg) {
         console.log('Создаем изображение графика...');
         chartImageBuffer = await this.createChartImage(chartSvg);

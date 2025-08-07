@@ -131,19 +131,19 @@ export const Help: React.FC = () => {
                   <div>
                     <strong>Основная информация:</strong>
                     <ul className="mt-1 space-y-1 text-xs">
-                      <li>• {'{Report No.'} - Номер отчета'}</li>
-                      <li>• {'{Report date}'} - Дата отчета</li>
-                      <li>• {'{name of the object}'} - Название объекта</li>
-                      <li>• {'{name of the air conditioning system}'} - Климатическая установка</li>
+                      <li>• {`{Report No.} - Номер отчета`}</li>
+                      <li>• {`{Report date} - Дата отчета`}</li>
+                      <li>• {`{name of the object} - Название объекта`}</li>
+                      <li>• {`{name of the air conditioning system} - Климатическая установка`}</li>
                     </ul>
                   </div>
                   <div>
                     <strong>Результаты:</strong>
                     <ul className="mt-1 space-y-1 text-xs">
-                      <li>• {'{Results table}'} - Таблица результатов</li>
-                      <li>• {'{chart}'} - График (повернутый на 90°)</li>
-                      <li>• {'{Result}'} - Выводы и заключение</li>
-                      <li>• {'{acceptance criteria}'} - Критерии приемки</li>
+                      <li>• {`{Results table} - Таблица результатов`}</li>
+                      <li>• {`{chart} - График (повернутый на 90°)`}</li>
+                      <li>• {`{Result} - Выводы и заключение`}</li>
+                      <li>• {`{acceptance criteria} - Критерии приемки`}</li>
                     </ul>
                   </div>
                 </div>
