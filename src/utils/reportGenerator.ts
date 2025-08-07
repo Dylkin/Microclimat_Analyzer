@@ -269,4 +269,31 @@ export class ReportGenerator {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+
+  /**
+   * Сохранение повернутого изображения графика отдельно
+   */
+  static async saveRotatedChartImage(chartElement: HTMLElement, reportTitle: string): Promise<void> {
+    try {
+      const chartImageBase64 = await ReportGenerator.captureChartAsImage(chartElement);
+      
+      // Преобразуем base64 в blob
+      const binaryString = atob(chartImageBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'image/png' });
+      
+      // Создаем имя файла
+      const sanitizedTitle = reportTitle.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_');
+      const filename = `${sanitizedTitle}_график_повернутый.png`;
+      
+      // Сохраняем файл
+      ReportGenerator.saveFile(blob, filename);
+    } catch (error) {
+      console.error('Ошибка сохранения изображения графика:', error);
+      throw error;
+    }
+  }
 }
