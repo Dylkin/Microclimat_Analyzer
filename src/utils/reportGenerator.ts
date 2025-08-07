@@ -242,22 +242,29 @@ export class ReportGenerator {
 
     let xmlContent = documentXml.asText();
     
-    // Ищем плейсхолдер {chart} и заменяем его на изображение
-    // Важно: заменяем только содержимое внутри <w:t> тега, не создавая вложенную структуру
+    // Добавляем все необходимые namespaces в корневой элемент document
+    if (!xmlContent.includes('xmlns:wp=')) {
+      xmlContent = xmlContent.replace(
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"',
+        `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"`
+      );
+    }
+    
+    // Заменяем плейсхолдер {chart} на изображение
     const imageXml = this.createImageXml(relationshipId);
     
-    // Заменяем {chart} на пустую строку в текстовых узлах и добавляем изображение в параграф
+    // Ищем плейсхолдер {chart} внутри текстового узла и заменяем весь параграф
     xmlContent = xmlContent.replace(
-      /(<w:t[^>]*>)([^<]*{chart}[^<]*)(<\/w:t>)/g,
-      (match, openTag, textContent, closeTag) => {
-        // Удаляем {chart} из текста
-        const cleanText = textContent.replace(/{chart}/g, '');
-        if (cleanText.trim()) {
-          return `${openTag}${cleanText}${closeTag}</w:r>${imageXml}<w:r><w:t>`;
-        } else {
-          return `</w:r>${imageXml}<w:r><w:t>`;
-        }
-      }
+      /(<w:p[^>]*>[\s\S]*?<w:t[^>]*>)([^<]*{chart}[^<]*)(<\/w:t>[\s\S]*?<\/w:p>)/g,
+      `<w:p>
+  <w:r>
+    ${imageXml}
+  </w:r>
+</w:p>`
     );
     
     zip.file('word/document.xml', xmlContent);
@@ -268,48 +275,45 @@ export class ReportGenerator {
    */
   private createImageXml(relationshipId: string): string {
     // Размеры в EMU (English Metric Units): 1 дюйм = 914400 EMU
-    // После поворота на 90° меняем местами ширину и высоту
-    const width = 3657600; // ~4 дюйма (было высотой до поворота)
-    const height = 5486400; // ~6 дюймов (было шириной до поворота)
+    // После поворота на 90° размеры: ширина = 4 дюйма, высота = 6 дюймов
+    const width = 3657600;  // ~4 дюйма
+    const height = 5486400; // ~6 дюймов
     
     return `
-<w:r>
-  <w:drawing>
-    <wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0">
-      <wp:extent cx="${width}" cy="${height}"/>
-      <wp:effectExtent l="0" t="0" r="0" b="0"/>
-      <wp:docPr id="1" name="Chart"/>
-      <wp:cNvGraphicFramePr>
-        <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
-      </wp:cNvGraphicFramePr>
-      <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-        <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
-          <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
-            <pic:nvPicPr>
-              <pic:cNvPr id="1" name="Chart"/>
-              <pic:cNvPicPr/>
-            </pic:nvPicPr>
-            <pic:blipFill>
-              <a:blip r:embed="${relationshipId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
-              <a:stretch>
-                <a:fillRect/>
-              </a:stretch>
-            </pic:blipFill>
-            <pic:spPr>
-              <a:xfrm>
-                <a:off x="0" y="0"/>
-                <a:ext cx="${width}" cy="${height}"/>
-              </a:xfrm>
-              <a:prstGeom prst="rect">
-                <a:avLst/>
-              </a:prstGeom>
-            </pic:spPr>
-          </pic:pic>
-        </a:graphicData>
-      </a:graphic>
-    </wp:inline>
-  </w:drawing>
-</w:r>
+<w:drawing>
+  <wp:inline distT="0" distB="0" distL="0" distR="0">
+    <wp:extent cx="${width}" cy="${height}"/>
+    <wp:docPr id="1" name="Chart"/>
+    <wp:cNvGraphicFramePr>
+      <a:graphicFrameLocks noChangeAspect="1"/>
+    </wp:cNvGraphicFramePr>
+    <a:graphic>
+      <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+        <pic:pic>
+          <pic:nvPicPr>
+            <pic:cNvPr id="1" name="Chart"/>
+            <pic:cNvPicPr/>
+          </pic:nvPicPr>
+          <pic:blipFill>
+            <a:blip r:embed="${relationshipId}"/>
+            <a:stretch>
+              <a:fillRect/>
+            </a:stretch>
+          </pic:blipFill>
+          <pic:spPr>
+            <a:xfrm>
+              <a:off x="0" y="0"/>
+              <a:ext cx="${width}" cy="${height}"/>
+            </a:xfrm>
+            <a:prstGeom prst="rect">
+              <a:avLst/>
+            </a:prstGeom>
+          </pic:spPr>
+        </pic:pic>
+      </a:graphicData>
+    </a:graphic>
+  </wp:inline>
+</w:drawing>
     `;
   }
 
