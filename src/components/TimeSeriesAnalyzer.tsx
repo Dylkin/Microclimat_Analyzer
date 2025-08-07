@@ -420,6 +420,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         chartElement={chartRef.current || undefined}
       />
 
+      {/* Analysis Results Table */}
+      <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
         
         <div className="overflow-x-auto">
@@ -537,6 +539,5 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
         </div>
       </div>
-    </div>
   );
 };
