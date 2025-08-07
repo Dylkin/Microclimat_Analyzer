@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets } from 'lucide-react';
+import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, FileText } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
+import { ReportGeneratorModal } from './ReportGeneratorModal';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,11 +25,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // UI state
   const [showSettings, setShowSettings] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
   
   // Chart dimensions
   const chartWidth = 1200;
   const chartHeight = 400;
   const chartMargin = { top: 20, right: 60, bottom: 60, left: 80 };
+
+  // Ref для элемента графика
+  const chartRef = useRef<HTMLDivElement>(null);
 
   // Generate analysis results table data
   const analysisResults = useMemo(() => {
@@ -240,6 +245,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <BarChart className="w-8 h-8 text-indigo-600" />
           <h1 className="text-2xl font-bold text-gray-900">Анализатор временных рядов</h1>
         </div>
+        <button
+          onClick={() => setShowReportModal(true)}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+        >
+          <FileText className="w-4 h-4" />
+          <span>Генерация отчета</span>
+        </button>
       </div>
 
       {/* Settings Panel */}
@@ -323,7 +335,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       </div>
 
       {/* Chart */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div ref={chartRef} className="bg-white rounded-lg shadow p-6">
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-gray-900">
             График {dataType === 'temperature' ? 'температуры' : 'влажности'}
@@ -519,6 +531,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
         </div>
       </div>
+
+      {/* Report Generator Modal */}
+      <ReportGeneratorModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        analysisResults={analysisResults}
+        chartElement={chartRef.current || undefined}
+      />
     </div>
   );
 };
