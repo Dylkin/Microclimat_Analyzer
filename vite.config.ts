@@ -5,8 +5,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     global: 'globalThis',
-    'process.env': {},
-    Buffer: ['buffer', 'Buffer'],
+    'process.env': {}
   },
   optimizeDeps: {
     include: [
@@ -15,8 +14,14 @@ export default defineConfig({
       'd3-scale-chromatic',
       'd3-selection',
       'd3-time-format',
-      'd3-zoom'
+      'd3-zoom',
+      'buffer'
     ],
+  },
+  resolve: {
+    alias: {
+      buffer: 'buffer',
+    },
   },
   server: {
     port: 5173,

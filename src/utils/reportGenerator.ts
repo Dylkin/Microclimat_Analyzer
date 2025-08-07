@@ -1,6 +1,7 @@
 import html2canvas from 'html2canvas';
 import { saveAs } from 'file-saver';
 import { createReport } from 'docx-templates';
+import { Buffer } from 'buffer';
 
 export interface ReportData {
   title: string;
