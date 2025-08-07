@@ -2,6 +2,12 @@ import { createReport } from 'docx-templates';
 import { saveAs } from 'file-saver';
 import { UploadedFile } from '../types/FileData';
 
+// Полифилл для Buffer в браузере
+if (typeof window !== 'undefined' && !window.Buffer) {
+  const { Buffer } = await import('buffer');
+  window.Buffer = Buffer;
+}
+
 export interface ReportData {
   // Основная информация
   'Report No.': string;
