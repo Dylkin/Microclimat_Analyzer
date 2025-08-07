@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
-    "buffer": "^6.0.3",
     "chart.js": "^4.5.0",
     "chartjs-adapter-date-fns": "^3.0.0",
     "d3-array": "^3.2.4",
@@ -20,19 +19,14 @@
     "d3-time-format": "^4.1.0",
     "d3-zoom": "^3.0.0",
     "docx-templates": "^4.14.1",
-    "events": "^3.3.0",
     "file-saver": "^2.0.5",
     "html-to-image": "^1.11.13",
     "lucide-react": "^0.532.0",
-    "path-browserify": "^1.0.1",
-    "process": "^0.11.10",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.62.0",
     "recharts": "^3.1.0",
-    "stream-browserify": "^3.0.0",
-    "util": "^0.12.5",
     "zod": "^4.0.15"
   },
   "devDependencies": {

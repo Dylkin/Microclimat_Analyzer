@@ -6,18 +6,6 @@ export default defineConfig({
   define: {
     global: 'globalThis',
     'process.env': {},
-    'process.browser': true,
-  },
-  resolve: {
-    alias: {
-      buffer: 'buffer',
-      process: 'process/browser',
-      stream: 'stream-browserify',
-      path: 'path-browserify',
-      util: 'util',
-      events: 'events',
-      vm: 'src/utils/vm-stub.js', // Заглушка для vm модуля
-    },
   },
   optimizeDeps: {
     include: [
@@ -29,14 +17,14 @@ export default defineConfig({
       'zod',
       'react-hook-form',
       '@hookform/resolvers/zod',
-      'chartjs-adapter-date-fns',
-      'buffer',
-      'process/browser',
-      'stream-browserify',
-      'path-browserify',
-      'util',
-      'events'
+      'chartjs-adapter-date-fns'
     ],
+  },
+  resolve: {
+    alias: {
+      buffer: 'buffer',
+      process: 'process/browser',
+    },
   },
   server: {
     port: 5173,

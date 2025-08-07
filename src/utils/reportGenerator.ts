@@ -52,10 +52,8 @@ export class ReportGenerator {
         cmdDelimiter: ['{', '}'],
         literalXmlDelimiter: ['{{', '}}'],
         processLineBreaks: true,
-        noSandBox: true, // Отключаем песочницу
-        runJs: false, // КРИТИЧНО: отключаем выполнение JavaScript
-        additionalJsContext: {}, // Пустой контекст
-        failFast: false, // Не останавливаемся на первой ошибке
+        noSandBox: true,
+        runJs: false, // Отключаем выполнение JavaScript
       });
 
       console.log('Отчет сгенерирован, размер:', reportBuffer.byteLength, 'байт');
