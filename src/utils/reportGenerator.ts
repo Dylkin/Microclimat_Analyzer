@@ -20,11 +20,11 @@ export class ReportGenerator {
       const templateBuffer = await this.readFileAsArrayBuffer(templateFile);
       console.log('Шаблон загружен, размер:', templateBuffer.byteLength, 'байт');
 
-      // 2. Захватываем и поворачиваем график
+      // 2. Захватываем график
       let chartImage: string | null = null;
       if (chartElement) {
-        chartImage = await this.captureAndRotateChart(chartElement);
-        console.log('График захвачен и повернут');
+        chartImage = await this.captureChart(chartElement);
+        console.log('График захвачен');
       }
 
       // 3. Создаем таблицу результатов
@@ -86,39 +86,16 @@ export class ReportGenerator {
   }
 
   /**
-   * Захват и поворот графика на 90° против часовой стрелки
+   * Захват графика
    */
-  private async captureAndRotateChart(chartElement: HTMLCanvasElement): Promise<string> {
+  private async captureChart(chartElement: HTMLCanvasElement): Promise<string> {
     try {
-      // Создаем временный контейнер для поворота
-      const container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.top = '-9999px';
-      container.style.transform = 'rotate(-90deg)';
-      container.style.transformOrigin = 'center center';
-      
-      // Клонируем canvas
-      const clonedCanvas = document.createElement('canvas');
-      clonedCanvas.width = chartElement.width;
-      clonedCanvas.height = chartElement.height;
-      const ctx = clonedCanvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(chartElement, 0, 0);
-      }
-      
-      container.appendChild(clonedCanvas);
-      document.body.appendChild(container);
-
-      // Захватываем повернутое изображение
-      const dataUrl = await toPng(container, {
+      // Захватываем изображение графика
+      const dataUrl = await toPng(chartElement, {
         quality: 1.0,
         pixelRatio: 2,
         backgroundColor: '#ffffff',
       });
-
-      // Удаляем временный контейнер
-      document.body.removeChild(container);
 
       // Возвращаем base64 данные без префикса
       return dataUrl.split(',')[1];

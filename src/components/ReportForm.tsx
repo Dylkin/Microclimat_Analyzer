@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Upload, FileText, AlertCircle } from 'lucide-react';
@@ -10,15 +10,13 @@ interface ReportFormProps {
 }
 
 export const ReportForm: React.FC<ReportFormProps> = ({ onSubmit, isGenerating }) => {
-  const [templateFile, setTemplateFile] = React.useState<File | null>(null);
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
   const templateInputRef = React.useRef<HTMLInputElement>(null);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-    setValue,
-    watch,
   } = useForm<ReportFormData>({
     resolver: zodResolver(reportSchema),
     defaultValues: {
