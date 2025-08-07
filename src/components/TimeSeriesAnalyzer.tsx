@@ -412,19 +412,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       {/* Chart */}
       <div ref={chartRef} className="bg-white rounded-lg shadow p-6">
         <div className="mb-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">
-              График {dataType === 'temperature' ? 'температуры' : 'влажности'}
-            </h3>
-            <button
-              onClick={handleSaveChart}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-              title="Сохранить график как PNG"
-            >
-              <Download className="w-4 h-4" />
-              <span>Сохранить график</span>
-            </button>
-          </div>
+          <h3 className="text-lg font-semibold text-gray-900">
+            График {dataType === 'temperature' ? 'температуры' : 'влажности'}
+          </h3>
         </div>
         
         <TimeSeriesChart
@@ -496,6 +486,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
         </div>
       )}
+
+      {/* Кнопка формирования отчета */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex justify-center">
+          <button
+            onClick={handleSaveChart}
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium"
+            title="Сформировать отчет с графиком"
+          >
+            <Download className="w-5 h-5" />
+            <span>Сформировать отчет</span>
+          </button>
+        </div>
+      </div>
 
       {/* Analysis Results Table */}
       <div className="bg-white rounded-lg shadow p-6">
