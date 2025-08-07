@@ -102,8 +102,8 @@ export class DocxReportGenerator {
               new ImageRun({
                 data: imageBuffer,
                 transformation: {
-                  width: 400, // Ширина в пикселях
-                  height: 600, // Высота в пикселях
+                  width: 560, // Увеличено на 40%
+                  height: 840, // Увеличено на 40%
                 },
               }),
             ],
