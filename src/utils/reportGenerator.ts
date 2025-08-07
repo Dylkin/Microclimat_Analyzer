@@ -209,11 +209,19 @@ export class ReportGenerator {
   }
 
   /**
-   * Захват графика как изображение с поворотом на 90 градусов против часовой стрелки
+   * Захват графика как изображение с CSS поворотом на 90 градусов против часовой стрелки
    */
   static async captureChartAsImage(chartElement: HTMLElement): Promise<string> {
     try {
-      // Захватываем график
+      // Применяем CSS поворот к элементу
+      const originalTransform = chartElement.style.transform;
+      chartElement.style.transform = 'rotate(-90deg)';
+      chartElement.style.transformOrigin = 'center center';
+      
+      // Небольшая задержка для применения CSS
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Захватываем график с примененным CSS поворотом
       const canvas = await html2canvas(chartElement, {
         backgroundColor: '#ffffff',
         scale: 2, // Увеличиваем разрешение
@@ -221,31 +229,17 @@ export class ReportGenerator {
         allowTaint: true,
       });
 
-      // Создаем новый canvas для поворота
-      const rotatedCanvas = document.createElement('canvas');
-      const ctx = rotatedCanvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error('Не удалось получить контекст canvas');
-      }
-
-      // Сохраняем исходные размеры canvas (не меняем местами!)
-      rotatedCanvas.width = canvas.width;
-      rotatedCanvas.height = canvas.height;
-
-      // Перемещаем точку поворота в центр canvas
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      
-      // Поворачиваем на 90 градусов против часовой стрелки
-      ctx.rotate(-Math.PI / 2);
-      
-      // Рисуем изображение относительно центра (смещаем на половину размеров)
-      ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+      // Восстанавливаем исходный transform
+      chartElement.style.transform = originalTransform;
 
       // Возвращаем base64 строку
-      return rotatedCanvas.toDataURL('image/png').split(',')[1];
+      return canvas.toDataURL('image/png').split(',')[1];
     } catch (error) {
       console.error('Ошибка захвата графика:', error);
+      // В случае ошибки также восстанавливаем transform
+      if (chartElement) {
+        chartElement.style.transform = '';
+      }
       throw error;
     }
   }
