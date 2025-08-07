@@ -221,90 +221,35 @@ export class ReportGenerator {
         allowTaint: true,
       });
 
-      // Получаем base64 изображения из canvas
-      const originalImageData = canvas.toDataURL('image/png');
+      // Создаем новый canvas для поворота
+      const rotatedCanvas = document.createElement('canvas');
+      const ctx = rotatedCanvas.getContext('2d');
       
-      // Создаем SVG с поворотом изображения на 90 градусов против часовой стрелки
-      const rotatedImageData = await ReportGenerator.rotateImageUsingSVG(
-        originalImageData, 
-        canvas.width, 
-        canvas.height
-      );
+      if (!ctx) {
+        throw new Error('Не удалось получить контекст canvas');
+      }
+
+      // Сохраняем исходные размеры canvas (не меняем местами!)
+      rotatedCanvas.width = canvas.width;
+      rotatedCanvas.height = canvas.height;
+
+      // Перемещаем точку поворота в центр canvas
+      ctx.translate(canvas.width / 2, canvas.height / 2);
       
-      return rotatedImageData;
+      // Поворачиваем на 90 градусов против часовой стрелки
+      ctx.rotate(-Math.PI / 2);
+      
+      // Рисуем изображение относительно центра (смещаем на половину размеров)
+      ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+
+      // Возвращаем base64 строку
+      return rotatedCanvas.toDataURL('image/png').split(',')[1];
     } catch (error) {
       console.error('Ошибка захвата графика:', error);
       throw error;
     }
   }
 
-  /**
-   * Поворот изображения на 90 градусов против часовой стрелки с использованием SVG
-   */
-  private static async rotateImageUsingSVG(
-    imageDataUrl: string, 
-    originalWidth: number, 
-    originalHeight: number
-  ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      try {
-        // Создаем SVG с поворотом изображения
-        const svgContent = `
-          <svg width="${originalWidth}" height="${originalHeight}" xmlns="http://www.w3.org/2000/svg">
-            <g transform="translate(${originalWidth/2}, ${originalHeight/2}) rotate(-90) translate(-${originalWidth/2}, -${originalHeight/2})">
-              <image href="${imageDataUrl}" width="${originalWidth}" height="${originalHeight}" x="0" y="0"/>
-            </g>
-          </svg>
-        `;
-
-        // Создаем Blob из SVG
-        const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
-        const svgUrl = URL.createObjectURL(svgBlob);
-
-        // Создаем изображение из SVG
-        const img = new Image();
-        img.onload = () => {
-          try {
-            // Создаем canvas для конвертации SVG в PNG
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            if (!ctx) {
-              reject(new Error('Не удалось получить контекст canvas'));
-              return;
-            }
-
-            // Устанавливаем размеры canvas (сохраняем исходные размеры)
-            canvas.width = originalWidth;
-            canvas.height = originalHeight;
-
-            // Рисуем SVG на canvas
-            ctx.drawImage(img, 0, 0, originalWidth, originalHeight);
-
-            // Получаем base64 результата
-            const rotatedImageData = canvas.toDataURL('image/png').split(',')[1];
-            
-            // Очищаем URL
-            URL.revokeObjectURL(svgUrl);
-            
-            resolve(rotatedImageData);
-          } catch (error) {
-            URL.revokeObjectURL(svgUrl);
-            reject(error);
-          }
-        };
-
-        img.onerror = () => {
-          URL.revokeObjectURL(svgUrl);
-          reject(new Error('Ошибка загрузки SVG изображения'));
-        };
-
-        img.src = svgUrl;
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
   /**
    * Преобразование base64 в ArrayBuffer
    */
