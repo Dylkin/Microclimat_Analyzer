@@ -81,53 +81,30 @@ export class ReportGenerator {
   /**
    * Обработка DOCX шаблона с заменой плейсхолдеров
    */
-  private async processDocxTemplate(templateFile: File, reportData: ReportData, chartImageData: Uint8Array): Promise<Uint8Array> {
+  private async processDocxTemplate(templateFile: File, reportData: ReportData, chartImageData: Uint8Array): Promise<Blob> {
     try {
       // Читаем шаблон как ArrayBuffer
       const templateBuffer = await templateFile.arrayBuffer();
       const zip = new PizZip(templateBuffer);
 
-      // Извлекаем document.xml
-      const documentXml = zip.file('word/document.xml');
-      if (!documentXml) {
-        throw new Error('Не удалось найти document.xml в шаблоне');
+      // Проверяем наличие необходимых файлов
+      this.validateDocxStructure(zip);
+
+      // Обрабатываем текстовые замены
+      this.processTextReplacements(zip, reportData);
+
+      // Обрабатываем вставку изображения
+      if (this.hasChartPlaceholder(zip)) {
+        await this.insertChartImage(zip, chartImageData);
       }
 
-      let xmlContent = documentXml.asText();
-
-      // Заменяем текстовые плейсхолдеры
-      xmlContent = xmlContent.replace(/{title}/g, this.escapeXml(reportData.title));
-      xmlContent = xmlContent.replace(/{period}/g, this.escapeXml(reportData.period));
-      xmlContent = xmlContent.replace(/{location}/g, this.escapeXml(reportData.location));
-      xmlContent = xmlContent.replace(/{responsible}/g, this.escapeXml(reportData.responsible));
-
-      // Создаем таблицу результатов анализа
-      const analysisTable = this.createAnalysisTableXml(reportData.analysisResults);
-      xmlContent = xmlContent.replace(/{analysisResults}/g, analysisTable);
-
-      // Обрабатываем плейсхолдер {chart}
-      if (xmlContent.includes('{chart}')) {
-        // Добавляем изображение в архив
-        const imageId = 'chart_image.png';
-        const imageRelId = 'rId999'; // Уникальный ID для связи
-
-        // Добавляем изображение в папку media
-        zip.file(`word/media/${imageId}`, chartImageData);
-
-        // Обновляем relationships
-        await this.updateRelationships(zip, imageRelId, imageId);
-
-        // Создаем XML для изображения с сохранением пропорций
-        const imageXml = this.createImageXml(imageRelId, chartImageData);
-        xmlContent = xmlContent.replace(/{chart}/g, imageXml);
-      }
-
-      // Обновляем document.xml
-      zip.file('word/document.xml', xmlContent);
-
-      // Генерируем новый DOCX
-      const result = zip.generate({ type: 'uint8array' });
-      return result;
+      // Генерируем DOCX как blob
+      const docxBlob = zip.generate({ 
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+      
+      return docxBlob;
 
     } catch (error) {
       console.error('Ошибка обработки DOCX шаблона:', error);
@@ -136,74 +113,188 @@ export class ReportGenerator {
   }
 
   /**
+   * Проверка структуры DOCX файла
+   */
+  private validateDocxStructure(zip: PizZip): void {
+    const requiredFiles = [
+      'word/document.xml',
+      'word/_rels/document.xml.rels',
+      '[Content_Types].xml'
+    ];
+
+    for (const file of requiredFiles) {
+      if (!zip.file(file)) {
+        throw new Error(`Отсутствует обязательный файл: ${file}`);
+      }
+    }
+  }
+
+  /**
+   * Обработка текстовых замен в документе
+   */
+  private processTextReplacements(zip: PizZip, reportData: ReportData): void {
+    const documentXml = zip.file('word/document.xml');
+    if (!documentXml) return;
+
+    let xmlContent = documentXml.asText();
+
+    // Заменяем текстовые плейсхолдеры
+    xmlContent = xmlContent.replace(/{title}/g, this.escapeXml(reportData.title));
+    xmlContent = xmlContent.replace(/{period}/g, this.escapeXml(reportData.period));
+    xmlContent = xmlContent.replace(/{location}/g, this.escapeXml(reportData.location));
+    xmlContent = xmlContent.replace(/{responsible}/g, this.escapeXml(reportData.responsible));
+
+    // Создаем таблицу результатов анализа
+    const analysisTable = this.createAnalysisTableXml(reportData.analysisResults);
+    xmlContent = xmlContent.replace(/{analysisResults}/g, analysisTable);
+
+    // Обновляем document.xml
+    zip.file('word/document.xml', xmlContent);
+  }
+
+  /**
+   * Проверка наличия плейсхолдера {chart}
+   */
+  private hasChartPlaceholder(zip: PizZip): boolean {
+    const documentXml = zip.file('word/document.xml');
+    if (!documentXml) return false;
+    
+    return documentXml.asText().includes('{chart}');
+  }
+
+  /**
+   * Вставка изображения графика в документ
+   */
+  private async insertChartImage(zip: PizZip, chartImageData: Uint8Array): Promise<void> {
+    const imageFileName = 'chart_image.png';
+    const imageRelId = this.getNextRelationshipId(zip);
+
+    // Добавляем изображение в архив
+    zip.file(`word/media/${imageFileName}`, chartImageData);
+
+    // Обновляем relationships
+    this.updateRelationships(zip, imageRelId, imageFileName);
+
+    // Обновляем Content_Types.xml
+    this.updateContentTypes(zip);
+
+    // Заменяем плейсхолдер на XML изображения
+    this.replaceChartPlaceholder(zip, imageRelId);
+  }
+
+  /**
+   * Получение следующего доступного ID для relationship
+   */
+  private getNextRelationshipId(zip: PizZip): string {
+    const relsFile = zip.file('word/_rels/document.xml.rels');
+    if (!relsFile) return 'rId999';
+
+    const relsContent = relsFile.asText();
+    const matches = relsContent.match(/rId(\d+)/g);
+    
+    if (!matches) return 'rId1';
+    
+    const maxId = Math.max(...matches.map(match => parseInt(match.replace('rId', ''))));
+    return `rId${maxId + 1}`;
+  }
+
+  /**
    * Обновление relationships для изображения
    */
-  private async updateRelationships(zip: PizZip, relationshipId: string, imageFileName: string): Promise<void> {
+  private updateRelationships(zip: PizZip, relationshipId: string, imageFileName: string): void {
     const relsFile = zip.file('word/_rels/document.xml.rels');
-    if (!relsFile) {
-      throw new Error('Не удалось найти файл relationships');
-    }
+    if (!relsFile) return;
 
     let relsContent = relsFile.asText();
     
     // Добавляем новую связь для изображения
-    const newRelationship = `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageFileName}"/>`;
+    const newRelationship = `  <Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageFileName}"/>`;
     
     // Вставляем перед закрывающим тегом </Relationships>
-    relsContent = relsContent.replace('</Relationships>', `${newRelationship}</Relationships>`);
+    relsContent = relsContent.replace('</Relationships>', `${newRelationship}\n</Relationships>`);
     
     zip.file('word/_rels/document.xml.rels', relsContent);
   }
 
   /**
+   * Обновление Content_Types.xml для поддержки PNG изображений
+   */
+  private updateContentTypes(zip: PizZip): void {
+    const contentTypesFile = zip.file('[Content_Types].xml');
+    if (!contentTypesFile) return;
+
+    let contentTypesXml = contentTypesFile.asText();
+    
+    // Проверяем, есть ли уже тип для PNG
+    if (!contentTypesXml.includes('Extension="png"')) {
+      const pngType = '  <Default Extension="png" ContentType="image/png"/>';
+      contentTypesXml = contentTypesXml.replace('</Types>', `${pngType}\n</Types>`);
+      zip.file('[Content_Types].xml', contentTypesXml);
+    }
+  }
+
+  /**
+   * Замена плейсхолдера {chart} на XML изображения
+   */
+  private replaceChartPlaceholder(zip: PizZip, relationshipId: string): void {
+    const documentXml = zip.file('word/document.xml');
+    if (!documentXml) return;
+
+    let xmlContent = documentXml.asText();
+    const imageXml = this.createImageXml(relationshipId);
+    xmlContent = xmlContent.replace(/{chart}/g, imageXml);
+    
+    zip.file('word/document.xml', xmlContent);
+  }
+
+  /**
    * Создание XML для изображения с сохранением пропорций
    */
-  private createImageXml(relationshipId: string, imageData: Uint8Array): string {
-    // Получаем размеры изображения (приблизительно)
-    // В реальном приложении можно использовать более точные методы
-    const width = 6000000; // ~6 дюймов в EMU (English Metric Units)
-    const height = 4000000; // ~4 дюйма в EMU
+  private createImageXml(relationshipId: string): string {
+    // Размеры в EMU (English Metric Units): 1 дюйм = 914400 EMU
+    const width = 5486400; // ~6 дюймов
+    const height = 3657600; // ~4 дюйма
     
     return `
-      <w:p>
-        <w:r>
-          <w:drawing>
-            <wp:inline distT="0" distB="0" distL="0" distR="0">
-              <wp:extent cx="${width}" cy="${height}"/>
-              <wp:effectExtent l="0" t="0" r="0" b="0"/>
-              <wp:docPr id="1" name="Chart"/>
-              <wp:cNvGraphicFramePr>
-                <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
-              </wp:cNvGraphicFramePr>
-              <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-                <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                  <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                    <pic:nvPicPr>
-                      <pic:cNvPr id="1" name="Chart"/>
-                      <pic:cNvPicPr/>
-                    </pic:nvPicPr>
-                    <pic:blipFill>
-                      <a:blip r:embed="${relationshipId}"/>
-                      <a:stretch>
-                        <a:fillRect/>
-                      </a:stretch>
-                    </pic:blipFill>
-                    <pic:spPr>
-                      <a:xfrm>
-                        <a:off x="0" y="0"/>
-                        <a:ext cx="${width}" cy="${height}"/>
-                      </a:xfrm>
-                      <a:prstGeom prst="rect">
-                        <a:avLst/>
-                      </a:prstGeom>
-                    </pic:spPr>
-                  </pic:pic>
-                </a:graphicData>
-              </a:graphic>
-            </wp:inline>
-          </w:drawing>
-        </w:r>
-      </w:p>
+<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:r>
+    <w:drawing>
+      <wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0">
+        <wp:extent cx="${width}" cy="${height}"/>
+        <wp:effectExtent l="0" t="0" r="0" b="0"/>
+        <wp:docPr id="1" name="Chart"/>
+        <wp:cNvGraphicFramePr>
+          <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+        </wp:cNvGraphicFramePr>
+        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+            <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+              <pic:nvPicPr>
+                <pic:cNvPr id="1" name="Chart"/>
+                <pic:cNvPicPr/>
+              </pic:nvPicPr>
+              <pic:blipFill>
+                <a:blip r:embed="${relationshipId}"/>
+                <a:stretch>
+                  <a:fillRect/>
+                </a:stretch>
+              </pic:blipFill>
+              <pic:spPr>
+                <a:xfrm>
+                  <a:off x="0" y="0"/>
+                  <a:ext cx="${width}" cy="${height}"/>
+                </a:xfrm>
+                <a:prstGeom prst="rect">
+                  <a:avLst/>
+                </a:prstGeom>
+              </pic:spPr>
+            </pic:pic>
+          </a:graphicData>
+        </a:graphic>
+      </wp:inline>
+    </w:drawing>
+  </w:r>
+</w:p>
     `;
   }
 
@@ -212,42 +303,39 @@ export class ReportGenerator {
    */
   private createAnalysisTableXml(results: ReportData['analysisResults']): string {
     const headerRow = `
-      <w:tr>
-        <w:tc><w:p><w:r><w:t>№ зоны</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>Логгер</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>S/N</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>Мин. t°C</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>Макс. t°C</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>Среднее t°C</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>Соответствие</w:t></w:r></w:p></w:tc>
-      </w:tr>
-    `;
+<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:tc><w:tcPr><w:tcW w:w="1000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>№ зоны</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Логгер</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>S/N</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Мин. t°C</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Макс. t°C</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Среднее t°C</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1400" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Соответствие</w:t></w:r></w:p></w:tc>
+</w:tr>`;
 
     const dataRows = results.map(result => `
-      <w:tr>
-        <w:tc><w:p><w:r><w:t>${this.escapeXml(String(result.zoneNumber))}</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>${this.escapeXml(String(result.measurementLevel))}</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>${this.escapeXml(result.loggerName)}</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>${this.escapeXml(result.serialNumber)}</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>${this.escapeXml(String(result.minTemp))}</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>${this.escapeXml(String(result.maxTemp))}</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>${this.escapeXml(String(result.avgTemp))}</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:t>${this.escapeXml(result.meetsLimits)}</w:t></w:r></w:p></w:tc>
-      </w:tr>
-    `).join('');
+<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:tc><w:tcPr><w:tcW w:w="1000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${this.escapeXml(String(result.zoneNumber))}</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${this.escapeXml(String(result.measurementLevel))}</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${this.escapeXml(result.loggerName)}</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${this.escapeXml(result.serialNumber)}</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${this.escapeXml(String(result.minTemp))}</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${this.escapeXml(String(result.maxTemp))}</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${this.escapeXml(String(result.avgTemp))}</w:t></w:r></w:p></w:tc>
+  <w:tc><w:tcPr><w:tcW w:w="1400" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${this.escapeXml(result.meetsLimits)}</w:t></w:r></w:p></w:tc>
+</w:tr>`).join('');
 
     return `
-      <w:tbl>
-        <w:tblPr>
-          <w:tblStyle w:val="TableGrid"/>
-          <w:tblW w:w="0" w:type="auto"/>
-          <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
-        </w:tblPr>
-        ${headerRow}
-        ${dataRows}
-      </w:tbl>
-    `;
+<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:tblPr>
+    <w:tblStyle w:val="TableGrid"/>
+    <w:tblW w:w="0" w:type="auto"/>
+    <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
+  </w:tblPr>
+  ${headerRow}
+  ${dataRows}
+</w:tbl>`;
   }
 
   /**
@@ -265,7 +353,7 @@ export class ReportGenerator {
   /**
    * Создание простого DOCX отчета без шаблона
    */
-  private async createSimpleDocxReport(reportData: ReportData, chartImageData: Uint8Array): Promise<Uint8Array> {
+  private async createSimpleDocxReport(reportData: ReportData, chartImageData: Uint8Array): Promise<Blob> {
     try {
       // Создаем таблицу результатов
       const tableRows = reportData.analysisResults.map(result => 
@@ -337,7 +425,10 @@ export class ReportGenerator {
         }],
       });
 
-      return await Packer.toBuffer(doc);
+      const buffer = await Packer.toBuffer(doc);
+      return new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
     } catch (error) {
       console.error('Ошибка создания простого DOCX отчета:', error);
       throw new Error('Не удалось создать отчет');
@@ -356,20 +447,19 @@ export class ReportGenerator {
       // Захватываем и поворачиваем график
       const chartImageData = await this.captureAndRotateChart(chartElement);
 
-      let docxData: Uint8Array;
+      let docxBlob: Blob;
 
       if (templateFile) {
         // Используем шаблон
-        docxData = await this.processDocxTemplate(templateFile, reportData, chartImageData);
+        docxBlob = await this.processDocxTemplate(templateFile, reportData, chartImageData);
       } else {
         // Создаем простой отчет
-        docxData = await this.createSimpleDocxReport(reportData, chartImageData);
+        docxBlob = await this.createSimpleDocxReport(reportData, chartImageData);
       }
 
       // Сохраняем файл
       const fileName = `Отчет_${reportData.title.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.docx`;
-      const blob = new Blob([docxData], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-      saveAs(blob, fileName);
+      saveAs(docxBlob, fileName);
 
     } catch (error) {
       console.error('Ошибка генерации отчета:', error);
