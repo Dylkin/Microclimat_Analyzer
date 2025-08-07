@@ -5,6 +5,7 @@ import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { ReportGeneratorModal } from './ReportGeneratorModal';
+import { ReportGenerator } from '../utils/reportGenerator';
 import { useAuth } from '../contexts/AuthContext';
 
 interface TimeSeriesAnalyzerProps {
@@ -26,6 +27,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [showSettings, setShowSettings] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [chartImageURL, setChartImageURL] = useState<string | null>(null);
   
   // Chart dimensions
   const chartWidth = 1200;
@@ -184,6 +186,47 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setZoomState(undefined);
   };
 
+  const handleSaveChartImage = async () => {
+    if (!chartRef.current) {
+      alert('График не найден');
+      return;
+    }
+
+    try {
+      // Сохраняем изображение и получаем URL
+      const url = await ReportGenerator.captureAndSaveChartImage(
+        chartRef.current,
+        `график_временных_рядов_${new Date().toISOString().split('T')[0]}.png`
+      );
+      
+      // Сохраняем URL для отображения
+      setChartImageURL(url);
+      
+      alert('График сохранен как PNG файл');
+    } catch (error) {
+      console.error('Ошибка сохранения графика:', error);
+      alert('Ошибка при сохранении графика');
+    }
+  };
+
+  const handleCreateImageURL = async () => {
+    if (!chartRef.current) {
+      alert('График не найден');
+      return;
+    }
+
+    try {
+      // Создаем URL без сохранения файла
+      const url = await ReportGenerator.captureChartAsBlobURL(chartRef.current);
+      setChartImageURL(url);
+      
+      alert('Ссылка на перевернутое изображение создана');
+    } catch (error) {
+      console.error('Ошибка создания ссылки на изображение:', error);
+      alert('Ошибка при создании ссылки на изображение');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -251,6 +294,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         >
           <FileText className="w-4 h-4" />
           <span>Генерация отчета</span>
+        </button>
+        <button
+          onClick={handleSaveChartImage}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+        >
+          <BarChart className="w-4 h-4" />
+          <span>Сохранить график PNG</span>
+        </button>
+        <button
+          onClick={handleCreateImageURL}
+          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+        >
+          <BarChart className="w-4 h-4" />
+          <span>Создать ссылку на изображение</span>
         </button>
       </div>
 
@@ -408,6 +465,64 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Ссылка на сохраненное изображение */}
+      {chartImageURL && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Сохраненное изображение графика</h3>
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600 mb-2">
+                Ссылка на перевернутое изображение графика (поворот на 90° против часовой стрелки):
+              </p>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={chartImageURL}
+                  readOnly
+                  className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-mono"
+                />
+                <button
+                  onClick={() => navigator.clipboard.writeText(chartImageURL)}
+                  className="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                >
+                  Копировать
+                </button>
+              </div>
+            </div>
+            
+            {/* Предварительный просмотр */}
+            <div className="border border-gray-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Предварительный просмотр:</h4>
+              <img 
+                src={chartImageURL} 
+                alt="Перевернутый график" 
+                className="max-w-full h-auto border border-gray-200 rounded"
+                style={{ maxHeight: '300px' }}
+              />
+            </div>
+            
+            <div className="flex space-x-2">
+              <a
+                href={chartImageURL}
+                download="rotated_chart.png"
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+              >
+                Скачать изображение
+              </a>
+              <button
+                onClick={() => {
+                  URL.revokeObjectURL(chartImageURL);
+                  setChartImageURL(null);
+                }}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
+              >
+                Удалить ссылку
+              </button>
+            </div>
           </div>
         </div>
       )}
