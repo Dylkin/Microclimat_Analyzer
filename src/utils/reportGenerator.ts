@@ -1,5 +1,5 @@
 import html2canvas from 'html2canvas';
-import Jimp from 'jimp';
+import * as Jimp from 'jimp';
 import { saveAs } from 'file-saver';
 import { createReport } from 'docx-templates';
 
