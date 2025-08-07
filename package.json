@@ -15,16 +15,11 @@
     "d3-selection": "^3.0.0",
     "d3-time-format": "^4.1.0",
     "d3-zoom": "^3.0.0",
-    "docx": "^9.5.1",
-    "docx-templates": "^4.14.1",
-    "file-saver": "^2.0.5",
-    "html2canvas": "^1.4.1",
     "lucide-react": "^0.532.0",
     "pizzip": "^3.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^3.1.0",
-    "sharp": "^0.34.3"
+    "recharts": "^3.1.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.5",

@@ -1,8 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, FileText } from 'lucide-react';
+import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
-import { ReportGeneratorModal } from './ReportGeneratorModal';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,7 +24,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // UI state
   const [showSettings, setShowSettings] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
-  const [showReportModal, setShowReportModal] = useState(false);
   
   // Chart dimensions
   const chartWidth = 1200;
@@ -245,13 +243,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <BarChart className="w-8 h-8 text-indigo-600" />
           <h1 className="text-2xl font-bold text-gray-900">Анализатор временных рядов</h1>
         </div>
-        <button
-          onClick={() => setShowReportModal(true)}
-          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-        >
-          <FileText className="w-4 h-4" />
-          <span>Генерация отчета</span>
-        </button>
       </div>
 
       {/* Settings Panel */}
@@ -411,14 +402,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
         </div>
       )}
-
-      {/* Report Generator Modal */}
-      <ReportGeneratorModal
-        isOpen={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        analysisResults={analysisResults}
-        chartElement={chartRef.current || undefined}
-      />
 
       {/* Analysis Results Table */}
       <div className="bg-white rounded-lg shadow p-6">
