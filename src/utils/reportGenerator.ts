@@ -110,8 +110,8 @@ export class ReportGenerator {
                 new ImageRun({
                   data: ReportGenerator.base64ToArrayBuffer(data.chartImageBase64),
                   transformation: {
-                    width: 937, // 33.13 см в пикселях (33.13 * 28.35 пикселей на см)
-                    height: 937, // Квадратное изображение для правильного отображения повернутого графика
+                    width: 600,
+                    height: 400,
                   },
                 }),
               ],
@@ -248,114 +248,6 @@ export class ReportGenerator {
     }
   }
 
-  /**
-   * Захват и сохранение графика как PNG файл с поворотом на 90 градусов против часовой стрелки
-   */
-  static async captureAndSaveChartImage(chartElement: HTMLElement, filename?: string): Promise<string> {
-    try {
-      // Захватываем график
-      const canvas = await html2canvas(chartElement, {
-        backgroundColor: '#ffffff',
-        scale: 2, // Увеличиваем разрешение
-        useCORS: true,
-        allowTaint: true,
-      });
-
-      // Создаем новый canvas для поворота
-      const rotatedCanvas = document.createElement('canvas');
-      const ctx = rotatedCanvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error('Не удалось получить контекст canvas');
-      }
-
-      // Меняем ширину и высоту местами
-      rotatedCanvas.width = canvas.height;
-      rotatedCanvas.height = canvas.width;
-
-      // Переносим точку вращения в центр
-      ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
-      // Поворачиваем на 90 градусов против часовой стрелки
-      ctx.rotate(-Math.PI / 2);
-      // Рисуем изображение с учетом исходных размеров
-      ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-
-      // Получаем data URL
-      const dataURL = rotatedCanvas.toDataURL('image/png');
-      
-      // Создаем blob из canvas
-      return new Promise((resolve) => {
-        rotatedCanvas.toBlob((blob) => {
-          if (!blob) {
-            throw new Error('Не удалось создать blob из canvas');
-          }
-          
-          // Создаем URL для blob
-          const url = URL.createObjectURL(blob);
-          
-          // Сохраняем файл
-          const defaultFilename = `chart_rotated_${new Date().toISOString().split('T')[0]}_${Date.now()}.png`;
-          ReportGenerator.saveFile(blob, filename || defaultFilename);
-          
-          // Возвращаем URL для дальнейшего использования
-          resolve(url);
-        }, 'image/png', 1.0);
-      });
-    } catch (error) {
-      console.error('Ошибка захвата и сохранения графика:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Захват графика и возврат blob URL без сохранения файла
-   */
-  static async captureChartAsBlobURL(chartElement: HTMLElement): Promise<string> {
-    try {
-      // Захватываем график
-      const canvas = await html2canvas(chartElement, {
-        backgroundColor: '#ffffff',
-        scale: 2, // Увеличиваем разрешение
-        useCORS: true,
-        allowTaint: true,
-      });
-
-      // Создаем новый canvas для поворота
-      const rotatedCanvas = document.createElement('canvas');
-      const ctx = rotatedCanvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error('Не удалось получить контекст canvas');
-      }
-
-      // Меняем ширину и высоту местами
-      rotatedCanvas.width = canvas.height;
-      rotatedCanvas.height = canvas.width;
-
-      // Переносим точку вращения в центр
-      ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
-      // Поворачиваем на 90 градусов против часовой стрелки
-      ctx.rotate(-Math.PI / 2);
-      // Рисуем изображение с учетом исходных размеров
-      ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-
-      // Создаем blob из canvas и возвращаем URL
-      return new Promise((resolve) => {
-        rotatedCanvas.toBlob((blob) => {
-          if (!blob) {
-            throw new Error('Не удалось создать blob из canvas');
-          }
-          
-          // Создаем и возвращаем URL для blob
-          const url = URL.createObjectURL(blob);
-          resolve(url);
-        }, 'image/png', 1.0);
-      });
-    } catch (error) {
-      console.error('Ошибка создания blob URL графика:', error);
-      throw error;
-    }
-  }
   /**
    * Преобразование base64 в ArrayBuffer
    */
