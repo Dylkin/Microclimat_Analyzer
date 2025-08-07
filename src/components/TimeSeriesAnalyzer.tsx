@@ -539,5 +539,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
         </div>
       </div>
+    </div>
   );
 };
