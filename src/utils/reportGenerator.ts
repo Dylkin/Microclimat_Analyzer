@@ -1,6 +1,21 @@
 import createReport from 'docx-templates';
 import { saveAs } from 'file-saver';
 
+// Полифилл для vm модуля в браузере
+if (typeof window !== 'undefined' && !window.vm) {
+  window.vm = {
+    Script: class {
+      constructor(code) {
+        this.code = code;
+      }
+      runInNewContext(context) {
+        const func = new Function(...Object.keys(context), `return ${this.code}`);
+        return func(...Object.values(context));
+      }
+    }
+  };
+}
+
 export interface ReportData {
   // Основная информация
   reportNo: string;
