@@ -174,30 +174,30 @@ export class ReportGenerator {
       // Подготавливаем данные для шаблона
       const templateData = {
         // Основная информация
-        'Report No.': reportData.reportNo,
-        'Report date': reportData.reportDate,
-        'name of the object': reportData.nameOfObject,
-        'name of the air conditioning system': reportData.nameOfAirConditioningSystem,
-        'name of the test': reportData.nameOfTest,
+        reportNo: reportData.reportNo,
+        reportDate: reportData.reportDate,
+        nameOfObject: reportData.nameOfObject,
+        nameOfAirConditioningSystem: reportData.nameOfAirConditioningSystem,
+        nameOfTest: reportData.nameOfTest,
         
         // Временные данные
-        'Date time of test start': reportData.dateTimeOfTestStart,
-        'Date time of test completion': reportData.dateTimeOfTestCompletion,
-        'Duration of the test': reportData.durationOfTest,
+        dateTimeOfTestStart: reportData.dateTimeOfTestStart,
+        dateTimeOfTestCompletion: reportData.dateTimeOfTestCompletion,
+        durationOfTest: reportData.durationOfTest,
         
         // Критерии и результаты
-        'acceptance criteria': reportData.acceptanceCriteria,
-        'Results table': reportData.resultsTable,
-        'Result': reportData.result,
+        acceptanceCriteria: reportData.acceptanceCriteria,
+        resultsTable: reportData.resultsTable,
+        result: reportData.result,
         
         // Исполнители
-        'executor': reportData.executor,
-        'director': reportData.director,
-        'test date': reportData.testDate,
+        executor: reportData.executor,
+        director: reportData.director,
+        testDate: reportData.testDate,
         
         // График (если есть)
         ...(chartImageBuffer && {
-          'chart': {
+          chart: {
             width: 15, // ширина в см (после поворота)
             height: 10, // высота в см (после поворота)
             data: chartImageBuffer,
@@ -296,26 +296,26 @@ export class ReportGenerator {
   static getAvailablePlaceholders(): { [category: string]: string[] } {
     return {
       'Основная информация': [
-        '{Report No.} - Номер отчета',
-        '{Report date} - Дата отчета',
-        '{name of the object} - Название объекта исследования',
-        '{name of the air conditioning system} - Название климатической установки',
-        '{name of the test} - Вид испытания'
+        '{reportNo} - Номер отчета',
+        '{reportDate} - Дата отчета',
+        '{nameOfObject} - Название объекта исследования',
+        '{nameOfAirConditioningSystem} - Название климатической установки',
+        '{nameOfTest} - Вид испытания'
       ],
       'Временные данные': [
-        '{Date time of test start} - Дата и время начала испытания',
-        '{Date time of test completion} - Дата и время завершения испытания',
-        '{Duration of the test} - Длительность испытания'
+        '{dateTimeOfTestStart} - Дата и время начала испытания',
+        '{dateTimeOfTestCompletion} - Дата и время завершения испытания',
+        '{durationOfTest} - Длительность испытания'
       ],
       'Критерии и результаты': [
-        '{acceptance criteria} - Критерии приемки',
-        '{Results table} - Таблица результатов',
-        '{Result} - Выводы и заключение'
+        '{acceptanceCriteria} - Критерии приемки',
+        '{resultsTable} - Таблица результатов',
+        '{result} - Выводы и заключение'
       ],
       'Исполнители': [
         '{executor} - Исполнитель',
         '{director} - Руководитель',
-        '{test date} - Дата проведения испытания'
+        '{testDate} - Дата проведения испытания'
       ],
       'График': [
         '{chart} - Место для вставки повернутого графика'
