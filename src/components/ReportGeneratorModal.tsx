@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, FileText, Download, Upload, AlertCircle, Image } from 'lucide-react';
+import { X, FileText, Download, Upload, AlertCircle } from 'lucide-react';
 import { ReportGenerator, ReportData } from '../utils/reportGenerator';
 
 interface ReportGeneratorModalProps {
@@ -37,7 +37,6 @@ export const ReportGeneratorModal: React.FC<ReportGeneratorModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isSavingImage, setIsSavingImage] = useState(false);
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -98,25 +97,6 @@ export const ReportGeneratorModal: React.FC<ReportGeneratorModalProps> = ({
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка при генерации отчета');
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  const handleSaveChartImage = async () => {
-    if (!chartElement) {
-      setError('График недоступен для сохранения');
-      return;
-    }
-
-    setIsSavingImage(true);
-    setError(null);
-
-    try {
-      await ReportGenerator.saveRotatedChartImage(chartElement, formData.title);
-    } catch (error) {
-      console.error('Ошибка сохранения изображения:', error);
-      setError(error instanceof Error ? error.message : 'Неизвестная ошибка при сохранении изображения');
-    } finally {
-      setIsSavingImage(false);
     }
   };
 
@@ -218,33 +198,14 @@ export const ReportGeneratorModal: React.FC<ReportGeneratorModalProps> = ({
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button
               onClick={onClose}
-              disabled={isGenerating || isSavingImage}
+              disabled={isGenerating}
               className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50"
             >
               Отмена
             </button>
-            {chartElement && (
-              <button
-                onClick={handleSaveChartImage}
-                disabled={isSavingImage || isGenerating}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSavingImage ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Сохранение...</span>
-                  </>
-                ) : (
-                  <>
-                    <Image className="w-4 h-4" />
-                    <span>Сохранить график</span>
-                  </>
-                )}
-              </button>
-            )}
             <button
               onClick={handleGenerateReport}
-              disabled={isGenerating || isSavingImage}
+              disabled={isGenerating}
               className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isGenerating ? (
