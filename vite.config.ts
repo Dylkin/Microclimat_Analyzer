@@ -9,15 +9,12 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
-      'chart.js',
-      'react-chartjs-2',
-      'html-to-image',
-      'file-saver',
-      'zod',
-      'react-hook-form',
-      '@hookform/resolvers/zod',
-      'chartjs-adapter-date-fns',
-      'docx-templates'
+      'd3-array',
+      'd3-scale',
+      'd3-scale-chromatic',
+      'd3-selection',
+      'd3-time-format',
+      'd3-zoom'
     ],
   },
   server: {
