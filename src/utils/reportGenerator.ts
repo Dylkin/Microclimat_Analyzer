@@ -1314,7 +1314,7 @@ export class ReportGenerator {
       let relsXml = await relsFile.async('text');
       
       // Проверяем, есть ли уже связь с изображением графика
-      if (!relsXml.includes('Target="media/chart.png"')) {
+      if (!relsXml.includes('Id="rIdChart"')) {
         // Находим максимальный ID для создания уникального ID для изображения
         const existingIds = relsXml.match(/Id="rId(\d+)"/g) || [];
         let maxId = 0;
@@ -1325,7 +1325,7 @@ export class ReportGenerator {
         const newId = `rId${maxId + 1}`;
         
         // Добавляем новую связь для изображения перед закрывающим тегом
-        const newRelationship = `  <Relationship Id="${newId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>`;
+        const newRelationship = '\n  <Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/chart.png"/>';
         relsXml = relsXml.replace(
           '</Relationships>',
           `${newRelationship}\n</Relationships>`
