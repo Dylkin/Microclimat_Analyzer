@@ -17,8 +17,8 @@
     "d3-zoom": "^3.0.0",
     "docx": "^9.5.1",
     "docx-templates": "^4.14.1",
-    "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
+    "jimp": "^1.6.0",
     "lucide-react": "^0.532.0",
     "pizzip": "^3.2.0",
     "react": "^18.3.1",
@@ -27,7 +27,6 @@
     "sharp": "^0.34.3"
   },
   "devDependencies": {
-    "@types/file-saver": "^2.0.7",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
