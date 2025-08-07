@@ -1,12 +1,12 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download } from 'lucide-react';
+import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
-import { saveAs } from 'file-saver';
+import { DocxReportGenerator, ReportData } from '../utils/docxGenerator';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -26,6 +26,17 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // UI state
   const [showSettings, setShowSettings] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
+  const [reportStatus, setReportStatus] = useState<{
+    isGenerating: boolean;
+    hasReport: boolean;
+    reportUrl: string | null;
+    reportFilename: string | null;
+  }>({
+    isGenerating: false,
+    hasReport: false,
+    reportUrl: null,
+    reportFilename: null
+  });
   
   // Chart dimensions
   const chartWidth = 1200;
@@ -184,15 +195,17 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setZoomState(undefined);
   };
 
-  const handleSaveChart = async () => {
+  const handleGenerateReport = async () => {
     if (!chartRef.current) {
       alert('График не найден для сохранения');
       return;
     }
 
+    setReportStatus(prev => ({ ...prev, isGenerating: true }));
+
     try {
       // Временно скрываем кнопку сохранения
-      const saveButton = chartRef.current.querySelector('button[title="Сохранить график как PNG"]') as HTMLElement;
+      const saveButton = chartRef.current.querySelector('button[title="Сформировать отчет с графиком"]') as HTMLElement;
       const originalDisplay = saveButton ? saveButton.style.display : '';
       if (saveButton) {
         saveButton.style.display = 'none';
@@ -222,8 +235,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const ctx = rotatedCanvas.getContext('2d');
       
       if (!ctx) {
-        alert('Ошибка создания контекста для поворота изображения');
-        return;
+        throw new Error('Ошибка создания контекста для поворота изображения');
       }
 
       // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
@@ -238,32 +250,85 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       ctx.drawImage(canvas, 0, 0);
 
       // Конвертируем повернутый canvas в blob
-      rotatedCanvas.toBlob((blob) => {
-        if (blob) {
-          // Генерируем имя файла с текущей датой и типом данных
-          const now = new Date();
-          const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
-          const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '-'); // HH-MM-SS
-          const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
-          const fileName = `график_${dataTypeLabel}_${dateStr}_${timeStr}.png`;
-          
-          // Сохраняем файл
-          saveAs(blob, fileName);
-        } else {
-          alert('Ошибка создания повернутого изображения');
-        }
-      }, 'image/png', 1.0);
+      const chartBlob = await new Promise<Blob>((resolve, reject) => {
+        rotatedCanvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Ошибка создания изображения графика'));
+          }
+        }, 'image/png', 1.0);
+      });
+
+      // Генерируем данные для отчета
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('ru-RU');
+      const timeStr = now.toLocaleTimeString('ru-RU');
+      const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
+      
+      const reportData: ReportData = {
+        title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
+        date: `${dateStr} ${timeStr}`,
+        dataType,
+        chartImageBlob: chartBlob,
+        analysisResults
+      };
+
+      // Генерируем DOCX отчет
+      const docxGenerator = DocxReportGenerator.getInstance();
+      const docxBlob = await docxGenerator.generateReport(reportData);
+
+      // Создаем URL для скачивания
+      const reportUrl = URL.createObjectURL(docxBlob);
+      const reportFilename = `отчет_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
+
+      // Обновляем состояние
+      setReportStatus({
+        isGenerating: false,
+        hasReport: true,
+        reportUrl,
+        reportFilename
+      });
       
     } catch (error) {
       console.error('Ошибка сохранения графика:', error);
       alert('Ошибка при сохранении графика');
+      setReportStatus(prev => ({ ...prev, isGenerating: false }));
     } finally {
       // Убеждаемся, что кнопка восстановлена в случае ошибки
-      const saveButton = chartRef.current?.querySelector('button[title="Сохранить график как PNG"]') as HTMLElement;
+      const saveButton = chartRef.current?.querySelector('button[title="Сформировать отчет с графиком"]') as HTMLElement;
       if (saveButton && saveButton.style.display === 'none') {
         saveButton.style.display = '';
       }
     }
+  };
+
+  const handleDownloadReport = () => {
+    if (reportStatus.reportUrl && reportStatus.reportFilename) {
+      const link = document.createElement('a');
+      link.href = reportStatus.reportUrl;
+      link.download = reportStatus.reportFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleDeleteReport = () => {
+    if (reportStatus.reportUrl) {
+      URL.revokeObjectURL(reportStatus.reportUrl);
+    }
+    
+    // Очищаем документ в генераторе
+    const docxGenerator = DocxReportGenerator.getInstance();
+    docxGenerator.clearDocument();
+    
+    setReportStatus({
+      isGenerating: false,
+      hasReport: false,
+      reportUrl: null,
+      reportFilename: null
+    });
   };
 
   if (loading) {
@@ -489,15 +554,46 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       {/* Кнопка формирования отчета */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center space-y-4">
           <button
-            onClick={handleSaveChart}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium"
+            onClick={handleGenerateReport}
+            disabled={reportStatus.isGenerating}
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
             title="Сформировать отчет с графиком"
           >
-            <Download className="w-5 h-5" />
-            <span>Сформировать отчет</span>
+            {reportStatus.isGenerating ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span>Формирование отчета...</span>
+              </>
+            ) : (
+              <>
+                <FileText className="w-5 h-5" />
+                <span>{reportStatus.hasReport ? 'Обновить отчет' : 'Сформировать отчет'}</span>
+              </>
+            )}
           </button>
+          
+          {/* Ссылка для скачивания и кнопка удаления */}
+          {reportStatus.hasReport && reportStatus.reportUrl && (
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={handleDownloadReport}
+                className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Скачать отчет ({reportStatus.reportFilename})</span>
+              </button>
+              
+              <button
+                onClick={handleDeleteReport}
+                className="text-red-600 hover:text-red-800 transition-colors"
+                title="Удалить отчет"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
