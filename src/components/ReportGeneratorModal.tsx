@@ -250,6 +250,13 @@ export const ReportGeneratorModal: React.FC<ReportGeneratorModalProps> = ({
               <li>• Метаданные: период, место, ответственный, дата генерации</li>
               {templateFile && <li>• Использование пользовательского DOCX шаблона</li>}
             </ul>
+            <div className="mt-3 p-3 bg-blue-100 rounded-lg">
+              <p className="text-xs text-blue-700">
+                <strong>Плейсхолдер для графика:</strong> В DOCX шаблоне используйте {'{chart}'} в том месте, 
+                где должен быть вставлен график. График будет автоматически повернут на 90° против часовой стрелки 
+                с сохранением исходных размеров и пропорций.
+              </p>
+            </div>
           </div>
         </div>
 

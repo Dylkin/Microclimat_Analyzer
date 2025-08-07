@@ -15,19 +15,28 @@ export interface ReportData {
 export class ReportGenerator {
   /**
    * Захват графика и поворот на 90 градусов против часовой стрелки
+   * с сохранением исходных размеров и пропорций
    */
   private async captureAndRotateChart(chartElement: HTMLElement): Promise<Buffer> {
     try {
       console.log('Захватываем график...');
       
-      // Захватываем график с высоким качеством
+      // Получаем исходные размеры элемента
+      const originalWidth = chartElement.offsetWidth;
+      const originalHeight = chartElement.offsetHeight;
+      
+      console.log(`Исходные размеры графика: ${originalWidth}x${originalHeight}`);
+      
+      // Захватываем график с высоким качеством, сохраняя исходные размеры
       const canvas = await html2canvas(chartElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
-        width: chartElement.offsetWidth,
-        height: chartElement.offsetHeight
+        width: originalWidth,
+        height: originalHeight,
+        windowWidth: originalWidth,
+        windowHeight: originalHeight
       });
 
       // Конвертируем canvas в blob
@@ -43,13 +52,17 @@ export class ReportGenerator {
 
       console.log('Поворачиваем изображение на 90° против часовой стрелки...');
       
-      // Используем Jimp для поворота изображения
+      // Используем Jimp для поворота изображения с сохранением размеров
       const image = await Jimp.read(buffer);
-      const rotatedImage = image.rotate(-90); // -90 градусов = против часовой стрелки
+      
+      // Поворачиваем на -90 градусов (против часовой стрелки)
+      // При повороте Jimp автоматически изменяет размеры canvas под повернутое изображение
+      const rotatedImage = image.rotate(-90);
       
       // Получаем buffer повернутого изображения
       const rotatedBuffer = await rotatedImage.getBufferAsync(Jimp.MIME_PNG);
       
+      console.log(`Размеры после поворота: ${rotatedImage.getWidth()}x${rotatedImage.getHeight()}`);
       console.log('График успешно повернут');
       return rotatedBuffer;
 
@@ -87,10 +100,10 @@ export class ReportGenerator {
         generatedDate: new Date().toLocaleDateString('ru-RU'),
         generatedTime: new Date().toLocaleTimeString('ru-RU'),
         analysisResults: reportData.analysisResults,
-        // Добавляем график как изображение
+        // Добавляем график как изображение для плейсхолдера {chart}
         chart: chartImage ? {
-          width: 15, // ширина в см
-          height: 10, // высота в см
+          width: 15, // ширина в см для документа
+          height: 10, // высота в см для документа
           data: chartImage,
           extension: '.png'
         } : null
