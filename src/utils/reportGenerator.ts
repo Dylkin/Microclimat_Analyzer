@@ -109,7 +109,7 @@ export class ReportGenerator {
 
       // Создаем документ из шаблона
       const report = await createReport({
-        template: templateBuffer,
+        template: new Uint8Array(templateBuffer),
         data: templateData,
         additionalJsContext: {
           // Дополнительные функции для шаблона
@@ -170,8 +170,16 @@ export class ReportGenerator {
    * Генерация HTML содержимого отчета
    */
   private generateHTMLReport(reportData: ReportData, chartImage?: Uint8Array): string {
-    const chartImageSrc = chartImage ? 
-      `data:image/png;base64,${btoa(String.fromCharCode(...chartImage))}` : '';
+    let chartImageSrc = '';
+    if (chartImage) {
+      // Преобразуем Uint8Array в base64 строку
+      let binary = '';
+      const len = chartImage.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(chartImage[i]);
+      }
+      chartImageSrc = `data:image/png;base64,${btoa(binary)}`;
+    }
 
     return `
 <!DOCTYPE html>
