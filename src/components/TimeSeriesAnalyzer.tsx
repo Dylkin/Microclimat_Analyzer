@@ -1,11 +1,10 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, FileText, Upload, Download } from 'lucide-react';
+import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
-import { ReportGenerator, ReportData } from '../utils/reportGenerator';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -25,12 +24,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // UI state
   const [showSettings, setShowSettings] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
-  const [showReportSection, setShowReportSection] = useState(false);
-  const [templateFile, setTemplateFile] = useState<File | null>(null);
-  const [reportData, setReportData] = useState<Partial<ReportData>>({});
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const chartRef = useRef<HTMLDivElement>(null);
-  const templateInputRef = useRef<HTMLInputElement>(null);
   
   // Chart dimensions
   const chartWidth = 1200;
@@ -186,107 +179,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setZoomState(undefined);
   };
 
-  // Обработчики для генерации отчета
-  const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && file.name.toLowerCase().endsWith('.docx')) {
-      setTemplateFile(file);
-    } else {
-      alert('Пожалуйста, выберите файл в формате .docx');
-    }
-  };
-
-  const handleReportDataChange = (field: keyof ReportData, value: string) => {
-    setReportData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const captureChartAsImage = (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (!chartRef.current) {
-        reject(new Error('График не найден'));
-        return;
-      }
-
-      const svgElement = chartRef.current.querySelector('svg');
-      if (!svgElement) {
-        reject(new Error('SVG элемент не найден'));
-        return;
-      }
-
-      // Клонируем SVG для обработки
-      const svgClone = svgElement.cloneNode(true) as SVGElement;
-      
-      // Создаем canvas
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        reject(new Error('Не удалось создать контекст canvas'));
-        return;
-      }
-
-      // Устанавливаем размеры canvas
-      const rect = svgElement.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-
-      // Конвертируем SVG в строку
-      const svgString = new XMLSerializer().serializeToString(svgClone);
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
-
-      const img = new Image();
-      img.onload = () => {
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/png'));
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error('Ошибка загрузки изображения'));
-      };
-      img.src = url;
-    });
-  };
-
-  const handleGenerateReport = async () => {
-    if (!templateFile) {
-      alert('Пожалуйста, загрузите шаблон отчета');
-      return;
-    }
-
-    setIsGeneratingReport(true);
-    
-    try {
-      // Захватываем изображение графика
-      const chartImageData = await captureChartAsImage();
-      
-      // Создаем генератор отчета
-      const reportGenerator = new ReportGenerator();
-      
-      // Генерируем отчет
-      await reportGenerator.generateReport(
-        templateFile,
-        reportData,
-        analysisResults,
-        chartImageData
-      );
-      
-      alert('Отчет успешно сгенерирован и сохранен!');
-      
-    } catch (error) {
-      console.error('Ошибка генерации отчета:', error);
-      alert(`Ошибка генерации отчета: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setIsGeneratingReport(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -431,7 +323,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       </div>
 
       {/* Chart */}
-      <div ref={chartRef} className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-lg shadow p-6">
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-gray-900">
             График {dataType === 'temperature' ? 'температуры' : 'влажности'}
@@ -507,149 +399,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
         </div>
       )}
-
-      {/* Генерация отчета */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <FileText className="w-6 h-6 text-purple-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Генерация отчета</h3>
-          </div>
-          <button
-            onClick={() => setShowReportSection(!showReportSection)}
-            className="text-purple-600 hover:text-purple-800 transition-colors"
-          >
-            {showReportSection ? 'Скрыть' : 'Показать'}
-          </button>
-        </div>
-
-        {showReportSection && (
-          <div className="space-y-6">
-            {/* Загрузка шаблона */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Шаблон отчета (DOCX)
-              </label>
-              <div className="flex items-center space-x-3">
-                <input
-                  ref={templateInputRef}
-                  type="file"
-                  accept=".docx"
-                  onChange={handleTemplateUpload}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => templateInputRef.current?.click()}
-                  className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>Выбрать шаблон</span>
-                </button>
-                {templateFile && (
-                  <span className="text-sm text-gray-600">
-                    Выбран: {templateFile.name}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Поля для заполнения отчета */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Номер отчета
-                </label>
-                <input
-                  type="text"
-                  value={reportData['Report No.'] || ''}
-                  onChange={(e) => handleReportDataChange('Report No.', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Введите номер отчета"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Название объекта
-                </label>
-                <input
-                  type="text"
-                  value={reportData['name of the object'] || ''}
-                  onChange={(e) => handleReportDataChange('name of the object', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Введите название объекта"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Климатическая установка
-                </label>
-                <input
-                  type="text"
-                  value={reportData['name of the air conditioning system'] || ''}
-                  onChange={(e) => handleReportDataChange('name of the air conditioning system', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Введите название системы"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Исполнитель
-                </label>
-                <input
-                  type="text"
-                  value={reportData['executor'] || ''}
-                  onChange={(e) => handleReportDataChange('executor', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Введите ФИО исполнителя"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Руководитель
-                </label>
-                <input
-                  type="text"
-                  value={reportData['director'] || ''}
-                  onChange={(e) => handleReportDataChange('director', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Введите ФИО руководителя"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Критерии приемки
-                </label>
-                <input
-                  type="text"
-                  value={reportData['acceptance criteria'] || ''}
-                  onChange={(e) => handleReportDataChange('acceptance criteria', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Введите критерии приемки"
-                />
-              </div>
-            </div>
-
-            {/* Кнопка генерации */}
-            <div className="flex justify-end">
-              <button
-                onClick={handleGenerateReport}
-                disabled={!templateFile || isGeneratingReport}
-                className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                <Download className="w-4 h-4" />
-                <span>
-                  {isGeneratingReport ? 'Генерация...' : 'Сгенерировать отчет'}
-                </span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Analysis Results */}
       <div className="bg-white rounded-lg shadow p-6">
