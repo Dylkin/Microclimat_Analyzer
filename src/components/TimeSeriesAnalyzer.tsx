@@ -1,10 +1,12 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets } from 'lucide-react';
+import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
+import html2canvas from 'html2canvas';
+import { saveAs } from 'file-saver';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -182,6 +184,50 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setZoomState(undefined);
   };
 
+  const handleSaveChart = async () => {
+    if (!chartRef.current) {
+      alert('График не найден для сохранения');
+      return;
+    }
+
+    try {
+      // Находим контейнер с графиком и легендой
+      const chartContainer = chartRef.current;
+      
+      // Создаем скриншот с высоким качеством
+      const canvas = await html2canvas(chartContainer, {
+        scale: 2, // Увеличиваем разрешение для лучшего качества
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        width: chartContainer.offsetWidth,
+        height: chartContainer.offsetHeight
+      });
+
+      // Конвертируем canvas в blob
+      canvas.toBlob((blob) => {
+        if (blob) {
+          // Генерируем имя файла с текущей датой и типом данных
+          const now = new Date();
+          const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+          const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '-'); // HH-MM-SS
+          const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
+          const fileName = `график_${dataTypeLabel}_${dateStr}_${timeStr}.png`;
+          
+          // Сохраняем файл
+          saveAs(blob, fileName);
+        } else {
+          alert('Ошибка создания изображения');
+        }
+      }, 'image/png', 1.0);
+      
+    } catch (error) {
+      console.error('Ошибка сохранения графика:', error);
+      alert('Ошибка при сохранении графика');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -328,9 +374,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       {/* Chart */}
       <div ref={chartRef} className="bg-white rounded-lg shadow p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">
-            График {dataType === 'temperature' ? 'температуры' : 'влажности'}
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">
+              График {dataType === 'temperature' ? 'температуры' : 'влажности'}
+            </h3>
+            <button
+              onClick={handleSaveChart}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+              title="Сохранить график как PNG"
+            >
+              <Download className="w-4 h-4" />
+              <span>Сохранить график</span>
+            </button>
+          </div>
         </div>
         
         <TimeSeriesChart
