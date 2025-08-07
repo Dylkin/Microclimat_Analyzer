@@ -229,17 +229,17 @@ export class ReportGenerator {
         throw new Error('Не удалось получить контекст canvas');
       }
 
-      // При повороте на 90° ширина и высота меняются местами
-      rotatedCanvas.width = canvas.height;
-      rotatedCanvas.height = canvas.width;
+      // Сохраняем исходные размеры canvas (не меняем местами!)
+      rotatedCanvas.width = canvas.width;
+      rotatedCanvas.height = canvas.height;
 
-      // Перемещаем точку поворота в центр нового canvas
-      ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
+      // Перемещаем точку поворота в центр canvas
+      ctx.translate(canvas.width / 2, canvas.height / 2);
       
       // Поворачиваем на 90 градусов против часовой стрелки
       ctx.rotate(-Math.PI / 2);
       
-      // Рисуем исходное изображение с центрированием
+      // Рисуем изображение относительно центра (смещаем на половину размеров)
       ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
 
       // Возвращаем base64 строку
