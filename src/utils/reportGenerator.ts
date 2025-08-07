@@ -251,6 +251,20 @@ export class ReportGenerator {
 
     } catch (error) {
       console.error('Ошибка генерации отчета:', error);
+      
+      // Проверяем, является ли это ошибкой синтаксиса плейсхолдера
+      if (error instanceof Error && error.message.includes('SyntaxError: Unexpected token')) {
+        const match = error.message.match(/Error executing command '([^']+)'/);
+        const invalidPlaceholder = match ? match[1] : 'неизвестный плейсхолдер';
+        
+        throw new Error(
+          `Ошибка в шаблоне: плейсхолдер "{${invalidPlaceholder}}" содержит недопустимые символы.\n\n` +
+          `Плейсхолдеры должны использовать camelCase без пробелов и специальных символов.\n` +
+          `Например: "{nameOfObject}" вместо "{name of the object}".\n\n` +
+          `Откройте ваш DOCX шаблон и исправьте все плейсхолдеры согласно документации.`
+        );
+      }
+      
       throw new Error(`Не удалось сгенерировать отчет: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   }
