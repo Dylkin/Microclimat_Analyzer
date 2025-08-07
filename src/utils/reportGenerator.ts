@@ -110,8 +110,16 @@ export class ReportGenerator {
                 new ImageRun({
                   data: ReportGenerator.base64ToArrayBuffer(data.chartImageBase64),
                   transformation: {
-                    width: 600,
-                    height: 400,
+                    width: 800,  // Увеличиваем ширину для лучшего качества
+                    height: 533, // Пропорциональная высота (800 * 2/3)
+                  },
+                  floating: {
+                    horizontalPosition: {
+                      align: AlignmentType.CENTER,
+                    },
+                    verticalPosition: {
+                      align: AlignmentType.CENTER,
+                    },
                   },
                 }),
               ],
@@ -227,6 +235,10 @@ export class ReportGenerator {
         scale: 2, // Увеличиваем разрешение
         useCORS: true,
         allowTaint: true,
+        width: chartElement.offsetWidth,
+        height: chartElement.offsetHeight,
+        windowWidth: chartElement.offsetWidth,
+        windowHeight: chartElement.offsetHeight
       });
 
       // Восстанавливаем исходный transform
