@@ -191,7 +191,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
 
     try {
-      // Находим контейнер с графиком и легендой
+      // Временно скрываем кнопку сохранения
+      const saveButton = chartRef.current.querySelector('button[title="Сохранить график как PNG"]') as HTMLElement;
+      const originalDisplay = saveButton ? saveButton.style.display : '';
+      if (saveButton) {
+        saveButton.style.display = 'none';
+      }
+
+      // Находим контейнер с графиком и легендой (исключая кнопку)
       const chartContainer = chartRef.current;
       
       // Создаем скриншот с высоким качеством
@@ -205,8 +212,33 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         height: chartContainer.offsetHeight
       });
 
-      // Конвертируем canvas в blob
-      canvas.toBlob((blob) => {
+      // Восстанавливаем отображение кнопки
+      if (saveButton) {
+        saveButton.style.display = originalDisplay;
+      }
+
+      // Создаем новый canvas для поворота изображения на 90° против часовой стрелки
+      const rotatedCanvas = document.createElement('canvas');
+      const ctx = rotatedCanvas.getContext('2d');
+      
+      if (!ctx) {
+        alert('Ошибка создания контекста для поворота изображения');
+        return;
+      }
+
+      // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
+      rotatedCanvas.width = canvas.height;
+      rotatedCanvas.height = canvas.width;
+
+      // Поворачиваем контекст на 90° против часовой стрелки
+      ctx.translate(0, canvas.width);
+      ctx.rotate(-Math.PI / 2);
+
+      // Рисуем исходное изображение на повернутом canvas
+      ctx.drawImage(canvas, 0, 0);
+
+      // Конвертируем повернутый canvas в blob
+      rotatedCanvas.toBlob((blob) => {
         if (blob) {
           // Генерируем имя файла с текущей датой и типом данных
           const now = new Date();
@@ -218,13 +250,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           // Сохраняем файл
           saveAs(blob, fileName);
         } else {
-          alert('Ошибка создания изображения');
+          alert('Ошибка создания повернутого изображения');
         }
       }, 'image/png', 1.0);
       
     } catch (error) {
       console.error('Ошибка сохранения графика:', error);
       alert('Ошибка при сохранении графика');
+    } finally {
+      // Убеждаемся, что кнопка восстановлена в случае ошибки
+      const saveButton = chartRef.current?.querySelector('button[title="Сохранить график как PNG"]') as HTMLElement;
+      if (saveButton && saveButton.style.display === 'none') {
+        saveButton.style.display = '';
+      }
     }
   };
 
