@@ -1,5 +1,4 @@
 import html2canvas from 'html2canvas';
-import * as Jimp from 'jimp';
 import { saveAs } from 'file-saver';
 import { createReport } from 'docx-templates';
 
@@ -16,7 +15,7 @@ export class ReportGenerator {
   /**
    * Захват графика и поворот на 90 градусов против часовой стрелки
    */
-  private async captureAndRotateChart(chartElement: HTMLElement): Promise<Buffer> {
+  private async captureAndRotateChart(chartElement: HTMLElement): Promise<Uint8Array> {
     try {
       console.log('Захватываем график...');
       
@@ -30,28 +29,38 @@ export class ReportGenerator {
         height: chartElement.offsetHeight
       });
 
-      // Конвертируем canvas в blob
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => {
+      console.log('Поворачиваем изображение на 90° против часовой стрелки...');
+      
+      // Создаем новый canvas для повернутого изображения
+      const rotatedCanvas = document.createElement('canvas');
+      const ctx = rotatedCanvas.getContext('2d')!;
+      
+      // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
+      rotatedCanvas.width = canvas.height;
+      rotatedCanvas.height = canvas.width;
+      
+      // Перемещаем точку отсчета в центр canvas
+      ctx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
+      
+      // Поворачиваем на -90 градусов (против часовой стрелки)
+      ctx.rotate(-Math.PI / 2);
+      
+      // Рисуем исходное изображение с учетом поворота
+      ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+      
+      // Конвертируем повернутый canvas в blob
+      const rotatedBlob = await new Promise<Blob>((resolve) => {
+        rotatedCanvas.toBlob((blob) => {
           resolve(blob!);
         }, 'image/png');
       });
-
-      // Конвертируем blob в buffer
-      const arrayBuffer = await blob.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      console.log('Поворачиваем изображение на 90° против часовой стрелки...');
       
-      // Используем Jimp для поворота изображения
-      const image = await Jimp.read(buffer);
-      const rotatedImage = image.rotate(-90); // -90 градусов = против часовой стрелки
-      
-      // Получаем buffer повернутого изображения
-      const rotatedBuffer = await rotatedImage.getBufferAsync(Jimp.MIME_PNG);
+      // Конвертируем blob в Uint8Array (браузерная альтернатива Buffer)
+      const arrayBuffer = await rotatedBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
       
       console.log('График успешно повернут');
-      return rotatedBuffer;
+      return uint8Array;
 
     } catch (error) {
       console.error('Ошибка при захвате и повороте графика:', error);
@@ -73,7 +82,7 @@ export class ReportGenerator {
       const templateBuffer = await templateFile.arrayBuffer();
       
       // Захватываем и поворачиваем график если он есть
-      let chartImage: Buffer | undefined;
+      let chartImage: Uint8Array | undefined;
       if (reportData.chartElement) {
         chartImage = await this.captureAndRotateChart(reportData.chartElement);
       }
@@ -135,7 +144,7 @@ export class ReportGenerator {
       console.log('Генерируем простой отчет...');
 
       // Захватываем график если есть
-      let chartImage: Buffer | undefined;
+      let chartImage: Uint8Array | undefined;
       if (reportData.chartElement) {
         chartImage = await this.captureAndRotateChart(reportData.chartElement);
       }
@@ -160,9 +169,9 @@ export class ReportGenerator {
   /**
    * Генерация HTML содержимого отчета
    */
-  private generateHTMLReport(reportData: ReportData, chartImage?: Buffer): string {
+  private generateHTMLReport(reportData: ReportData, chartImage?: Uint8Array): string {
     const chartImageSrc = chartImage ? 
-      `data:image/png;base64,${chartImage.toString('base64')}` : '';
+      `data:image/png;base64,${btoa(String.fromCharCode(...chartImage))}` : '';
 
     return `
 <!DOCTYPE html>
