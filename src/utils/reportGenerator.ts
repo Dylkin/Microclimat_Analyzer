@@ -110,8 +110,8 @@ export class ReportGenerator {
                 new ImageRun({
                   data: ReportGenerator.base64ToArrayBuffer(data.chartImageBase64),
                   transformation: {
-                    width: 600,
-                    height: 400,
+                    width: 937, // 33.13 см в пикселях (33.13 * 28.35 пикселей на см)
+                    height: 937, // Квадратное изображение для правильного отображения повернутого графика
                   },
                 }),
               ],
