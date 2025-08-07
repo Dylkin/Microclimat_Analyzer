@@ -53,6 +53,7 @@ export class ReportGenerator {
         literalXmlDelimiter: ['{{', '}}'],
         processLineBreaks: true,
         noSandBox: true,
+        runJs: false, // Отключаем выполнение JavaScript
       });
 
       console.log('Отчет сгенерирован, размер:', reportBuffer.byteLength, 'байт');
