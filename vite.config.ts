@@ -16,7 +16,7 @@ export default defineConfig({
       path: 'path-browserify',
       util: 'util',
       events: 'events',
-      vm: false, // Отключаем vm модуль
+      vm: 'src/utils/vm-stub.js', // Заглушка для vm модуля
     },
   },
   optimizeDeps: {
