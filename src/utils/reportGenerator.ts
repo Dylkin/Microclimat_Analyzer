@@ -62,7 +62,8 @@ export class ReportGenerator {
         data: templateData,
         cmdDelimiter: ['{', '}'],
         processLineBreaks: true,
-        failFast: false
+        failFast: false,
+        runJs: false
       });
       
       // Сохраняем файл
