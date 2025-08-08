@@ -95,9 +95,6 @@ export class TemplateReportGenerator {
       // Заполняем шаблон данными
       doc.setData(templateData);
 
-      // Добавляем изображение в document.xml после обработки шаблона
-      await this.insertImageIntoDocument(zip, chartImageBuffer);
-
       try {
         // Рендерим документ
         doc.render();
@@ -115,6 +112,9 @@ export class TemplateReportGenerator {
         
         throw error;
       }
+
+      // ВАЖНО: Добавляем изображение в document.xml ПОСЛЕ рендеринга шаблона
+      await this.insertImageIntoDocument(zip, chartImageBuffer);
 
       // Генерируем новый DOCX файл
       const output = doc.getZip().generate({
@@ -147,18 +147,46 @@ export class TemplateReportGenerator {
         return;
       }
 
-      // Создаем XML для изображения
-      const imageXml = this.createImageXml('rId1'); // Используем rId1 для простоты
+      console.log('Размер document.xml:', documentXml.length);
       
-      // Ищем место для вставки изображения (например, после первого параграфа или в конце body)
-      let updatedXml = documentXml;
+      // Находим максимальный rId в relationships для использования правильного ID
+      let relationshipId = 'rId10'; // По умолчанию используем rId10
       
-      // Вариант 1: Вставляем после тега {chart} если он есть
-      if (updatedXml.includes('{chart}')) {
-        updatedXml = updatedXml.replace('{chart}', imageXml);
+      try {
+        const relsXml = zip.file('word/_rels/document.xml.rels').asText();
+        const rIdMatches = relsXml.match(/rId(\d+)/g) || [];
+        if (rIdMatches.length > 0) {
+          const maxRId = Math.max(...rIdMatches.map(id => parseInt(id.replace('rId', ''))));
+          relationshipId = `rId${maxRId}`;
+          console.log('Используем relationship ID:', relationshipId);
+        }
+      } catch (error) {
+        console.warn('Не удалось определить relationship ID, используем rId10');
       }
-      // Вариант 2: Вставляем перед закрывающим тегом </w:body>
-      else if (updatedXml.includes('</w:body>')) {
+
+      // Создаем XML для изображения с правильным relationship ID
+      const imageXml = this.createImageXml(relationshipId);
+      
+      // Ищем место для вставки изображения
+      let updatedXml = documentXml;
+      let imageInserted = false;
+      
+      // Вариант 1: Заменяем плейсхолдер {chart} если он есть
+      if (updatedXml.includes('{chart}')) {
+        console.log('Найден плейсхолдер {chart}, заменяем на изображение');
+        const paragraphWithImage = `
+        <w:p>
+          <w:r>
+            ${imageXml}
+          </w:r>
+        </w:p>`;
+        updatedXml = updatedXml.replace('{chart}', paragraphWithImage);
+        imageInserted = true;
+      }
+      
+      // Вариант 2: Если плейсхолдера нет, вставляем перед </w:body>
+      if (!imageInserted && updatedXml.includes('</w:body>')) {
+        console.log('Вставляем изображение перед </w:body>');
         const paragraphWithImage = `
         <w:p>
           <w:r>
@@ -166,9 +194,12 @@ export class TemplateReportGenerator {
           </w:r>
         </w:p>`;
         updatedXml = updatedXml.replace('</w:body>', `${paragraphWithImage}</w:body>`);
+        imageInserted = true;
       }
-      // Вариант 3: Вставляем перед закрывающим тегом </w:document>
-      else {
+      
+      // Вариант 3: Если нет </w:body>, вставляем перед </w:document>
+      if (!imageInserted && updatedXml.includes('</w:document>')) {
+        console.log('Вставляем изображение перед </w:document>');
         const paragraphWithImage = `
         <w:body>
           <w:p>
@@ -178,11 +209,18 @@ export class TemplateReportGenerator {
           </w:p>
         </w:body>`;
         updatedXml = updatedXml.replace('</w:document>', `${paragraphWithImage}</w:document>`);
+        imageInserted = true;
+      }
+      
+      // Проверяем, было ли изображение вставлено
+      if (!imageInserted) {
+        console.error('Не удалось найти подходящее место для вставки изображения');
+        return;
       }
 
       // Обновляем document.xml в ZIP
       zip.file('word/document.xml', updatedXml);
-      console.log('Изображение успешно вставлено в document.xml');
+      console.log('Изображение успешно вставлено в document.xml с ID:', relationshipId);
       
     } catch (error) {
       console.error('Ошибка вставки изображения в document.xml:', error);
