@@ -14,7 +14,6 @@ export class TemplateReportGenerator {
 
   // Фиксированный список поддерживаемых плейсхолдеров
   private static readonly PLACEHOLDERS = {
-    CHART: '{chart}',
     RESULTS_TABLE: '{results_table}',
     EXECUTOR: '{executor}',
     REPORT_DATE: '{report_date}'
@@ -38,15 +37,11 @@ export class TemplateReportGenerator {
       // Читаем шаблон как ArrayBuffer
       const templateBuffer = await this.readFileAsArrayBuffer(templateFile);
       
-      // Конвертируем изображение графика в base64
-      const chartImageBase64 = await this.blobToBase64(data.chartImageBlob);
-      
       // Создаем PNG файл из blob
       const pngFileName = await this.createPngFile(data.chartImageBlob, data.dataType);
       
       // Подготавливаем данные для замены плейсхолдеров
       const templateData = {
-        chart: chartImageBase64,
         'results_table': this.formatResultsTable(data.analysisResults),
         executor: String(data.executor),
         'report_date': String(data.reportDate)
@@ -92,20 +87,6 @@ export class TemplateReportGenerator {
     });
   }
 
-  private async blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Убираем префикс data:image/png;base64,
-        const parts = result.split(',');
-        const base64 = parts.length > 1 ? parts[1] : '';
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
 
   private formatResultsTable(results: any[]): string {
     if (!results || results.length === 0) {
