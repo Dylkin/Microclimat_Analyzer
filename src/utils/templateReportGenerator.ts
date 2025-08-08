@@ -78,14 +78,16 @@ export class TemplateReportGenerator {
         executor: data.executor,
         report_date: data.reportDate,
         chart: 'chart_placeholder', // Значение для ImageModule
-        results_table: resultsTable
+        analysisResults: data.analysisResults || [], // Передаем массив для итерации в шаблоне
+        results_table: resultsTable // Оставляем для обратной совместимости
       };
 
       console.log('Данные для шаблона:', {
         executor: data.executor,
         report_date: data.reportDate,
         chart_image_size: `${chartImageBuffer.byteLength} байт`,
-        results_table_length: resultsTable.length
+        results_table_length: resultsTable.length,
+        analysisResults_count: data.analysisResults?.length || 0
       });
 
       // Заполняем шаблон данными
