@@ -23,7 +23,7 @@ export class TemplateReportGenerator {
 
   async generateReportFromTemplate(templateFile: File, data: TemplateReportData): Promise<Blob> {
     try {
-      console.log('Начинаем обработку DOCX шаблона с Docxtemplater...');
+      console.log('Генерация отчета с использованием docxtemplater + ImageModule...');
       
       // Читаем шаблон как ArrayBuffer
       const templateArrayBuffer = await templateFile.arrayBuffer();
@@ -34,15 +34,12 @@ export class TemplateReportGenerator {
       // Создаем ZIP из шаблона
       const zip = new PizZip(templateArrayBuffer);
       
-      // Добавляем изображение в ZIP структуру вручную
-      await this.addImageToZipStructure(zip, chartImageBuffer);
-      
       // Настраиваем модуль для изображений
       const imageOpts = {
-        centered: true,
+        centered: false,
         fileType: 'docx',
         getImage: (tagValue: string, tagName: string) => {
-          console.log(`Обработка изображения для тега: ${tagName}`);
+          console.log(`Обработка изображения для тега: ${tagName}, значение: ${tagValue}`);
           if (tagName === 'chart') {
             return chartImageBuffer;
           }
@@ -51,8 +48,8 @@ export class TemplateReportGenerator {
         getSize: (img: ArrayBuffer, tagValue: string, tagName: string) => {
           console.log(`Установка размера изображения для тега: ${tagName}`);
           if (tagName === 'chart') {
-            // Размеры в пикселях для DOCX (конвертируются в EMU автоматически)
-            return [800, 600]; // ширина x высота
+            // Размеры в пикселях (будут автоматически конвертированы в EMU)
+            return [600, 400]; // ширина x высота
           }
           throw new Error(`Неизвестный тег изображения для размера: ${tagName}`);
         },
@@ -60,36 +57,36 @@ export class TemplateReportGenerator {
           console.log(`Установка свойств изображения для тега: ${tagName}`);
           return {
             extension: 'png',
-            mime: 'image/png',
-            name: 'image1.png'
+            mime: 'image/png'
           };
         }
       };
 
       const imageModule = new ImageModule(imageOpts);
 
-      // Создаем экземпляр Docxtemplater
+      // Создаем экземпляр Docxtemplater с модулем изображений
       const doc = new Docxtemplater(zip, {
         modules: [imageModule],
         paragraphLoop: true,
         linebreaks: true,
-      }
-      )
-      // Создаем таблицу результатов в формате HTML/текст
+      });
+
+      // Создаем таблицу результатов в текстовом формате
       const resultsTable = this.createResultsTable(data.analysisResults);
 
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
         report_date: data.reportDate,
-        // НЕ добавляем chart в templateData - только через imageModule
+        chart: 'chart_placeholder', // Значение для ImageModule
         results_table: resultsTable
       };
 
       console.log('Данные для шаблона:', {
         executor: data.executor,
         report_date: data.reportDate,
-        chart_image_size: `${chartImageBuffer.byteLength} байт`
+        chart_image_size: `${chartImageBuffer.byteLength} байт`,
+        results_table_length: resultsTable.length
       });
 
       // Заполняем шаблон данными
@@ -98,7 +95,7 @@ export class TemplateReportGenerator {
       try {
         // Рендерим документ
         doc.render();
-        console.log('Документ успешно отрендерен');
+        console.log('Документ успешно отрендерен с ImageModule');
       } catch (error) {
         console.error('Ошибка рендеринга документа:', error);
         
@@ -113,16 +110,13 @@ export class TemplateReportGenerator {
         throw error;
       }
 
-      // КРИТИЧНО: Принудительно вставляем изображение в document.xml
-      await this.forceInsertImageIntoDocument(zip, chartImageBuffer);
-
       // Генерируем новый DOCX файл
       const output = doc.getZip().generate({
         type: 'blob',
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       });
 
-      console.log('DOCX файл успешно сгенерирован');
+      console.log('DOCX файл успешно сгенерирован с изображением');
       return output;
 
     } catch (error) {
@@ -131,295 +125,6 @@ export class TemplateReportGenerator {
     }
   }
 
-  /**
-   * Принудительно вставляет изображение в document.xml
-   */
-  private async forceInsertImageIntoDocument(zip: PizZip, imageBuffer: ArrayBuffer): Promise<void> {
-    try {
-      console.log('ПРИНУДИТЕЛЬНО вставляем изображение в document.xml...');
-      
-      // Читаем document.xml
-      let documentXml = '';
-      try {
-        documentXml = zip.file('word/document.xml').asText();
-        console.log('Размер исходного document.xml:', documentXml.length);
-      } catch (error) {
-        console.error('Не удалось прочитать document.xml:', error);
-        throw new Error('Критическая ошибка: не удалось прочитать document.xml');
-      }
-
-      // Определяем relationship ID для изображения
-      let relationshipId = 'rId10';
-      
-      try {
-        const relsXml = zip.file('word/_rels/document.xml.rels').asText();
-        console.log('Содержимое relationships:', relsXml.substring(0, 500));
-        const rIdMatches = relsXml.match(/rId(\d+)/g) || [];
-        if (rIdMatches.length > 0) {
-          const maxRId = Math.max(...rIdMatches.map(id => parseInt(id.replace('rId', ''))));
-          relationshipId = `rId${maxRId}`;
-        }
-        console.log('Используем relationship ID:', relationshipId);
-      } catch (error) {
-        console.warn('Не удалось определить relationship ID, используем rId10:', error);
-      }
-
-      // Добавляем необходимые пространства имен в корневой элемент
-      let updatedXml = this.addNamespacesToDocument(documentXml);
-
-      // Создаем XML для изображения с правильным relationship ID
-      const imageXml = this.createImageXml(relationshipId);
-      console.log('Создан XML для изображения с ID:', relationshipId);
-      
-      // Создаем полный параграф с изображением
-      const paragraphWithImage = `
-    <w:p>
-      <w:r>
-        ${imageXml}
-      </w:r>
-    </w:p>`;
-      
-      let imageInserted = false;
-      
-      // СТРАТЕГИЯ 1: Заменяем плейсхолдер {chart}
-      if (updatedXml.includes('{chart}')) {
-        console.log('Найден плейсхолдер {chart}, заменяем на изображение');
-        updatedXml = updatedXml.replace('{chart}', paragraphWithImage);
-        imageInserted = true;
-      }
-      
-      // СТРАТЕГИЯ 2: Вставляем перед </w:body>
-      if (!imageInserted) {
-        if (updatedXml.includes('</w:body>')) {
-          console.log('Вставляем изображение перед </w:body>');
-          updatedXml = updatedXml.replace('</w:body>', `${paragraphWithImage}
-  </w:body>`);
-          imageInserted = true;
-        }
-      }
-      
-      // СТРАТЕГИЯ 3: Вставляем перед </w:document>
-      if (!imageInserted) {
-        console.log('Вставляем изображение перед </w:document>');
-        updatedXml = updatedXml.replace('</w:document>', `${paragraphWithImage}
-</w:document>`);
-        imageInserted = true;
-      }
-      
-      if (!imageInserted) {
-        throw new Error('КРИТИЧЕСКАЯ ОШИБКА: Не удалось вставить изображение в document.xml');
-      }
-
-      // Обновляем document.xml в ZIP
-      zip.file('word/document.xml', updatedXml);
-      
-      // ПРОВЕРЯЕМ результат
-      const finalXml = zip.file('word/document.xml').asText();
-      const hasDrawing = finalXml.includes('<w:drawing>');
-      const hasRelationshipId = finalXml.includes(relationshipId);
-      
-      console.log('✅ Изображение вставлено в document.xml');
-      console.log('✅ Содержит <w:drawing>:', hasDrawing);
-      console.log('✅ Содержит relationship ID:', hasRelationshipId, relationshipId);
-      
-      if (!hasDrawing || !hasRelationshipId) {
-        throw new Error(`ОШИБКА ПРОВЕРКИ: drawing=${hasDrawing}, relationshipId=${hasRelationshipId}`);
-      }
-      
-    } catch (error) {
-      console.error('КРИТИЧЕСКАЯ ОШИБКА вставки изображения в document.xml:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Добавляет необходимые пространства имен в корневой элемент document.xml
-   */
-  private addNamespacesToDocument(documentXml: string): string {
-    // Проверяем, есть ли уже необходимые пространства имен
-    const requiredNamespaces = [
-      'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"',
-      'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"',
-      'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"'
-    ];
-
-    let updatedXml = documentXml;
-
-    // Находим открывающий тег w:document
-    const documentTagMatch = updatedXml.match(/<w:document[^>]*>/);
-    if (!documentTagMatch) {
-      console.warn('Не найден тег w:document');
-      return documentXml;
-    }
-
-    const documentTag = documentTagMatch[0];
-    let newDocumentTag = documentTag;
-
-    // Добавляем недостающие пространства имен
-    requiredNamespaces.forEach(namespace => {
-      const namespacePrefix = namespace.split('=')[0];
-      if (!newDocumentTag.includes(namespacePrefix)) {
-        // Вставляем перед закрывающим >
-        newDocumentTag = newDocumentTag.replace('>', ` ${namespace}>`);
-      }
-    });
-
-    // Заменяем старый тег на новый
-    if (newDocumentTag !== documentTag) {
-      updatedXml = updatedXml.replace(documentTag, newDocumentTag);
-      console.log('Добавлены пространства имен в w:document');
-    }
-
-    return updatedXml;
-  }
-  /**
-   * Создает XML элемент для изображения
-   */
-  private createImageXml(relationshipId: string): string {
-    return `
-<w:drawing>
-  <wp:inline distT="0" distB="0" distL="0" distR="0">
-    <wp:extent cx="7620000" cy="5715000"/>
-    <wp:effectExtent l="0" t="0" r="0" b="0"/>
-    <wp:docPr id="1" name="График" descr="График временных рядов"/>
-    <wp:cNvGraphicFramePr>
-      <a:graphicFrameLocks noChangeAspect="1"/>
-    </wp:cNvGraphicFramePr>
-    <a:graphic>
-      <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
-        <pic:pic>
-          <pic:nvPicPr>
-            <pic:cNvPr id="1" name="График"/>
-            <pic:cNvPicPr/>
-          </pic:nvPicPr>
-          <pic:blipFill>
-            <a:blip r:embed="${relationshipId}"/>
-            <a:stretch>
-              <a:fillRect/>
-            </a:stretch>
-          </pic:blipFill>
-          <pic:spPr>
-            <a:xfrm>
-              <a:off x="0" y="0"/>
-              <a:ext cx="7620000" cy="5715000"/>
-            </a:xfrm>
-            <a:prstGeom prst="rect">
-              <a:avLst/>
-            </a:prstGeom>
-          </pic:spPr>
-        </pic:pic>
-      </a:graphicData>
-    </a:graphic>
-  </wp:inline>
-</w:drawing>`;
-  }
-
-  /**
-   * Добавляет изображение в ZIP структуру DOCX файла
-   */
-  private async addImageToZipStructure(zip: PizZip, imageBuffer: ArrayBuffer): Promise<void> {
-    try {
-      console.log('Добавляем изображение в ZIP структуру...');
-      
-      // 1. Создаем папку word/media/ и добавляем изображение
-      const imagePath = 'word/media/image1.png';
-      zip.file(imagePath, imageBuffer);
-      console.log(`Изображение добавлено в ${imagePath}`);
-      
-      // 2. Обновляем [Content_Types].xml
-      await this.updateContentTypes(zip);
-      
-      // 3. Обновляем word/_rels/document.xml.rels
-      await this.updateDocumentRels(zip);
-      
-    } catch (error) {
-      console.error('Ошибка добавления изображения в ZIP структуру:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Обновляет [Content_Types].xml для поддержки PNG изображений
-   */
-  private async updateContentTypes(zip: PizZip): Promise<void> {
-    try {
-      const contentTypesPath = '[Content_Types].xml';
-      let contentTypesXml = '';
-      
-      // Читаем существующий файл или создаем новый
-      try {
-        contentTypesXml = zip.file(contentTypesPath).asText();
-      } catch (error) {
-        console.log('Создаем новый [Content_Types].xml');
-        contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>`;
-      }
-      
-      // Добавляем PNG тип если его нет
-      if (!contentTypesXml.includes('Extension="png"')) {
-        const pngDefault = '  <Default Extension="png" ContentType="image/png"/>';
-        contentTypesXml = contentTypesXml.replace(
-          '</Types>',
-          `${pngDefault}\n</Types>`
-        );
-        
-        zip.file(contentTypesPath, contentTypesXml);
-        console.log('Обновлен [Content_Types].xml');
-      }
-      
-    } catch (error) {
-      console.error('Ошибка обновления Content_Types.xml:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Обновляет word/_rels/document.xml.rels для связи с изображением
-   */
-  private async updateDocumentRels(zip: PizZip): Promise<void> {
-    try {
-      const relsPath = 'word/_rels/document.xml.rels';
-      let relsXml = '';
-      
-      // Читаем существующий файл или создаем новый
-      try {
-        relsXml = zip.file(relsPath).asText();
-      } catch (error) {
-        console.log('Создаем новый document.xml.rels');
-        relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-</Relationships>`;
-      }
-      
-      // Находим максимальный rId
-      const rIdMatches = relsXml.match(/rId(\d+)/g) || [];
-      const maxRId = rIdMatches.length > 0 
-        ? Math.max(...rIdMatches.map(id => parseInt(id.replace('rId', '')))) 
-        : 0;
-      const newRId = maxRId + 1;
-      
-      // Добавляем связь с изображением если её нет
-      const imageRelId = `rId${newRId}`;
-      if (!relsXml.includes('media/image1.png')) {
-        const imageRelationship = `  <Relationship Id="${imageRelId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>`;
-        relsXml = relsXml.replace(
-          '</Relationships>',
-          `${imageRelationship}\n</Relationships>`
-        );
-        
-        zip.file(relsPath, relsXml);
-        console.log(`Обновлен document.xml.rels с ${imageRelId}`);
-      }
-      
-    } catch (error) {
-      console.error('Ошибка обновления document.xml.rels:', error);
-      throw error;
-    }
-  }
   private createResultsTable(analysisResults: any[]): string {
     if (!analysisResults || analysisResults.length === 0) {
       return 'Нет данных для отображения';
