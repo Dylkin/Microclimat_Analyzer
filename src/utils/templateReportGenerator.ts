@@ -1,5 +1,7 @@
 import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+import Docxtemplater from 'docxtemplater';
+import PizZip from 'pizzip';
+import ImageModule from 'docxtemplater-image-module-free';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -21,28 +23,93 @@ export class TemplateReportGenerator {
 
   async generateReportFromTemplate(templateFile: File, data: TemplateReportData): Promise<Blob> {
     try {
-      console.log('Начинаем обработку DOCX шаблона...');
+      console.log('Начинаем обработку DOCX шаблона с Docxtemplater...');
       
-      // Читаем шаблон как ZIP архив
+      // Читаем шаблон как ArrayBuffer
       const templateArrayBuffer = await templateFile.arrayBuffer();
-      const zip = await JSZip.loadAsync(templateArrayBuffer);
       
-      console.log('Содержимое ZIP архива:', Object.keys(zip.files));
+      // Конвертируем изображение в ArrayBuffer
+      const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
+      
+      // Создаем ZIP из шаблона
+      const zip = new PizZip(templateArrayBuffer);
+      
+      // Настраиваем модуль для изображений
+      const imageOpts = {
+        centered: false,
+        getImage: (tagValue: string, tagName: string) => {
+          console.log(`Обработка изображения для тега: ${tagName}`);
+          if (tagName === 'chart') {
+            return chartImageBuffer;
+          }
+          return null;
+        },
+        getSize: (img: ArrayBuffer, tagValue: string, tagName: string) => {
+          console.log(`Установка размера изображения для тега: ${tagName}`);
+          if (tagName === 'chart') {
+            // Размеры изображения в пикселях (будут конвертированы в EMU)
+            return [600, 400]; // ширина x высота
+          }
+          return [100, 100];
+        }
+      };
 
-      // Обрабатываем основной документ
-      await this.processMainDocument(zip, data);
-      
-      // Обрабатываем нижние колонтитулы
-      await this.processFooters(zip, data);
-      
-      // Обрабатываем заголовки
-      await this.processHeaders(zip, data);
+      const imageModule = new ImageModule(imageOpts);
 
-      console.log('DOCX файл успешно модифицирован');
+      // Создаем экземпляр Docxtemplater
+      const doc = new Docxtemplater(zip, {
+        modules: [imageModule],
+        paragraphLoop: true,
+        linebreaks: true,
+      });
+
+      // Создаем таблицу результатов в формате HTML/текст
+      const resultsTable = this.createResultsTable(data.analysisResults);
+
+      // Подготавливаем данные для замены
+      const templateData = {
+        executor: data.executor,
+        report_date: data.reportDate,
+        chart: chartImageBuffer, // Передаем ArrayBuffer изображения напрямую
+        results_table: resultsTable
+      };
+
+      console.log('Данные для шаблона:', {
+        executor: templateData.executor,
+        report_date: templateData.report_date,
+        chart: `PNG изображение (${chartImageBuffer.byteLength} байт)`,
+        results_table_length: resultsTable.length
+      });
+
+      // Заполняем шаблон данными
+      doc.setData(templateData);
+
+      try {
+        // Рендерим документ
+        doc.render();
+        console.log('Документ успешно отрендерен');
+      } catch (error) {
+        console.error('Ошибка рендеринга документа:', error);
+        
+        // Выводим подробную информацию об ошибке
+        if (error.properties && error.properties.errors instanceof Array) {
+          const errorMessages = error.properties.errors.map((err: any) => {
+            return `${err.name}: ${err.message} в части "${err.part}"`;
+          }).join('\n');
+          console.error('Детали ошибок:', errorMessages);
+        }
+        
+        throw error;
+      }
 
       // Генерируем новый DOCX файл
-      const modifiedDocx = await zip.generateAsync({ type: 'blob' });
-      return modifiedDocx;
+      const output = doc.getZip().generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+
+      console.log('DOCX файл успешно сгенерирован');
+      return output;
 
     } catch (error) {
       console.error('Ошибка генерации отчета из шаблона:', error);
@@ -50,117 +117,54 @@ export class TemplateReportGenerator {
     }
   }
 
-  private async processMainDocument(zip: JSZip, data: TemplateReportData): Promise<void> {
-    const documentFile = zip.file('word/document.xml');
-    if (!documentFile) {
-      console.warn('Файл word/document.xml не найден');
-      return;
+  private createResultsTable(analysisResults: any[]): string {
+    if (!analysisResults || analysisResults.length === 0) {
+      return 'Нет данных для отображения';
     }
 
-    let documentXml = await documentFile.async('text');
-    console.log('Исходный document.xml найден, размер:', documentXml.length);
-
-    // Заменяем текстовые плейсхолдеры
-    documentXml = this.replacePlaceholders(documentXml, data);
-
-    // Сохраняем модифицированный document.xml
-    zip.file('word/document.xml', documentXml);
-  }
-
-  private async processFooters(zip: JSZip, data: TemplateReportData): Promise<void> {
-    // Ищем файлы нижних колонтитулов
-    const footerFiles = Object.keys(zip.files).filter(filename => 
-      filename.startsWith('word/footer') && filename.endsWith('.xml')
-    );
-
-    console.log('Найдены файлы нижних колонтитулов:', footerFiles);
-
-    for (const footerFile of footerFiles) {
-      const file = zip.file(footerFile);
-      if (file) {
-        let footerXml = await file.async('text');
-        console.log(`Обрабатываем нижний колонтитул: ${footerFile}`);
-        
-        // Заменяем плейсхолдеры в нижнем колонтитуле
-        footerXml = this.replacePlaceholders(footerXml, data);
-        
-        // Сохраняем модифицированный нижний колонтитул
-        zip.file(footerFile, footerXml);
-      }
-    }
-  }
-
-  private async processHeaders(zip: JSZip, data: TemplateReportData): Promise<void> {
-    // Ищем файлы заголовков
-    const headerFiles = Object.keys(zip.files).filter(filename => 
-      filename.startsWith('word/header') && filename.endsWith('.xml')
-    );
-
-    console.log('Найдены файлы заголовков:', headerFiles);
-
-    for (const headerFile of headerFiles) {
-      const file = zip.file(headerFile);
-      if (file) {
-        let headerXml = await file.async('text');
-        console.log(`Обрабатываем заголовок: ${headerFile}`);
-        
-        // Заменяем плейсхолдеры в заголовке
-        headerXml = this.replacePlaceholders(headerXml, data);
-        
-        // Сохраняем модифицированный заголовок
-        zip.file(headerFile, headerXml);
-      }
-    }
-  }
-
-  private replacePlaceholders(xmlContent: string, data: TemplateReportData): string {
-    let modifiedXml = xmlContent;
-
-    // Простая замена текстовых плейсхолдеров
-    modifiedXml = modifiedXml.replace(/{executor}/g, this.escapeXml(data.executor));
-    modifiedXml = modifiedXml.replace(/{report_date}/g, this.escapeXml(data.reportDate));
-
-    // Обработка плейсхолдера {chart} - заменяем на текст-заглушку
-    if (modifiedXml.includes('{chart}')) {
-      console.log('Найден плейсхолдер {chart}, заменяем на текст');
-      modifiedXml = modifiedXml.replace(/{chart}/g, '[График будет вставлен здесь]');
-    }
-
-    // Обработка плейсхолдера {results table} - заменяем на текстовое представление таблицы
-    if (modifiedXml.includes('{results table}')) {
-      console.log('Найден плейсхолдер {results table}, заменяем на таблицу');
-      const tableText = this.createTableText(data.analysisResults);
-      modifiedXml = modifiedXml.replace(/{results table}/g, tableText);
-    }
-
-    return modifiedXml;
-  }
-
-  private createTableText(analysisResults: any[]): string {
-    let tableText = 'РЕЗУЛЬТАТЫ АНАЛИЗА:\n\n';
+    let table = 'РЕЗУЛЬТАТЫ АНАЛИЗА:\n\n';
     
     // Заголовок таблицы
-    tableText += '№ зоны | Уровень (м.) | Логгер | S/N | Мин. t°C | Макс. t°C | Среднее t°C | Соответствие\n';
-    tableText += '-------|-------------|--------|-----|----------|-----------|-------------|-------------\n';
+    table += '№ зоны | Уровень (м.) | Логгер | S/N | Мин. t°C | Макс. t°C | Среднее t°C | Соответствие\n';
+    table += '-------|-------------|--------|-----|----------|-----------|-------------|-------------\n';
     
     // Строки данных
     analysisResults.forEach(result => {
-      tableText += `${result.zoneNumber} | ${result.measurementLevel} | ${result.loggerName} | ${result.serialNumber} | ${result.minTemp} | ${result.maxTemp} | ${result.avgTemp} | ${result.meetsLimits}\n`;
+      const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
+      table += `${zoneNumber} | ${result.measurementLevel || '-'} | ${result.loggerName || '-'} | ${result.serialNumber || '-'} | ${result.minTemp || '-'} | ${result.maxTemp || '-'} | ${result.avgTemp || '-'} | ${result.meetsLimits || '-'}\n`;
     });
 
-    return tableText;
-  }
+    table += '\n';
+    
+    // Добавляем статистику
+    const validResults = analysisResults.filter(r => !r.isExternal && r.minTemp !== '-');
+    const externalSensors = analysisResults.filter(r => r.isExternal).length;
+    
+    table += `\nОбщая статистика:\n`;
+    table += `- Всего датчиков: ${analysisResults.length}\n`;
+    table += `- Внутренние датчики: ${validResults.length}\n`;
+    table += `- Внешние датчики: ${externalSensors}\n`;
+    
+    const compliantCount = analysisResults.filter(r => r.meetsLimits === 'Да').length;
+    const nonCompliantCount = analysisResults.filter(r => r.meetsLimits === 'Нет').length;
+    
+    if (compliantCount > 0 || nonCompliantCount > 0) {
+      table += `- Соответствуют лимитам: ${compliantCount}\n`;
+      table += `- Не соответствуют лимитам: ${nonCompliantCount}\n`;
+    }
 
-  private escapeXml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+    return table;
   }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
-    saveAs(blob, filename);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Очищаем URL через некоторое время
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }
 }
