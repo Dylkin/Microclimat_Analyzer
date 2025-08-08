@@ -33,17 +33,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     reportUrl: string | null;
     reportFilename: string | null;
     isGeneratingFromTemplate: boolean;
-    isGeneratingFromTemplate: boolean;
   }>({
     isGenerating: false,
     hasReport: false,
     reportUrl: null,
     reportFilename: null,
     isGeneratingFromTemplate: false
-    isGeneratingFromTemplate: false
   });
-  const [templateFile, setTemplateFile] = useState<File | null>(null);
-  const templateInputRef = useRef<HTMLInputElement>(null);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
   
