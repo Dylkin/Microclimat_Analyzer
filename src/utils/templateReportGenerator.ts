@@ -108,36 +108,14 @@ export class TemplateReportGenerator {
       return 'Нет данных для отображения';
     }
 
-    // Создаем HTML таблицу для вставки в документ
-    let tableHtml = `
-      <table border="1" style="border-collapse: collapse; width: 100%;">
-        <tr style="background-color: #f0f0f0;">
-          <th style="padding: 8px; text-align: left;">№ зоны</th>
-          <th style="padding: 8px; text-align: left;">Уровень (м.)</th>
-          <th style="padding: 8px; text-align: left;">Логгер</th>
-          <th style="padding: 8px; text-align: left;">S/N</th>
-          <th style="padding: 8px; text-align: left;">Мин.t°C</th>
-          <th style="padding: 8px; text-align: left;">Макс.t°C</th>
-          <th style="padding: 8px; text-align: left;">Среднее t°C</th>
-          <th style="padding: 8px; text-align: left;">Соответствие</th>
-        </tr>`;
+    // Создаем простую текстовую таблицу
+    let tableText = '№ зоны\tУровень (м.)\tЛоггер\tS/N\tМин.t°C\tМакс.t°C\tСреднее t°C\tСоответствие\n';
 
     results.forEach(result => {
-      tableHtml += `
-        <tr>
-          <td style="padding: 8px;">${this.escapeHtml(result.zoneNumber)}</td>
-          <td style="padding: 8px;">${this.escapeHtml(result.measurementLevel)}</td>
-          <td style="padding: 8px;">${this.escapeHtml(result.loggerName)}</td>
-          <td style="padding: 8px;">${this.escapeHtml(result.serialNumber)}</td>
-          <td style="padding: 8px;">${this.escapeHtml(result.minTemp)}</td>
-          <td style="padding: 8px;">${this.escapeHtml(result.maxTemp)}</td>
-          <td style="padding: 8px;">${this.escapeHtml(result.avgTemp)}</td>
-          <td style="padding: 8px;">${this.escapeHtml(result.meetsLimits)}</td>
-        </tr>`;
+      tableText += `${result.zoneNumber}\t${result.measurementLevel}\t${result.loggerName}\t${result.serialNumber}\t${result.minTemp}\t${result.maxTemp}\t${result.avgTemp}\t${result.meetsLimits}\n`;
     });
 
-    tableHtml += '</table>';
-    return tableHtml;
+    return tableText;
   }
 
   private escapeHtml(text: string | number): string {
