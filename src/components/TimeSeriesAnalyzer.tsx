@@ -224,7 +224,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       // Создаем скриншот с высоким качеством
       const canvas = await html2canvas(chartContainer, {
-        scale: 2, // Увеличиваем разрешение для лучшего качества
+        scale: 1, // Уменьшаем разрешение для предотвращения ошибок с большими изображениями
         backgroundColor: '#ffffff',
         useCORS: true,
         allowTaint: true,
@@ -344,7 +344,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       const chartContainer = chartRef.current;
       const canvas = await html2canvas(chartContainer, {
-        scale: 2,
+        scale: 1,
         backgroundColor: '#ffffff',
         useCORS: true,
         allowTaint: true,
