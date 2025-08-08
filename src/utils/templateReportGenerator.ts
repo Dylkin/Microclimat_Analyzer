@@ -63,6 +63,7 @@ export class TemplateReportGenerator {
         linebreaks: true,
       }
       )
+      const now = new Date();
       const dateStr = now.toLocaleDateString('ru-RU'); // Только дата без времени
       // Создаем таблицу результатов в формате HTML/текст
       const resultsTable = this.createResultsTable(data.analysisResults);
