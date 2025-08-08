@@ -41,12 +41,30 @@ export class TemplateReportGenerator {
       // Конвертируем изображение графика в base64
       const chartImageBase64 = await this.blobToBase64(data.chartImageBlob);
       
-      // Безопасная функция для преобразования в строку
-      const safeString = (value: any): string => {
-        if (value === null || value === undefined) return '';
-        if (typeof value === 'string') return value;
-        if (typeof value === 'number') return value.toString();
-        if (typeof value === 'boolean') return value.toString();
+      // Строгая функция для преобразования в строку
+      const ensureString = (value: any): string => {
+        if (value === null || value === undefined) {
+          return '';
+        }
+        if (typeof value === 'string') {
+          return value;
+        }
+        if (typeof value === 'number') {
+          return value.toString();
+        }
+        if (typeof value === 'boolean') {
+          return value.toString();
+        }
+        if (typeof value === 'object') {
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return '[Object]';
+          }
+        }
+        if (typeof value === 'function') {
+          return '[Function]';
+        }
         return String(value);
       };
 
@@ -59,33 +77,61 @@ export class TemplateReportGenerator {
           width: 6,
           height: 4
         },
-        'results table': safeString(this.formatResultsTable(data.analysisResults)),
-        executor: safeString(data.executor),
-        'report date': safeString(data.reportDate)
+        'results table': ensureString(this.formatResultsTable(data.analysisResults)),
+        executor: ensureString(data.executor),
+        'report date': ensureString(data.reportDate)
       };
 
-      console.log('Данные для шаблона подготовлены:', Object.keys(templateData));
+      console.log('Данные для шаблона подготовлены');
+      console.log('Типы данных:', {
+        chart: typeof templateData.chart,
+        'results table': typeof templateData['results table'],
+        executor: typeof templateData.executor,
+        'report date': typeof templateData['report date']
+      });
 
       // Генерируем отчет с помощью docx-templates
       const reportBuffer = await createReport({
         template: templateBuffer,
         data: templateData,
         additionalJsContext: {
-          // Дополнительные функции для обработки данных в шаблоне
-          formatNumber: (num: any) => {
-            const n = parseFloat(num);
-            return isNaN(n) ? '0.0' : n.toFixed(1);
-          },
-          formatDate: (date: any) => {
+          // Безопасные функции для обработки данных в шаблоне
+          formatNumber: (num: any): string => {
             try {
-              return new Date(date).toLocaleDateString('ru-RU');
+              const n = parseFloat(ensureString(num));
+              return isNaN(n) ? '0.0' : n.toFixed(1);
             } catch {
-              return safeString(date);
+              return '0.0';
             }
           },
-          safeString: safeString
+          formatDate: (date: any): string => {
+            try {
+              const dateStr = ensureString(date);
+              const parsedDate = new Date(dateStr);
+              return isNaN(parsedDate.getTime()) ? dateStr : parsedDate.toLocaleDateString('ru-RU');
+            } catch {
+              return ensureString(date);
+            }
+          },
+          safeString: ensureString,
+          // Функция для безопасного получения значения
+          getValue: (obj: any, key: string): string => {
+            try {
+              if (obj && typeof obj === 'object' && key in obj) {
+                return ensureString(obj[key]);
+              }
+              return '';
+            } catch {
+              return '';
+            }
+          }
         },
-        processLineBreaks: true
+        processLineBreaks: true,
+        // Добавляем обработчик ошибок
+        errorHandler: (error: any) => {
+          console.error('Ошибка в шаблоне:', error);
+          return '[Ошибка обработки]';
+        }
       });
 
       console.log('Отчет успешно сгенерирован');
@@ -103,10 +149,10 @@ export class TemplateReportGenerator {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (event) => {
-        if (event.target?.result) {
-          resolve(event.target.result as ArrayBuffer);
+        if (event.target?.result && event.target.result instanceof ArrayBuffer) {
+          resolve(event.target.result);
         } else {
-          reject(new Error('Не удалось прочитать файл шаблона'));
+          reject(new Error('Не удалось прочитать файл шаблона как ArrayBuffer'));
         }
       };
       reader.onerror = () => reject(new Error('Ошибка чтения файла шаблона'));
@@ -118,15 +164,40 @@ export class TemplateReportGenerator {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        const result = reader.result as string;
         try {
-          // Убираем префикс data:image/png;base64,
-          const parts = result.split(',');
-          const base64 = parts.length > 1 ? parts[1] : '';
+          const result = reader.result;
           
-          // Проверяем, что base64 строка не пустая
+          // Проверяем, что результат является строкой
+          if (typeof result !== 'string') {
+            reject(new Error('FileReader не вернул строку'));
+            return;
+          }
+          
+          // Проверяем формат data URL
+          if (!result.startsWith('data:')) {
+            reject(new Error('Некорректный формат data URL'));
+            return;
+          }
+          
+          // Разделяем по запятой
+          const parts = result.split(',');
+          if (parts.length !== 2) {
+            reject(new Error('Некорректная структура data URL'));
+            return;
+          }
+          
+          const base64 = parts[1];
+          
+          // Проверяем, что base64 строка не пустая и содержит только допустимые символы
           if (!base64 || typeof base64 !== 'string') {
-            reject(new Error('Не удалось получить base64 данные изображения'));
+            reject(new Error('Пустая base64 строка'));
+            return;
+          }
+          
+          // Проверяем корректность base64
+          const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+          if (!base64Regex.test(base64)) {
+            reject(new Error('Некорректные символы в base64 строке'));
             return;
           }
           
@@ -141,31 +212,82 @@ export class TemplateReportGenerator {
   }
 
   private formatResultsTable(results: any[]): string {
-    if (!results || results.length === 0) {
+    if (!results || !Array.isArray(results) || results.length === 0) {
       return 'Нет данных для отображения';
     }
 
-    // Безопасная функция для получения значения
+    // Безопасная функция для получения значения из объекта
     const safeValue = (obj: any, key: string): string => {
-      const value = obj?.[key];
-      if (value === null || value === undefined) return '-';
-      if (typeof value === 'string') return value;
-      if (typeof value === 'number') return value.toString();
-      return String(value);
+      try {
+        if (!obj || typeof obj !== 'object') {
+          return '-';
+        }
+        
+        const value = obj[key];
+        
+        if (value === null || value === undefined) {
+          return '-';
+        }
+        
+        if (typeof value === 'string') {
+          return value;
+        }
+        
+        if (typeof value === 'number') {
+          return value.toString();
+        }
+        
+        if (typeof value === 'boolean') {
+          return value.toString();
+        }
+        
+        return String(value);
+      } catch {
+        return '-';
+      }
     };
 
-    // Создаем простую текстовую таблицу
+    // Создаем простую текстовую таблицу с табуляцией
     let tableText = '№ зоны\tУровень (м.)\tЛоггер\tS/N\tМин.t°C\tМакс.t°C\tСреднее t°C\tСоответствие\n';
 
     results.forEach(result => {
-      tableText += `${safeValue(result, 'zoneNumber')}\t${safeValue(result, 'measurementLevel')}\t${safeValue(result, 'loggerName')}\t${safeValue(result, 'serialNumber')}\t${safeValue(result, 'minTemp')}\t${safeValue(result, 'maxTemp')}\t${safeValue(result, 'avgTemp')}\t${safeValue(result, 'meetsLimits')}\n`;
+      try {
+        const row = [
+          safeValue(result, 'zoneNumber'),
+          safeValue(result, 'measurementLevel'),
+          safeValue(result, 'loggerName'),
+          safeValue(result, 'serialNumber'),
+          safeValue(result, 'minTemp'),
+          safeValue(result, 'maxTemp'),
+          safeValue(result, 'avgTemp'),
+          safeValue(result, 'meetsLimits')
+        ].join('\t');
+        
+        tableText += row + '\n';
+      } catch (error) {
+        console.warn('Ошибка обработки строки результата:', error);
+        tableText += '-\t-\t-\t-\t-\t-\t-\t-\n';
+      }
     });
 
     return tableText;
   }
 
-
   async saveReport(blob: Blob, filename: string): Promise<void> {
-    saveAs(blob, filename);
+    try {
+      // Проверяем корректность параметров
+      if (!blob || !(blob instanceof Blob)) {
+        throw new Error('Некорректный blob для сохранения');
+      }
+      
+      if (!filename || typeof filename !== 'string') {
+        throw new Error('Некорректное имя файла');
+      }
+      
+      saveAs(blob, filename);
+    } catch (error) {
+      console.error('Ошибка сохранения файла:', error);
+      throw error;
+    }
   }
 }
