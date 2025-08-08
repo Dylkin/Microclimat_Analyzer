@@ -48,10 +48,9 @@ export class TemplateReportGenerator {
         getSize: (img: ArrayBuffer, tagValue: string, tagName: string) => {
           console.log(`Установка размера изображения для тега: ${tagName}`);
           if (tagName === 'chart') {
-            // Размеры в пикселях (будут автоматически конвертированы в EMU)
-            return [600, 400]; // ширина x высота
+            return null; // Используем размеры по умолчанию
           }
-          throw new Error(`Неизвестный тег изображения для размера: ${tagName}`);
+          return null;
         },
         getProps: (img: ArrayBuffer, tagValue: string, tagName: string) => {
           console.log(`Установка свойств изображения для тега: ${tagName}`);
