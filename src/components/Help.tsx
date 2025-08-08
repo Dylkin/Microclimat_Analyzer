@@ -176,8 +176,6 @@ export const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-800 mb-3">Поддерживаемые устройства</h3>
             <div className="bg-gray-50 rounded-lg p-4">
               <ul className="space-y-2 text-sm text-gray-700">
-                <li>• <strong>DL-019:</strong> Одноканальный логгер температуры</li>
-                <li>• <strong>DL-221:</strong> Двухканальный логгер (температура + влажность)</li>
                 <li>• <strong>Testo 174T:</strong> Одноканальные логгеры</li>
                 <li>• <strong>Testo 174H:</strong> Двухканальные логгеры</li>
               </ul>
