@@ -36,30 +36,21 @@ export class TemplateReportGenerator {
       
       // Настраиваем модуль для изображений
       const imageOpts = {
-        centered: true,
-        fileType: 'docx',
+        centered: false,
         getImage: (tagValue: string, tagName: string) => {
           console.log(`Обработка изображения для тега: ${tagName}`);
           if (tagName === 'chart') {
             return chartImageBuffer;
           }
-          throw new Error(`Неизвестный тег изображения: ${tagName}`);
+          return null;
         },
         getSize: (img: ArrayBuffer, tagValue: string, tagName: string) => {
           console.log(`Установка размера изображения для тега: ${tagName}`);
           if (tagName === 'chart') {
-            // Размеры в пикселях для DOCX (конвертируются в EMU автоматически)
-            return [800, 600]; // ширина x высота
+            // Размеры изображения в пикселях (будут конвертированы в EMU)
+            return [600, 400]; // ширина x высота
           }
-          throw new Error(`Неизвестный тег изображения для размера: ${tagName}`);
-        },
-        getProps: (img: ArrayBuffer, tagValue: string, tagName: string) => {
-          console.log(`Установка свойств изображения для тега: ${tagName}`);
-          return {
-            // Дополнительные свойства для корректной вставки
-            extension: '.png',
-            mime: 'image/png'
-          };
+          return [100, 100];
         }
       };
 
