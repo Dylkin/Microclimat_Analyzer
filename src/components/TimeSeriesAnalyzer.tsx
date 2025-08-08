@@ -416,7 +416,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
     } catch (error) {
       console.error('Ошибка создания отчета из шаблона:', error);
-      alert('Ошибка при создании отчета из шаблона');
+      alert('Ошибка при создании отчета из шаблона: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
     } finally {
       setReportStatus(prev => ({ ...prev, isGeneratingFromTemplate: false }));
     }
@@ -694,17 +694,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <Upload className="w-4 h-4" />
                 <span>Загрузить шаблон</span>
               </button>
-              {templateFile && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">{templateFile.name}</span>
-                  <button
-                    onClick={() => setTemplateFile(null)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+              <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  <strong>Поддерживаемые плейсхолдеры:</strong><br/>
+                  • <code>{'{chart}'}</code> - График временных рядов<br/>
+                  • <code>{'{results table}'}</code> - Таблица результатов анализа<br/>
+                  • <code>{'{executor}'}</code> - Сотрудник, сформировавший отчет<br/>
+                  • <code>{'{report date}'}</code> - Дата формирования отчета
+                </p>
+              </div>
             </div>
             {templateFile && (
               <div className="mt-2 p-3 bg-blue-50 rounded-lg">

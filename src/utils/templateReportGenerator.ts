@@ -12,6 +12,14 @@ export interface TemplateReportData {
 export class TemplateReportGenerator {
   private static instance: TemplateReportGenerator;
 
+  // Фиксированный список поддерживаемых плейсхолдеров
+  private static readonly PLACEHOLDERS = {
+    CHART: '{chart}',
+    RESULTS_TABLE: '{results table}',
+    EXECUTOR: '{executor}',
+    REPORT_DATE: '{report date}'
+  };
+
   static getInstance(): TemplateReportGenerator {
     if (!TemplateReportGenerator.instance) {
       TemplateReportGenerator.instance = new TemplateReportGenerator();
@@ -19,18 +27,24 @@ export class TemplateReportGenerator {
     return TemplateReportGenerator.instance;
   }
 
+  static getAvailablePlaceholders(): string[] {
+    return Object.values(TemplateReportGenerator.PLACEHOLDERS);
+  }
+
   async generateReportFromTemplate(templateFile: File, data: TemplateReportData): Promise<Blob> {
     try {
+      console.log('Начинаем генерацию отчета из шаблона:', templateFile.name);
+      
       // Читаем шаблон как ArrayBuffer
       const templateBuffer = await this.readFileAsArrayBuffer(templateFile);
       
-      // Парсим DOCX шаблон
+      // Парсим DOCX шаблон и извлекаем текстовое содержимое
       const templateContent = await this.parseDocxTemplate(templateBuffer);
       
-      // Заменяем плейсхолдеры
+      // Заменяем плейсхолдеры на актуальные данные
       const processedContent = await this.replacePlaceholders(templateContent, data);
       
-      // Создаем новый документ
+      // Создаем новый документ с обработанным содержимым
       const doc = new Document({
         sections: [{
           children: processedContent
@@ -39,10 +53,12 @@ export class TemplateReportGenerator {
 
       // Генерируем DOCX файл
       const buffer = await Packer.toBlob(doc);
+      console.log('Отчет успешно сгенерирован');
       return buffer;
+      
     } catch (error) {
       console.error('Ошибка генерации отчета из шаблона:', error);
-      throw new Error('Не удалось создать отчет из шаблона');
+      throw new Error('Не удалось создать отчет из шаблона: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
     }
   }
 
@@ -61,78 +77,80 @@ export class TemplateReportGenerator {
     });
   }
 
-  private async parseDocxTemplate(buffer: ArrayBuffer): Promise<Paragraph[]> {
-    // Упрощенный парсер DOCX - извлекаем текст и создаем базовую структуру
-    // В реальном проекте здесь должен быть полноценный DOCX парсер
-    
+  private async parseDocxTemplate(buffer: ArrayBuffer): Promise<string[]> {
     try {
-      // Конвертируем ArrayBuffer в строку для поиска плейсхолдеров
+      // Простой парсер для извлечения текста из DOCX
+      // DOCX - это ZIP архив, содержащий XML файлы
       const uint8Array = new Uint8Array(buffer);
-      const decoder = new TextDecoder('utf-8', { ignoreBOM: true });
-      let content = '';
       
-      // Пытаемся извлечь текст из DOCX (упрощенный подход)
-      for (let i = 0; i < uint8Array.length - 10; i++) {
-        const char = decoder.decode(uint8Array.slice(i, i + 1));
-        if (char.match(/[a-zA-Zа-яА-Я0-9\s\{\}]/)) {
-          content += char;
-        }
-      }
-
-      // Разбиваем на параграфы и создаем структуру документа
-      const lines = content.split(/[\r\n]+/).filter(line => line.trim().length > 0);
+      // Ищем document.xml внутри архива
+      const textContent = this.extractTextFromDocx(uint8Array);
       
-      return lines.map(line => new Paragraph({
-        children: [new TextRun({ text: line.trim() })],
-        spacing: { after: 200 }
-      }));
-
+      // Разбиваем текст на параграфы
+      const paragraphs = textContent.split(/[\r\n]+/).filter(p => p.trim().length > 0);
+      
+      console.log('Извлечено параграфов из шаблона:', paragraphs.length);
+      console.log('Содержимое шаблона:', paragraphs.slice(0, 5)); // Показываем первые 5 параграфов
+      
+      return paragraphs;
+      
     } catch (error) {
       console.error('Ошибка парсинга DOCX шаблона:', error);
       // Возвращаем базовый шаблон с плейсхолдерами
       return [
-        new Paragraph({
-          children: [new TextRun({ text: 'ОТЧЕТ ПО АНАЛИЗУ ВРЕМЕННЫХ РЯДОВ', bold: true, size: 32 })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 400 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: 'Дата формирования: {report date}', size: 24 })],
-          spacing: { after: 200 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: 'Исполнитель: {executor}', size: 24 })],
-          spacing: { after: 400 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: 'График временных рядов:', bold: true, size: 28 })],
-          spacing: { after: 200 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: '{chart}' })],
-          spacing: { after: 400 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: 'Результаты анализа:', bold: true, size: 28 })],
-          spacing: { after: 200 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: '{results table}' })],
-          spacing: { after: 200 }
-        })
+        'ОТЧЕТ ПО АНАЛИЗУ ВРЕМЕННЫХ РЯДОВ',
+        'Дата формирования: {report date}',
+        'Исполнитель: {executor}',
+        'График временных рядов:',
+        '{chart}',
+        'Результаты анализа:',
+        '{results table}'
       ];
     }
   }
 
-  private async replacePlaceholders(content: Paragraph[], data: TemplateReportData): Promise<Paragraph[]> {
+  private extractTextFromDocx(uint8Array: Uint8Array): string {
+    // Простое извлечение текста из DOCX
+    // Ищем читаемые строки в бинарных данных
+    let text = '';
+    let currentString = '';
+    
+    for (let i = 0; i < uint8Array.length; i++) {
+      const byte = uint8Array[i];
+      
+      // Если это печатный ASCII символ или пробел
+      if ((byte >= 32 && byte <= 126) || byte === 9 || byte === 10 || byte === 13) {
+        currentString += String.fromCharCode(byte);
+      } else {
+        // Если накопилась строка длиннее 3 символов, добавляем её
+        if (currentString.length > 3) {
+          text += currentString + '\n';
+        }
+        currentString = '';
+      }
+    }
+    
+    // Добавляем последнюю строку
+    if (currentString.length > 3) {
+      text += currentString;
+    }
+    
+    return text;
+  }
+
+  private async replacePlaceholders(templateParagraphs: string[], data: TemplateReportData): Promise<Paragraph[]> {
     const processedContent: Paragraph[] = [];
     const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
 
-    for (const paragraph of content) {
-      // Получаем текст из параграфа
-      const paragraphText = this.extractTextFromParagraph(paragraph);
+    console.log('Начинаем замену плейсхолдеров...');
+
+    for (let i = 0; i < templateParagraphs.length; i++) {
+      const paragraphText = templateParagraphs[i];
       
-      if (paragraphText.includes('{chart}')) {
+      // Проверяем каждый плейсхолдер
+      if (paragraphText.includes(TemplateReportGenerator.PLACEHOLDERS.CHART)) {
+        console.log('Найден плейсхолдер {chart}, вставляем изображение');
+        
         // Заменяем плейсхолдер графика на изображение
         processedContent.push(new Paragraph({
           children: [
@@ -147,87 +165,61 @@ export class TemplateReportGenerator {
           alignment: AlignmentType.CENTER,
           spacing: { after: 400 },
         }));
-      } else if (paragraphText.includes('{results table}')) {
+        
+      } else if (paragraphText.includes(TemplateReportGenerator.PLACEHOLDERS.RESULTS_TABLE)) {
+        console.log('Найден плейсхолдер {results table}, вставляем таблицу');
+        
         // Заменяем плейсхолдер таблицы на таблицу результатов
-        const table = this.createResultsTable(data.analysisResults);
-        processedContent.push(new Paragraph({ children: [] })); // Пустой параграф для размещения таблицы
-        // Примечание: В реальной реализации здесь нужно добавить таблицу в документ
-        // Для упрощения добавляем текстовое представление
-        processedContent.push(...this.createTextTable(data.analysisResults));
+        const tableRows = this.createTextTable(data.analysisResults);
+        processedContent.push(...tableRows);
+        
       } else {
         // Заменяем текстовые плейсхолдеры
         let newText = paragraphText
-          .replace('{executor}', data.executor)
-          .replace('{report date}', data.reportDate);
+          .replace(TemplateReportGenerator.PLACEHOLDERS.EXECUTOR, data.executor)
+          .replace(TemplateReportGenerator.PLACEHOLDERS.REPORT_DATE, data.reportDate);
 
-        // Создаем новый параграф с замененным текстом
+        // Определяем стиль параграфа
+        const isTitle = newText.toUpperCase().includes('ОТЧЕТ') || newText.includes('АНАЛИЗ');
+        const isHeading = newText.includes(':') && newText.length < 100;
+        
         const newParagraph = new Paragraph({
           children: [new TextRun({ 
             text: newText,
-            size: paragraphText.includes('ОТЧЕТ') ? 32 : 24,
-            bold: paragraphText.includes('ОТЧЕТ') || paragraphText.includes(':')
+            size: isTitle ? 32 : isHeading ? 28 : 24,
+            bold: isTitle || isHeading
           })],
-          alignment: paragraphText.includes('ОТЧЕТ') ? AlignmentType.CENTER : AlignmentType.LEFT,
-          spacing: { after: 200 }
+          alignment: isTitle ? AlignmentType.CENTER : AlignmentType.LEFT,
+          spacing: { after: isTitle ? 400 : isHeading ? 300 : 200 }
         });
         
         processedContent.push(newParagraph);
       }
     }
 
+    console.log('Замена плейсхолдеров завершена, создано параграфов:', processedContent.length);
     return processedContent;
-  }
-
-  private extractTextFromParagraph(paragraph: Paragraph): string {
-    // Упрощенное извлечение текста из параграфа
-    // В реальной реализации нужно правильно обрабатывать структуру параграфа
-    try {
-      return (paragraph as any).root?.[0]?.children?.[0]?.children?.[0]?.text || '';
-    } catch {
-      return '';
-    }
-  }
-
-  private createResultsTable(results: any[]): Table {
-    const headerRow = new TableRow({
-      children: [
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: '№ зоны', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Уровень (м.)', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Логгер', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Мин. t°C', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Макс. t°C', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Соответствие', bold: true })] })] }),
-      ],
-    });
-
-    const dataRows = results.map(result => new TableRow({
-      children: [
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(result.zoneNumber) })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(result.measurementLevel) })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(result.loggerName) })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(result.serialNumber) })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(result.minTemp) })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(result.maxTemp) })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(result.avgTemp) })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(result.meetsLimits) })] })] }),
-      ],
-    }));
-
-    return new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [headerRow, ...dataRows],
-    });
   }
 
   private createTextTable(results: any[]): Paragraph[] {
     const paragraphs: Paragraph[] = [];
     
+    console.log('Создаем таблицу результатов, записей:', results.length);
+    
     // Заголовок таблицы
     paragraphs.push(new Paragraph({
       children: [new TextRun({ 
-        text: '№ зоны | Уровень | Логгер | S/N | Мин.t°C | Макс.t°C | Среднее t°C | Соответствие',
+        text: 'Результаты анализа временных рядов',
+        bold: true,
+        size: 28
+      })],
+      spacing: { after: 200 }
+    }));
+
+    // Заголовки колонок
+    paragraphs.push(new Paragraph({
+      children: [new TextRun({ 
+        text: '№ зоны | Уровень (м.) | Логгер | S/N | Мин.t°C | Макс.t°C | Среднее t°C | Соответствие',
         bold: true,
         size: 20
       })],
@@ -236,18 +228,25 @@ export class TemplateReportGenerator {
 
     // Разделитель
     paragraphs.push(new Paragraph({
-      children: [new TextRun({ text: '─'.repeat(80), size: 20 })],
+      children: [new TextRun({ text: '─'.repeat(100), size: 20 })],
       spacing: { after: 100 }
     }));
 
     // Строки данных
-    results.forEach(result => {
+    results.forEach((result, index) => {
       const rowText = `${result.zoneNumber} | ${result.measurementLevel} | ${result.loggerName} | ${result.serialNumber} | ${result.minTemp} | ${result.maxTemp} | ${result.avgTemp} | ${result.meetsLimits}`;
+      
       paragraphs.push(new Paragraph({
         children: [new TextRun({ text: rowText, size: 18 })],
         spacing: { after: 50 }
       }));
     });
+
+    // Добавляем пустую строку после таблицы
+    paragraphs.push(new Paragraph({
+      children: [new TextRun({ text: '', size: 18 })],
+      spacing: { after: 200 }
+    }));
 
     return paragraphs;
   }
