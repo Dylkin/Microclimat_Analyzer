@@ -41,101 +41,36 @@ export class TemplateReportGenerator {
       // Конвертируем изображение графика в base64
       const chartImageBase64 = await this.blobToBase64(data.chartImageBlob);
       
-      // Строгая функция для преобразования в строку
-      const ensureString = (value: any): string => {
-        if (value === null || value === undefined) {
-          return '';
-        }
-        if (typeof value === 'string') {
-          return value;
-        }
-        if (typeof value === 'number') {
-          return value.toString();
-        }
-        if (typeof value === 'boolean') {
-          return value.toString();
-        }
-        if (typeof value === 'object') {
-          try {
-            return JSON.stringify(value);
-          } catch {
-            return '[Object]';
-          }
-        }
-        if (typeof value === 'function') {
-          return '[Function]';
-        }
-        return String(value);
-      };
-
+      // Создаем PNG файл из blob
+      const pngFileName = await this.createPngFile(data.chartImageBlob, data.dataType);
+      
       // Подготавливаем данные для замены плейсхолдеров
       const templateData = {
-        chart: {
-          _type: 'image',
-          source: chartImageBase64,
-          format: 'png',
-          width: 6,
-          height: 4
-        },
-        'results table': ensureString(this.formatResultsTable(data.analysisResults)),
-        executor: ensureString(data.executor),
-        'report date': ensureString(data.reportDate)
+        chart: chartImageBase64,
+        'results table': String(this.formatResultsTable(data.analysisResults)),
+        executor: String(data.executor),
+        'report date': String(data.reportDate)
       };
 
-      console.log('Данные для шаблона подготовлены');
-      console.log('Типы данных:', {
-        chart: typeof templateData.chart,
-        'results table': typeof templateData['results table'],
-        executor: typeof templateData.executor,
-        'report date': typeof templateData['report date']
-      });
+      console.log('Данные для шаблона подготовлены:', Object.keys(templateData));
 
       // Генерируем отчет с помощью docx-templates
       const reportBuffer = await createReport({
         template: templateBuffer,
         data: templateData,
         additionalJsContext: {
-          // Безопасные функции для обработки данных в шаблоне
-          formatNumber: (num: any): string => {
-            try {
-              const n = parseFloat(ensureString(num));
-              return isNaN(n) ? '0.0' : n.toFixed(1);
-            } catch {
-              return '0.0';
-            }
-          },
-          formatDate: (date: any): string => {
-            try {
-              const dateStr = ensureString(date);
-              const parsedDate = new Date(dateStr);
-              return isNaN(parsedDate.getTime()) ? dateStr : parsedDate.toLocaleDateString('ru-RU');
-            } catch {
-              return ensureString(date);
-            }
-          },
-          safeString: ensureString,
-          // Функция для безопасного получения значения
-          getValue: (obj: any, key: string): string => {
-            try {
-              if (obj && typeof obj === 'object' && key in obj) {
-                return ensureString(obj[key]);
-              }
-              return '';
-            } catch {
-              return '';
-            }
-          }
+          // Дополнительные функции для обработки данных в шаблоне
+          formatNumber: (num: number) => num.toFixed(1),
+          formatDate: (date: string) => new Date(date).toLocaleDateString('ru-RU')
         },
-        processLineBreaks: true,
-        // Добавляем обработчик ошибок
-        errorHandler: (error: any) => {
-          console.error('Ошибка в шаблоне:', error);
-          return '[Ошибка обработки]';
-        }
+        processLineBreaks: true
       });
 
+      // Встраиваем PNG файл в структуру DOCX
+      const finalReportBuffer = await this.embedPngInDocx(reportBuffer, data.chartImageBlob, pngFileName);
+
       console.log('Отчет успешно сгенерирован');
-      return new Blob([reportBuffer], { 
+      return new Blob([finalReportBuffer], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       });
       
@@ -149,10 +84,10 @@ export class TemplateReportGenerator {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (event) => {
-        if (event.target?.result && event.target.result instanceof ArrayBuffer) {
-          resolve(event.target.result);
+        if (event.target?.result) {
+          resolve(event.target.result as ArrayBuffer);
         } else {
-          reject(new Error('Не удалось прочитать файл шаблона как ArrayBuffer'));
+          reject(new Error('Не удалось прочитать файл шаблона'));
         }
       };
       reader.onerror = () => reject(new Error('Ошибка чтения файла шаблона'));
@@ -164,130 +99,104 @@ export class TemplateReportGenerator {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        try {
-          const result = reader.result;
-          
-          // Проверяем, что результат является строкой
-          if (typeof result !== 'string') {
-            reject(new Error('FileReader не вернул строку'));
-            return;
-          }
-          
-          // Проверяем формат data URL
-          if (!result.startsWith('data:')) {
-            reject(new Error('Некорректный формат data URL'));
-            return;
-          }
-          
-          // Разделяем по запятой
-          const parts = result.split(',');
-          if (parts.length !== 2) {
-            reject(new Error('Некорректная структура data URL'));
-            return;
-          }
-          
-          const base64 = parts[1];
-          
-          // Проверяем, что base64 строка не пустая и содержит только допустимые символы
-          if (!base64 || typeof base64 !== 'string') {
-            reject(new Error('Пустая base64 строка'));
-            return;
-          }
-          
-          // Проверяем корректность base64
-          const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-          if (!base64Regex.test(base64)) {
-            reject(new Error('Некорректные символы в base64 строке'));
-            return;
-          }
-          
-          resolve(base64);
-        } catch (error) {
-          reject(new Error('Ошибка обработки base64 данных: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка')));
-        }
+        const result = reader.result as string;
+        // Убираем префикс data:image/png;base64,
+        const parts = result.split(',');
+        const base64 = parts.length > 1 ? parts[1] : '';
+        resolve(base64);
       };
-      reader.onerror = () => reject(new Error('Ошибка чтения blob данных'));
+      reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
   }
 
   private formatResultsTable(results: any[]): string {
-    if (!results || !Array.isArray(results) || results.length === 0) {
+    if (!results || results.length === 0) {
       return 'Нет данных для отображения';
     }
 
-    // Безопасная функция для получения значения из объекта
-    const safeValue = (obj: any, key: string): string => {
-      try {
-        if (!obj || typeof obj !== 'object') {
-          return '-';
-        }
-        
-        const value = obj[key];
-        
-        if (value === null || value === undefined) {
-          return '-';
-        }
-        
-        if (typeof value === 'string') {
-          return value;
-        }
-        
-        if (typeof value === 'number') {
-          return value.toString();
-        }
-        
-        if (typeof value === 'boolean') {
-          return value.toString();
-        }
-        
-        return String(value);
-      } catch {
-        return '-';
-      }
-    };
-
-    // Создаем простую текстовую таблицу с табуляцией
+    // Создаем простую текстовую таблицу
     let tableText = '№ зоны\tУровень (м.)\tЛоггер\tS/N\tМин.t°C\tМакс.t°C\tСреднее t°C\tСоответствие\n';
 
     results.forEach(result => {
-      try {
-        const row = [
-          safeValue(result, 'zoneNumber'),
-          safeValue(result, 'measurementLevel'),
-          safeValue(result, 'loggerName'),
-          safeValue(result, 'serialNumber'),
-          safeValue(result, 'minTemp'),
-          safeValue(result, 'maxTemp'),
-          safeValue(result, 'avgTemp'),
-          safeValue(result, 'meetsLimits')
-        ].join('\t');
-        
-        tableText += row + '\n';
-      } catch (error) {
-        console.warn('Ошибка обработки строки результата:', error);
-        tableText += '-\t-\t-\t-\t-\t-\t-\t-\n';
-      }
+      tableText += `${result.zoneNumber}\t${result.measurementLevel}\t${result.loggerName}\t${result.serialNumber}\t${result.minTemp}\t${result.maxTemp}\t${result.avgTemp}\t${result.meetsLimits}\n`;
     });
 
     return tableText;
   }
 
-  async saveReport(blob: Blob, filename: string): Promise<void> {
+  private escapeHtml(text: string | number): string {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * Создание PNG файла из blob изображения
+   */
+  private async createPngFile(chartBlob: Blob, dataType: 'temperature' | 'humidity'): Promise<string> {
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '-');
+    const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
+    
+    const fileName = `график_${dataTypeLabel}_${dateStr}_${timeStr}.png`;
+    
+    // Создаем ссылку для скачивания PNG файла
+    const pngUrl = URL.createObjectURL(chartBlob);
+    const link = document.createElement('a');
+    link.href = pngUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Очищаем URL через некоторое время
+    setTimeout(() => URL.revokeObjectURL(pngUrl), 1000);
+    
+    return fileName;
+  }
+
+  /**
+   * Встраивание PNG файла в структуру DOCX
+   */
+  private async embedPngInDocx(docxBuffer: ArrayBuffer, pngBlob: Blob, pngFileName: string): Promise<ArrayBuffer> {
     try {
-      // Проверяем корректность параметров
-      if (!blob || !(blob instanceof Blob)) {
-        throw new Error('Некорректный blob для сохранения');
-      }
+      // Импортируем JSZip динамически
+      const JSZip = (await import('jszip')).default;
       
-      if (!filename || typeof filename !== 'string') {
-        throw new Error('Некорректное имя файла');
-      }
+      // Загружаем DOCX как ZIP архив
+      const zip = await JSZip.loadAsync(docxBuffer);
       
-      saveAs(blob, filename);
+      // Конвертируем PNG blob в ArrayBuffer
+      const pngArrayBuffer = await pngBlob.arrayBuffer();
+      
+      // Добавляем PNG файл в папку word/media
+      zip.file(`word/media/${pngFileName}`, pngArrayBuffer);
+      
+      // Генерируем обновленный DOCX
+      const updatedDocxBuffer = await zip.generateAsync({
+        type: 'arraybuffer',
+        compression: 'DEFLATE',
+        compressionOptions: {
+          level: 6
+        }
+      });
+      
+      console.log(`PNG файл ${pngFileName} успешно встроен в DOCX`);
+      return updatedDocxBuffer;
+      
     } catch (error) {
-      console.error('Ошибка сохранения файла:', error);
-      throw error;
+      console.error('Ошибка встраивания PNG в DOCX:', error);
+      // Если встраивание не удалось, возвращаем исходный буфер
+      return docxBuffer;
     }
+  }
+
+  async saveReport(blob: Blob, filename: string): Promise<void> {
+    saveAs(blob, filename);
   }
 }
