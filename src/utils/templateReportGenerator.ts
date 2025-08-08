@@ -271,15 +271,18 @@ export class TemplateReportGenerator {
             })
           ]
         }))
+      ]
+    });
+
     // Добавляем таблицу как параграф (обходной путь)
     paragraphs.push(new Paragraph({
       children: [],
       spacing: { after: 400 }
     }));
-      ]
+
     return paragraphs;
   }
-    });
+
   async saveReport(blob: Blob, filename: string): Promise<void> {
     saveAs(blob, filename);
   }
