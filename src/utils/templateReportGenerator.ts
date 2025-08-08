@@ -164,50 +164,61 @@ export class TemplateReportGenerator {
         console.warn('Не удалось определить relationship ID, используем rId10');
       }
 
+      // Добавляем необходимые пространства имен в корневой элемент
+      let updatedXml = this.addNamespacesToDocument(documentXml);
+
       // Создаем XML для изображения с правильным relationship ID
       const imageXml = this.createImageXml(relationshipId);
       
-      // Ищем место для вставки изображения
-      let updatedXml = documentXml;
       let imageInserted = false;
       
-      // Вариант 1: Заменяем плейсхолдер {chart} если он есть
+      // Вариант 1: Заменяем плейсхолдер {chart} внутри w:body если он есть
       if (updatedXml.includes('{chart}')) {
         console.log('Найден плейсхолдер {chart}, заменяем на изображение');
         const paragraphWithImage = `
-        <w:p>
-          <w:r>
-            ${imageXml}
-          </w:r>
-        </w:p>`;
+      <w:p>
+        <w:r>
+          ${imageXml}
+        </w:r>
+      </w:p>`;
         updatedXml = updatedXml.replace('{chart}', paragraphWithImage);
         imageInserted = true;
       }
       
-      // Вариант 2: Если плейсхолдера нет, вставляем перед </w:body>
-      if (!imageInserted && updatedXml.includes('</w:body>')) {
-        console.log('Вставляем изображение перед </w:body>');
+      // Вариант 2: Если плейсхолдера нет, вставляем внутри w:body перед w:sectPr или перед </w:body>
+      if (!imageInserted) {
         const paragraphWithImage = `
-        <w:p>
-          <w:r>
-            ${imageXml}
-          </w:r>
-        </w:p>`;
-        updatedXml = updatedXml.replace('</w:body>', `${paragraphWithImage}</w:body>`);
-        imageInserted = true;
+      <w:p>
+        <w:r>
+          ${imageXml}
+        </w:r>
+      </w:p>`;
+        
+        // Пытаемся вставить перед w:sectPr (если есть)
+        if (updatedXml.includes('<w:sectPr>')) {
+          console.log('Вставляем изображение перед <w:sectPr>');
+          updatedXml = updatedXml.replace('<w:sectPr>', `${paragraphWithImage}\n    <w:sectPr>`);
+          imageInserted = true;
+        }
+        // Иначе вставляем перед </w:body>
+        else if (updatedXml.includes('</w:body>')) {
+          console.log('Вставляем изображение перед </w:body>');
+          updatedXml = updatedXml.replace('</w:body>', `${paragraphWithImage}\n  </w:body>`);
+          imageInserted = true;
+        }
       }
       
-      // Вариант 3: Если нет </w:body>, вставляем перед </w:document>
-      if (!imageInserted && updatedXml.includes('</w:document>')) {
-        console.log('Вставляем изображение перед </w:document>');
+      // Вариант 3: Если нет w:body, создаем его
+      if (!imageInserted) {
+        console.log('Создаем новый w:body с изображением');
         const paragraphWithImage = `
-        <w:body>
-          <w:p>
-            <w:r>
-              ${imageXml}
-            </w:r>
-          </w:p>
-        </w:body>`;
+  <w:body>
+    <w:p>
+      <w:r>
+        ${imageXml}
+      </w:r>
+    </w:p>
+  </w:body>`;
         updatedXml = updatedXml.replace('</w:document>', `${paragraphWithImage}</w:document>`);
         imageInserted = true;
       }
@@ -228,45 +239,85 @@ export class TemplateReportGenerator {
   }
 
   /**
+   * Добавляет необходимые пространства имен в корневой элемент document.xml
+   */
+  private addNamespacesToDocument(documentXml: string): string {
+    // Проверяем, есть ли уже необходимые пространства имен
+    const requiredNamespaces = [
+      'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"',
+      'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"',
+      'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"'
+    ];
+
+    let updatedXml = documentXml;
+
+    // Находим открывающий тег w:document
+    const documentTagMatch = updatedXml.match(/<w:document[^>]*>/);
+    if (!documentTagMatch) {
+      console.warn('Не найден тег w:document');
+      return documentXml;
+    }
+
+    const documentTag = documentTagMatch[0];
+    let newDocumentTag = documentTag;
+
+    // Добавляем недостающие пространства имен
+    requiredNamespaces.forEach(namespace => {
+      const namespacePrefix = namespace.split('=')[0];
+      if (!newDocumentTag.includes(namespacePrefix)) {
+        // Вставляем перед закрывающим >
+        newDocumentTag = newDocumentTag.replace('>', ` ${namespace}>`);
+      }
+    });
+
+    // Заменяем старый тег на новый
+    if (newDocumentTag !== documentTag) {
+      updatedXml = updatedXml.replace(documentTag, newDocumentTag);
+      console.log('Добавлены пространства имен в w:document');
+    }
+
+    return updatedXml;
+  }
+  /**
    * Создает XML элемент для изображения
    */
   private createImageXml(relationshipId: string): string {
     return `
-    <w:drawing>
-      <wp:inline distT="0" distB="0" distL="0" distR="0">
-        <wp:extent cx="7620000" cy="5715000"/>
-        <wp:effectExtent l="0" t="0" r="0" b="0"/>
-        <wp:docPr id="1" name="График" descr="График временных рядов"/>
-        <wp:cNvGraphicFramePr>
-          <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
-        </wp:cNvGraphicFramePr>
-        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
-            <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
-              <pic:nvPicPr>
-                <pic:cNvPr id="1" name="График"/>
-                <pic:cNvPicPr/>
-              </pic:nvPicPr>
-              <pic:blipFill>
-                <a:blip r:embed="${relationshipId}"/>
-                <a:stretch>
-                  <a:fillRect/>
-                </a:stretch>
-              </pic:blipFill>
-              <pic:spPr>
-                <a:xfrm>
-                  <a:off x="0" y="0"/>
-                  <a:ext cx="7620000" cy="5715000"/>
-                </a:xfrm>
-                <a:prstGeom prst="rect">
-                  <a:avLst/>
-                </a:prstGeom>
-              </pic:spPr>
-            </pic:pic>
-          </a:graphicData>
-        </a:graphic>
-      </wp:inline>
-    </w:drawing>`;
+<w:drawing>
+  <wp:inline distT="0" distB="0" distL="0" distR="0">
+    <wp:extent cx="7620000" cy="5715000"/>
+    <wp:effectExtent l="0" t="0" r="0" b="0"/>
+    <wp:docPr id="1" name="График" descr="График временных рядов"/>
+    <wp:cNvGraphicFramePr>
+      <a:graphicFrameLocks noChangeAspect="1"/>
+    </wp:cNvGraphicFramePr>
+    <a:graphic>
+      <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+        <pic:pic>
+          <pic:nvPicPr>
+            <pic:cNvPr id="1" name="График"/>
+            <pic:cNvPicPr/>
+          </pic:nvPicPr>
+          <pic:blipFill>
+            <a:blip r:embed="${relationshipId}"/>
+            <a:stretch>
+              <a:fillRect/>
+            </a:stretch>
+          </pic:blipFill>
+          <pic:spPr>
+            <a:xfrm>
+              <a:off x="0" y="0"/>
+              <a:ext cx="7620000" cy="5715000"/>
+            </a:xfrm>
+            <a:prstGeom prst="rect">
+              <a:avLst/>
+            </a:prstGeom>
+          </pic:spPr>
+        </pic:pic>
+      </a:graphicData>
+    </a:graphic>
+  </wp:inline>
+</w:drawing>`;
   }
 
   /**
