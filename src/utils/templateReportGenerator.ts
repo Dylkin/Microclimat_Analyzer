@@ -63,13 +63,13 @@ export class TemplateReportGenerator {
         linebreaks: true,
       }
       )
-      const dateStr = now.toLocaleDateString('ru-RU'); // Только дата без времени
       // Создаем таблицу результатов в формате HTML/текст
       const resultsTable = this.createResultsTable(data.analysisResults);
 
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
+        report_date: data.reportDate,
         // НЕ добавляем chart в templateData - только через imageModule
         results_table: resultsTable
       };
