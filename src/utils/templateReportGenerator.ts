@@ -43,12 +43,7 @@ export class TemplateReportGenerator {
       
       // Подготавливаем данные для замены плейсхолдеров
       const templateData = {
-        chart: {
-          width: 15,
-          height: 10,
-          data: chartImageBase64,
-          extension: '.png'
-        },
+        chart: chartImageBase64,
         'results table': String(this.formatResultsTable(data.analysisResults)),
         executor: String(data.executor),
         'report date': String(data.reportDate)
