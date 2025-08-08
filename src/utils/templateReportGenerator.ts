@@ -1,4 +1,3 @@
-import { saveAs } from 'file-saver';
 import { createReport } from 'docx-templates';
 
 export interface TemplateReportData {
@@ -16,7 +15,8 @@ export class TemplateReportGenerator {
   private static readonly PLACEHOLDERS = {
     RESULTS_TABLE: '{results_table}',
     EXECUTOR: '{executor}',
-    REPORT_DATE: '{report_date}'
+    REPORT_DATE: '{report_date}',
+    CHART_IMAGE: '{chart_image}'
   };
 
   static getInstance(): TemplateReportGenerator {
@@ -37,14 +37,19 @@ export class TemplateReportGenerator {
       // Читаем шаблон как ArrayBuffer
       const templateBuffer = await this.readFileAsArrayBuffer(templateFile);
       
-      // Создаем PNG файл из blob
-      const pngFileName = await this.createPngFile(data.chartImageBlob, data.dataType);
+      // Конвертируем изображение в Uint8Array для docx-templates
+      const chartImageData = new Uint8Array(await data.chartImageBlob.arrayBuffer());
       
       // Подготавливаем данные для замены плейсхолдеров
       const templateData = {
         'results_table': this.formatResultsTable(data.analysisResults),
         executor: String(data.executor),
-        'report_date': String(data.reportDate)
+        'report_date': String(data.reportDate),
+        'chart_image': {
+          _type: 'image',
+          _data: chartImageData,
+          _options: { width: 500, height: 300 }
+        }
       };
 
       console.log('Данные для шаблона подготовлены:', Object.keys(templateData));
@@ -61,10 +66,8 @@ export class TemplateReportGenerator {
         processLineBreaks: true
       });
 
-      // Встраиваем PNG файл в DOCX архив
-      const finalReportBuffer = await this.embedPngInDocx(reportBuffer, data.chartImageBlob, pngFileName);
       console.log('Отчет успешно сгенерирован');
-      return new Blob([finalReportBuffer], { 
+      return new Blob([reportBuffer], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       });
       
@@ -105,136 +108,4 @@ export class TemplateReportGenerator {
     return tableText;
   }
 
-  private escapeHtml(text: string | number): string {
-    return String(text)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  /**
-   * Создание PNG файла из blob изображения
-   */
-  private async createPngFile(chartBlob: Blob, dataType: 'temperature' | 'humidity'): Promise<string> {
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10);
-    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '-');
-    const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
-    
-    const fileName = `график_${dataTypeLabel}_${dateStr}_${timeStr}.png`;
-    
-    // Создаем ссылку для скачивания PNG файла
-    const pngUrl = URL.createObjectURL(chartBlob);
-    const link = document.createElement('a');
-    link.href = pngUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Очищаем URL через некоторое время
-    setTimeout(() => URL.revokeObjectURL(pngUrl), 1000);
-    
-    return fileName;
-  }
-
-  /**
-   * Встраивание PNG файла в структуру DOCX
-   */
-  private async embedPngInDocx(docxBuffer: ArrayBuffer, pngBlob: Blob, pngFileName: string): Promise<ArrayBuffer> {
-    try {
-      // Импортируем JSZip динамически
-      const JSZip = (await import('jszip')).default;
-      
-      // Загружаем DOCX как ZIP архив
-      const zip = await JSZip.loadAsync(docxBuffer);
-      
-      // Конвертируем PNG blob в ArrayBuffer
-      const pngArrayBuffer = await pngBlob.arrayBuffer();
-      
-      // Создаем папку word/media если она не существует
-      if (!zip.folder('word/media')) {
-        zip.folder('word/media');
-      }
-      
-      // Добавляем PNG файл в папку word/media с фиксированным именем для ссылки в XML
-      const mediaFileName = 'chart.png';
-      zip.file(`word/media/${mediaFileName}`, pngArrayBuffer);
-      
-      // Обновляем [Content_Types].xml для регистрации PNG файла
-      const contentTypesXml = zip.file('[Content_Types].xml');
-      if (contentTypesXml) {
-        const contentTypesContent = await contentTypesXml.async('string');
-        
-        // Добавляем тип PNG если его нет
-        if (!contentTypesContent.includes('Extension="png"')) {
-          const updatedContentTypes = contentTypesContent.replace(
-            '</Types>',
-            '  <Default Extension="png" ContentType="image/png"/>\n</Types>'
-          );
-          zip.file('[Content_Types].xml', updatedContentTypes);
-        }
-      }
-      
-      // Обновляем word/_rels/document.xml.rels для создания связи с изображением
-      const documentRelsPath = 'word/_rels/document.xml.rels';
-      let documentRels = zip.file(documentRelsPath);
-      
-      if (!documentRels) {
-        // Создаем файл связей если его нет
-        const relsContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${mediaFileName}"/>
-</Relationships>`;
-        zip.file(documentRelsPath, relsContent);
-      } else {
-        const relsContent = await documentRels.async('string');
-        
-        // Добавляем связь с изображением если её нет
-        if (!relsContent.includes(`Target="media/${mediaFileName}"`)) {
-          // Находим максимальный rId
-          const rIdMatches = relsContent.match(/rId(\d+)/g);
-          let maxRId = 0;
-          if (rIdMatches) {
-            rIdMatches.forEach(match => {
-              const num = parseInt(match.replace('rId', ''));
-              if (num > maxRId) maxRId = num;
-            });
-          }
-          
-          const newRId = `rId${maxRId + 1}`;
-          const imageRelationship = `  <Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${mediaFileName}"/>`;
-          
-          const updatedRels = relsContent.replace(
-            '</Relationships>',
-            `${imageRelationship}\n</Relationships>`
-          );
-          zip.file(documentRelsPath, updatedRels);
-        }
-      }
-      
-      // Генерируем обновленный DOCX
-      const updatedDocxBuffer = await zip.generateAsync({
-        type: 'arraybuffer',
-        compression: 'DEFLATE',
-        compressionOptions: {
-          level: 6
-        }
-      });
-      
-      console.log(`PNG файл ${mediaFileName} успешно встроен в DOCX`);
-      return updatedDocxBuffer;
-      
-    } catch (error) {
-      console.error('Ошибка встраивания PNG в DOCX:', error);
-      // Если встраивание не удалось, возвращаем исходный буфер
-      return docxBuffer;
-    }
-  }
-
-  async saveReport(blob: Blob, filename: string): Promise<void> {
-    saveAs(blob, filename);
-  }
 }

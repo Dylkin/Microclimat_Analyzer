@@ -43,9 +43,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
   
-  // Состояние для отслеживания процесса генерации из шаблона
-  const [isGeneratingFromTemplate, setIsGeneratingFromTemplate] = useState(false);
-  
   // Chart dimensions
   const chartWidth = 1200;
   const chartHeight = 400;
@@ -224,7 +221,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       // Создаем скриншот с высоким качеством
       const canvas = await html2canvas(chartContainer, {
-        scale: 1, // Уменьшаем разрешение для предотвращения ошибок с большими изображениями
+        scale: 2, // Увеличиваем разрешение для лучшего качества
         backgroundColor: '#ffffff',
         useCORS: true,
         allowTaint: true,
@@ -332,19 +329,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return;
     }
 
-    setIsGeneratingFromTemplate(true);
+    setReportStatus(prev => ({ ...prev, isGeneratingFromTemplate: true }));
 
     try {
-      // Создаем скриншот графика
-      const saveButton = chartRef.current.querySelector('button[title="Сформировать отчет с графиком"]') as HTMLElement;
-      const originalDisplay = saveButton ? saveButton.style.display : '';
-      if (saveButton) {
-        saveButton.style.display = 'none';
-      }
-
       const chartContainer = chartRef.current;
       const canvas = await html2canvas(chartContainer, {
-        scale: 1,
+        scale: 2,
         backgroundColor: '#ffffff',
         useCORS: true,
         allowTaint: true,
@@ -352,10 +342,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         width: chartContainer.offsetWidth,
         height: chartContainer.offsetHeight
       });
-
-      if (saveButton) {
-        saveButton.style.display = originalDisplay;
-      }
 
       // Поворачиваем изображение на 90° против часовой стрелки
       const rotatedCanvas = document.createElement('canvas');
@@ -417,7 +403,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     } catch (error) {
       console.error('Ошибка создания отчета из шаблона:', error);
     } finally {
-      setIsGeneratingFromTemplate(false);
+      setReportStatus(prev => ({ ...prev, isGeneratingFromTemplate: false }));
     }
   };
 
@@ -716,10 +702,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             {templateFile && (
               <button
                 onClick={handleGenerateTemplateReport}
-                disabled={isGeneratingFromTemplate}
+                disabled={reportStatus.isGeneratingFromTemplate}
                 className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {isGeneratingFromTemplate ? (
+                {reportStatus.isGeneratingFromTemplate ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                     <span>Создание отчета из шаблона...</span>
