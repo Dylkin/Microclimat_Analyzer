@@ -719,35 +719,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             )}
           </div>
 
-          {/* Информация о плейсхолдерах */}
-          <div className="w-full max-w-2xl">
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <h4 className="text-sm font-semibold text-green-800 mb-3">
-                📋 Поддерживаемые плейсхолдеры для шаблонов
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-green-700">
-                <div className="flex items-center space-x-2">
-                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-xs">{'{chart}'}</code>
-                  <span>График временных рядов</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-xs">{'{results table}'}</code>
-                  <span>Таблица результатов</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-xs">{'{executor}'}</code>
-                  <span>Сотрудник</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-xs">{'{report date}'}</code>
-                  <span>Дата отчета</span>
-                </div>
-              </div>
-              <div className="mt-3 p-2 bg-green-100 rounded text-xs text-green-600">
-                <strong>Совет:</strong> Просто вставьте эти плейсхолдеры в ваш DOCX шаблон, и система автоматически заменит их на актуальные данные.
-              </div>
-            </div>
-          </div>
 
           {/* Кнопки генерации отчетов */}
           <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
