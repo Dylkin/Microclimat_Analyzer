@@ -61,8 +61,7 @@ export class TemplateReportGenerator {
         modules: [imageModule],
         paragraphLoop: true,
         linebreaks: true,
-      });
-
+      const dateStr = now.toLocaleDateString('ru-RU'); // Только дата без времени
       // Создаем таблицу результатов в формате HTML/текст
       const resultsTable = this.createResultsTable(data.analysisResults);
 
@@ -70,14 +69,14 @@ export class TemplateReportGenerator {
       const templateData = {
         executor: data.executor,
         report_date: data.reportDate,
+        // НЕ добавляем chart в templateData - только через imageModule
         results_table: resultsTable
       };
 
       console.log('Данные для шаблона:', {
         executor: templateData.executor,
         report_date: templateData.report_date,
-        chart: `PNG изображение (${chartImageBuffer.byteLength} байт)`,
-        results_table_length: resultsTable.length
+        chart_image_size: `${chartImageBuffer.byteLength} байт`
       });
 
       // Заполняем шаблон данными
