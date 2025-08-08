@@ -710,7 +710,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <div className="mt-2 p-3 bg-blue-50 rounded-lg">
                 <p className="text-xs text-blue-700">
                   <strong>Доступные плейсхолдеры:</strong><br/>
-                  • <code>{'{%chart}'}</code> - График (изображение)<br/>
+                  • <code>{'{chart}'}</code> - График<br/>
                   • <code>{'{executor}'}</code> - Исполнитель<br/>
                   • <code>{'{report_date}'}</code> - Дата отчета
                 </p>
