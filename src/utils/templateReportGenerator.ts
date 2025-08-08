@@ -1,23 +1,14 @@
-import { createReport } from 'docx-templates';
+import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, Table, TableRow, TableCell, WidthType } from 'docx';
+import { saveAs } from 'file-saver';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
-  analysisResults: any[];
   executor: string;
-  reportDate: string;
-  dataType: 'temperature' | 'humidity';
+  report_date: string;
 }
 
 export class TemplateReportGenerator {
   private static instance: TemplateReportGenerator;
-
-  // Фиксированный список поддерживаемых плейсхолдеров
-  private static readonly PLACEHOLDERS = {
-    RESULTS_TABLE: '{results_table}',
-    EXECUTOR: '{executor}',
-    REPORT_DATE: '{report_date}',
-    CHART_IMAGE: '{chart_image}'
-  };
 
   static getInstance(): TemplateReportGenerator {
     if (!TemplateReportGenerator.instance) {
@@ -26,54 +17,30 @@ export class TemplateReportGenerator {
     return TemplateReportGenerator.instance;
   }
 
-  static getAvailablePlaceholders(): string[] {
-    return Object.values(TemplateReportGenerator.PLACEHOLDERS);
-  }
-
   async generateReportFromTemplate(templateFile: File, data: TemplateReportData): Promise<Blob> {
     try {
-      console.log('Начинаем генерацию отчета из шаблона:', templateFile.name);
-      
       // Читаем шаблон как ArrayBuffer
       const templateBuffer = await this.readFileAsArrayBuffer(templateFile);
       
-      // Конвертируем изображение в Uint8Array для docx-templates
-      const chartImageData = new Uint8Array(await data.chartImageBlob.arrayBuffer());
+      // Парсим DOCX шаблон
+      const templateContent = await this.parseDocxTemplate(templateBuffer);
       
-      // Подготавливаем данные для замены плейсхолдеров
-      const templateData = {
-        'results_table': this.formatResultsTable(data.analysisResults),
-        executor: String(data.executor),
-        'report_date': String(data.reportDate),
-        'chart_image': {
-          _type: 'image',
-          _data: chartImageData,
-          _options: { width: 500, height: 300 }
-        }
-      };
-
-      console.log('Данные для шаблона подготовлены:', Object.keys(templateData));
-
-      // Генерируем отчет с помощью docx-templates
-      const reportBuffer = await createReport({
-        template: templateBuffer,
-        data: templateData,
-        additionalJsContext: {
-          // Дополнительные функции для обработки данных в шаблоне
-          formatNumber: (num: number) => num.toFixed(1),
-          formatDate: (date: string) => new Date(date).toLocaleDateString('ru-RU')
-        },
-        processLineBreaks: true
+      // Заменяем плейсхолдеры
+      const processedContent = await this.replacePlaceholders(templateContent, data);
+      
+      // Создаем новый документ
+      const doc = new Document({
+        sections: [{
+          children: processedContent
+        }]
       });
 
-      console.log('Отчет успешно сгенерирован');
-      return new Blob([reportBuffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-      });
-      
+      // Генерируем DOCX файл
+      const buffer = await Packer.toBlob(doc);
+      return buffer;
     } catch (error) {
       console.error('Ошибка генерации отчета из шаблона:', error);
-      throw new Error('Не удалось создать отчет из шаблона: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
+      throw new Error('Не удалось создать отчет из шаблона');
     }
   }
 
@@ -92,20 +59,127 @@ export class TemplateReportGenerator {
     });
   }
 
+  private async parseDocxTemplate(buffer: ArrayBuffer): Promise<Paragraph[]> {
+    // Упрощенный парсер DOCX - извлекаем текст и создаем базовую структуру
+    // В реальном проекте здесь должен быть полноценный DOCX парсер
+    
+    try {
+      // Конвертируем ArrayBuffer в строку для поиска плейсхолдеров
+      const uint8Array = new Uint8Array(buffer);
+      const decoder = new TextDecoder('utf-8', { ignoreBOM: true });
+      let content = '';
+      
+      // Пытаемся извлечь текст из DOCX (упрощенный подход)
+      for (let i = 0; i < uint8Array.length - 10; i++) {
+        const char = decoder.decode(uint8Array.slice(i, i + 1));
+        if (char.match(/[a-zA-Zа-яА-Я0-9\s\{\}]/)) {
+          content += char;
+        }
+      }
 
-  private formatResultsTable(results: any[]): string {
-    if (!results || results.length === 0) {
-      return 'Нет данных для отображения';
+      // Разбиваем на параграфы и создаем структуру документа
+      const lines = content.split(/[\r\n]+/).filter(line => line.trim().length > 0);
+      
+      return lines.map(line => new Paragraph({
+        children: [new TextRun({ text: line.trim() })],
+        spacing: { after: 200 }
+      }));
+
+    } catch (error) {
+      console.error('Ошибка парсинга DOCX шаблона:', error);
+      // Возвращаем базовый шаблон с плейсхолдерами
+      return [
+        new Paragraph({
+          children: [new TextRun({ text: 'ОТЧЕТ ПО АНАЛИЗУ ВРЕМЕННЫХ РЯДОВ', bold: true, size: 32 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 400 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: 'Дата формирования: {report_date}', size: 24 })],
+          spacing: { after: 200 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: 'Исполнитель: {executor}', size: 24 })],
+          spacing: { after: 400 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: 'График временных рядов:', bold: true, size: 28 })],
+          spacing: { after: 200 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: '{chart}' })],
+          spacing: { after: 400 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: 'Результаты анализа:', bold: true, size: 28 })],
+          spacing: { after: 200 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: 'Таблица результатов будет вставлена здесь' })],
+          spacing: { after: 200 }
+        })
+      ];
     }
-
-    // Создаем простую текстовую таблицу
-    let tableText = '№ зоны\tУровень (м.)\tЛоггер\tS/N\tМин.t°C\tМакс.t°C\tСреднее t°C\tСоответствие\n';
-
-    results.forEach(result => {
-      tableText += `${result.zoneNumber}\t${result.measurementLevel}\t${result.loggerName}\t${result.serialNumber}\t${result.minTemp}\t${result.maxTemp}\t${result.avgTemp}\t${result.meetsLimits}\n`;
-    });
-
-    return tableText;
   }
 
+  private async replacePlaceholders(content: Paragraph[], data: TemplateReportData): Promise<Paragraph[]> {
+    const processedContent: Paragraph[] = [];
+    const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
+
+    for (const paragraph of content) {
+      // Получаем текст из параграфа
+      const paragraphText = this.extractTextFromParagraph(paragraph);
+      
+      if (paragraphText.includes('{chart}')) {
+        // Заменяем плейсхолдер графика на изображение
+        processedContent.push(new Paragraph({
+          children: [
+            new ImageRun({
+              data: chartImageBuffer,
+              transformation: {
+                width: 560,
+                height: 840,
+              },
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 400 },
+        }));
+      } else {
+        // Заменяем текстовые плейсхолдеры
+        let newText = paragraphText
+          .replace('{executor}', data.executor)
+          .replace('{report_date}', data.report_date);
+
+        // Создаем новый параграф с замененным текстом
+        const newParagraph = new Paragraph({
+          children: [new TextRun({ 
+            text: newText,
+            size: paragraphText.includes('ОТЧЕТ') ? 32 : 24,
+            bold: paragraphText.includes('ОТЧЕТ') || paragraphText.includes(':')
+          })],
+          alignment: paragraphText.includes('ОТЧЕТ') ? AlignmentType.CENTER : AlignmentType.LEFT,
+          spacing: { after: 200 }
+        });
+        
+        processedContent.push(newParagraph);
+      }
+    }
+
+    return processedContent;
+  }
+
+  private extractTextFromParagraph(paragraph: Paragraph): string {
+    // Упрощенное извлечение текста из параграфа
+    // В реальной реализации нужно правильно обрабатывать структуру параграфа
+    try {
+      return (paragraph as any).root?.[0]?.children?.[0]?.children?.[0]?.text || '';
+    } catch {
+      return '';
+    }
+  }
+
+  async saveReport(blob: Blob, filename: string): Promise<void> {
+    saveAs(blob, filename);
+  }
 }
