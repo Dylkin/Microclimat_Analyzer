@@ -66,11 +66,8 @@ export class TemplateReportGenerator {
         processLineBreaks: true
       });
 
-      // Встраиваем PNG файл в структуру DOCX
-      const finalReportBuffer = await this.embedPngInDocx(reportBuffer, data.chartImageBlob, pngFileName);
-
       console.log('Отчет успешно сгенерирован');
-      return new Blob([finalReportBuffer], { 
+      return new Blob([reportBuffer], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       });
       
