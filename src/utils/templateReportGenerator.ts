@@ -3,8 +3,10 @@ import { saveAs } from 'file-saver';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
+  analysisResults: any[];
   executor: string;
-  report_date: string;
+  reportDate: string;
+  dataType: 'temperature' | 'humidity';
 }
 
 export class TemplateReportGenerator {
@@ -145,11 +147,15 @@ export class TemplateReportGenerator {
           alignment: AlignmentType.CENTER,
           spacing: { after: 400 },
         }));
+      } else if (paragraphText.includes('{results table}')) {
+        // Заменяем плейсхолдер таблицы на таблицу результатов
+        const resultsTable = this.createResultsTable(data.analysisResults);
+        processedContent.push(...resultsTable);
       } else {
         // Заменяем текстовые плейсхолдеры
         let newText = paragraphText
           .replace('{executor}', data.executor)
-          .replace('{report_date}', data.report_date);
+          .replace('{report_date}', data.reportDate);
 
         // Создаем новый параграф с замененным текстом
         const newParagraph = new Paragraph({
@@ -179,6 +185,101 @@ export class TemplateReportGenerator {
     }
   }
 
+  private createResultsTable(analysisResults: any[]): Paragraph[] {
+    const paragraphs: Paragraph[] = [];
+
+    // Заголовок таблицы
+    paragraphs.push(new Paragraph({
+      children: [new TextRun({ 
+        text: 'Результаты анализа',
+        bold: true,
+        size: 28
+      })],
+      spacing: { after: 200 }
+    }));
+
+    // Создаем таблицу
+    const table = new Table({
+      width: {
+        size: 100,
+        type: WidthType.PERCENTAGE,
+      },
+      rows: [
+        // Заголовок таблицы
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: '№ зоны', bold: true, size: 20 })] })],
+              width: { size: 15, type: WidthType.PERCENTAGE }
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: 'Уровень (м.)', bold: true, size: 20 })] })],
+              width: { size: 15, type: WidthType.PERCENTAGE }
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: 'Логгер', bold: true, size: 20 })] })],
+              width: { size: 15, type: WidthType.PERCENTAGE }
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true, size: 20 })] })],
+              width: { size: 15, type: WidthType.PERCENTAGE }
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: 'Мин. t°C', bold: true, size: 20 })] })],
+              width: { size: 10, type: WidthType.PERCENTAGE }
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: 'Макс. t°C', bold: true, size: 20 })] })],
+              width: { size: 10, type: WidthType.PERCENTAGE }
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true, size: 20 })] })],
+              width: { size: 10, type: WidthType.PERCENTAGE }
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: 'Соответствие', bold: true, size: 20 })] })],
+              width: { size: 10, type: WidthType.PERCENTAGE }
+            })
+          ]
+        }),
+        // Строки данных
+        ...analysisResults.map(result => new TableRow({
+          children: [
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(result.zoneNumber), size: 18 })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(result.measurementLevel), size: 18 })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(result.loggerName), size: 18 })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(result.serialNumber), size: 18 })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(result.minTemp), size: 18 })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(result.maxTemp), size: 18 })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(result.avgTemp), size: 18 })] })]
+            }),
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text: String(result.meetsLimits), size: 18 })] })]
+            })
+          ]
+        }))
+    // Добавляем таблицу как параграф (обходной путь)
+    paragraphs.push(new Paragraph({
+      children: [],
+      spacing: { after: 400 }
+    }));
+      ]
+    return paragraphs;
+  }
+    });
   async saveReport(blob: Blob, filename: string): Promise<void> {
     saveAs(blob, filename);
   }

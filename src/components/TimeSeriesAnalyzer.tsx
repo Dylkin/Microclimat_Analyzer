@@ -389,6 +389,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
         analysisResults,
+        analysisResults,
         executor: user?.fullName || 'Неизвестный пользователь',
         reportDate: `${dateStr} ${timeStr}`,
         dataType
