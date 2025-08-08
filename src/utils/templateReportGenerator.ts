@@ -61,8 +61,10 @@ export class TemplateReportGenerator {
         processLineBreaks: true
       });
 
+      // Встраиваем PNG файл в DOCX архив
+      const finalReportBuffer = await this.embedPngInDocx(reportBuffer, data.chartImageBlob, pngFileName);
       console.log('Отчет успешно сгенерирован');
-      return new Blob([reportBuffer], { 
+      return new Blob([finalReportBuffer], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       });
       
@@ -152,8 +154,66 @@ export class TemplateReportGenerator {
       // Конвертируем PNG blob в ArrayBuffer
       const pngArrayBuffer = await pngBlob.arrayBuffer();
       
-      // Добавляем PNG файл в папку word/media
-      zip.file(`word/media/${pngFileName}`, pngArrayBuffer);
+      // Создаем папку word/media если она не существует
+      if (!zip.folder('word/media')) {
+        zip.folder('word/media');
+      }
+      
+      // Добавляем PNG файл в папку word/media с фиксированным именем для ссылки в XML
+      const mediaFileName = 'chart.png';
+      zip.file(`word/media/${mediaFileName}`, pngArrayBuffer);
+      
+      // Обновляем [Content_Types].xml для регистрации PNG файла
+      const contentTypesXml = zip.file('[Content_Types].xml');
+      if (contentTypesXml) {
+        const contentTypesContent = await contentTypesXml.async('string');
+        
+        // Добавляем тип PNG если его нет
+        if (!contentTypesContent.includes('Extension="png"')) {
+          const updatedContentTypes = contentTypesContent.replace(
+            '</Types>',
+            '  <Default Extension="png" ContentType="image/png"/>\n</Types>'
+          );
+          zip.file('[Content_Types].xml', updatedContentTypes);
+        }
+      }
+      
+      // Обновляем word/_rels/document.xml.rels для создания связи с изображением
+      const documentRelsPath = 'word/_rels/document.xml.rels';
+      let documentRels = zip.file(documentRelsPath);
+      
+      if (!documentRels) {
+        // Создаем файл связей если его нет
+        const relsContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${mediaFileName}"/>
+</Relationships>`;
+        zip.file(documentRelsPath, relsContent);
+      } else {
+        const relsContent = await documentRels.async('string');
+        
+        // Добавляем связь с изображением если её нет
+        if (!relsContent.includes(`Target="media/${mediaFileName}"`)) {
+          // Находим максимальный rId
+          const rIdMatches = relsContent.match(/rId(\d+)/g);
+          let maxRId = 0;
+          if (rIdMatches) {
+            rIdMatches.forEach(match => {
+              const num = parseInt(match.replace('rId', ''));
+              if (num > maxRId) maxRId = num;
+            });
+          }
+          
+          const newRId = `rId${maxRId + 1}`;
+          const imageRelationship = `  <Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${mediaFileName}"/>`;
+          
+          const updatedRels = relsContent.replace(
+            '</Relationships>',
+            `${imageRelationship}\n</Relationships>`
+          );
+          zip.file(documentRelsPath, updatedRels);
+        }
+      }
       
       // Генерируем обновленный DOCX
       const updatedDocxBuffer = await zip.generateAsync({
@@ -164,7 +224,7 @@ export class TemplateReportGenerator {
         }
       });
       
-      console.log(`PNG файл ${pngFileName} успешно встроен в DOCX`);
+      console.log(`PNG файл ${mediaFileName} успешно встроен в DOCX`);
       return updatedDocxBuffer;
       
     } catch (error) {
