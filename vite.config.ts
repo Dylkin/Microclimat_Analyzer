@@ -9,6 +9,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
+      'buffer',
       'd3-array',
       'd3-scale',
       'd3-scale-chromatic',
