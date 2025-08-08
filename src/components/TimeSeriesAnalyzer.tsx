@@ -702,9 +702,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 </p>
                 <button
                   onClick={() => setTemplateFile(null)}
-                  className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+                  className="mt-2 text-red-600 hover:text-red-800 transition-colors"
                 >
-                  Удалить шаблон
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             )}
