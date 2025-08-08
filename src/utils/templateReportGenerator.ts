@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, Table, TableRow, TableCell, WidthType } from 'docx';
+import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
 export interface TemplateReportData {
@@ -21,266 +21,248 @@ export class TemplateReportGenerator {
 
   async generateReportFromTemplate(templateFile: File, data: TemplateReportData): Promise<Blob> {
     try {
-      // Читаем шаблон как ArrayBuffer
-      const templateBuffer = await this.readFileAsArrayBuffer(templateFile);
+      console.log('Начинаем обработку DOCX шаблона...');
       
-      // Парсим DOCX шаблон
-      const templateContent = await this.parseDocxTemplate(templateBuffer);
+      // Читаем шаблон как ZIP архив
+      const templateArrayBuffer = await templateFile.arrayBuffer();
+      const zip = await JSZip.loadAsync(templateArrayBuffer);
       
-      // Заменяем плейсхолдеры
-      const processedContent = await this.replacePlaceholders(templateContent, data);
-      
-      // Создаем новый документ
-      const doc = new Document({
-        sections: [{
-          children: processedContent
-        }]
-      });
+      // Читаем document.xml - основное содержимое документа
+      const documentXml = await zip.file('word/document.xml')?.async('text');
+      if (!documentXml) {
+        throw new Error('Не удалось найти document.xml в DOCX файле');
+      }
 
-      // Генерируем DOCX файл
-      const buffer = await Packer.toBlob(doc);
-      return buffer;
+      console.log('Исходный document.xml найден');
+
+      // Заменяем текстовые плейсхолдеры
+      let modifiedXml = documentXml;
+      modifiedXml = modifiedXml.replace(/{executor}/g, this.escapeXml(data.executor));
+      modifiedXml = modifiedXml.replace(/{report_date}/g, this.escapeXml(data.reportDate));
+
+      // Обрабатываем плейсхолдер {chart}
+      const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
+      const chartImageBase64 = this.arrayBufferToBase64(chartImageBuffer);
+      
+      // Создаем папку media если её нет
+      if (!zip.file('word/media/')) {
+        zip.folder('word/media');
+      }
+
+      // Добавляем изображение в архив
+      const imageName = 'image1.png';
+      zip.file(`word/media/${imageName}`, chartImageBuffer);
+
+      // Создаем связи для изображения (relationships)
+      await this.updateRelationships(zip, imageName);
+
+      // Заменяем плейсхолдер {chart} на XML для изображения
+      const imageXml = this.createImageXml(imageName);
+      modifiedXml = modifiedXml.replace(/{chart}/g, imageXml);
+
+      // Обрабатываем плейсхолдер {results table}
+      const tableXml = this.createResultsTableXml(data.analysisResults);
+      modifiedXml = modifiedXml.replace(/{results table}/g, tableXml);
+
+      // Сохраняем модифицированный document.xml
+      zip.file('word/document.xml', modifiedXml);
+
+      console.log('DOCX файл успешно модифицирован');
+
+      // Генерируем новый DOCX файл
+      const modifiedDocx = await zip.generateAsync({ type: 'blob' });
+      return modifiedDocx;
+
     } catch (error) {
       console.error('Ошибка генерации отчета из шаблона:', error);
-      throw new Error('Не удалось создать отчет из шаблона');
+      throw new Error(`Не удалось создать отчет из шаблона: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   }
 
-  private async readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          resolve(event.target.result as ArrayBuffer);
-        } else {
-          reject(new Error('Не удалось прочитать файл шаблона'));
-        }
-      };
-      reader.onerror = () => reject(new Error('Ошибка чтения файла шаблона'));
-      reader.readAsArrayBuffer(file);
-    });
-  }
-
-  private async parseDocxTemplate(buffer: ArrayBuffer): Promise<Paragraph[]> {
-    // Упрощенный парсер DOCX - извлекаем текст и создаем базовую структуру
-    // В реальном проекте здесь должен быть полноценный DOCX парсер
-    
+  private async updateRelationships(zip: JSZip, imageName: string): Promise<void> {
     try {
-      // Конвертируем ArrayBuffer в строку для поиска плейсхолдеров
-      const uint8Array = new Uint8Array(buffer);
-      const decoder = new TextDecoder('utf-8', { ignoreBOM: true });
-      let content = '';
+      // Читаем существующие relationships
+      const relsFile = zip.file('word/_rels/document.xml.rels');
+      let relsXml = '';
       
-      // Пытаемся извлечь текст из DOCX (упрощенный подход)
-      for (let i = 0; i < uint8Array.length - 10; i++) {
-        const char = decoder.decode(uint8Array.slice(i, i + 1));
-        if (char.match(/[a-zA-Zа-яА-Я0-9\s\{\}]/)) {
-          content += char;
-        }
+      if (relsFile) {
+        relsXml = await relsFile.async('text');
+      } else {
+        // Создаем базовый relationships файл
+        relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`;
       }
 
-      // Разбиваем на параграфы и создаем структуру документа
-      const lines = content.split(/[\r\n]+/).filter(line => line.trim().length > 0);
+      // Находим максимальный Id для создания нового
+      const idMatches = relsXml.match(/Id="rId(\d+)"/g);
+      let maxId = 0;
+      if (idMatches) {
+        idMatches.forEach(match => {
+          const id = parseInt(match.match(/\d+/)?.[0] || '0');
+          if (id > maxId) maxId = id;
+        });
+      }
+
+      const newId = maxId + 1;
+      const imageRelId = `rId${newId}`;
+
+      // Добавляем relationship для изображения
+      const imageRel = `<Relationship Id="${imageRelId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageName}"/>`;
       
-      return lines.map(line => new Paragraph({
-        children: [new TextRun({ text: line.trim() })],
-        spacing: { after: 200 }
-      }));
+      // Вставляем перед закрывающим тегом
+      const modifiedRelsXml = relsXml.replace('</Relationships>', `${imageRel}</Relationships>`);
+
+      // Создаем папку _rels если её нет
+      if (!zip.file('word/_rels/')) {
+        zip.folder('word/_rels');
+      }
+
+      // Сохраняем обновленный relationships файл
+      zip.file('word/_rels/document.xml.rels', modifiedRelsXml);
+
+      // Сохраняем ID для использования в XML изображения
+      this.currentImageRelId = imageRelId;
 
     } catch (error) {
-      console.error('Ошибка парсинга DOCX шаблона:', error);
-      // Возвращаем базовый шаблон с плейсхолдерами
-      return [
-        new Paragraph({
-          children: [new TextRun({ text: 'ОТЧЕТ ПО АНАЛИЗУ ВРЕМЕННЫХ РЯДОВ', bold: true, size: 32 })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 400 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: 'Дата формирования: {report_date}', size: 24 })],
-          spacing: { after: 200 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: 'Исполнитель: {executor}', size: 24 })],
-          spacing: { after: 400 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: 'График временных рядов:', bold: true, size: 28 })],
-          spacing: { after: 200 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: '{chart}' })],
-          spacing: { after: 400 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: 'Результаты анализа:', bold: true, size: 28 })],
-          spacing: { after: 200 }
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: 'Таблица результатов будет вставлена здесь' })],
-          spacing: { after: 200 }
-        })
-      ];
+      console.error('Ошибка обновления relationships:', error);
+      this.currentImageRelId = 'rId1'; // Fallback
     }
   }
 
-  private async replacePlaceholders(content: Paragraph[], data: TemplateReportData): Promise<Paragraph[]> {
-    const processedContent: Paragraph[] = [];
-    const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
+  private currentImageRelId: string = 'rId1';
 
-    for (const paragraph of content) {
-      // Получаем текст из параграфа
-      const paragraphText = this.extractTextFromParagraph(paragraph);
-      
-      if (paragraphText.includes('{chart}')) {
-        // Заменяем плейсхолдер графика на изображение
-        processedContent.push(new Paragraph({
-          children: [
-            new ImageRun({
-              data: chartImageBuffer,
-              transformation: {
-                width: 560,
-                height: 840,
-              },
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 400 },
-        }));
-      } else if (paragraphText.includes('{results table}')) {
-        // Заменяем плейсхолдер таблицы на таблицу результатов
-        const resultsTable = this.createResultsTable(data.analysisResults);
-        processedContent.push(...resultsTable);
-      } else {
-        // Заменяем текстовые плейсхолдеры
-        let newText = paragraphText
-          .replace('{executor}', data.executor)
-          .replace('{report_date}', data.reportDate);
-
-        // Создаем новый параграф с замененным текстом
-        const newParagraph = new Paragraph({
-          children: [new TextRun({ 
-            text: newText,
-            size: paragraphText.includes('ОТЧЕТ') ? 32 : 24,
-            bold: paragraphText.includes('ОТЧЕТ') || paragraphText.includes(':')
-          })],
-          alignment: paragraphText.includes('ОТЧЕТ') ? AlignmentType.CENTER : AlignmentType.LEFT,
-          spacing: { after: 200 }
-        });
-        
-        processedContent.push(newParagraph);
-      }
-    }
-
-    return processedContent;
+  private createImageXml(imageName: string): string {
+    // Создаем XML для вставки изображения
+    return `<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:r>
+        <w:drawing>
+          <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+            <wp:extent cx="5486400" cy="8229600"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:docPr id="1" name="${imageName}"/>
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+            </wp:cNvGraphicFramePr>
+            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="1" name="${imageName}"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="${this.currentImageRelId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+                    <a:stretch>
+                      <a:fillRect/>
+                    </a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="5486400" cy="8229600"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect">
+                      <a:avLst/>
+                    </a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>`;
   }
 
-  private extractTextFromParagraph(paragraph: Paragraph): string {
-    // Упрощенное извлечение текста из параграфа
-    // В реальной реализации нужно правильно обрабатывать структуру параграфа
-    try {
-      return (paragraph as any).root?.[0]?.children?.[0]?.children?.[0]?.text || '';
-    } catch {
-      return '';
-    }
-  }
-
-  private createResultsTable(analysisResults: any[]): Paragraph[] {
-    const paragraphs: Paragraph[] = [];
+  private createResultsTableXml(analysisResults: any[]): string {
+    // Создаем XML для таблицы результатов
+    let tableXml = `<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:tblPr>
+        <w:tblStyle w:val="TableGrid"/>
+        <w:tblW w:w="0" w:type="auto"/>
+        <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
+      </w:tblPr>
+      <w:tblGrid>
+        <w:gridCol w:w="1000"/>
+        <w:gridCol w:w="1200"/>
+        <w:gridCol w:w="1200"/>
+        <w:gridCol w:w="1200"/>
+        <w:gridCol w:w="800"/>
+        <w:gridCol w:w="800"/>
+        <w:gridCol w:w="800"/>
+        <w:gridCol w:w="1000"/>
+      </w:tblGrid>`;
 
     // Заголовок таблицы
-    paragraphs.push(new Paragraph({
-      children: [new TextRun({ 
-        text: 'Результаты анализа',
-        bold: true,
-        size: 28
-      })],
-      spacing: { after: 200 }
-    }));
+    tableXml += `<w:tr>
+      ${this.createTableCell('№ зоны', true)}
+      ${this.createTableCell('Уровень (м.)', true)}
+      ${this.createTableCell('Логгер', true)}
+      ${this.createTableCell('S/N', true)}
+      ${this.createTableCell('Мин. t°C', true)}
+      ${this.createTableCell('Макс. t°C', true)}
+      ${this.createTableCell('Среднее t°C', true)}
+      ${this.createTableCell('Соответствие', true)}
+    </w:tr>`;
 
-    // Создаем таблицу
-    const table = new Table({
-      width: {
-        size: 100,
-        type: WidthType.PERCENTAGE,
-      },
-      rows: [
-        // Заголовок таблицы
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: '№ зоны', bold: true, size: 20 })] })],
-              width: { size: 15, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: 'Уровень (м.)', bold: true, size: 20 })] })],
-              width: { size: 15, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: 'Логгер', bold: true, size: 20 })] })],
-              width: { size: 15, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true, size: 20 })] })],
-              width: { size: 15, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: 'Мин. t°C', bold: true, size: 20 })] })],
-              width: { size: 10, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: 'Макс. t°C', bold: true, size: 20 })] })],
-              width: { size: 10, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true, size: 20 })] })],
-              width: { size: 10, type: WidthType.PERCENTAGE }
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: 'Соответствие', bold: true, size: 20 })] })],
-              width: { size: 10, type: WidthType.PERCENTAGE }
-            })
-          ]
-        }),
-        // Строки данных
-        ...analysisResults.map(result => new TableRow({
-          children: [
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(result.zoneNumber), size: 18 })] })]
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(result.measurementLevel), size: 18 })] })]
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(result.loggerName), size: 18 })] })]
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(result.serialNumber), size: 18 })] })]
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(result.minTemp), size: 18 })] })]
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(result.maxTemp), size: 18 })] })]
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(result.avgTemp), size: 18 })] })]
-            }),
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: String(result.meetsLimits), size: 18 })] })]
-            })
-          ]
-        }))
-      ]
+    // Строки данных
+    analysisResults.forEach(result => {
+      tableXml += `<w:tr>
+        ${this.createTableCell(String(result.zoneNumber))}
+        ${this.createTableCell(String(result.measurementLevel))}
+        ${this.createTableCell(String(result.loggerName))}
+        ${this.createTableCell(String(result.serialNumber))}
+        ${this.createTableCell(String(result.minTemp))}
+        ${this.createTableCell(String(result.maxTemp))}
+        ${this.createTableCell(String(result.avgTemp))}
+        ${this.createTableCell(String(result.meetsLimits))}
+      </w:tr>`;
     });
 
-    // Добавляем таблицу как параграф (обходной путь)
-    paragraphs.push(new Paragraph({
-      children: [],
-      spacing: { after: 400 }
-    }));
+    tableXml += '</w:tbl>';
+    return tableXml;
+  }
 
-    return paragraphs;
+  private createTableCell(text: string, isHeader: boolean = false): string {
+    const boldStart = isHeader ? '<w:b/>' : '';
+    const boldEnd = isHeader ? '' : '';
+    
+    return `<w:tc>
+      <w:tcPr>
+        <w:tcW w:w="0" w:type="auto"/>
+      </w:tcPr>
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="center"/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            ${boldStart}
+            <w:sz w:val="20"/>
+          </w:rPr>
+          <w:t>${this.escapeXml(text)}</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>`;
+  }
+
+  private escapeXml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
   }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
