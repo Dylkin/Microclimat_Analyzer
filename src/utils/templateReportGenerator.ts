@@ -172,35 +172,25 @@ export class TemplateReportGenerator {
       
       let imageInserted = false;
       
-      // Вариант 1: Заменяем плейсхолдер {chart} внутри w:body если он есть
+      // Вариант 1: Заменяем плейсхолдер {chart} если он есть
       if (updatedXml.includes('{chart}')) {
         console.log('Найден плейсхолдер {chart}, заменяем на изображение');
-        const paragraphWithImage = `
-      <w:p>
-        <w:r>
-          ${imageXml}
-        </w:r>
-      </w:p>`;
+        const paragraphWithImage = `<w:p><w:r>${imageXml}</w:r></w:p>`;
         updatedXml = updatedXml.replace('{chart}', paragraphWithImage);
         imageInserted = true;
       }
       
-      // Вариант 2: Если плейсхолдера нет, вставляем внутри w:body перед w:sectPr или перед </w:body>
+      // Вариант 2: Если плейсхолдера нет, вставляем внутри w:body перед w:sectPr
       if (!imageInserted) {
-        const paragraphWithImage = `
-      <w:p>
-        <w:r>
-          ${imageXml}
-        </w:r>
-      </w:p>`;
+        const paragraphWithImage = `    <w:p><w:r>${imageXml}</w:r></w:p>`;
         
-        // Пытаемся вставить перед w:sectPr (если есть)
+        // Ищем w:sectPr внутри w:body и вставляем перед ним
         if (updatedXml.includes('<w:sectPr>')) {
           console.log('Вставляем изображение перед <w:sectPr>');
           updatedXml = updatedXml.replace('<w:sectPr>', `${paragraphWithImage}\n    <w:sectPr>`);
           imageInserted = true;
         }
-        // Иначе вставляем перед </w:body>
+        // Если нет w:sectPr, вставляем перед </w:body>
         else if (updatedXml.includes('</w:body>')) {
           console.log('Вставляем изображение перед </w:body>');
           updatedXml = updatedXml.replace('</w:body>', `${paragraphWithImage}\n  </w:body>`);
@@ -208,17 +198,10 @@ export class TemplateReportGenerator {
         }
       }
       
-      // Вариант 3: Если нет w:body, создаем его
+      // Вариант 3: Если структура документа нестандартная, создаем w:body
       if (!imageInserted) {
         console.log('Создаем новый w:body с изображением');
-        const paragraphWithImage = `
-  <w:body>
-    <w:p>
-      <w:r>
-        ${imageXml}
-      </w:r>
-    </w:p>
-  </w:body>`;
+        const bodyWithImage = `  <w:body>\n    <w:p><w:r>${imageXml}</w:r></w:p>\n  </w:body>`;
         updatedXml = updatedXml.replace('</w:document>', `${paragraphWithImage}</w:document>`);
         imageInserted = true;
       }
