@@ -295,7 +295,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         isGenerating: false,
         hasReport: true,
         reportUrl,
-        reportFilename
+        reportFilename,
+        isGeneratingFromTemplate: false
       });
       
     } catch (error) {
@@ -449,7 +450,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       isGenerating: false,
       hasReport: false,
       reportUrl: null,
-      reportFilename: null
+      reportFilename: null,
+      isGeneratingFromTemplate: false
     });
   };
 
@@ -735,198 +737,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <div>• <code className="bg-blue-100 px-1 rounded">{'{report date}'}</code> - Дата формирования отчета</div>
               </div>
             </div>
-          </div>
-
-          {/* Кнопки генерации отчетов */}
-          <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
-            {templateFile && (
-              <button
-                onClick={handleGenerateTemplateReport}
-                disabled={isGeneratingFromTemplate}
-                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {isGeneratingFromTemplate ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span>Создание отчета из шаблона...</span>
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-5 h-5" />
-                    <span>Создать отчет из шаблона</span>
-                  </>
-                )}
-              </button>
-            )}
-            
-          <button
-            onClick={handleGenerateReport}
-            disabled={reportStatus.isGenerating}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-            title="Сформировать отчет с графиком"
-          >
-            {reportStatus.isGenerating ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Формирование отчета...</span>
-              </>
-            ) : (
-              <>
-                <FileText className="w-5 h-5" />
-                <span>{reportStatus.hasReport ? 'Обновить отчет' : 'Сформировать отчет'}</span>
-              </>
-            )}
-          </button>
-          </div>
-          
-          {/* Ссылка для скачивания и кнопка удаления */}
-          {reportStatus.hasReport && reportStatus.reportUrl && (
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleDownloadReport}
-                className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-                <span>Скачать отчет ({reportStatus.reportFilename})</span>
-              </button>
-              
-              <button
-                onClick={handleDeleteReport}
-                className="text-red-600 hover:text-red-800 transition-colors"
-                title="Удалить отчет"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Analysis Results Table */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  № зоны измерения
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Уровень измерения (м.)
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Наименование логгера (6 символов)
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Серийный № логгера
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Мин. t°C
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Макс. t°C
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Среднее t°C
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Соответствие лимитам
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {analysisResults.map((result, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {result.zoneNumber}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {result.measurementLevel}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {result.loggerName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {result.serialNumber}
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
-                    !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
-                    globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp
-                      ? 'bg-blue-200' 
-                      : ''
-                  }`}>
-                    {result.minTemp}
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
-                    !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
-                    globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp
-                      ? 'bg-red-200' 
-                      : ''
-                  }`}>
-                    {result.maxTemp}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {result.avgTemp}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      result.meetsLimits === 'Да' 
-                        ? 'bg-green-100 text-green-800' 
-                        : result.meetsLimits === 'Нет'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {result.meetsLimits}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Legend */}
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Обозначения:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-blue-200 rounded"></div>
-              <span>Минимальное значение в выбранном периоде</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-red-200 rounded"></div>
-              <span>Максимальное значение в выбранном периоде</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                Да
-              </span>
-              <span>Соответствует лимитам</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                Нет
-              </span>
-              <span>Не соответствует лимитам</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs bg-gray-200 px-2 py-1 rounded font-mono">DL-023</span>
-              <span>Наименование логгера (первые 6 символов файла)</span>
-            </div>
-          </div>
-          <div className="mt-3 text-xs text-gray-600">
-            <strong>Примечание:</strong> При изменении масштаба графика статистика пересчитывается только для выбранного временного периода.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-                </p>
-              </div>
-            )}
           </div>
 
           {/* Кнопки генерации отчетов */}
