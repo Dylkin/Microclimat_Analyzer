@@ -49,9 +49,9 @@ export class TemplateReportGenerator {
           data: chartImageBase64,
           extension: '.png'
         },
-        'results table': this.formatResultsTable(data.analysisResults),
-        executor: data.executor,
-        'report date': data.reportDate
+        'results table': String(this.formatResultsTable(data.analysisResults)),
+        executor: String(data.executor),
+        'report date': String(data.reportDate)
       };
 
       console.log('Данные для шаблона подготовлены:', Object.keys(templateData));
