@@ -414,8 +414,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Очищаем URL
       setTimeout(() => URL.revokeObjectURL(reportUrl), 1000);
       
-      alert('Отчет успешно создан и скачан!');
-      
     } catch (error) {
       console.error('Ошибка создания отчета из шаблона:', error);
       alert('Ошибка при создании отчета из шаблона');
