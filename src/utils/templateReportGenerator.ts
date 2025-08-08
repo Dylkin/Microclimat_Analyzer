@@ -15,9 +15,9 @@ export class TemplateReportGenerator {
   // Фиксированный список поддерживаемых плейсхолдеров
   private static readonly PLACEHOLDERS = {
     CHART: '{chart}',
-    RESULTS_TABLE: '{results table}',
+    RESULTS_TABLE: '{results_table}',
     EXECUTOR: '{executor}',
-    REPORT_DATE: '{report date}'
+    REPORT_DATE: '{report_date}'
   };
 
   static getInstance(): TemplateReportGenerator {
@@ -47,9 +47,9 @@ export class TemplateReportGenerator {
       // Подготавливаем данные для замены плейсхолдеров
       const templateData = {
         chart: chartImageBase64,
-        'results table': String(this.formatResultsTable(data.analysisResults)),
+        'results_table': this.formatResultsTable(data.analysisResults),
         executor: String(data.executor),
-        'report date': String(data.reportDate)
+        'report_date': String(data.reportDate)
       };
 
       console.log('Данные для шаблона подготовлены:', Object.keys(templateData));
