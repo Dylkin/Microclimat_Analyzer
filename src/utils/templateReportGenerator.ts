@@ -174,41 +174,25 @@ export class TemplateReportGenerator {
       // Вариант 1: Заменяем плейсхолдер {chart} если он есть
       if (updatedXml.includes('{chart}')) {
         console.log('Найден плейсхолдер {chart}, заменяем на изображение');
-        const paragraphWithImage = `
-        <w:p>
-          <w:r>
-            ${imageXml}
-          </w:r>
-        </w:p>`;
-        updatedXml = updatedXml.replace('{chart}', paragraphWithImage);
+        updatedXml = updatedXml.replace('{chart}', imageXml);
         imageInserted = true;
       }
       
       // Вариант 2: Если плейсхолдера нет, вставляем перед </w:body>
       if (!imageInserted && updatedXml.includes('</w:body>')) {
         console.log('Вставляем изображение перед </w:body>');
-        const paragraphWithImage = `
-        <w:p>
-          <w:r>
-            ${imageXml}
-          </w:r>
-        </w:p>`;
-        updatedXml = updatedXml.replace('</w:body>', `${paragraphWithImage}</w:body>`);
+        updatedXml = updatedXml.replace('</w:body>', `${imageXml}</w:body>`);
         imageInserted = true;
       }
       
       // Вариант 3: Если нет </w:body>, вставляем перед </w:document>
       if (!imageInserted && updatedXml.includes('</w:document>')) {
         console.log('Вставляем изображение перед </w:document>');
-        const paragraphWithImage = `
+        const bodyWithImage = `
         <w:body>
-          <w:p>
-            <w:r>
-              ${imageXml}
-            </w:r>
-          </w:p>
+          ${imageXml}
         </w:body>`;
-        updatedXml = updatedXml.replace('</w:document>', `${paragraphWithImage}</w:document>`);
+        updatedXml = updatedXml.replace('</w:document>', `${bodyWithImage}</w:document>`);
         imageInserted = true;
       }
       
@@ -232,17 +216,19 @@ export class TemplateReportGenerator {
    */
   private createImageXml(relationshipId: string): string {
     return `
+<w:p>
+  <w:r>
     <w:drawing>
       <wp:inline distT="0" distB="0" distL="0" distR="0">
         <wp:extent cx="7620000" cy="5715000"/>
         <wp:effectExtent l="0" t="0" r="0" b="0"/>
         <wp:docPr id="1" name="График" descr="График временных рядов"/>
         <wp:cNvGraphicFramePr>
-          <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+          <a:graphicFrameLocks noChangeAspect="1"/>
         </wp:cNvGraphicFramePr>
-        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <a:graphic>
           <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
-            <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+            <pic:pic>
               <pic:nvPicPr>
                 <pic:cNvPr id="1" name="График"/>
                 <pic:cNvPicPr/>
@@ -266,7 +252,9 @@ export class TemplateReportGenerator {
           </a:graphicData>
         </a:graphic>
       </wp:inline>
-    </w:drawing>`;
+    </w:drawing>
+  </w:r>
+</w:p>`;
   }
 
   /**
