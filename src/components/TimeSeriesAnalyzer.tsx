@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, Upload } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -7,6 +7,7 @@ import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeS
 import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxReportGenerator, ReportData } from '../utils/docxGenerator';
+import { TemplateReportGenerator, TemplateReportData } from '../utils/templateReportGenerator';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -31,12 +32,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     hasReport: boolean;
     reportUrl: string | null;
     reportFilename: string | null;
+    isGeneratingFromTemplate: boolean;
   }>({
     isGenerating: false,
     hasReport: false,
     reportUrl: null,
-    reportFilename: null
+    reportFilename: null,
+    isGeneratingFromTemplate: false
   });
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const templateInputRef = useRef<HTMLInputElement>(null);
   
   // Chart dimensions
   const chartWidth = 1200;
@@ -303,6 +308,120 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
   };
 
+  const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.name.toLowerCase().endsWith('.docx')) {
+        alert('Пожалуйста, выберите файл в формате .docx');
+        return;
+      }
+      setTemplateFile(file);
+    }
+  };
+
+  const handleGenerateTemplateReport = async () => {
+    if (!templateFile) {
+      alert('Пожалуйста, загрузите шаблон отчета');
+      return;
+    }
+
+    if (!chartRef.current) {
+      alert('График не найден для сохранения');
+      return;
+    }
+
+    setReportStatus(prev => ({ ...prev, isGeneratingFromTemplate: true }));
+
+    try {
+      // Создаем скриншот графика
+      const saveButton = chartRef.current.querySelector('button[title="Сформировать отчет с графиком"]') as HTMLElement;
+      const originalDisplay = saveButton ? saveButton.style.display : '';
+      if (saveButton) {
+        saveButton.style.display = 'none';
+      }
+
+      const chartContainer = chartRef.current;
+      const canvas = await html2canvas(chartContainer, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        width: chartContainer.offsetWidth,
+        height: chartContainer.offsetHeight
+      });
+
+      if (saveButton) {
+        saveButton.style.display = originalDisplay;
+      }
+
+      // Поворачиваем изображение на 90° против часовой стрелки
+      const rotatedCanvas = document.createElement('canvas');
+      const ctx = rotatedCanvas.getContext('2d');
+      
+      if (!ctx) {
+        throw new Error('Ошибка создания контекста для поворота изображения');
+      }
+
+      rotatedCanvas.width = canvas.height;
+      rotatedCanvas.height = canvas.width;
+      ctx.translate(0, canvas.width);
+      ctx.rotate(-Math.PI / 2);
+      ctx.drawImage(canvas, 0, 0);
+
+      const chartBlob = await new Promise<Blob>((resolve, reject) => {
+        rotatedCanvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Ошибка создания изображения графика'));
+          }
+        }, 'image/png', 1.0);
+      });
+
+      // Подготавливаем данные для шаблона
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('ru-RU');
+      const timeStr = now.toLocaleTimeString('ru-RU');
+      const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
+      
+      const templateData: TemplateReportData = {
+        chartImageBlob: chartBlob,
+        analysisResults,
+        executor: user?.fullName || 'Неизвестный пользователь',
+        reportDate: `${dateStr} ${timeStr}`,
+        dataType
+      };
+
+      // Генерируем отчет из шаблона
+      const templateGenerator = TemplateReportGenerator.getInstance();
+      const reportBlob = await templateGenerator.generateReportFromTemplate(templateFile, templateData);
+
+      // Создаем URL для скачивания
+      const reportUrl = URL.createObjectURL(reportBlob);
+      const reportFilename = `отчет_по_шаблону_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
+
+      // Автоматически скачиваем файл
+      const link = document.createElement('a');
+      link.href = reportUrl;
+      link.download = reportFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Очищаем URL
+      setTimeout(() => URL.revokeObjectURL(reportUrl), 1000);
+      
+      alert('Отчет успешно создан и скачан!');
+      
+    } catch (error) {
+      console.error('Ошибка создания отчета из шаблона:', error);
+      alert('Ошибка при создании отчета из шаблона');
+    } finally {
+      setReportStatus(prev => ({ ...prev, isGeneratingFromTemplate: false }));
+    }
+  };
+
   const handleDownloadReport = () => {
     if (reportStatus.reportUrl && reportStatus.reportFilename) {
       const link = document.createElement('a');
@@ -554,7 +673,74 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       {/* Кнопка формирования отчета */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex flex-col items-center space-y-4">
+        <div className="flex flex-col items-center space-y-6">
+          {/* Загрузка шаблона */}
+          <div className="w-full max-w-md">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Шаблон отчета (необязательно)
+            </label>
+            <div className="flex items-center space-x-3">
+              <input
+                ref={templateInputRef}
+                type="file"
+                accept=".docx"
+                onChange={handleTemplateUpload}
+                className="hidden"
+              />
+              <button
+                onClick={() => templateInputRef.current?.click()}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Загрузить шаблон</span>
+              </button>
+              {templateFile && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">{templateFile.name}</span>
+                  <button
+                    onClick={() => setTemplateFile(null)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+            {templateFile && (
+              <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  <strong>Доступные плейсхолдеры:</strong><br/>
+                  • <code>{'{chart}'}</code> - График<br/>
+                  • <code>{'{results table}'}</code> - Таблица результатов<br/>
+                  • <code>{'{executor}'}</code> - Исполнитель<br/>
+                  • <code>{'{report date}'}</code> - Дата отчета
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Кнопки генерации отчетов */}
+          <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
+            {templateFile && (
+              <button
+                onClick={handleGenerateTemplateReport}
+                disabled={reportStatus.isGeneratingFromTemplate}
+                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {reportStatus.isGeneratingFromTemplate ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Создание отчета из шаблона...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-5 h-5" />
+                    <span>Создать отчет из шаблона</span>
+                  </>
+                )}
+              </button>
+            )}
+            
           <button
             onClick={handleGenerateReport}
             disabled={reportStatus.isGenerating}
@@ -573,6 +759,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </>
             )}
           </button>
+          </div>
           
           {/* Ссылка для скачивания и кнопка удаления */}
           {reportStatus.hasReport && reportStatus.reportUrl && (
