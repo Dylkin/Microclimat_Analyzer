@@ -694,15 +694,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <Upload className="w-4 h-4" />
                 <span>Загрузить шаблон</span>
               </button>
-              <div className="mt-2 p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-700">
-                  <strong>Поддерживаемые плейсхолдеры:</strong><br/>
-                  • <code>{'{chart}'}</code> - График временных рядов<br/>
-                  • <code>{'{results table}'}</code> - Таблица результатов анализа<br/>
-                  • <code>{'{executor}'}</code> - Сотрудник, сформировавший отчет<br/>
-                  • <code>{'{report date}'}</code> - Дата формирования отчета
-                </p>
-              </div>
             </div>
             {templateFile && (
               <div className="mt-2 p-3 bg-blue-50 rounded-lg">
