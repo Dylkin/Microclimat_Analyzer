@@ -70,14 +70,13 @@ export class TemplateReportGenerator {
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
-        report_date: data.reportDate,
         // НЕ добавляем chart в templateData - только через imageModule
         results_table: resultsTable
       };
 
       console.log('Данные для шаблона:', {
-        executor: templateData.executor,
-        report_date: templateData.report_date,
+        executor: data.executor,
+        report_date: data.reportDate,
         chart_image_size: `${chartImageBuffer.byteLength} байт`
       });
 
