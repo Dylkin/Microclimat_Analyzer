@@ -70,7 +70,6 @@ export class TemplateReportGenerator {
       const templateData = {
         executor: data.executor,
         report_date: data.reportDate,
-        chart: chartImageBuffer, // Передаем ArrayBuffer изображения напрямую
         results_table: resultsTable
       };
 
