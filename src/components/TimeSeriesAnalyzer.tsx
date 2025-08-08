@@ -770,16 +770,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <ExternalLink className="w-4 h-4" />
                 <span>Скачать отчет ({reportStatus.reportFilename})</span>
               </button>
-              
-              <button
-                onClick={handleDeleteReport}
-                className="text-red-600 hover:text-red-800 transition-colors"
-                title="Удалить отчет"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          )}
         </div>
       </div>
 

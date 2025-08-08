@@ -35,10 +35,13 @@ export class TemplateReportGenerator {
 
       console.log('Исходный document.xml найден');
 
-      // Заменяем текстовые плейсхолдеры
+      // Заменяем текстовые плейсхолдеры в основном документе
       let modifiedXml = documentXml;
       modifiedXml = modifiedXml.replace(/{executor}/g, this.escapeXml(data.executor));
       modifiedXml = modifiedXml.replace(/{report_date}/g, this.escapeXml(data.reportDate));
+
+      // Обрабатываем нижний колонтитул (footer)
+      await this.processFooter(zip, data);
 
       // Обрабатываем плейсхолдер {chart}
       const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
@@ -76,6 +79,38 @@ export class TemplateReportGenerator {
     } catch (error) {
       console.error('Ошибка генерации отчета из шаблона:', error);
       throw new Error(`Не удалось создать отчет из шаблона: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  }
+
+  private async processFooter(zip: JSZip, data: TemplateReportData): Promise<void> {
+    try {
+      // Ищем файлы нижних колонтитулов
+      const footerFiles = Object.keys(zip.files).filter(filename => 
+        filename.startsWith('word/footer') && filename.endsWith('.xml')
+      );
+
+      for (const footerFile of footerFiles) {
+        const footerXml = await zip.file(footerFile)?.async('text');
+        if (footerXml) {
+          console.log(`Обрабатываем нижний колонтитул: ${footerFile}`);
+          
+          // Заменяем плейсхолдеры в нижнем колонтитуле
+          let modifiedFooterXml = footerXml;
+          modifiedFooterXml = modifiedFooterXml.replace(/{executor}/g, this.escapeXml(data.executor));
+          modifiedFooterXml = modifiedFooterXml.replace(/{report_date}/g, this.escapeXml(data.reportDate));
+          
+          // Если есть плейсхолдер {chart} в нижнем колонтитуле, заменяем его на изображение
+          if (modifiedFooterXml.includes('{chart}')) {
+            const imageXml = this.createImageXml('image1.png');
+            modifiedFooterXml = modifiedFooterXml.replace(/{chart}/g, imageXml);
+          }
+          
+          // Сохраняем модифицированный нижний колонтитул
+          zip.file(footerFile, modifiedFooterXml);
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка обработки нижнего колонтитула:', error);
     }
   }
 
