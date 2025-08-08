@@ -389,7 +389,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
         analysisResults,
-        analysisResults,
         executor: user?.fullName || 'Неизвестный пользователь',
         reportDate: `${dateStr} ${timeStr}`,
         dataType
@@ -446,7 +445,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       isGenerating: false,
       hasReport: false,
       reportUrl: null,
-      reportFilename: null
+      reportFilename: null,
+      isGeneratingFromTemplate: false
     });
   };
 
@@ -740,24 +740,24 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </button>
             )}
 
-          <button
-            onClick={handleGenerateReport}
-            disabled={reportStatus.isGenerating}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-            title="Сформировать отчет с графиком"
-          >
-            {reportStatus.isGenerating ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Формирование отчета...</span>
-              </>
-            ) : (
-              <>
-                <FileText className="w-5 h-5" />
-                <span>{reportStatus.hasReport ? 'Обновить отчет' : 'Сформировать отчет'}</span>
-              </>
-            )}
-          </button>
+            <button
+              onClick={handleGenerateReport}
+              disabled={reportStatus.isGenerating}
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+              title="Сформировать отчет с графиком"
+            >
+              {reportStatus.isGenerating ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <span>Формирование отчета...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-5 h-5" />
+                  <span>{reportStatus.hasReport ? 'Обновить отчет' : 'Сформировать отчет'}</span>
+                </>
+              )}
+            </button>
           </div>
           
           {/* Ссылка для скачивания и кнопка удаления */}
@@ -770,6 +770,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <ExternalLink className="w-4 h-4" />
                 <span>Скачать отчет ({reportStatus.reportFilename})</span>
               </button>
+            </div>
+          )}
         </div>
       </div>
 
