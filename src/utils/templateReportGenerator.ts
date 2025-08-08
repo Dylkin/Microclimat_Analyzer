@@ -95,7 +95,8 @@ export class TemplateReportGenerator {
       reader.onload = () => {
         const result = reader.result as string;
         // Убираем префикс data:image/png;base64,
-        const base64 = result.split(',')[1];
+        const parts = result.split(',');
+        const base64 = parts.length > 1 ? parts[1] : '';
         resolve(base64);
       };
       reader.onerror = reject;
