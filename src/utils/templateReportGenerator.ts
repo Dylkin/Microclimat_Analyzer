@@ -61,6 +61,8 @@ export class TemplateReportGenerator {
         modules: [imageModule],
         paragraphLoop: true,
         linebreaks: true,
+      }
+      )
       const dateStr = now.toLocaleDateString('ru-RU'); // Только дата без времени
       // Создаем таблицу результатов в формате HTML/текст
       const resultsTable = this.createResultsTable(data.analysisResults);
