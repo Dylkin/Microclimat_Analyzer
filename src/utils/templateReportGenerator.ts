@@ -95,6 +95,9 @@ export class TemplateReportGenerator {
       // Заполняем шаблон данными
       doc.setData(templateData);
 
+      // Добавляем изображение в document.xml после обработки шаблона
+      await this.insertImageIntoDocument(zip, chartImageBuffer);
+
       try {
         // Рендерим документ
         doc.render();
@@ -126,6 +129,106 @@ export class TemplateReportGenerator {
       console.error('Ошибка генерации отчета из шаблона:', error);
       throw new Error(`Не удалось создать отчет из шаблона: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
+  }
+
+  /**
+   * Вставляет изображение в document.xml с правильным XML элементом
+   */
+  private async insertImageIntoDocument(zip: PizZip, imageBuffer: ArrayBuffer): Promise<void> {
+    try {
+      console.log('Вставляем изображение в document.xml...');
+      
+      // Читаем document.xml
+      let documentXml = '';
+      try {
+        documentXml = zip.file('word/document.xml').asText();
+      } catch (error) {
+        console.error('Не удалось прочитать document.xml:', error);
+        return;
+      }
+
+      // Создаем XML для изображения
+      const imageXml = this.createImageXml('rId1'); // Используем rId1 для простоты
+      
+      // Ищем место для вставки изображения (например, после первого параграфа или в конце body)
+      let updatedXml = documentXml;
+      
+      // Вариант 1: Вставляем после тега {chart} если он есть
+      if (updatedXml.includes('{chart}')) {
+        updatedXml = updatedXml.replace('{chart}', imageXml);
+      }
+      // Вариант 2: Вставляем перед закрывающим тегом </w:body>
+      else if (updatedXml.includes('</w:body>')) {
+        const paragraphWithImage = `
+        <w:p>
+          <w:r>
+            ${imageXml}
+          </w:r>
+        </w:p>`;
+        updatedXml = updatedXml.replace('</w:body>', `${paragraphWithImage}</w:body>`);
+      }
+      // Вариант 3: Вставляем перед закрывающим тегом </w:document>
+      else {
+        const paragraphWithImage = `
+        <w:body>
+          <w:p>
+            <w:r>
+              ${imageXml}
+            </w:r>
+          </w:p>
+        </w:body>`;
+        updatedXml = updatedXml.replace('</w:document>', `${paragraphWithImage}</w:document>`);
+      }
+
+      // Обновляем document.xml в ZIP
+      zip.file('word/document.xml', updatedXml);
+      console.log('Изображение успешно вставлено в document.xml');
+      
+    } catch (error) {
+      console.error('Ошибка вставки изображения в document.xml:', error);
+    }
+  }
+
+  /**
+   * Создает XML элемент для изображения
+   */
+  private createImageXml(relationshipId: string): string {
+    return `
+    <w:drawing>
+      <wp:inline distT="0" distB="0" distL="0" distR="0">
+        <wp:extent cx="7620000" cy="5715000"/>
+        <wp:effectExtent l="0" t="0" r="0" b="0"/>
+        <wp:docPr id="1" name="График" descr="График временных рядов"/>
+        <wp:cNvGraphicFramePr>
+          <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+        </wp:cNvGraphicFramePr>
+        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+            <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+              <pic:nvPicPr>
+                <pic:cNvPr id="1" name="График"/>
+                <pic:cNvPicPr/>
+              </pic:nvPicPr>
+              <pic:blipFill>
+                <a:blip r:embed="${relationshipId}"/>
+                <a:stretch>
+                  <a:fillRect/>
+                </a:stretch>
+              </pic:blipFill>
+              <pic:spPr>
+                <a:xfrm>
+                  <a:off x="0" y="0"/>
+                  <a:ext cx="7620000" cy="5715000"/>
+                </a:xfrm>
+                <a:prstGeom prst="rect">
+                  <a:avLst/>
+                </a:prstGeom>
+              </pic:spPr>
+            </pic:pic>
+          </a:graphicData>
+        </a:graphic>
+      </wp:inline>
+    </w:drawing>`;
   }
 
   /**
