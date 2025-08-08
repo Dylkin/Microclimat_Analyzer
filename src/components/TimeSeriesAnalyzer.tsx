@@ -325,12 +325,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   const handleGenerateTemplateReport = async () => {
     if (!templateFile) {
-      alert('Пожалуйста, загрузите шаблон отчета');
       return;
     }
 
     if (!chartRef.current) {
-      alert('График не найден для сохранения');
       return;
     }
 
@@ -416,11 +414,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Очищаем URL
       setTimeout(() => URL.revokeObjectURL(reportUrl), 1000);
       
-      alert('Отчет успешно создан и скачан!');
-      
     } catch (error) {
       console.error('Ошибка создания отчета из шаблона:', error);
-      alert('Ошибка при создании отчета из шаблона: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
     } finally {
       setIsGeneratingFromTemplate(false);
     }
@@ -726,15 +721,30 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
           {/* Информация о плейсхолдерах */}
           <div className="w-full max-w-2xl">
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-700 mb-2">
-                <strong>Поддерживаемые плейсхолдеры для шаблонов:</strong>
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-blue-600">
-                <div>• <code className="bg-blue-100 px-1 rounded">{'{chart}'}</code> - График временных рядов</div>
-                <div>• <code className="bg-blue-100 px-1 rounded">{'{results table}'}</code> - Таблица результатов анализа</div>
-                <div>• <code className="bg-blue-100 px-1 rounded">{'{executor}'}</code> - Сотрудник, сформировавший отчет</div>
-                <div>• <code className="bg-blue-100 px-1 rounded">{'{report date}'}</code> - Дата формирования отчета</div>
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <h4 className="text-sm font-semibold text-green-800 mb-3">
+                📋 Поддерживаемые плейсхолдеры для шаблонов
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-green-700">
+                <div className="flex items-center space-x-2">
+                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-xs">{'{chart}'}</code>
+                  <span>График временных рядов</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-xs">{'{results table}'}</code>
+                  <span>Таблица результатов</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-xs">{'{executor}'}</code>
+                  <span>Сотрудник</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-xs">{'{report date}'}</code>
+                  <span>Дата отчета</span>
+                </div>
+              </div>
+              <div className="mt-3 p-2 bg-green-100 rounded text-xs text-green-600">
+                <strong>Совет:</strong> Просто вставьте эти плейсхолдеры в ваш DOCX шаблон, и система автоматически заменит их на актуальные данные.
               </div>
             </div>
           </div>

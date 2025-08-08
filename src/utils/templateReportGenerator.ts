@@ -1,5 +1,5 @@
 import { saveAs } from 'file-saver';
-import PizZip from 'pizzip';
+import { createReport } from 'docx-templates';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -38,37 +38,40 @@ export class TemplateReportGenerator {
       // Читаем шаблон как ArrayBuffer
       const templateBuffer = await this.readFileAsArrayBuffer(templateFile);
       
-      // Создаем ZIP объект из шаблона
-      const zip = new PizZip(templateBuffer);
+      // Конвертируем изображение графика в base64
+      const chartImageBase64 = await this.blobToBase64(data.chartImageBlob);
       
-      // Извлекаем document.xml
-      const documentXml = zip.file('word/document.xml');
-      if (!documentXml) {
-        throw new Error('Не удалось найти document.xml в DOCX файле');
-      }
-      
-      let documentContent = documentXml.asText();
-      console.log('Извлечен document.xml, размер:', documentContent.length);
-      
-      // Заменяем плейсхолдеры
-      documentContent = await this.replacePlaceholdersInXml(documentContent, data);
-      
-      // Обновляем document.xml в архиве
-      zip.file('word/document.xml', documentContent);
-      
-      // Если есть изображение графика, добавляем его в архив
-      if (data.chartImageBlob) {
-        await this.addImageToDocx(zip, data.chartImageBlob);
-      }
-      
-      // Генерируем новый DOCX файл
-      const newDocxBuffer = zip.generate({ type: 'arraybuffer' });
-      const blob = new Blob([newDocxBuffer], { 
+      // Подготавливаем данные для замены плейсхолдеров
+      const templateData = {
+        chart: {
+          width: 15,
+          height: 10,
+          data: chartImageBase64,
+          extension: '.png'
+        },
+        'results table': this.formatResultsTable(data.analysisResults),
+        executor: data.executor,
+        'report date': data.reportDate
+      };
+
+      console.log('Данные для шаблона подготовлены:', Object.keys(templateData));
+
+      // Генерируем отчет с помощью docx-templates
+      const reportBuffer = await createReport({
+        template: templateBuffer,
+        data: templateData,
+        additionalJsContext: {
+          // Дополнительные функции для обработки данных в шаблоне
+          formatNumber: (num: number) => num.toFixed(1),
+          formatDate: (date: string) => new Date(date).toLocaleDateString('ru-RU')
+        },
+        processLineBreaks: true
+      });
+
+      console.log('Отчет успешно сгенерирован');
+      return new Blob([reportBuffer], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       });
-      
-      console.log('Отчет успешно сгенерирован');
-      return blob;
       
     } catch (error) {
       console.error('Ошибка генерации отчета из шаблона:', error);
@@ -91,184 +94,64 @@ export class TemplateReportGenerator {
     });
   }
 
-  private async replacePlaceholdersInXml(xmlContent: string, data: TemplateReportData): Promise<string> {
-    let updatedContent = xmlContent;
-    
-    console.log('Начинаем замену плейсхолдеров в XML...');
-    
-    // Заменяем текстовые плейсхолдеры
-    updatedContent = updatedContent.replace(
-      new RegExp(this.escapeRegExp(TemplateReportGenerator.PLACEHOLDERS.EXECUTOR), 'g'),
-      this.escapeXml(data.executor)
-    );
-    
-    updatedContent = updatedContent.replace(
-      new RegExp(this.escapeRegExp(TemplateReportGenerator.PLACEHOLDERS.REPORT_DATE), 'g'),
-      this.escapeXml(data.reportDate)
-    );
-    
-    // Заменяем плейсхолдер таблицы на XML таблицу
-    if (updatedContent.includes(TemplateReportGenerator.PLACEHOLDERS.RESULTS_TABLE)) {
-      const tableXml = this.createTableXml(data.analysisResults);
-      updatedContent = updatedContent.replace(
-        new RegExp(this.escapeRegExp(TemplateReportGenerator.PLACEHOLDERS.RESULTS_TABLE), 'g'),
-        tableXml
-      );
-      console.log('Заменен плейсхолдер {results table}');
-    }
-    
-    // Заменяем плейсхолдер графика на ссылку на изображение
-    if (updatedContent.includes(TemplateReportGenerator.PLACEHOLDERS.CHART)) {
-      const imageXml = this.createImageXml();
-      updatedContent = updatedContent.replace(
-        new RegExp(this.escapeRegExp(TemplateReportGenerator.PLACEHOLDERS.CHART), 'g'),
-        imageXml
-      );
-      console.log('Заменен плейсхолдер {chart}');
-    }
-    
-    console.log('Замена плейсхолдеров завершена');
-    return updatedContent;
+  private async blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Убираем префикс data:image/png;base64,
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
-  private createTableXml(results: any[]): string {
+  private formatResultsTable(results: any[]): string {
     if (!results || results.length === 0) {
-      return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
+      return 'Нет данных для отображения';
     }
 
-    let tableXml = `
-      <w:tbl>
-        <w:tblPr>
-          <w:tblStyle w:val="TableGrid"/>
-          <w:tblW w:w="0" w:type="auto"/>
-          <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
-        </w:tblPr>
-        <w:tblGrid>
-          <w:gridCol w:w="1000"/>
-          <w:gridCol w:w="1200"/>
-          <w:gridCol w:w="1500"/>
-          <w:gridCol w:w="1200"/>
-          <w:gridCol w:w="800"/>
-          <w:gridCol w:w="800"/>
-          <w:gridCol w:w="800"/>
-          <w:gridCol w:w="1000"/>
-        </w:tblGrid>
-        <w:tr>
-          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Логгер</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>S/N</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Мин.t°C</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Макс.t°C</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Среднее t°C</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Соответствие</w:t></w:r></w:p></w:tc>
-        </w:tr>`;
+    // Создаем HTML таблицу для вставки в документ
+    let tableHtml = `
+      <table border="1" style="border-collapse: collapse; width: 100%;">
+        <tr style="background-color: #f0f0f0;">
+          <th style="padding: 8px; text-align: left;">№ зоны</th>
+          <th style="padding: 8px; text-align: left;">Уровень (м.)</th>
+          <th style="padding: 8px; text-align: left;">Логгер</th>
+          <th style="padding: 8px; text-align: left;">S/N</th>
+          <th style="padding: 8px; text-align: left;">Мин.t°C</th>
+          <th style="padding: 8px; text-align: left;">Макс.t°C</th>
+          <th style="padding: 8px; text-align: left;">Среднее t°C</th>
+          <th style="padding: 8px; text-align: left;">Соответствие</th>
+        </tr>`;
 
-    // Добавляем строки данных
     results.forEach(result => {
-      tableXml += `
-        <w:tr>
-          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.zoneNumber)}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.measurementLevel)}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.loggerName)}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.serialNumber)}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.minTemp)}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.maxTemp)}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.avgTemp)}</w:t></w:r></w:p></w:tc>
-          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.meetsLimits)}</w:t></w:r></w:p></w:tc>
-        </w:tr>`;
+      tableHtml += `
+        <tr>
+          <td style="padding: 8px;">${this.escapeHtml(result.zoneNumber)}</td>
+          <td style="padding: 8px;">${this.escapeHtml(result.measurementLevel)}</td>
+          <td style="padding: 8px;">${this.escapeHtml(result.loggerName)}</td>
+          <td style="padding: 8px;">${this.escapeHtml(result.serialNumber)}</td>
+          <td style="padding: 8px;">${this.escapeHtml(result.minTemp)}</td>
+          <td style="padding: 8px;">${this.escapeHtml(result.maxTemp)}</td>
+          <td style="padding: 8px;">${this.escapeHtml(result.avgTemp)}</td>
+          <td style="padding: 8px;">${this.escapeHtml(result.meetsLimits)}</td>
+        </tr>`;
     });
 
-    tableXml += '</w:tbl>';
-    return tableXml;
+    tableHtml += '</table>';
+    return tableHtml;
   }
 
-  private createImageXml(): string {
-    // Создаем XML для вставки изображения
-    return `
-      <w:p>
-        <w:r>
-          <w:drawing>
-            <wp:inline distT="0" distB="0" distL="0" distR="0">
-              <wp:extent cx="5486400" cy="4114800"/>
-              <wp:effectExtent l="0" t="0" r="0" b="0"/>
-              <wp:docPr id="1" name="Chart"/>
-              <wp:cNvGraphicFramePr/>
-              <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-                <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                  <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                    <pic:nvPicPr>
-                      <pic:cNvPr id="1" name="Chart"/>
-                      <pic:cNvPicPr/>
-                    </pic:nvPicPr>
-                    <pic:blipFill>
-                      <a:blip r:embed="rId4"/>
-                      <a:stretch>
-                        <a:fillRect/>
-                      </a:stretch>
-                    </pic:blipFill>
-                    <pic:spPr>
-                      <a:xfrm>
-                        <a:off x="0" y="0"/>
-                        <a:ext cx="5486400" cy="4114800"/>
-                      </a:xfrm>
-                      <a:prstGeom prst="rect">
-                        <a:avLst/>
-                      </a:prstGeom>
-                    </pic:spPr>
-                  </pic:pic>
-                </a:graphicData>
-              </a:graphic>
-            </wp:inline>
-          </w:drawing>
-        </w:r>
-      </w:p>`;
-  }
-
-  private async addImageToDocx(zip: PizZip, imageBlob: Blob): Promise<void> {
-    try {
-      // Добавляем изображение в папку media
-      const imageBuffer = await imageBlob.arrayBuffer();
-      zip.file('word/media/image1.png', imageBuffer);
-
-      // Обновляем relationships
-      const relsContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
-  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>
-</Relationships>`;
-
-      zip.file('word/_rels/document.xml.rels', relsContent);
-
-      // Обновляем Content_Types.xml
-      let contentTypes = zip.file('[Content_Types].xml')?.asText() || '';
-      if (!contentTypes.includes('image/png')) {
-        contentTypes = contentTypes.replace(
-          '</Types>',
-          '  <Default Extension="png" ContentType="image/png"/>\n</Types>'
-        );
-        zip.file('[Content_Types].xml', contentTypes);
-      }
-
-      console.log('Изображение добавлено в DOCX архив');
-    } catch (error) {
-      console.error('Ошибка добавления изображения:', error);
-    }
-  }
-
-  private escapeXml(text: string | number): string {
+  private escapeHtml(text: string | number): string {
     return String(text)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
-  }
-
-  private escapeRegExp(string: string): string {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      .replace(/'/g, '&#39;');
   }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
