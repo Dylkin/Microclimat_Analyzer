@@ -48,7 +48,7 @@ export class TemplateReportGenerator {
         getSize: (img: ArrayBuffer, tagValue: string, tagName: string) => {
           console.log(`Установка размера изображения для тега: ${tagName}`);
           if (tagName === 'chart') {
-            return null; // Используем размеры по умолчанию
+            return [600, 800]; // Устанавливаем размеры 600x800 пикселей
           }
           return null;
         },
