@@ -222,65 +222,6 @@ export class TemplateReportGenerator {
     }
 
     return table;
-          }).join('\n');
-          console.error('Детали ошибок:', errorMessages);
-        }
-        
-        throw error;
-      }
-
-      // Генерируем новый DOCX файл
-      const output = doc.getZip().generate({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      });
-
-      console.log('DOCX файл успешно сгенерирован с изображением');
-      return output;
-
-    } catch (error) {
-      console.error('Ошибка генерации отчета из шаблона:', error);
-      throw new Error(`Не удалось создать отчет из шаблона: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
-  }
-
-  private createResultsTable(analysisResults: any[]): string {
-    if (!analysisResults || analysisResults.length === 0) {
-      return 'Нет данных для отображения';
-    }
-
-    let table = 'РЕЗУЛЬТАТЫ АНАЛИЗА:\n\n';
-    
-    // Заголовок таблицы
-    table += '№ зоны | Уровень (м.) | Логгер | S/N | Мин. t°C | Макс. t°C | Среднее t°C | Соответствие\n';
-    table += '-------|-------------|--------|-----|----------|-----------|-------------|-------------\n';
-    
-    // Строки данных
-    analysisResults.forEach(result => {
-      const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
-      table += `${zoneNumber} | ${result.measurementLevel || '-'} | ${result.loggerName || '-'} | ${result.serialNumber || '-'} | ${result.minTemp || '-'} | ${result.maxTemp || '-'} | ${result.avgTemp || '-'} | ${result.meetsLimits || '-'}\n`;
-    });
-
-    table += '\n';
-    
-    // Добавляем статистику
-    const validResults = analysisResults.filter(r => !r.isExternal && r.minTemp !== '-');
-    const externalSensors = analysisResults.filter(r => r.isExternal).length;
-    
-    table += `\nОбщая статистика:\n`;
-    table += `- Всего датчиков: ${analysisResults.length}\n`;
-    table += `- Внутренние датчики: ${validResults.length}\n`;
-    table += `- Внешние датчики: ${externalSensors}\n`;
-    
-    const compliantCount = analysisResults.filter(r => r.meetsLimits === 'Да').length;
-    const nonCompliantCount = analysisResults.filter(r => r.meetsLimits === 'Нет').length;
-    
-    if (compliantCount > 0 || nonCompliantCount > 0) {
-      table += `- Соответствуют лимитам: ${compliantCount}\n`;
-      table += `- Не соответствуют лимитам: ${nonCompliantCount}\n`;
-    }
-
-    return table;
   }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
