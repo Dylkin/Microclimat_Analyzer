@@ -807,6 +807,33 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Отчет</h3>
         
         <div className="space-y-4">
+          {/* Поля отчета */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Номер отчета
+              </label>
+              <input
+                type="text"
+                value={reportNumber}
+                onChange={(e) => setReportNumber(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Введите номер отчета"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Дата формирования отчета
+              </label>
+              <input
+                type="date"
+                value={reportDate}
+                onChange={(e) => setReportDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
           {/* Загрузка шаблона */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
