@@ -42,6 +42,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   });
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
+  const [reportNumber, setReportNumber] = useState('');
+  const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   
   // Chart dimensions
   const chartWidth = 1200;
@@ -382,16 +384,25 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       // Подготавливаем данные для шаблона
       const now = new Date();
-      const dateStr = now.toLocaleDateString('ru-RU');
+      const dateStr = reportDate ? new Date(reportDate).toLocaleDateString('ru-RU') : now.toLocaleDateString('ru-RU');
       const timeStr = now.toLocaleTimeString('ru-RU');
       const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
+      
+      // Создаем таблицу результатов для вставки в шаблон
+      const resultsTableHtml = createResultsTableForTemplate(analysisResults);
+      
+      // Создаем критерии приемки
+      const acceptanceCriteria = createAcceptanceCriteria();
       
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
         analysisResults,
         executor: user?.fullName || 'Неизвестный пользователь',
-        reportDate: `${dateStr} ${timeStr}`,
-        dataType
+        reportDate: dateStr, // Только дата без времени
+        dataType,
+        reportNumber: reportNumber || `REP-${Date.now()}`,
+        resultsTable: resultsTableHtml,
+        acceptanceCriteria
       };
 
       // Генерируем отчет из шаблона

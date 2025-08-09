@@ -9,6 +9,9 @@ export interface TemplateReportData {
   executor: string;
   reportDate: string;
   dataType: 'temperature' | 'humidity';
+  reportNumber: string;
+  resultsTable: string;
+  acceptanceCriteria: string;
 }
 
 export class TemplateReportGenerator {
@@ -76,16 +79,22 @@ export class TemplateReportGenerator {
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
-        report_date: data.reportDate,
+        Report_No: data.reportNumber,
+        Report_start: data.reportDate,
+        report_date: data.reportDate, // Оставляем для обратной совместимости
         chart: 'chart_placeholder', // Значение для ImageModule
-        results_table: resultsTable
+        Results_table: data.resultsTable,
+        results_table: resultsTable, // Оставляем для обратной совместимости
+        Acceptance_criteria: data.acceptanceCriteria
       };
 
       console.log('Данные для шаблона:', {
         executor: data.executor,
-        report_date: data.reportDate,
+        Report_No: data.reportNumber,
+        Report_start: data.reportDate,
         chart_image_size: `${chartImageBuffer.byteLength} байт`,
-        results_table_length: resultsTable.length
+        Results_table_length: data.resultsTable.length,
+        Acceptance_criteria_length: data.acceptanceCriteria.length
       });
 
       // Заполняем шаблон данными
