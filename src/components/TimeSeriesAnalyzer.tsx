@@ -671,110 +671,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
       )}
 
-      {/* Кнопка формирования отчета */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex flex-col items-center space-y-6">
-          {/* Загрузка шаблона */}
-          <div className="w-full max-w-md">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Шаблон отчета (необязательно)
-            </label>
-            <div className="flex items-center space-x-3">
-              <input
-                ref={templateInputRef}
-                type="file"
-                accept=".docx"
-                onChange={handleTemplateUpload}
-                className="hidden"
-              />
-              <button
-                onClick={() => templateInputRef.current?.click()}
-                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
-              >
-                <Upload className="w-4 h-4" />
-                <span>Загрузить шаблон</span>
-              </button>
-              {templateFile && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">{templateFile.name}</span>
-                  <button
-                    onClick={() => setTemplateFile(null)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-            {templateFile && (
-              <div className="mt-2 p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-700">
-                  <strong>Доступные плейсхолдеры:</strong><br/>
-                  • <code>{'{chart}'}</code> - График<br/>
-                  • <code>{'{executor}'}</code> - Исполнитель<br/>
-                  • <code>{'{report_date}'}</code> - Дата отчета
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Кнопки генерации отчетов */}
-          <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
-            {templateFile && (
-              <button
-                onClick={handleGenerateTemplateReport}
-                disabled={reportStatus.isGeneratingFromTemplate}
-                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {reportStatus.isGeneratingFromTemplate ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span>Создание отчета из шаблона...</span>
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-5 h-5" />
-                    <span>Создать отчет из шаблона</span>
-                  </>
-                )}
-              </button>
-            )}
-
-            <button
-              onClick={handleGenerateReport}
-              disabled={reportStatus.isGenerating}
-              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-              title="Сформировать отчет с графиком"
-            >
-              {reportStatus.isGenerating ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Формирование отчета...</span>
-                </>
-              ) : (
-                <>
-                  <FileText className="w-5 h-5" />
-                  <span>{reportStatus.hasReport ? 'Обновить отчет' : 'Сформировать отчет'}</span>
-                </>
-              )}
-            </button>
-          </div>
-          
-          {/* Ссылка для скачивания и кнопка удаления */}
-          {reportStatus.hasReport && reportStatus.reportUrl && (
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleDownloadReport}
-                className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-                <span>Скачать отчет ({reportStatus.reportFilename})</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Analysis Results Table */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
@@ -892,6 +788,89 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <div className="mt-3 text-xs text-gray-600">
             <strong>Примечание:</strong> При изменении масштаба графика статистика пересчитывается только для выбранного временного периода.
           </div>
+        </div>
+      </div>
+
+      {/* Отчет */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Отчет</h3>
+        
+        <div className="space-y-4">
+          {/* Загрузка шаблона */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Шаблон отчета
+            </label>
+            <div className="flex items-center space-x-3">
+              <input
+                ref={templateInputRef}
+                type="file"
+                accept=".docx"
+                onChange={handleTemplateUpload}
+                className="hidden"
+              />
+              <button
+                onClick={() => templateInputRef.current?.click()}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Загрузить шаблон</span>
+              </button>
+              {templateFile && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">{templateFile.name}</span>
+                  <button
+                    onClick={() => setTemplateFile(null)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Кнопка генерации отчета из шаблона */}
+          {templateFile && (
+            <div className="flex justify-center">
+              <button
+                onClick={handleGenerateTemplateReport}
+                disabled={reportStatus.isGeneratingFromTemplate}
+                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {reportStatus.isGeneratingFromTemplate ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Создание отчета из шаблона...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-5 h-5" />
+                    <span>Создать отчет из шаблона</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Ссылка на сформированный отчет */}
+          {reportStatus.hasReport && reportStatus.reportUrl && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <FileText className="w-5 h-5 text-green-600" />
+                  <span className="text-sm font-medium text-green-800">Отчет сформирован</span>
+                </div>
+                <button
+                  onClick={handleDownloadReport}
+                  className="flex items-center space-x-2 text-green-600 hover:text-green-800 transition-colors font-medium"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Скачать отчет</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
