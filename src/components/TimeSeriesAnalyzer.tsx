@@ -493,6 +493,65 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     });
   };
 
+  // Функция для создания HTML таблицы результатов
+  const createResultsTableForTemplate = (results: any[]) => {
+    const tableRows = results.map(result => `
+      <tr>
+        <td>${result.zoneNumber}</td>
+        <td>${result.measurementLevel}</td>
+        <td>${result.loggerName}</td>
+        <td>${result.serialNumber}</td>
+        <td>${result.minTemp}</td>
+        <td>${result.maxTemp}</td>
+        <td>${result.avgTemp}</td>
+        <td>${result.meetsLimits}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <table border="1" style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr>
+            <th>№ зоны измерения</th>
+            <th>Уровень измерения (м.)</th>
+            <th>Наименование логгера (6 символов)</th>
+            <th>Серийный № логгера</th>
+            <th>Мин. t°C</th>
+            <th>Макс. t°C</th>
+            <th>Среднее t°C</th>
+            <th>Соответствие лимитам</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+    `;
+  };
+
+  // Функция для создания критериев приемки
+  const createAcceptanceCriteria = () => {
+    let criteria = '';
+    
+    if (limits.temperature) {
+      const tempMin = limits.temperature.min !== undefined ? `${limits.temperature.min}°C` : 'не установлен';
+      const tempMax = limits.temperature.max !== undefined ? `${limits.temperature.max}°C` : 'не установлен';
+      criteria += `Лимиты температуры: от ${tempMin} до ${tempMax}\n`;
+    } else {
+      criteria += 'Лимиты температуры: не установлены\n';
+    }
+    
+    if (limits.humidity) {
+      const humMin = limits.humidity.min !== undefined ? `${limits.humidity.min}%` : 'не установлен';
+      const humMax = limits.humidity.max !== undefined ? `${limits.humidity.max}%` : 'не установлен';
+      criteria += `Лимиты влажности: от ${humMin} до ${humMax}`;
+    } else {
+      criteria += 'Лимиты влажности: не установлены';
+    }
+    
+    return criteria;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
