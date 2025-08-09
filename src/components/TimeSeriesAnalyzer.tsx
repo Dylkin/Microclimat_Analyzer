@@ -333,10 +333,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return;
     }
 
+    console.log('=== Начало создания отчета из шаблона ===');
+    console.log('Файл шаблона:', templateFile.name);
+    console.log('Номер отчета:', reportNumber);
+    console.log('Дата отчета:', reportDate);
+
     setReportStatus(prev => ({ ...prev, isGeneratingFromTemplate: true }));
 
     try {
       // Создаем скриншот графика
+      console.log('Создаем скриншот графика...');
       const saveButton = chartRef.current.querySelector('button[title="Сформировать отчет с графиком"]') as HTMLElement;
       const originalDisplay = saveButton ? saveButton.style.display : '';
       if (saveButton) {
@@ -353,12 +359,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         width: chartContainer.offsetWidth,
         height: chartContainer.offsetHeight
       });
+      console.log('Скриншот создан, размер:', canvas.width, 'x', canvas.height);
 
       if (saveButton) {
         saveButton.style.display = originalDisplay;
       }
 
       // Поворачиваем изображение на 90° против часовой стрелки
+      console.log('Поворачиваем изображение на 90°...');
       const rotatedCanvas = document.createElement('canvas');
       const ctx = rotatedCanvas.getContext('2d');
       
@@ -371,10 +379,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       ctx.translate(0, canvas.width);
       ctx.rotate(-Math.PI / 2);
       ctx.drawImage(canvas, 0, 0);
+      console.log('Изображение повернуто, новый размер:', rotatedCanvas.width, 'x', rotatedCanvas.height);
 
       const chartBlob = await new Promise<Blob>((resolve, reject) => {
         rotatedCanvas.toBlob((blob) => {
           if (blob) {
+            console.log('Blob изображения создан, размер:', blob.size, 'байт');
             resolve(blob);
           } else {
             reject(new Error('Ошибка создания изображения графика'));
@@ -385,14 +395,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Подготавливаем данные для шаблона
       const now = new Date();
       const dateStr = reportDate ? new Date(reportDate).toLocaleDateString('ru-RU') : now.toLocaleDateString('ru-RU');
-      const timeStr = now.toLocaleTimeString('ru-RU');
       const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
       
       // Создаем таблицу результатов для вставки в шаблон
       const resultsTableHtml = createResultsTableForTemplate(analysisResults);
+      console.log('HTML таблица создана, длина:', resultsTableHtml.length);
       
       // Создаем критерии приемки
       const acceptanceCriteria = createAcceptanceCriteria();
+      console.log('Критерии приемки созданы, длина:', acceptanceCriteria.length);
       
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
@@ -406,15 +417,28 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         acceptanceCriteria
       };
 
+      console.log('Данные для шаблона подготовлены:', {
+        executor: templateData.executor,
+        reportNumber: templateData.reportNumber,
+        reportStart: templateData.reportStart,
+        reportDate: templateData.reportDate,
+        chartBlobSize: chartBlob.size,
+        resultsTableLength: resultsTableHtml.length,
+        acceptanceCriteriaLength: acceptanceCriteria.length
+      });
+
       // Генерируем отчет из шаблона
+      console.log('Запускаем генерацию отчета...');
       const templateGenerator = TemplateReportGenerator.getInstance();
       const reportBlob = await templateGenerator.generateReportFromTemplate(templateFile, templateData);
+      console.log('Отчет сгенерирован, размер:', reportBlob.size, 'байт');
 
       // Создаем URL для скачивания
       const reportUrl = URL.createObjectURL(reportBlob);
       const reportFilename = `отчет_по_шаблону_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
 
       // Автоматически скачиваем файл
+      console.log('Автоматически скачиваем файл:', reportFilename);
       const link = document.createElement('a');
       link.href = reportUrl;
       link.download = reportFilename;
@@ -425,9 +449,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Очищаем URL
       setTimeout(() => URL.revokeObjectURL(reportUrl), 1000);
       
+      console.log('=== Отчет успешно создан и скачан ===');
+      
     } catch (error) {
-      console.error('Ошибка создания отчета из шаблона:', error);
-      alert('Ошибка при создании отчета из шаблона');
+      console.error('=== ОШИБКА СОЗДАНИЯ ОТЧЕТА ===');
+      console.error('Тип ошибки:', error?.constructor?.name);
+      console.error('Сообщение:', error instanceof Error ? error.message : String(error));
+      console.error('Stack:', error instanceof Error ? error.stack : 'No stack');
+      
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      alert(`Ошибка при создании отчета из шаблона:\n\n${errorMessage}\n\nПроверьте консоль браузера для подробной информации.`);
     } finally {
       setReportStatus(prev => ({ ...prev, isGeneratingFromTemplate: false }));
     }
