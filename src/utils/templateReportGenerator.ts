@@ -8,8 +8,9 @@ export interface TemplateReportData {
   analysisResults: any[];
   executor: string;
   reportDate: string;
-  dataType: 'temperature' | 'humidity';
   reportNumber: string;
+  reportStart: string;
+  dataType: 'temperature' | 'humidity';
   resultsTable: string;
   acceptanceCriteria: string;
 }
@@ -79,8 +80,8 @@ export class TemplateReportGenerator {
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
-        Report_No: data.reportNumber,
-        Report_start: data.reportDate,
+        'Report_No': data.reportNumber,
+        'Report_start': data.reportStart,
         report_date: data.reportDate, // Оставляем для обратной совместимости
         chart: 'chart_placeholder', // Значение для ImageModule
         Results_table: data.resultsTable,
@@ -90,8 +91,8 @@ export class TemplateReportGenerator {
 
       console.log('Данные для шаблона:', {
         executor: data.executor,
-        Report_No: data.reportNumber,
-        Report_start: data.reportDate,
+        'Report_No': data.reportNumber,
+        'Report_start': data.reportStart,
         chart_image_size: `${chartImageBuffer.byteLength} байт`,
         Results_table_length: data.resultsTable.length,
         Acceptance_criteria_length: data.acceptanceCriteria.length

@@ -398,9 +398,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         chartImageBlob: chartBlob,
         analysisResults,
         executor: user?.fullName || 'Неизвестный пользователь',
-        reportDate: dateStr, // Только дата без времени
-        dataType,
+        reportDate: dateStr,
         reportNumber: reportNumber || `REP-${Date.now()}`,
+        reportStart: dateStr,
+        dataType,
         resultsTable: resultsTableHtml,
         acceptanceCriteria
       };
@@ -823,7 +824,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Дата формирования отчета
+                Дата отчета
               </label>
               <input
                 type="date"
