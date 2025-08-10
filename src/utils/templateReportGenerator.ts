@@ -163,5 +163,3 @@ export class TemplateReportGenerator {
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }
 }
-
-export { TemplateReportGenerator }
