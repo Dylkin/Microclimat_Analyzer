@@ -279,13 +279,12 @@ export class TemplateReportGenerator {
           <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.avgTemp || '-'}</td>
           <td style="border: 1px solid #000; padding: 6px; text-align: center; ${complianceStyle}">${result.meetsLimits || '-'}</td>
         </tr>
-    });
+       `;
+     });
 
     html += `
         </tbody>
       </table>
-    }
-    )
     `;
 
     return html;
