@@ -147,7 +147,7 @@ export const Help: React.FC = () => {
             <div className="mt-4 p-3 bg-purple-100 rounded-lg">
               <p className="text-xs text-purple-700">
                 <strong>Примечание:</strong> Для изображений используйте специальный синтаксис <code>{'{%chart}'}</code>. 
-                Обратите внимание на русскую букву "С" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
+                Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
               </p>
             </div>
           </div>
