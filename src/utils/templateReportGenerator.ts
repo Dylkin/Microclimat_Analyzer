@@ -217,9 +217,9 @@ export class TemplateReportGenerator {
       }
       
       // Создаем простую текстовую таблицу для вставки в шаблон
-      let resultsTableHtml = '';
+      let resultsTableText = '';
       if (data.resultsTableData && data.resultsTableData.length > 0) {
-        resultsTableHtml = this.createHtmlTable(data.resultsTableData);
+        resultsTableText = this.createTextTable(data.resultsTableData);
       }
       
       // Подготавливаем данные для docxtemplater (все значения должны быть строками)
@@ -233,7 +233,7 @@ export class TemplateReportGenerator {
         EligibilityCriteria: data.acceptanceCriteria || '',
         ObjectName: data.objectName || '',
         CoolingSystemName: data.coolingSystemName || '',
-        ResultsTable: resultsTableHtml || '',
+        ResultsTable: resultsTableText || '',
       };
 
       // 1. Загрузка шаблона с правильной кодировкой
@@ -281,59 +281,45 @@ export class TemplateReportGenerator {
   }
 
   /**
-   * Создание HTML таблицы для вставки в шаблон
+   * Создание текстовой таблицы для вставки в шаблон
    */
-  private createHtmlTable(resultsTableData: any[]): string {
-    let html = `
-      <table border="1" style="border-collapse: collapse; width: 100%;">
-        <thead>
-          <tr style="background-color: #f3f4f6;">
-            <th style="padding: 8px; text-align: center; font-weight: bold;">№ зоны</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Уровень (м.)</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Логгер</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">S/N</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Мин. t°C</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Макс. t°C</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Среднее t°C</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Соответствие</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
+  private createTextTable(resultsTableData: any[]): string {
+    // Создаем простую текстовую таблицу
+    let table = '';
+    
+    // Заголовок таблицы
+    const headers = [
+      '№ зоны',
+      'Уровень (м.)',
+      'Логгер',
+      'S/N',
+      'Мин. t°C',
+      'Макс. t°C',
+      'Среднее t°C',
+      'Соответствие'
+    ];
+    
+    // Создаем строку заголовков
+    table += headers.join('\t') + '\n';
+    table += '─'.repeat(80) + '\n';
 
+    // Добавляем строки данных
     resultsTableData.forEach(row => {
-      // Определяем цвет фона для минимальных и максимальных значений
-      const minTempStyle = row.isMinTemp ? 'background-color: #dbeafe;' : '';
-      const maxTempStyle = row.isMaxTemp ? 'background-color: #fecaca;' : '';
+      const rowData = [
+        row.zoneNumber || '-',
+        row.measurementLevel || '-',
+        row.loggerName || '-',
+        row.serialNumber || '-',
+        row.minTemp || '-',
+        row.maxTemp || '-',
+        row.avgTemp || '-',
+        row.meetsLimits || '-'
+      ];
       
-      // Определяем цвет для соответствия лимитам
-      let complianceStyle = '';
-      if (row.meetsLimits === 'Да') {
-        complianceStyle = 'background-color: #dcfce7; color: #166534;';
-      } else if (row.meetsLimits === 'Нет') {
-        complianceStyle = 'background-color: #fef2f2; color: #dc2626;';
-      }
-
-      html += `
-        <tr>
-          <td style="padding: 6px; text-align: center;">${row.zoneNumber || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.measurementLevel || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.loggerName || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.serialNumber || '-'}</td>
-          <td style="padding: 6px; text-align: center; ${minTempStyle}">${row.minTemp || '-'}</td>
-          <td style="padding: 6px; text-align: center; ${maxTempStyle}">${row.maxTemp || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.avgTemp || '-'}</td>
-          <td style="padding: 6px; text-align: center; ${complianceStyle}">${row.meetsLimits || '-'}</td>
-        </tr>
-      `;
+      table += rowData.join('\t') + '\n';
     });
 
-    html += `
-        </tbody>
-      </table>
-    `;
-
-    return html;
+    return table;
   }
 
 
