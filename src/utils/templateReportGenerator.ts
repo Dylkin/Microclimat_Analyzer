@@ -73,7 +73,6 @@ export class TemplateReportGenerator {
       console.log('TestType:', data.testType);
       console.log('ObjectName:', data.objectName);
       console.log('CoolingSystemName:', data.coolingSystemName);
-      console.log('ResultsTable_size:', resultsTableBuffer ? `${resultsTableBuffer.byteLength} байт` : 'не предоставлена');
       console.log('ResultsTable_html_length:', resultsTableHtml ? `${resultsTableHtml.length} символов` : 'не предоставлена');
 
       // Загружаем шаблон в PizZip
