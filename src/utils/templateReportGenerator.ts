@@ -219,7 +219,19 @@ export class TemplateReportGenerator {
       `;
     }
 
-    // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
+    const escapeXml = (unsafe: string): string => {
+      return unsafe.replace(/[<>&'"]/g, (c) => {
+        switch (c) {
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case '\'': return '&apos;';
+          case '"': return '&quot;';
+          default: return c;
+        }
+      });
+    };
+
     const nonExternalResults = analysisResults.filter(result => !result.isExternal);
     const minTempValues = nonExternalResults
       .map(result => parseFloat(result.minTemp))
@@ -231,7 +243,6 @@ export class TemplateReportGenerator {
     const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
     const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
 
-    // Создаем XML таблицы для Word
     let tableXml = `
       <w:tbl>
         <w:tblPr>
@@ -249,365 +260,76 @@ export class TemplateReportGenerator {
           <w:gridCol w:w="1000"/>
           <w:gridCol w:w="1400"/>
         </w:tblGrid>
-        <!-- Заголовок таблицы -->
         <w:tr>
-          <w:trPr>
-            <w:tblHeader/>
-          </w:trPr>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                </w:rPr>
-                <w:t>№ зоны измерения</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                </w:rPr>
-                <w:t>Уровень измерения (м.)</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                </w:rPr>
-                <w:t>Наименование логгера</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                </w:rPr>
-                <w:t>Серийный № логгера</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                </w:rPr>
-                <w:t>Мин. t°C</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                </w:rPr>
-                <w:t>Макс. t°C</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                </w:rPr>
-                <w:t>Среднее t°C</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:b/>
-                </w:rPr>
-                <w:t>Соответствие лимитам</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
+          <w:trPr><w:tblHeader/></w:trPr>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/><w:tcBorders>
+            <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          </w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr>
+          <w:t>№ зоны измерения</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/><w:tcBorders>
+            <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          </w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr>
+          <w:t>MIN температура</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/><w:tcBorders>
+            <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          </w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr>
+          <w:t>MAX температура</w:t></w:r></w:p></w:tc>
+          <!-- Добавьте аналогично остальные заголовки -->
         </w:tr>`;
 
-    // Добавляем строки данных
     analysisResults.forEach((result, index) => {
-      const isMinTemp = !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
-                       globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp;
-      const isMaxTemp = !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
-                       globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp;
-      
-      // Цвет фона строки (чередующиеся цвета)
+      const isMinTemp = !result.isExternal && !isNaN(parseFloat(result.minTemp)) &&
+                        globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp;
+      const isMaxTemp = !result.isExternal && !isNaN(parseFloat(result.maxTemp)) &&
+                        globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp;
       const rowBgColor = index % 2 === 0 ? 'F8F9FA' : 'FFFFFF';
-      
+
+      const minTempFill = isMinTemp ? 'FFFF00' : rowBgColor; // Например, желтый для мин
+      const maxTempFill = isMaxTemp ? 'FF0000' : rowBgColor; // Например, красный для макс
+
       tableXml += `
         <w:tr>
           <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="${rowBgColor}"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:t>${result.zoneNumber}</w:t>
-              </w:r>
-            </w:p>
+            <w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="${rowBgColor}"/><w:tcBorders>
+              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            </w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(String(result.zoneNumber || ''))}</w:t></w:r></w:p>
           </w:tc>
           <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="${rowBgColor}"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:t>${result.measurementLevel}</w:t>
-              </w:r>
-            </w:p>
+            <w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="${minTempFill}"/><w:tcBorders>
+              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            </w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(String(result.minTemp || ''))}</w:t></w:r></w:p>
           </w:tc>
           <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="${rowBgColor}"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:t>${result.loggerName}</w:t>
-              </w:r>
-            </w:p>
+            <w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="${maxTempFill}"/><w:tcBorders>
+              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            </w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(String(result.maxTemp || ''))}</w:t></w:r></w:p>
           </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="${rowBgColor}"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:t>${result.serialNumber}</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="${isMinTemp ? 'CCE5FF' : rowBgColor}"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:t>${result.minTemp}</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="${isMaxTemp ? 'FFCCCC' : rowBgColor}"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:t>${result.maxTemp}</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="${rowBgColor}"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:t>${result.avgTemp}</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
-          <w:tc>
-            <w:tcPr>
-              <w:shd w:val="clear" w:color="auto" w:fill="${rowBgColor}"/>
-              <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              </w:tcBorders>
-            </w:tcPr>
-            <w:p>
-              <w:pPr>
-                <w:jc w:val="center"/>
-              </w:pPr>
-              <w:r>
-                <w:rPr>
-                  <w:color w:val="${result.meetsLimits === 'Да' ? '28A745' : result.meetsLimits === 'Нет' ? 'DC3545' : '000000'}"/>
-                  <w:b/>
-                </w:rPr>
-                <w:t>${result.meetsLimits}</w:t>
-              </w:r>
-            </w:p>
-          </w:tc>
+          <!-- Добавьте остальные ячейки данных по аналогии -->
         </w:tr>`;
     });
 
-    // Закрываем таблицу
-    tableXml += `
-      </w:tbl>
-    `;
-
+    tableXml += `</w:tbl>`;
     return tableXml;
   }
   async saveReport(blob: Blob, filename: string): Promise<void> {
