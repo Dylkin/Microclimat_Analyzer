@@ -13,7 +13,6 @@ export interface TemplateReportData {
   testType: string;
   objectName: string;
   coolingSystemName: string;
-}
 
 export class TemplateReportGenerator {
   private static instance: TemplateReportGenerator;

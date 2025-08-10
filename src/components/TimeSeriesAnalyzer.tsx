@@ -423,9 +423,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Создаем критерии приемки
       const acceptanceCriteria = createAcceptanceCriteria();
       
-      // Создаем HTML таблицу для вставки в отчет
-      const resultsTableHtml = TemplateReportGenerator.createHtmlTable(analysisResults);
-      
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
         analysisResults,
@@ -438,7 +435,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         testType: getTestTypeDisplayName(testType),
         objectName: objectName || 'Не указано',
         coolingSystemName: coolingSystemName || 'Не указано',
-      };
 
       console.log('Данные для шаблона подготовлены:', {
         executor: templateData.executor,
