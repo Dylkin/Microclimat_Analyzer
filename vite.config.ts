@@ -9,13 +9,13 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
-      'buffer',
       'd3-array',
       'd3-scale',
       'd3-scale-chromatic',
       'd3-selection',
       'd3-time-format',
-      'd3-zoom'
+      'd3-zoom',
+      'docxtemplater-table-module'
     ],
   },
   server: {
