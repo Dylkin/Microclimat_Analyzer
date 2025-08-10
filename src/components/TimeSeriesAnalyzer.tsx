@@ -503,42 +503,39 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   // Функция для создания HTML таблицы результатов
-  const createResultsTableForTemplate = (results: any[]): string => {
-    if (!results || results.length === 0) {
-      return 'Нет данных для отображения';
-    }
+  const createResultsTableForTemplate = (results: any[]) => {
+    const tableRows = results.map(result => `
+      <tr>
+        <td>${result.zoneNumber}</td>
+        <td>${result.measurementLevel}</td>
+        <td>${result.loggerName}</td>
+        <td>${result.serialNumber}</td>
+        <td>${result.minTemp}</td>
+        <td>${result.maxTemp}</td>
+        <td>${result.avgTemp}</td>
+        <td>${result.meetsLimits}</td>
+      </tr>
+    `).join('');
 
-    let table = 'РЕЗУЛЬТАТЫ АНАЛИЗА:\r\n\r\n';
-    
-    // Заголовок таблицы (используем табуляцию для разделения колонок)
-    table += '№ зоны\tУровень (м.)\tЛоггер\tS/N\tМин. t°C\tМакс. t°C\tСреднее t°C\tСоответствие\r\n';
-    
-    // Строки данных
-    results.forEach(result => {
-      const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
-      table += `${zoneNumber}\t${result.measurementLevel || '-'}\t${result.loggerName || '-'}\t${result.serialNumber || '-'}\t${result.minTemp || '-'}\t${result.maxTemp || '-'}\t${result.avgTemp || '-'}\t${result.meetsLimits || '-'}\r\n`;
-    });
-
-    table += '\r\n';
-    
-    // Добавляем статистику
-    const validResults = results.filter(r => !r.isExternal && r.minTemp !== '-');
-    const externalSensors = results.filter(r => r.isExternal).length;
-    
-    table += `Общая статистика:\r\n`;
-    table += `- Всего датчиков: ${results.length}\r\n`;
-    table += `- Внутренние датчики: ${validResults.length}\r\n`;
-    table += `- Внешние датчики: ${externalSensors}\r\n`;
-    
-    const compliantCount = results.filter(r => r.meetsLimits === 'Да').length;
-    const nonCompliantCount = results.filter(r => r.meetsLimits === 'Нет').length;
-    
-    if (compliantCount > 0 || nonCompliantCount > 0) {
-      table += `- Соответствуют лимитам: ${compliantCount}\r\n`;
-      table += `- Не соответствуют лимитам: ${nonCompliantCount}\r\n`;
-    }
-
-    return table;
+    return `
+      <table border="1" style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr>
+            <th>№ зоны измерения</th>
+            <th>Уровень измерения (м.)</th>
+            <th>Наименование логгера (6 символов)</th>
+            <th>Серийный № логгера</th>
+            <th>Мин. t°C</th>
+            <th>Макс. t°C</th>
+            <th>Среднее t°C</th>
+            <th>Соответствие лимитам</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+    `;
   };
 
   // Функция для создания критериев приемки

@@ -203,34 +203,35 @@ export class TemplateReportGenerator {
       return 'Нет данных для отображения';
     }
 
-    let table = 'РЕЗУЛЬТАТЫ АНАЛИЗА:\r\n\r\n';
+    let table = 'РЕЗУЛЬТАТЫ АНАЛИЗА:\n\n';
     
     // Заголовок таблицы
-    table += '№ зоны\tУровень (м.)\tЛоггер\tS/N\tМин. t°C\tМакс. t°C\tСреднее t°C\tСоответствие\r\n';
+    table += '№ зоны | Уровень (м.) | Логгер | S/N | Мин. t°C | Макс. t°C | Среднее t°C | Соответствие\n';
+    table += '-------|-------------|--------|-----|----------|-----------|-------------|-------------\n';
     
     // Строки данных
     analysisResults.forEach(result => {
       const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
-      table += `${zoneNumber}\t${result.measurementLevel || '-'}\t${result.loggerName || '-'}\t${result.serialNumber || '-'}\t${result.minTemp || '-'}\t${result.maxTemp || '-'}\t${result.avgTemp || '-'}\t${result.meetsLimits || '-'}\r\n`;
+      table += `${zoneNumber} | ${result.measurementLevel || '-'} | ${result.loggerName || '-'} | ${result.serialNumber || '-'} | ${result.minTemp || '-'} | ${result.maxTemp || '-'} | ${result.avgTemp || '-'} | ${result.meetsLimits || '-'}\n`;
     });
 
-    table += '\r\n';
+    table += '\n';
     
     // Добавляем статистику
     const validResults = analysisResults.filter(r => !r.isExternal && r.minTemp !== '-');
     const externalSensors = analysisResults.filter(r => r.isExternal).length;
     
-    table += `\r\nОбщая статистика:\r\n`;
-    table += `- Всего датчиков: ${analysisResults.length}\r\n`;
-    table += `- Внутренние датчики: ${validResults.length}\r\n`;
-    table += `- Внешние датчики: ${externalSensors}\r\n`;
+    table += `\nОбщая статистика:\n`;
+    table += `- Всего датчиков: ${analysisResults.length}\n`;
+    table += `- Внутренние датчики: ${validResults.length}\n`;
+    table += `- Внешние датчики: ${externalSensors}\n`;
     
     const compliantCount = analysisResults.filter(r => r.meetsLimits === 'Да').length;
     const nonCompliantCount = analysisResults.filter(r => r.meetsLimits === 'Нет').length;
     
     if (compliantCount > 0 || nonCompliantCount > 0) {
-      table += `- Соответствуют лимитам: ${compliantCount}\r\n`;
-      table += `- Не соответствуют лимитам: ${nonCompliantCount}\r\n`;
+      table += `- Соответствуют лимитам: ${compliantCount}\n`;
+      table += `- Не соответствуют лимитам: ${nonCompliantCount}\n`;
     }
 
     return table;
