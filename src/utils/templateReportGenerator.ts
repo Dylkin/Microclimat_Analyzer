@@ -242,7 +242,7 @@ export class TemplateReportGenerator {
       additionalJsContext: {
         // Дополнительные функции для обработки данных
         formatNumber: (num: number) => num.toFixed(1),
-        isExternal: (zoneNumber: number) => zoneNumber === 999
+        isExternal: (zoneNumber: number) => zoneNumber === 999 ? 'true' : 'false'
       }
     });
     
