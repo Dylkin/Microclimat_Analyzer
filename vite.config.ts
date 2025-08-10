@@ -5,8 +5,9 @@ export default defineConfig({
   plugins: [react()],
   define: {
     global: 'globalThis',
-    'process.env': {},
-    process: 'globalThis.process',
+    'process.env': '{}',
+    process: '{ env: {} }',
+    Buffer: 'globalThis.Buffer',
   },
   optimizeDeps: {
     include: [
