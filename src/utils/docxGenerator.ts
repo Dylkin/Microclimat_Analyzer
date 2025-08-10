@@ -286,9 +286,28 @@ export class DocxReportGenerator {
     if (dataType === 'temperature' && validResults.length > 0) {
       // Температурная статистика
       const temperatures = validResults.map(r => parseFloat(r.avgTemp)).filter(t => !isNaN(t));
-      const minTemp = Math.min(...temperatures);
-      const maxTemp = Math.max(...temperatures);
-      const avgTemp = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+      
+      // Проверяем, есть ли валидные температурные данные
+      let minTempDisplay = '-';
+      let maxTempDisplay = '-';
+      let avgTempDisplay = '-';
+      
+      if (temperatures.length > 0) {
+        const minTemp = Math.min(...temperatures);
+        const maxTemp = Math.max(...temperatures);
+        const avgTemp = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+        
+        // Проверяем, что значения являются конечными числами
+        if (isFinite(minTemp)) {
+          minTempDisplay = minTemp.toFixed(1);
+        }
+        if (isFinite(maxTemp)) {
+          maxTempDisplay = maxTemp.toFixed(1);
+        }
+        if (isFinite(avgTemp)) {
+          avgTempDisplay = avgTemp.toFixed(1);
+        }
+      }
 
       paragraphs.push(
         new Paragraph({
@@ -304,7 +323,7 @@ export class DocxReportGenerator {
         new Paragraph({
           children: [
             new TextRun({
-              text: `• Минимальная средняя температура: ${minTemp.toFixed(1)}°C`,
+              text: `• Минимальная средняя температура: ${minTempDisplay}°C`,
               size: 22,
             }),
           ],
@@ -313,7 +332,7 @@ export class DocxReportGenerator {
         new Paragraph({
           children: [
             new TextRun({
-              text: `• Максимальная средняя температура: ${maxTemp.toFixed(1)}°C`,
+              text: `• Максимальная средняя температура: ${maxTempDisplay}°C`,
               size: 22,
             }),
           ],
@@ -322,7 +341,7 @@ export class DocxReportGenerator {
         new Paragraph({
           children: [
             new TextRun({
-              text: `• Общая средняя температура: ${avgTemp.toFixed(1)}°C`,
+              text: `• Общая средняя температура: ${avgTempDisplay}°C`,
               size: 22,
             }),
           ],
