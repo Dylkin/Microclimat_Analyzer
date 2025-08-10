@@ -138,6 +138,7 @@ export const Help: React.FC = () => {
               <h4 className="font-medium text-purple-900">Изображения и таблицы:</h4>
               <ul className="space-y-1 text-purple-800">
                 <li><code className="bg-purple-100 px-2 py-1 rounded">{'{chart_image}'}</code> - График временных рядов (изображение)</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа (HTML таблица)</li>
               </ul>
             </div>
             <div className="mt-4 p-3 bg-purple-100 rounded-lg">
@@ -145,6 +146,7 @@ export const Help: React.FC = () => {
                 <strong>Примечание:</strong> Используется библиотека docx-templates для лучшей поддержки таблиц. 
                 Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
                 График вставляется как PNG изображение с высоким разрешением (scale: 2).
+                Таблица результатов вставляется как HTML таблица с сохранением стилей и цветовых выделений.
               </p>
             </div>
           </div>
@@ -251,15 +253,16 @@ export const Help: React.FC = () => {
           <div className="border-l-4 border-purple-500 pl-4">
             <h3 className="font-semibold text-gray-800">Как добавить маркеры на график?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа (редактируемая DOCX таблица)</li>
+              Дважды кликните на график в нужном месте, чтобы добавить вертикальный маркер. Маркеры можно редактировать и удалять в разделе "Маркеры" под графиком.
             </p>
           </div>
 
           <div className="border-l-4 border-red-500 pl-4">
-              <strong>Примечание:</strong> Используется библиотека docx-templates для полной поддержки таблиц. 
+            <h3 className="font-semibold text-gray-800">Как работает вставка таблицы в отчет?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              График вставляется как PNG изображение с высоким разрешением (scale: 2).
-              Таблица результатов конвертируется из HTML в полноценную DOCX таблицу с сохранением всех стилей и цветовых выделений.
+              Таблица результатов автоматически вставляется в отчет через плейсхолдер <code>{'{ResultsTable}'}</code>. 
+              Она включает все данные анализа: номера зон, уровни измерения, характеристики логгеров, статистику температур и соответствие лимитам.
+              Цветовые выделения (минимальные/максимальные значения, соответствие лимитам) сохраняются в итоговом документе.
             </p>
           </div>
         </div>
