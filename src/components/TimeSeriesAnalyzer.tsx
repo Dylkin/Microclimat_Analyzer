@@ -44,6 +44,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const templateInputRef = useRef<HTMLInputElement>(null);
   const [reportNumber, setReportNumber] = useState('');
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+  const [testType, setTestType] = useState('');
   const [objectName, setObjectName] = useState('');
   const [coolingSystemName, setCoolingSystemName] = useState('');
   
@@ -413,6 +414,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportStart: dateStr,
         dataType,
         acceptanceCriteria,
+        testType: testType || 'Не выбрано',
         objectName: objectName || 'Не указано',
         coolingSystemName: coolingSystemName || 'Не указано'
       };
@@ -424,6 +426,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportDate: templateData.reportDate,
         chartBlobSize: chartBlob.size,
         acceptanceCriteriaLength: acceptanceCriteria.length,
+        testType: templateData.testType,
         objectName: templateData.objectName,
         coolingSystemName: templateData.coolingSystemName
       });
@@ -614,6 +617,23 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </button>
             )}
           </div>
+        </div>
+
+        {/* Test Type Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Испытания</label>
+          <select
+            value={testType}
+            onChange={(e) => setTestType(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option value="">Выберите тип испытания</option>
+            <option value="empty_volume">Испытание на соответствие критериям в пустом объеме</option>
+            <option value="loaded_volume">Испытание на соответствие критериям в загруженном объеме</option>
+            <option value="temperature_recovery">Испытание по восстановлению температуры после открытия двери</option>
+            <option value="power_off">Испытание на отключение электропитания</option>
+            <option value="power_on">Испытание на включение электропитания</option>
+          </select>
         </div>
 
         {/* Limits */}

@@ -12,6 +12,7 @@ export interface TemplateReportData {
   reportStart: string;
   dataType: 'temperature' | 'humidity';
   acceptanceCriteria: string;
+  testType: string;
   objectName: string;
   coolingSystemName: string;
 }
@@ -102,9 +103,11 @@ export class TemplateReportGenerator {
         report_date: data.reportDate, // Оставляем для обратной совместимости
         chart: 'chart_placeholder', // Значение для ImageModule
         Acceptance_criteria: data.acceptanceCriteria,
+        TestType: data.testType || 'Не выбрано',
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
+        TestType: data.testType || 'Не выбрано',
         analysis_table: resultsTable
       };
 
@@ -115,6 +118,7 @@ export class TemplateReportGenerator {
       console.log('report_date:', data.reportDate);
       console.log('chart_image_size:', `${chartImageBuffer.byteLength} байт`);
       console.log('Acceptance_criteria_length:', data.acceptanceCriteria?.length || 0);
+      console.log('TestType:', data.testType);
       console.log('AcceptanceСriteria_length:', data.acceptanceCriteria?.length || 0);
       console.log('ObjectName:', data.objectName);
       console.log('CoolingSystemName:', data.coolingSystemName);
