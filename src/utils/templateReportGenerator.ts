@@ -206,26 +206,16 @@ export class TemplateReportGenerator {
     let table = 'РЕЗУЛЬТАТЫ АНАЛИЗА:\n\n';
     
     // Заголовок таблицы
-    table += '┌─────────┬─────────────┬────────┬─────┬──────────┬───────────┬─────────────┬─────────────┐\n';
-    table += '│ № зоны  │ Уровень(м.)│ Логгер │ S/N │ Мин. t°C │ Макс. t°C │ Среднее t°C │ Соответствие│\n';
-    table += '├─────────┼─────────────┼────────┼─────┼──────────┼───────────┼─────────────┼─────────────┤\n';
+    table += '№ зоны | Уровень (м.) | Логгер | S/N | Мин. t°C | Макс. t°C | Среднее t°C | Соответствие\n';
+    table += '-------|-------------|--------|-----|----------|-----------|-------------|-------------\n';
     
     // Строки данных
     analysisResults.forEach(result => {
       const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
-      const zone = String(zoneNumber).padEnd(7);
-      const level = String(result.measurementLevel || '-').padEnd(11);
-      const logger = String(result.loggerName || '-').padEnd(6);
-      const serial = String(result.serialNumber || '-').padEnd(3);
-      const minTemp = String(result.minTemp || '-').padEnd(8);
-      const maxTemp = String(result.maxTemp || '-').padEnd(9);
-      const avgTemp = String(result.avgTemp || '-').padEnd(11);
-      const meets = String(result.meetsLimits || '-').padEnd(11);
-      
-      table += `│ ${zone} │ ${level} │ ${logger} │ ${serial} │ ${minTemp} │ ${maxTemp} │ ${avgTemp} │ ${meets} │\n`;
+      table += `${zoneNumber} | ${result.measurementLevel || '-'} | ${result.loggerName || '-'} | ${result.serialNumber || '-'} | ${result.minTemp || '-'} | ${result.maxTemp || '-'} | ${result.avgTemp || '-'} | ${result.meetsLimits || '-'}\n`;
     });
 
-    table += '└─────────┴─────────────┴────────┴─────┴──────────┴───────────┴─────────────┴─────────────┘\n\n';
+    table += '\n';
     
     // Добавляем статистику
     const validResults = analysisResults.filter(r => !r.isExternal && r.minTemp !== '-');
