@@ -1,7 +1,7 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+import ImageModule from 'docxtemplater-image-module-free';
 import html2canvas from 'html2canvas';
-import htmlToDocx from 'html-to-docx';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -45,8 +45,7 @@ export class TemplateReportGenerator {
       let resultsTableBuffer: ArrayBuffer | undefined;
       if (data.resultsTableElement) {
         console.log('Создаем изображение таблицы результатов...');
-        const tableImageBlob = await this.createTableImage(data.resultsTableElement);
-        resultsTableBuffer = await tableImageBlob.arrayBuffer();
+        resultsTableBuffer = await this.createTableImage(data.resultsTableElement);
         console.log('Изображение таблицы создано, размер:', resultsTableBuffer.byteLength, 'байт');
       }
       
@@ -79,10 +78,27 @@ export class TemplateReportGenerator {
       // Загружаем шаблон в PizZip
       const zip = new PizZip(templateArrayBuffer);
 
+      // Создаем модуль для работы с изображениями
+      const imageModule = new ImageModule({
+        centered: false,
+        getImage: function(tagValue: any) {
+          return tagValue;
+        },
+        getSize: function(img: ArrayBuffer, tagValue: any, tagName: string) {
+          // Размеры для таблицы результатов
+          if (tagName === 'ResultsTable') {
+            return [600, 400]; // ширина, высота в пикселях
+          }
+          // Размеры для графика
+          return [800, 600];
+        }
+      });
+
       // Создаем docxtemplater
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
+        modules: [imageModule]
       });
 
       // Устанавливаем данные
@@ -114,17 +130,13 @@ export class TemplateReportGenerator {
   /**
    * Создает изображение таблицы для вставки в шаблон
    */
-  private async createTableImage(tableElement: HTMLElement): Promise<Blob> {
+  private async createTableImage(tableElement: HTMLElement): Promise<ArrayBuffer> {
     try {
       console.log('Создаем изображение таблицы для шаблона...');
       
-      // Сохраняем оригинальные стили
       const originalStyles = new Map<HTMLElement, string>();
-      
-      // Улучшаем стили для экспорта
       this.enhanceTableForExport(tableElement, originalStyles);
       
-      // Создаем скриншот таблицы
       const canvas = await html2canvas(tableElement, {
         scale: 2,
         logging: false,
@@ -135,7 +147,6 @@ export class TemplateReportGenerator {
         height: tableElement.offsetHeight
       });
       
-      // Восстанавливаем оригинальные стили
       this.restoreOriginalStyles(originalStyles);
       
       console.log('Изображение таблицы создано, размер:', canvas.width, 'x', canvas.height);
@@ -144,8 +155,9 @@ export class TemplateReportGenerator {
       return new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((blob) => {
           if (blob) {
-            console.log('Blob изображения таблицы создан, размер:', blob.size, 'байт');
-            resolve(blob);
+            blob.arrayBuffer()
+              .then(resolve)
+              .catch(reject);
           } else {
             reject(new Error('Ошибка создания изображения таблицы'));
           }
