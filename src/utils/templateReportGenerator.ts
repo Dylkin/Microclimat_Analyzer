@@ -424,6 +424,7 @@ export class TemplateReportGenerator {
             </w:p>
           </w:tc>
         </w:tr>`;
+  }
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
