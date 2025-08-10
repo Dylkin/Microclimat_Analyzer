@@ -441,6 +441,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
+        resultsTableElement: resultsTableRef.current || undefined,
         executor: user?.fullName || 'Неизвестный пользователь',
         reportDate: dateStr,
         reportNumber: reportNumber || `REP-${Date.now()}`,

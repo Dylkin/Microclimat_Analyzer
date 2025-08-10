@@ -6,6 +6,7 @@ export default defineConfig({
   define: {
     global: 'globalThis',
     'process.env': {},
+    process: 'globalThis.process',
   },
   optimizeDeps: {
     include: [
@@ -15,6 +16,7 @@ export default defineConfig({
       'd3-selection',
       'd3-time-format',
       'd3-zoom',
+      'html-to-docx',
     ],
   },
   server: {

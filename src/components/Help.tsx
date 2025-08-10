@@ -139,13 +139,14 @@ export const Help: React.FC = () => {
               <ul className="space-y-1 text-purple-800">
                 <li><code className="bg-purple-100 px-2 py-1 rounded">{'{chart_image}'}</code> - График временных рядов (изображение)</li>
                 <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа (изображение)</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа (изображение)</li>
               </ul>
             </div>
             <div className="mt-4 p-3 bg-purple-100 rounded-lg">
               <p className="text-xs text-purple-700">
                 <strong>Примечание:</strong> Используется библиотека docx-templates. 
                 Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
-                Изображения (график и таблица) вставляются как PNG с высоким разрешением.
+                Изображения (график и таблица) вставляются как PNG с высоким разрешением (scale: 2).
               </p>
             </div>
           </div>
