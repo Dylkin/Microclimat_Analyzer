@@ -233,7 +233,7 @@ export class TemplateReportGenerator {
         EligibilityCriteria: data.acceptanceCriteria || '',
         ObjectName: data.objectName || '',
         CoolingSystemName: data.coolingSystemName || '',
-        ResultsTable: resultsTableHtml || 'Нет данных для отображения',
+        ResultsTable: resultsTableHtml || '',
       };
 
       // 1. Загрузка шаблона с правильной кодировкой
@@ -284,17 +284,56 @@ export class TemplateReportGenerator {
    * Создание HTML таблицы для вставки в шаблон
    */
   private createHtmlTable(resultsTableData: any[]): string {
-    // Создаем простую текстовую таблицу для docxtemplater
-    let tableText = '';
-    
-    // Заголовок таблицы
-    tableText += '№ зоны\tУровень (м.)\tЛоггер\tS/N\tМин. t°C\tМакс. t°C\tСреднее t°C\tСоответствие\n';
+    let html = `
+      <table border="1" style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr style="background-color: #f3f4f6;">
+            <th style="padding: 8px; text-align: center; font-weight: bold;">№ зоны</th>
+            <th style="padding: 8px; text-align: center; font-weight: bold;">Уровень (м.)</th>
+            <th style="padding: 8px; text-align: center; font-weight: bold;">Логгер</th>
+            <th style="padding: 8px; text-align: center; font-weight: bold;">S/N</th>
+            <th style="padding: 8px; text-align: center; font-weight: bold;">Мин. t°C</th>
+            <th style="padding: 8px; text-align: center; font-weight: bold;">Макс. t°C</th>
+            <th style="padding: 8px; text-align: center; font-weight: bold;">Среднее t°C</th>
+            <th style="padding: 8px; text-align: center; font-weight: bold;">Соответствие</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
 
     resultsTableData.forEach(row => {
-      tableText += `${row.zoneNumber || '-'}\t${row.measurementLevel || '-'}\t${row.loggerName || '-'}\t${row.serialNumber || '-'}\t${row.minTemp || '-'}\t${row.maxTemp || '-'}\t${row.avgTemp || '-'}\t${row.meetsLimits || '-'}\n`;
+      // Определяем цвет фона для минимальных и максимальных значений
+      const minTempStyle = row.isMinTemp ? 'background-color: #dbeafe;' : '';
+      const maxTempStyle = row.isMaxTemp ? 'background-color: #fecaca;' : '';
+      
+      // Определяем цвет для соответствия лимитам
+      let complianceStyle = '';
+      if (row.meetsLimits === 'Да') {
+        complianceStyle = 'background-color: #dcfce7; color: #166534;';
+      } else if (row.meetsLimits === 'Нет') {
+        complianceStyle = 'background-color: #fef2f2; color: #dc2626;';
+      }
+
+      html += `
+        <tr>
+          <td style="padding: 6px; text-align: center;">${row.zoneNumber || '-'}</td>
+          <td style="padding: 6px; text-align: center;">${row.measurementLevel || '-'}</td>
+          <td style="padding: 6px; text-align: center;">${row.loggerName || '-'}</td>
+          <td style="padding: 6px; text-align: center;">${row.serialNumber || '-'}</td>
+          <td style="padding: 6px; text-align: center; ${minTempStyle}">${row.minTemp || '-'}</td>
+          <td style="padding: 6px; text-align: center; ${maxTempStyle}">${row.maxTemp || '-'}</td>
+          <td style="padding: 6px; text-align: center;">${row.avgTemp || '-'}</td>
+          <td style="padding: 6px; text-align: center; ${complianceStyle}">${row.meetsLimits || '-'}</td>
+        </tr>
+      `;
     });
 
-    return tableText;
+    html += `
+        </tbody>
+      </table>
+    `;
+
+    return html;
   }
 
 
