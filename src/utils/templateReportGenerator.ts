@@ -1,5 +1,3 @@
-import PizZip from 'pizzip';
-import Docxtemplater from 'docxtemplater';
 import { createReport } from 'docx-templates';
 
 export interface TemplateReportData {
