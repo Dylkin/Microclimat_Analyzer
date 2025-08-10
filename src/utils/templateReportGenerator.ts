@@ -32,13 +32,8 @@ export class TemplateReportGenerator {
       console.log('Имя файла шаблона:', templateFile.name);
       console.log('Размер файла шаблона:', templateFile.size, 'байт');
       
-      // Пробуем использовать docx-templates для лучшей поддержки таблиц
-      try {
-        return await this.generateWithDocxTemplates(templateFile, data);
-      } catch (docxTemplatesError) {
-        console.warn('docx-templates не сработал, используем fallback:', docxTemplatesError);
-        return await this.generateWithDocxtemplater(templateFile, data);
-      }
+      // Используем только docx-templates для полной поддержки HTML таблиц
+      return await this.generateWithDocxTemplates(templateFile, data);
       
     } catch (error) {
       console.error('Ошибка генерации отчета из шаблона:', error);
@@ -73,7 +68,7 @@ export class TemplateReportGenerator {
       AcceptanceСriteria: data.acceptanceCriteria,
       ObjectName: data.objectName,
       CoolingSystemName: data.coolingSystemName,
-      ResultsTable: data.resultsTableHtml ? this.convertHtmlToDocxTable(data.resultsTableHtml) : 'Таблица недоступна'
+      ResultsTable: data.resultsTableHtml ? this.convertHtmlToDocxTable(data.resultsTableHtml) : { rows: [] }
     };
 
     // Читаем шаблон
@@ -95,83 +90,12 @@ export class TemplateReportGenerator {
     });
   }
 
-  /**
-   * Fallback генерация с помощью docxtemplater
-   */
-  private async generateWithDocxtemplater(templateFile: File, data: TemplateReportData): Promise<Blob> {
-    console.log('Используем docxtemplater для генерации отчета');
-    
-    // Читаем шаблон как ArrayBuffer
-    const templateArrayBuffer = await templateFile.arrayBuffer();
-    console.log('Шаблон успешно прочитан как ArrayBuffer');
-      
-      // Конвертируем изображение в ArrayBuffer
-      const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
-      console.log('Изображение конвертировано в ArrayBuffer, размер:', chartImageBuffer.byteLength, 'байт');
-      
-      // Подготавливаем HTML таблицы результатов если предоставлена
-      let resultsTableHtml: string | undefined;
-      if (data.resultsTableHtml) {
-        console.log('Подготавливаем HTML таблицы результатов...');
-        resultsTableHtml = data.resultsTableHtml;
-        console.log('HTML таблицы подготовлен, длина:', resultsTableHtml.length, 'символов');
-      }
-      
-      // Подготавливаем данные для замены
-      const templateData = {
-        executor: data.executor,
-        Report_No: data.reportNumber,
-        Report_start: data.reportStart,
-        report_date: data.reportDate,
-        chart: chartImageBuffer,
-        Acceptance_criteria: data.acceptanceCriteria,
-        TestType: data.testType || 'Не выбрано',
-        AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
-        ObjectName: data.objectName,
-        CoolingSystemName: data.coolingSystemName,
-        ResultsTable: this.convertHtmlTableToText(data.resultsTableHtml), // Конвертируем HTML в текст
-      };
 
-      console.log('=== Данные для шаблона ===');
-      console.log('executor:', data.executor);
-      console.log('Report_No:', data.reportNumber);
-      console.log('Report_start:', data.reportStart);
-      console.log('report_date:', data.reportDate);
-      console.log('chart_image_size:', `${chartImageBuffer.byteLength} байт`);
-      console.log('TestType:', data.testType);
-      console.log('ObjectName:', data.objectName);
-      console.log('CoolingSystemName:', data.coolingSystemName);
-      console.log('ResultsTable_html_length:', resultsTableHtml ? `${resultsTableHtml.length} символов` : 'не предоставлена');
 
-      // Загружаем шаблон в PizZip
-      const zip = new PizZip(templateArrayBuffer);
 
-      // Создаем docxtemplater
-      const doc = new Docxtemplater(zip, {
-        paragraphLoop: true,
-        linebreaks: true,
-      });
 
-      // Устанавливаем данные
-      doc.setData(templateData);
 
-      try {
-        // Рендерим документ
-        doc.render();
-      } catch (error) {
-        console.error('Ошибка рендеринга документа:', error);
-        throw new Error(`Ошибка заполнения шаблона: ${error}`);
-      }
 
-      // Генерируем итоговый документ
-      const output = doc.getZip().generate({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      });
-      
-      console.log('Отчет успешно сгенерирован');
-      return output;
-  }
 
   /**
    * Конвертирует HTML таблицу в структуру для docx-templates
@@ -239,59 +163,8 @@ export class TemplateReportGenerator {
     }
   }
 
-  /**
-   * Конвертирует HTML таблицу в текстовое представление для DOCX (fallback)
-   */
-  private convertHtmlTableToText(htmlTable?: string): string {
-    if (!htmlTable) {
-      return 'Таблица результатов недоступна';
-    }
 
-    try {
-      // Создаем временный DOM элемент для парсинга HTML
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlTable, 'text/html');
-      const table = doc.querySelector('table');
-      
-      if (!table) {
-        return 'Таблица не найдена';
-      }
 
-      let textTable = '';
-      
-      // Обрабатываем заголовки
-      const headers = table.querySelectorAll('thead th');
-      if (headers.length > 0) {
-        const headerTexts = Array.from(headers).map(th => th.textContent?.trim() || '');
-        textTable += headerTexts.join(' | ') + '\n';
-        textTable += headerTexts.map(() => '---').join(' | ') + '\n';
-      }
-      
-      // Обрабатываем строки данных
-      const rows = table.querySelectorAll('tbody tr');
-      rows.forEach(row => {
-        const cells = row.querySelectorAll('td');
-        const cellTexts = Array.from(cells).map(td => {
-          let text = td.textContent?.trim() || '';
-          // Добавляем индикаторы для цветовых выделений
-          if (td.style.backgroundColor === 'rgb(191, 219, 254)' || td.classList.contains('bg-blue-200')) {
-            text += ' (МИН)';
-          }
-          if (td.style.backgroundColor === 'rgb(254, 202, 202)' || td.classList.contains('bg-red-200')) {
-            text += ' (МАКС)';
-          }
-          return text;
-        });
-        textTable += cellTexts.join(' | ') + '\n';
-      });
-      
-      return textTable;
-      
-    } catch (error) {
-      console.error('Ошибка конвертации HTML таблицы:', error);
-      return 'Ошибка обработки таблицы результатов';
-    }
-  }
 
   /**
    * Конвертирует ArrayBuffer в base64 строку
