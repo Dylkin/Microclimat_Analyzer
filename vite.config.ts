@@ -17,7 +17,7 @@ export default defineConfig({
       'd3-time-format',
       'd3-zoom',
       'html-to-docx',
-      'docx-templates',
+      'docx-templates'
     ],
   },
   build: {
