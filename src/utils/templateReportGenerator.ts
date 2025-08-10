@@ -108,17 +108,19 @@ export class TemplateReportGenerator {
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
         analysis_table: resultsTable,
-        // Добавляем отдельные поля для каждого столбца таблицы
-        tableRows: data.analysisResults.map(result => ({
-          zoneNumber: String(result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-')),
-          measurementLevel: String(result.measurementLevel || '-'),
-          loggerName: String(result.loggerName || '-'),
-          serialNumber: String(result.serialNumber || '-'),
-          minTemp: String(result.minTemp || '-'),
-          maxTemp: String(result.maxTemp || '-'),
-          avgTemp: String(result.avgTemp || '-'),
-          meetsLimits: String(result.meetsLimits || '-')
-        }))
+        // Создаем простую строку таблицы для вставки
+        ResultsTable: data.analysisResults.map(result => {
+          const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
+          const measurementLevel = result.measurementLevel || '-';
+          const loggerName = result.loggerName || '-';
+          const serialNumber = result.serialNumber || '-';
+          const minTemp = result.minTemp || '-';
+          const maxTemp = result.maxTemp || '-';
+          const avgTemp = result.avgTemp || '-';
+          const meetsLimits = result.meetsLimits || '-';
+          
+          return `${zoneNumber}\t${measurementLevel}\t${loggerName}\t${serialNumber}\t${minTemp}\t${maxTemp}\t${avgTemp}\t${meetsLimits}`;
+        }).join('\n')
       };
 
       console.log('=== Данные для шаблона ===');
