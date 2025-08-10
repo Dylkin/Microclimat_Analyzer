@@ -218,18 +218,12 @@ export class TemplateReportGenerator {
       Report_No: String(data.reportNumber || ''),
       Report_start: String(data.reportStart || ''),
       report_date: String(data.reportDate || ''),
-      chart_image: {
-        width: 15, // cm
-        height: 10, // cm
-        data: chartImageData,
-        extension: '.png'
-      },
-      Acceptance_criteria: String(data.acceptanceCriteria || ''),
+      chart_image: chartImageData, // Передаем напрямую Uint8Array
       TestType: String(data.testType || 'Не выбрано'),
       EligibilityCriteria: String(data.acceptanceCriteria || ''),
       ObjectName: String(data.objectName || ''),
       CoolingSystemName: String(data.coolingSystemName || ''),
-      ResultsTable: resultsTableHtml,
+      ResultsTable: String(resultsTableHtml || ''), // Убеждаемся, что это строка
     };
 
     // Читаем шаблон
@@ -239,11 +233,7 @@ export class TemplateReportGenerator {
     const reportBuffer = await createReport({
       template: templateBuffer,
       data: templateData,
-      additionalJsContext: {
-        // Дополнительные функции для обработки данных
-        formatNumber: (num: number) => num.toFixed(1),
-        isExternal: (zoneNumber: number) => zoneNumber === 999 ? 'true' : 'false'
-      }
+      // Убираем additionalJsContext, так как он может вызывать проблемы с типами
     });
     
     return new Blob([reportBuffer], {
