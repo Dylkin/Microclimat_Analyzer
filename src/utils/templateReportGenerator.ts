@@ -290,6 +290,11 @@ export class TemplateReportGenerator {
   }
 
   private escapeXml(text: string): string {
+    // Проверяем, что text является строкой
+    if (typeof text !== 'string') {
+      text = String(text);
+    }
+    
     return text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
