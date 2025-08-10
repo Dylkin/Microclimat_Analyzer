@@ -3,13 +3,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    port: 5173,
-    host: true,
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'credentialless'
-    }
-  },
   define: {
     global: 'globalThis',
     'process.env': {},
@@ -22,7 +15,10 @@ export default defineConfig({
       'd3-selection',
       'd3-time-format',
       'd3-zoom',
-      'docxtemplater-html-module',
     ],
+  },
+  server: {
+    port: 5173,
+    host: true
   },
 })
