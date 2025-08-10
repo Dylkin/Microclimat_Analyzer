@@ -109,7 +109,7 @@ export class TemplateReportGenerator {
         TestType: data.testType || 'Не выбрано',
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
-        CoolingSystemName: data.coolingSystemName,
+        CoolingSystemName: data.coolingSystemName || 'Не указано',
         analysis_table: resultsTable,
         ResultsTable: formattedTable
       };
@@ -211,6 +211,26 @@ export class TemplateReportGenerator {
       isCompliant: result.meetsLimits === 'Да',
       isNonCompliant: result.meetsLimits === 'Нет'
     }));
+  }
+
+  private createFormattedTable(analysisResults: any[]): any {
+    if (!analysisResults || analysisResults.length === 0) {
+      return { rows: [] };
+    }
+
+    // Создаем строки таблицы
+    const rows = analysisResults.map(result => ({
+      zoneNumber: result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-'),
+      measurementLevel: result.measurementLevel || '-',
+      loggerName: result.loggerName || '-',
+      serialNumber: result.serialNumber || '-',
+      minTemp: result.minTemp || '-',
+      maxTemp: result.maxTemp || '-',
+      avgTemp: result.avgTemp || '-',
+      meetsLimits: result.meetsLimits || '-'
+    }));
+
+    return { rows };
   }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
