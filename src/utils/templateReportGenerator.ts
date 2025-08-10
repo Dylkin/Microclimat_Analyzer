@@ -1,5 +1,4 @@
 import { createReport } from 'docx-templates';
-import { convertHtmlTableToDocx } from './htmlTableToDocx';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -12,7 +11,6 @@ export interface TemplateReportData {
   testType: string;
   objectName: string;
   coolingSystemName: string;
-  resultsTableHtml?: string;
 }
 
 export class TemplateReportGenerator {
@@ -50,33 +48,6 @@ export class TemplateReportGenerator {
     const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
     const chartImageData = new Uint8Array(chartImageBuffer);
     
-    // Конвертируем HTML таблицу в DOCX формат если она есть
-    let resultsTable = null;
-    if (data.resultsTableHtml) {
-      try {
-        console.log('Конвертируем HTML таблицу в DOCX формат...');
-        
-        // Создаем временный DOM элемент для парсинга HTML
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = data.resultsTableHtml;
-        const tableElement = tempDiv.querySelector('table') as HTMLTableElement;
-        
-        if (tableElement) {
-          resultsTable = await convertHtmlTableToDocx(tableElement, {
-            keepFontStyles: true,
-            defaultColWidth: 1500,
-            processCellContent: (cell) => cell.textContent?.trim() || ''
-          });
-          console.log('HTML таблица успешно конвертирована в DOCX');
-        } else {
-          console.warn('Таблица не найдена в HTML');
-        }
-      } catch (error) {
-        console.error('Ошибка конвертации HTML таблицы:', error);
-        // Продолжаем без таблицы
-      }
-    }
-    
     // Подготавливаем данные для docx-templates
     const templateData = {
       executor: data.executor,
@@ -94,7 +65,6 @@ export class TemplateReportGenerator {
       AcceptanceСriteria: data.acceptanceCriteria,
       ObjectName: data.objectName,
       CoolingSystemName: data.coolingSystemName,
-      ...(resultsTable && { ResultsTable: { _type: 'docx', data: resultsTable } })
     };
 
     // Читаем шаблон
@@ -114,7 +84,6 @@ export class TemplateReportGenerator {
     return new Blob([reportBuffer], {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     });
-  }
 
 
 
