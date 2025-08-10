@@ -1,5 +1,6 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+const HtmlModule = require('docxtemplater-html-module');
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -56,6 +57,7 @@ export class TemplateReportGenerator {
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
         myTable: tableXml, // XML таблица
+        myTable: this.createTableHtml(data.analysisResults), // HTML таблица
       };
 
       console.log('=== Данные для шаблона ===');
@@ -76,6 +78,7 @@ export class TemplateReportGenerator {
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
+        modules: [new HtmlModule({})],
       });
 
       // Устанавливаем данные
@@ -105,11 +108,11 @@ export class TemplateReportGenerator {
   }
 
   /**
-   * Создание XML таблицы для вставки в DOCX
+   * Создание HTML таблицы для вставки в DOCX
    */
-  private createTableXml(analysisResults: any[]): string {
+  private createTableHtml(analysisResults: any[]): string {
     if (!analysisResults || analysisResults.length === 0) {
-      return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
+      return '<p>Нет данных для отображения</p>';
     }
 
     // Вычисляем глобальные минимальные и максимальные значения
@@ -124,39 +127,22 @@ export class TemplateReportGenerator {
     const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
     const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
 
-    // Начало таблицы
-    let tableXml = `
-    <w:tbl>
-      <w:tblPr>
-        <w:tblStyle w:val="TableGrid"/>
-        <w:tblW w:w="0" w:type="auto"/>
-        <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
-      </w:tblPr>
-      <w:tblGrid>
-        <w:gridCol w:w="1200"/>
-        <w:gridCol w:w="1200"/>
-        <w:gridCol w:w="1200"/>
-        <w:gridCol w:w="1200"/>
-        <w:gridCol w:w="1000"/>
-        <w:gridCol w:w="1000"/>
-        <w:gridCol w:w="1000"/>
-        <w:gridCol w:w="1400"/>
-      </w:tblGrid>
-      
-      <!-- Заголовок таблицы -->
-      <w:tr>
-        <w:trPr>
-          <w:tblHeader/>
-        </w:trPr>
-        ${this.createHeaderCell('№ зоны измерения')}
-        ${this.createHeaderCell('Уровень измерения (м.)')}
-        ${this.createHeaderCell('Наименование логгера')}
-        ${this.createHeaderCell('Серийный № логгера')}
-        ${this.createHeaderCell('Мин. t°C')}
-        ${this.createHeaderCell('Макс. t°C')}
-        ${this.createHeaderCell('Среднее t°C')}
-        ${this.createHeaderCell('Соответствие лимитам')}
-      </w:tr>`;
+    // Создаем HTML таблицу
+    let tableHtml = `
+    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 10pt;">
+      <thead>
+        <tr style="background-color: #D9D9D9; font-weight: bold;">
+          <th style="padding: 8px; text-align: center; border: 1px solid #000;">№ зоны измерения</th>
+          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Уровень измерения (м.)</th>
+          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Наименование логгера</th>
+          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Серийный № логгера</th>
+          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Мин. t°C</th>
+          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Макс. t°C</th>
+          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Среднее t°C</th>
+          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Соответствие лимитам</th>
+        </tr>
+      </thead>
+      <tbody>`;
 
     // Добавляем строки данных
     analysisResults.forEach((result, index) => {
@@ -165,130 +151,35 @@ export class TemplateReportGenerator {
       const isMaxTemp = !result.isExternal && globalMaxTemp !== null && 
                        !isNaN(parseFloat(result.maxTemp)) && parseFloat(result.maxTemp) === globalMaxTemp;
 
-      const rowBgColor = index % 2 === 0 ? 'F8F9FA' : 'FFFFFF';
+      const rowBgColor = index % 2 === 0 ? '#F8F9FA' : '#FFFFFF';
+      const minTempBgColor = isMinTemp ? '#CCE5FF' : rowBgColor;
+      const maxTempBgColor = isMaxTemp ? '#FFCCDD' : rowBgColor;
 
-      tableXml += `
-      <w:tr>
-        ${this.createDataCell(result.zoneNumber || '-', rowBgColor)}
-        ${this.createDataCell(result.measurementLevel || '-', rowBgColor)}
-        ${this.createDataCell(result.loggerName || '-', rowBgColor)}
-        ${this.createDataCell(result.serialNumber || '-', rowBgColor)}
-        ${this.createTempCell(result.minTemp || '-', isMinTemp ? 'CCE5FF' : rowBgColor)}
-        ${this.createTempCell(result.maxTemp || '-', isMaxTemp ? 'FFCCDD' : rowBgColor)}
-        ${this.createDataCell(result.avgTemp || '-', rowBgColor)}
-        ${this.createComplianceCell(result.meetsLimits || '-', rowBgColor)}
-      </w:tr>`;
+      const complianceColor = result.meetsLimits === 'Да' ? '#28A745' : 
+                             result.meetsLimits === 'Нет' ? '#DC3545' : '#000000';
+
+      tableHtml += `
+        <tr>
+          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor};">${this.escapeHtml(result.zoneNumber || '-')}</td>
+          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor};">${this.escapeHtml(result.measurementLevel || '-')}</td>
+          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor};">${this.escapeHtml(result.loggerName || '-')}</td>
+          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor};">${this.escapeHtml(result.serialNumber || '-')}</td>
+          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${minTempBgColor};">${this.escapeHtml(result.minTemp || '-')}</td>
+          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${maxTempBgColor};">${this.escapeHtml(result.maxTemp || '-')}</td>
+          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor};">${this.escapeHtml(result.avgTemp || '-')}</td>
+          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor}; color: ${complianceColor}; font-weight: bold;">${this.escapeHtml(result.meetsLimits || '-')}</td>
+        </tr>`;
     });
 
     // Закрываем таблицу
-    tableXml += `
-    </w:tbl>`;
+    tableHtml += `
+      </tbody>
+    </table>`;
 
-    return tableXml;
+    return tableHtml;
   }
 
-  private createHeaderCell(content: string): string {
-    return `
-    <w:tc>
-      <w:tcPr>
-        <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
-        <w:tcBorders>
-          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-        </w:tcBorders>
-      </w:tcPr>
-      <w:p>
-        <w:pPr>
-          <w:jc w:val="center"/>
-        </w:pPr>
-        <w:r>
-          <w:rPr>
-            <w:b/>
-          </w:rPr>
-          <w:t>${this.escapeXml(content)}</w:t>
-        </w:r>
-      </w:p>
-    </w:tc>`;
-  }
-
-  private createDataCell(content: string, bgColor: string): string {
-    return `
-    <w:tc>
-      <w:tcPr>
-        <w:shd w:val="clear" w:color="auto" w:fill="${bgColor}"/>
-        <w:tcBorders>
-          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-        </w:tcBorders>
-      </w:tcPr>
-      <w:p>
-        <w:pPr>
-          <w:jc w:val="center"/>
-        </w:pPr>
-        <w:r>
-          <w:t>${this.escapeXml(content)}</w:t>
-        </w:r>
-      </w:p>
-    </w:tc>`;
-  }
-
-  private createTempCell(content: string, bgColor: string): string {
-    return `
-    <w:tc>
-      <w:tcPr>
-        <w:shd w:val="clear" w:color="auto" w:fill="${bgColor}"/>
-        <w:tcBorders>
-          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-        </w:tcBorders>
-      </w:tcPr>
-      <w:p>
-        <w:pPr>
-          <w:jc w:val="center"/>
-        </w:pPr>
-        <w:r>
-          <w:t>${this.escapeXml(content)}</w:t>
-        </w:r>
-      </w:p>
-    </w:tc>`;
-  }
-
-  private createComplianceCell(content: string, bgColor: string): string {
-    const textColor = content === 'Да' ? '28A745' : content === 'Нет' ? 'DC3545' : '000000';
-    
-    return `
-    <w:tc>
-      <w:tcPr>
-        <w:shd w:val="clear" w:color="auto" w:fill="${bgColor}"/>
-        <w:tcBorders>
-          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-        </w:tcBorders>
-      </w:tcPr>
-      <w:p>
-        <w:pPr>
-          <w:jc w:val="center"/>
-        </w:pPr>
-        <w:r>
-          <w:rPr>
-            <w:color w:val="${textColor}"/>
-            <w:b/>
-          </w:rPr>
-          <w:t>${this.escapeXml(content)}</w:t>
-        </w:r>
-      </w:p>
-    </w:tc>`;
-  }
-
-  private escapeXml(text: string): string {
+  private escapeHtml(text: string): string {
     // Проверяем, что text является строкой
     if (typeof text !== 'string') {
       text = String(text);
@@ -299,7 +190,7 @@ export class TemplateReportGenerator {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+      .replace(/'/g, '&#39;');
   }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
