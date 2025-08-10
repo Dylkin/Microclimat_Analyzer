@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      'docxtemplater-html-module': 'docxtemplater-html-module/build/index.js'
+      'docxtemplater-html-module': 'docxtemplater-html-module/dist/index.js'
     }
   },
   define: {
