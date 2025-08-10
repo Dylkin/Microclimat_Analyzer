@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
+import { Table, TableRow, TableCell, Paragraph, TextRun, WidthType } from 'docx';
 import PizZip from 'pizzip';
 
 export interface TemplateReportData {
@@ -15,6 +16,7 @@ export interface TemplateReportData {
   testType: string;
   objectName: string;
   coolingSystemName: string;
+  resultsTableRows: any[];
 }
 
 export class TemplateReportGenerator {
@@ -84,8 +86,8 @@ export class TemplateReportGenerator {
       console.log('ImageModule создан');
 
       // Создаем HTML таблицу
-      const htmlTable = this.createFormattedHtmlTable(data.analysisResults);
-      console.log('HTML таблица создана, длина:', htmlTable.length);
+      const tableRows = this.createTableRowsData(data.analysisResults);
+      console.log('Данные таблицы созданы, строк:', tableRows.length);
 
       // Создаем экземпляр Docxtemplater с модулем изображений
       const doc = new Docxtemplater(zip, {
@@ -108,7 +110,7 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        ResultsTable: htmlTable || ''
+        resultsTable: tableRows
       };
 
       console.log('=== Данные для шаблона ===');
@@ -157,9 +159,9 @@ export class TemplateReportGenerator {
     }
   }
 
-  private createFormattedHtmlTable(analysisResults: any[]): string {
+  private createTableRowsData(analysisResults: any[]): any[] {
     if (!analysisResults || analysisResults.length === 0) {
-      return '<p>Нет данных для отображения</p>';
+      return [];
     }
 
     // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
@@ -174,91 +176,30 @@ export class TemplateReportGenerator {
     const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
     const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
 
-    let html = `
-      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-family: Arial, sans-serif;">
-        <thead>
-          <tr style="background-color: #f8f9fa;">
-            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">№ зоны измерения</th>
-            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Уровень измерения (м.)</th>
-            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Наименование логгера</th>
-            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Серийный № логгера</th>
-            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Мин. t°C</th>
-            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Макс. t°C</th>
-            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Среднее t°C</th>
-            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Соответствие лимитам</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
-
-    analysisResults.forEach((result, index) => {
-      // Определяем цвет фона для минимальных и максимальных значений
-      let minTempStyle = 'border: 1px solid #dee2e6; padding: 8px;';
-      let maxTempStyle = 'border: 1px solid #dee2e6; padding: 8px;';
+    // Создаем массив строк для таблицы
+    const tableRows = analysisResults.map((result, index) => {
+      const isMinTemp = !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
+                       globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp;
+      const isMaxTemp = !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
+                       globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp;
       
-      if (!result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
-          globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp) {
-        minTempStyle += ' background-color: #cce5ff;'; // Голубой фон для минимума
-      }
-      
-      if (!result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
-          globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp) {
-        maxTempStyle += ' background-color: #ffcccc;'; // Розовый фон для максимума
-      }
-
-      // Определяем цвет для соответствия лимитам
-      let complianceStyle = 'border: 1px solid #dee2e6; padding: 8px;';
-      let complianceColor = '';
-      if (result.meetsLimits === 'Да') {
-        complianceColor = 'color: #28a745; font-weight: bold;';
-      } else if (result.meetsLimits === 'Нет') {
-        complianceColor = 'color: #dc3545; font-weight: bold;';
-      }
-
-      html += `
-        <tr style="${index % 2 === 0 ? 'background-color: #f8f9fa;' : ''}">
-          <td style="border: 1px solid #dee2e6; padding: 8px;">${result.zoneNumber}</td>
-          <td style="border: 1px solid #dee2e6; padding: 8px;">${result.measurementLevel}</td>
-          <td style="border: 1px solid #dee2e6; padding: 8px;">${result.loggerName}</td>
-          <td style="border: 1px solid #dee2e6; padding: 8px;">${result.serialNumber}</td>
-          <td style="${minTempStyle}">${result.minTemp}</td>
-          <td style="${maxTempStyle}">${result.maxTemp}</td>
-          <td style="border: 1px solid #dee2e6; padding: 8px;">${result.avgTemp}</td>
-          <td style="${complianceStyle} ${complianceColor}">${result.meetsLimits}</td>
-        </tr>
-      `;
+      return {
+        zoneNumber: result.zoneNumber,
+        measurementLevel: result.measurementLevel,
+        loggerName: result.loggerName,
+        serialNumber: result.serialNumber,
+        minTemp: result.minTemp,
+        maxTemp: result.maxTemp,
+        avgTemp: result.avgTemp,
+        meetsLimits: result.meetsLimits,
+        isMinTemp,
+        isMaxTemp,
+        isCompliant: result.meetsLimits === 'Да',
+        isNonCompliant: result.meetsLimits === 'Нет'
+      };
     });
 
-    html += `
-        </tbody>
-      </table>
-      
-      <div style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; font-family: Arial, sans-serif;">
-        <h4 style="margin-top: 0; color: #495057;">Обозначения:</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-          <div style="display: flex; align-items: center;">
-            <div style="width: 20px; height: 15px; background-color: #cce5ff; margin-right: 8px; border: 1px solid #999;"></div>
-            <span style="font-size: 14px;">Минимальное значение в выбранном периоде</span>
-          </div>
-          <div style="display: flex; align-items: center;">
-            <div style="width: 20px; height: 15px; background-color: #ffcccc; margin-right: 8px; border: 1px solid #999;"></div>
-            <span style="font-size: 14px;">Максимальное значение в выбранном периоде</span>
-          </div>
-          <div style="display: flex; align-items: center;">
-            <span style="color: #28a745; font-weight: bold; margin-right: 8px;">Да</span>
-            <span style="font-size: 14px;">Соответствует лимитам</span>
-          </div>
-          <div style="display: flex; align-items: center;">
-            <span style="color: #dc3545; font-weight: bold; margin-right: 8px;">Нет</span>
-            <span style="font-size: 14px;">Не соответствует лимитам</span>
-          </div>
-        </div>
-        <div style="margin-top: 15px; font-size: 12px; color: #6c757d;">
-          <strong>Примечание:</strong> При изменении масштаба графика статистика пересчитывается только для выбранного временного периода.
-        </div>
-      </div>
-    `;
-    return html;
+    return tableRows;
   }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {

@@ -435,6 +435,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         testType: getTestTypeDisplayName(testType),
         objectName: objectName || 'Не указано',
         coolingSystemName: coolingSystemName || 'Не указано',
+        resultsTableRows: analysisResults
       };
 
       console.log('Данные для шаблона подготовлены:', {
