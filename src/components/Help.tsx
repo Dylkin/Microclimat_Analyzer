@@ -251,13 +251,15 @@ export const Help: React.FC = () => {
           <div className="border-l-4 border-purple-500 pl-4">
             <h3 className="font-semibold text-gray-800">Как добавить маркеры на график?</h3>
             <p className="text-sm text-gray-600 mt-1">
+              <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа (редактируемая DOCX таблица)</li>
             </p>
           </div>
 
           <div className="border-l-4 border-red-500 pl-4">
-            <h3 className="font-semibold text-gray-800">Как создать отчет?</h3>
+              <strong>Примечание:</strong> Используется библиотека docx-templates для полной поддержки таблиц. 
             <p className="text-sm text-gray-600 mt-1">
-              График вставляется как PNG с высоким разрешением.
+              График вставляется как PNG изображение с высоким разрешением (scale: 2).
+              Таблица результатов конвертируется из HTML в полноценную DOCX таблицу с сохранением всех стилей и цветовых выделений.
             </p>
           </div>
         </div>

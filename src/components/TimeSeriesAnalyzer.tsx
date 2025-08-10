@@ -449,7 +449,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         acceptanceCriteria,
         testType: getTestTypeDisplayName(testType),
         objectName: objectName || 'Не указано',
-        coolingSystemName: coolingSystemName || 'Не указано'
+        coolingSystemName: coolingSystemName || 'Не указано',
+        resultsTableHtml: this.createTableHtml()
       };
 
       console.log('Данные для шаблона подготовлены:', {
@@ -553,6 +554,69 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     return criteria;
   };
 
+  // Функция для создания HTML таблицы результатов
+  const createTableHtml = (): string => {
+    const tableRows = analysisResults.map((result, index) => {
+      const minTempClass = !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
+        globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp
+        ? 'bg-blue-200' 
+        : '';
+      
+      const maxTempClass = !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
+        globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp
+        ? 'bg-red-200' 
+        : '';
+      
+      const meetsLimitsClass = result.meetsLimits === 'Да' 
+        ? 'bg-green-100 text-green-800' 
+        : result.meetsLimits === 'Нет'
+        ? 'bg-red-100 text-red-800'
+        : 'bg-gray-100 text-gray-800';
+      
+      return `
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 16px 24px; font-weight: 500; color: #111827;">${result.zoneNumber}</td>
+          <td style="padding: 16px 24px; color: #6b7280;">${result.measurementLevel}</td>
+          <td style="padding: 16px 24px; color: #6b7280;">${result.loggerName}</td>
+          <td style="padding: 16px 24px; color: #6b7280;">${result.serialNumber}</td>
+          <td style="padding: 16px 24px; color: #6b7280; ${minTempClass ? 'background-color: #dbeafe;' : ''}">${result.minTemp}</td>
+          <td style="padding: 16px 24px; color: #6b7280; ${maxTempClass ? 'background-color: #fecaca;' : ''}">${result.maxTemp}</td>
+          <td style="padding: 16px 24px; color: #6b7280;">${result.avgTemp}</td>
+          <td style="padding: 16px 24px;">
+            <span style="display: inline-flex; padding: 2px 10px; font-size: 12px; font-weight: 600; border-radius: 9999px; ${
+              result.meetsLimits === 'Да' 
+                ? 'background-color: #dcfce7; color: #166534;' 
+                : result.meetsLimits === 'Нет'
+                ? 'background-color: #fee2e2; color: #991b1b;'
+                : 'background-color: #f3f4f6; color: #374151;'
+            }">
+              ${result.meetsLimits}
+            </span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    
+    return `
+      <table style="width: 100%; border-collapse: collapse; background-color: white; border: 1px solid #e5e7eb;">
+        <thead style="background-color: #f9fafb;">
+          <tr>
+            <th style="padding: 12px 24px; text-align: left; font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb;">№ зоны измерения</th>
+            <th style="padding: 12px 24px; text-align: left; font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb;">Уровень измерения (м.)</th>
+            <th style="padding: 12px 24px; text-align: left; font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb;">Наименование логгера (6 символов)</th>
+            <th style="padding: 12px 24px; text-align: left; font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb;">Серийный № логгера</th>
+            <th style="padding: 12px 24px; text-align: left; font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb;">Мин. t°C</th>
+            <th style="padding: 12px 24px; text-align: left; font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb;">Макс. t°C</th>
+            <th style="padding: 12px 24px; text-align: left; font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb;">Среднее t°C</th>
+            <th style="padding: 12px 24px; text-align: left; font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb;">Соответствие лимитам</th>
+          </tr>
+        </thead>
+        <tbody style="background-color: white;">
+          ${tableRows}
+        </tbody>
+      </table>
+    `;
+  };
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
