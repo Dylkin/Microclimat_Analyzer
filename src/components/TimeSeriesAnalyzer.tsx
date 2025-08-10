@@ -69,7 +69,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       );
     }
 
-    return files.map((file) => {
+    // First pass: calculate raw results without min/max flags
+    const rawResults = files.map((file) => {
       // Find data points for this file
       const filePoints = filteredPoints.filter(point => point.fileId === file.name);
       
@@ -85,7 +86,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           minHumidity: '-',
           maxHumidity: '-',
           avgHumidity: '-',
-          meetsLimits: '-'
+          meetsLimits: '-',
+          isExternal: file.zoneNumber === 999,
+          minTempValue: null,
+          maxTempValue: null
         };
       }
 
@@ -100,11 +104,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       let tempStats = { min: '-', max: '-', avg: '-' };
       let humidityStats = { min: '-', max: '-', avg: '-' };
+      let minTempValue = null;
+      let maxTempValue = null;
       
       if (temperatures.length > 0) {
         const min = Math.min(...temperatures);
         const max = Math.max(...temperatures);
         const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+        
+        minTempValue = min;
+        maxTempValue = max;
         
         tempStats = {
           min: Math.round(min * 10) / 10,
@@ -151,20 +160,41 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         maxHumidity: humidityStats.max,
         avgHumidity: humidityStats.avg,
         meetsLimits,
-        isExternal: file.zoneNumber === 999
+        isExternal: file.zoneNumber === 999,
+        minTempValue,
+        maxTempValue
       };
     });
+
+    // Calculate global min/max temperatures (excluding external sensors)
+    const nonExternalResults = rawResults.filter(result => !result.isExternal);
+    const minTempValues = nonExternalResults
+      .map(result => result.minTempValue)
+      .filter(val => val !== null) as number[];
+    const maxTempValues = nonExternalResults
+      .map(result => result.maxTempValue)
+      .filter(val => val !== null) as number[];
+    
+    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
+    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
+
+    // Second pass: add min/max flags
+    return rawResults.map(result => ({
+      ...result,
+      isMinTemp: !result.isExternal && result.minTempValue !== null && globalMinTemp !== null && result.minTempValue === globalMinTemp,
+      isMaxTemp: !result.isExternal && result.maxTempValue !== null && globalMaxTemp !== null && result.maxTempValue === globalMaxTemp
+    }));
   }, [data, files, limits, zoomState]); // Добавляем zoomState в зависимости
 
   // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
   const { globalMinTemp, globalMaxTemp } = useMemo(() => {
     const nonExternalResults = analysisResults.filter(result => !result.isExternal);
     const minTempValues = nonExternalResults
-      .map(result => parseFloat(result.minTemp))
-      .filter(val => !isNaN(val));
+      .map(result => result.minTempValue)
+      .filter(val => val !== null) as number[];
     const maxTempValues = nonExternalResults
-      .map(result => parseFloat(result.maxTemp))
-      .filter(val => !isNaN(val));
+      .map(result => result.maxTempValue)
+      .filter(val => val !== null) as number[];
     
     return {
       globalMinTemp: minTempValues.length > 0 ? Math.min(...minTempValues) : null,
@@ -843,16 +873,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     {result.serialNumber}
                   </td>
                   <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
-                    !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
-                    globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp
+                    result.isMinTemp
                       ? 'bg-blue-200' 
                       : ''
                   }`}>
                     {result.minTemp}
                   </td>
                   <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
-                    !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
-                    globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp
+                    result.isMaxTemp
                       ? 'bg-red-200' 
                       : ''
                   }`}>
