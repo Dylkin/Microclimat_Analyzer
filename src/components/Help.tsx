@@ -108,6 +108,51 @@ export const Help: React.FC = () => {
           </div>
         </div>
 
+        {/* Список плейсхолдеров для DOCX шаблонов */}
+        <div className="mb-8">
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-purple-900 mb-4">📋 Плейсхолдеры для DOCX шаблонов</h3>
+            <p className="text-purple-800 mb-4">
+              При создании DOCX шаблона используйте следующие плейсхолдеры для автоматической вставки данных:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="space-y-2">
+                <h4 className="font-medium text-purple-900">Основные данные:</h4>
+                <ul className="space-y-1 text-purple-800">
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{executor}'}</code> - ФИО исполнителя</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{Report_No}'}</code> - Номер отчета</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{Report_start}'}</code> - Дата отчета</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{report_date}'}</code> - Дата отчета (альтернативный)</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ObjectName}'}</code> - Наименование объекта</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{CoolingSystemName}'}</code> - Наименование холодильной установки</li>
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-medium text-purple-900">Данные анализа:</h4>
+                <ul className="space-y-1 text-purple-800">
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{TestType}'}</code> - Тип испытания</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{AcceptanceСriteria}'}</code> - Критерии приемки</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{Results_table}'}</code> - Таблица результатов (альтернативный)</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{results_table}'}</code> - Таблица результатов (текстовый формат)</li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              <h4 className="font-medium text-purple-900">Изображения:</h4>
+              <ul className="space-y-1 text-purple-800">
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{%chart}'}</code> - График временных рядов (изображение)</li>
+              </ul>
+            </div>
+            <div className="mt-4 p-3 bg-purple-100 rounded-lg">
+              <p className="text-xs text-purple-700">
+                <strong>Примечание:</strong> Для изображений используйте специальный синтаксис <code>{'{%chart}'}</code>. 
+                Обратите внимание на русскую букву "С" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-6">
           {/* Загрузка файлов */}
           <div>

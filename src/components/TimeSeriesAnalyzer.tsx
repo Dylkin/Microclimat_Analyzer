@@ -45,6 +45,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [reportNumber, setReportNumber] = useState('');
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [testType, setTestType] = useState('');
+  const [objectName, setObjectName] = useState('');
+  const [coolingSystemName, setCoolingSystemName] = useState('');
   
   // Chart dimensions
   const chartWidth = 1200;
@@ -416,7 +418,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         dataType,
         resultsTable: resultsTableHtml,
         acceptanceCriteria,
-        testType: testType || 'Не выбрано'
+        testType: testType || 'Не выбрано',
+        objectName: objectName || 'Не указано',
+        coolingSystemName: coolingSystemName || 'Не указано'
       };
 
       console.log('Данные для шаблона подготовлены:', {
@@ -427,7 +431,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         chartBlobSize: chartBlob.size,
         resultsTableLength: resultsTableHtml.length,
         acceptanceCriteriaLength: acceptanceCriteria.length,
-        testType: templateData.testType
+        testType: templateData.testType,
+        objectName: templateData.objectName,
+        coolingSystemName: templateData.coolingSystemName
       });
 
       // Генерируем отчет из шаблона
@@ -941,6 +947,30 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 value={reportDate}
                 onChange={(e) => setReportDate(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Наименование объекта
+              </label>
+              <input
+                type="text"
+                value={objectName}
+                onChange={(e) => setObjectName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Введите наименование объекта"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Наименование Холодильной установки
+              </label>
+              <input
+                type="text"
+                value={coolingSystemName}
+                onChange={(e) => setCoolingSystemName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Введите наименование холодильной установки"
               />
             </div>
           </div>

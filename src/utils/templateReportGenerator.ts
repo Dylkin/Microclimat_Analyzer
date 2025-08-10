@@ -14,6 +14,8 @@ export interface TemplateReportData {
   resultsTable: string;
   acceptanceCriteria: string;
   testType: string;
+  objectName: string;
+  coolingSystemName: string;
 }
 
 export class TemplateReportGenerator {
@@ -106,7 +108,9 @@ export class TemplateReportGenerator {
         Acceptance_criteria: data.acceptanceCriteria,
         TestType: data.testType,
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
-        ResultsTable: data.resultsTable
+        ResultsTable: data.resultsTable,
+        ObjectName: data.objectName,
+        CoolingSystemName: data.coolingSystemName
       };
 
       console.log('=== Данные для шаблона ===');
@@ -120,6 +124,8 @@ export class TemplateReportGenerator {
       console.log('TestType:', data.testType);
       console.log('AcceptanceСriteria_length:', data.acceptanceCriteria?.length || 0);
       console.log('ResultsTable_length:', data.resultsTable?.length || 0);
+      console.log('ObjectName:', data.objectName);
+      console.log('CoolingSystemName:', data.coolingSystemName);
 
       // Заполняем шаблон данными
       console.log('Устанавливаем данные в шаблон...');
