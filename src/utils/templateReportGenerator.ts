@@ -5,7 +5,7 @@ import htmlToDocx from 'html-to-docx';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
-  resultsTableElement?: HTMLElement;
+  resultsTableHtml?: string;
   executor: string;
   reportDate: string;
   reportNumber: string;
@@ -41,13 +41,12 @@ export class TemplateReportGenerator {
       const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
       console.log('Изображение конвертировано в ArrayBuffer, размер:', chartImageBuffer.byteLength, 'байт');
       
-      // Создаем изображение таблицы результатов если элемент предоставлен
-      let resultsTableBuffer: ArrayBuffer | undefined;
-      if (data.resultsTableElement) {
-        console.log('Создаем изображение таблицы результатов...');
-        const tableImageBlob = await this.createTableImage(data.resultsTableElement);
-        resultsTableBuffer = await tableImageBlob.arrayBuffer();
-        console.log('Изображение таблицы создано, размер:', resultsTableBuffer.byteLength, 'байт');
+      // Подготавливаем HTML таблицы результатов если предоставлена
+      let resultsTableHtml: string | undefined;
+      if (data.resultsTableHtml) {
+        console.log('Подготавливаем HTML таблицы результатов...');
+        resultsTableHtml = data.resultsTableHtml;
+        console.log('HTML таблицы подготовлен, длина:', resultsTableHtml.length, 'символов');
       }
       
       // Подготавливаем данные для замены
@@ -62,7 +61,7 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        ResultsTable: resultsTableBuffer,
+        ResultsTable: resultsTableHtml,
       };
 
       console.log('=== Данные для шаблона ===');
@@ -75,6 +74,7 @@ export class TemplateReportGenerator {
       console.log('ObjectName:', data.objectName);
       console.log('CoolingSystemName:', data.coolingSystemName);
       console.log('ResultsTable_size:', resultsTableBuffer ? `${resultsTableBuffer.byteLength} байт` : 'не предоставлена');
+      console.log('ResultsTable_html_length:', resultsTableHtml ? `${resultsTableHtml.length} символов` : 'не предоставлена');
 
       // Загружаем шаблон в PizZip
       const zip = new PizZip(templateArrayBuffer);
@@ -111,86 +111,71 @@ export class TemplateReportGenerator {
     }
   }
 
+
+
   /**
-   * Создает изображение таблицы для вставки в шаблон
+   * Создает HTML строку таблицы для вставки в шаблон
    */
-  private async createTableImage(tableElement: HTMLElement): Promise<Blob> {
+  private createTableHtml(tableElement: HTMLElement): string {
     try {
-      console.log('Создаем изображение таблицы для шаблона...');
+      console.log('Создаем HTML таблицы для шаблона...');
       
-      // Сохраняем оригинальные стили
-      const originalStyles = new Map<HTMLElement, string>();
+      // Клонируем элемент для безопасного изменения
+      const clonedTable = tableElement.cloneNode(true) as HTMLElement;
       
-      // Улучшаем стили для экспорта
-      this.enhanceTableForExport(tableElement, originalStyles);
+      // Применяем стили для лучшего отображения в DOCX
+      this.enhanceTableHtmlForDocx(clonedTable);
       
-      // Создаем скриншот таблицы
-      const canvas = await html2canvas(tableElement, {
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        width: tableElement.offsetWidth,
-        height: tableElement.offsetHeight
-      });
+      const tableHtml = clonedTable.outerHTML;
+      console.log('HTML таблицы создан, длина:', tableHtml.length, 'символов');
       
-      // Восстанавливаем оригинальные стили
-      this.restoreOriginalStyles(originalStyles);
-      
-      console.log('Изображение таблицы создано, размер:', canvas.width, 'x', canvas.height);
-      
-      // Конвертируем в blob
-      return new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((blob) => {
-          if (blob) {
-            console.log('Blob изображения таблицы создан, размер:', blob.size, 'байт');
-            resolve(blob);
-          } else {
-            reject(new Error('Ошибка создания изображения таблицы'));
-          }
-        }, 'image/png', 1.0);
-      });
+      return tableHtml;
       
     } catch (error) {
-      console.error('Ошибка создания изображения таблицы:', error);
-      throw new Error(`Ошибка создания изображения таблицы: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      console.error('Ошибка создания HTML таблицы:', error);
+      throw new Error(`Ошибка создания HTML таблицы: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   }
 
   /**
-   * Улучшает стили таблицы для экспорта
+   * Улучшает HTML таблицы для отображения в DOCX
    */
-  private enhanceTableForExport(element: HTMLElement, originalStyles: Map<HTMLElement, string>): void {
-    // Сохраняем и улучшаем стили для всех ячеек таблицы
-    const cells = element.querySelectorAll('td, th');
-    cells.forEach(cell => {
-      const htmlCell = cell as HTMLElement;
-      originalStyles.set(htmlCell, htmlCell.style.cssText);
-      
-      // Увеличиваем размер шрифта
-      htmlCell.style.fontSize = '12pt';
-      htmlCell.style.lineHeight = '1.4';
-      
-      // Улучшаем отступы
-      if (!htmlCell.style.padding) {
-        htmlCell.style.padding = '8px';
-      }
+  private enhanceTableHtmlForDocx(tableElement: HTMLElement): void {
+    // Добавляем инлайн стили для лучшего отображения в DOCX
+    const table = tableElement.querySelector('table');
+    if (table) {
+      table.style.borderCollapse = 'collapse';
+      table.style.width = '100%';
+      table.style.fontSize = '12pt';
+      table.style.fontFamily = 'Arial, sans-serif';
+    }
+    
+    // Стилизуем заголовки
+    const headers = tableElement.querySelectorAll('th');
+    headers.forEach(th => {
+      const htmlTh = th as HTMLElement;
+      htmlTh.style.backgroundColor = '#f3f4f6';
+      htmlTh.style.border = '1px solid #d1d5db';
+      htmlTh.style.padding = '8px';
+      htmlTh.style.fontWeight = 'bold';
+      htmlTh.style.textAlign = 'left';
     });
     
-    // Сохраняем и улучшаем стили основного элемента
-    originalStyles.set(element, element.style.cssText);
-    element.style.boxShadow = 'none';
-    element.style.transform = 'none';
-    element.style.borderRadius = '0';
-  }
-
-  /**
-   * Восстанавливает оригинальные стили
-   */
-  private restoreOriginalStyles(originalStyles: Map<HTMLElement, string>): void {
-    originalStyles.forEach((cssText, element) => {
-      element.style.cssText = cssText;
+    // Стилизуем ячейки
+    const cells = tableElement.querySelectorAll('td');
+    cells.forEach(td => {
+      const htmlTd = td as HTMLElement;
+      htmlTd.style.border = '1px solid #d1d5db';
+      htmlTd.style.padding = '8px';
+      htmlTd.style.textAlign = 'left';
+      
+      // Сохраняем цветовые выделения
+      if (htmlTd.classList.contains('bg-blue-200')) {
+        htmlTd.style.backgroundColor = '#bfdbfe';
+      }
+      if (htmlTd.classList.contains('bg-red-200')) {
+        htmlTd.style.backgroundColor = '#fecaca';
+      }
     });
   }
 
