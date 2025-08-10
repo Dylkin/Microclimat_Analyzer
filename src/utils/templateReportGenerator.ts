@@ -136,6 +136,11 @@ export class TemplateReportGenerator {
         if (error && typeof error === 'object' && 'properties' in error) {
           const errorProps = (error as any).properties;
           if (errorProps && errorProps.errors instanceof Array) {
+          }
+        }
+      }
+    }
+  }
 
   private createResultsTable(analysisResults: any[]): string {
     if (!analysisResults || analysisResults.length === 0) {
