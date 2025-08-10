@@ -17,7 +17,6 @@ export default defineConfig({
       'd3-zoom',
     ],
     exclude: [
-      'docxtemplater-html-module',
     ],
   },
   server: {
