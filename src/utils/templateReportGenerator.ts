@@ -1,7 +1,6 @@
 import JSZip from 'jszip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
-import { Table, TableRow, TableCell, Paragraph, TextRun, WidthType } from 'docx';
 import PizZip from 'pizzip';
 
 export interface TemplateReportData {
@@ -17,6 +16,7 @@ export interface TemplateReportData {
   objectName: string;
   coolingSystemName: string;
   resultsTableRows: any[];
+  resultsTableXml?: string;
 }
 
 export class TemplateReportGenerator {
@@ -88,6 +88,10 @@ export class TemplateReportGenerator {
       // Создаем HTML таблицу
       const tableRows = this.createTableRowsData(data.analysisResults);
       console.log('Данные таблицы созданы, строк:', tableRows.length);
+      
+      // Создаем XML таблицу для вставки в DOCX
+      const tableXml = this.createDocxTable(data.analysisResults);
+      console.log('XML таблица создана');
 
       // Создаем экземпляр Docxtemplater с модулем изображений
       const doc = new Docxtemplater(zip, {
@@ -110,7 +114,8 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        resultsTable: tableRows
+        resultsTable: tableRows,
+        resultsTableXml: tableXml
       };
 
       console.log('=== Данные для шаблона ===');
@@ -202,6 +207,223 @@ export class TemplateReportGenerator {
     return tableRows;
   }
 
+  private createDocxTable(analysisResults: any[]): string {
+    if (!analysisResults || analysisResults.length === 0) {
+      return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
+    }
+
+    // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
+    const nonExternalResults = analysisResults.filter(result => !result.isExternal);
+    const minTempValues = nonExternalResults
+      .map(result => parseFloat(result.minTemp))
+      .filter(val => !isNaN(val));
+    const maxTempValues = nonExternalResults
+      .map(result => parseFloat(result.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
+    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
+
+    // Создаем XML таблицы для Word
+    let tableXml = `
+      <w:tbl>
+        <w:tblPr>
+          <w:tblStyle w:val="TableGrid"/>
+          <w:tblW w:w="0" w:type="auto"/>
+          <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
+        </w:tblPr>
+        <w:tblGrid>
+          <w:gridCol w:w="1200"/>
+          <w:gridCol w:w="1200"/>
+          <w:gridCol w:w="1200"/>
+          <w:gridCol w:w="1200"/>
+          <w:gridCol w:w="1000"/>
+          <w:gridCol w:w="1000"/>
+          <w:gridCol w:w="1000"/>
+          <w:gridCol w:w="1400"/>
+        </w:tblGrid>
+        <!-- Заголовок таблицы -->
+        <w:tr>
+          <w:trPr>
+            <w:tblHeader/>
+          </w:trPr>
+          <w:tc>
+            <w:tcPr>
+              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p>
+              <w:pPr>
+                <w:jc w:val="center"/>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:b/>
+                </w:rPr>
+                <w:t>№ зоны измерения</w:t>
+              </w:r>
+            </w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p>
+              <w:pPr>
+                <w:jc w:val="center"/>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:b/>
+                </w:rPr>
+                <w:t>Уровень измерения (м.)</w:t>
+              </w:r>
+            </w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p>
+              <w:pPr>
+                <w:jc w:val="center"/>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:b/>
+                </w:rPr>
+                <w:t>Наименование логгера</w:t>
+              </w:r>
+            </w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p>
+              <w:pPr>
+                <w:jc w:val="center"/>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:b/>
+                </w:rPr>
+                <w:t>Серийный № логгера</w:t>
+              </w:r>
+            </w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p>
+              <w:pPr>
+                <w:jc w:val="center"/>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:b/>
+                </w:rPr>
+                <w:t>Мин. t°C</w:t>
+              </w:r>
+            </w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p>
+              <w:pPr>
+                <w:jc w:val="center"/>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:b/>
+                </w:rPr>
+                <w:t>Макс. t°C</w:t>
+              </w:r>
+            </w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p>
+              <w:pPr>
+                <w:jc w:val="center"/>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:b/>
+                </w:rPr>
+                <w:t>Среднее t°C</w:t>
+              </w:r>
+            </w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+            </w:tcPr>
+            <w:p>
+              <w:pPr>
+                <w:jc w:val="center"/>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:b/>
+                </w:rPr>
+                <w:t>Соответствие лимитам</w:t>
+              </w:r>
+            </w:p>
+          </w:tc>
+        </w:tr>`;
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
