@@ -1,6 +1,5 @@
 import JSZip from 'jszip';
 import Docxtemplater from 'docxtemplater';
-import PizZip from 'pizzip';
 import ImageModule from 'docxtemplater-image-module-free';
 
 export interface TemplateReportData {
@@ -11,7 +10,6 @@ export interface TemplateReportData {
   reportNumber: string;
   reportStart: string;
   dataType: 'temperature' | 'humidity';
-  resultsTable: string;
   acceptanceCriteria: string;
   testType: string;
   objectName: string;
@@ -103,12 +101,9 @@ export class TemplateReportGenerator {
         Report_start: data.reportStart,
         report_date: data.reportDate, // Оставляем для обратной совместимости
         chart: 'chart_placeholder', // Значение для ImageModule
-        Results_table: data.resultsTable,
-        results_table: resultsTable, // Оставляем для обратной совместимости
         Acceptance_criteria: data.acceptanceCriteria,
         TestType: data.testType || 'Не выбрано',
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
-        ResultsTable: data.resultsTable,
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName
       };
@@ -119,11 +114,9 @@ export class TemplateReportGenerator {
       console.log('Report_start:', data.reportStart);
       console.log('report_date:', data.reportDate);
       console.log('chart_image_size:', `${chartImageBuffer.byteLength} байт`);
-      console.log('Results_table_length:', data.resultsTable?.length || 0);
       console.log('Acceptance_criteria_length:', data.acceptanceCriteria?.length || 0);
       console.log('TestType:', data.testType);
       console.log('AcceptanceСriteria_length:', data.acceptanceCriteria?.length || 0);
-      console.log('ResultsTable_length:', data.resultsTable?.length || 0);
       console.log('ObjectName:', data.objectName);
       console.log('CoolingSystemName:', data.coolingSystemName);
 
@@ -143,60 +136,6 @@ export class TemplateReportGenerator {
         if (error && typeof error === 'object' && 'properties' in error) {
           const errorProps = (error as any).properties;
           if (errorProps && errorProps.errors instanceof Array) {
-            const errorMessages = errorProps.errors.map((err: any) => {
-              return `${err.name || 'Unknown'}: ${err.message || 'No message'} в части "${err.part || 'Unknown'}"`;
-            }).join('\n');
-            console.error('Детали ошибок рендеринга:', errorMessages);
-          }
-          if (errorProps && errorProps.id) {
-            console.error('ID ошибки:', errorProps.id);
-          }
-          if (errorProps && errorProps.explanation) {
-            console.error('Объяснение ошибки:', errorProps.explanation);
-          }
-        }
-        
-        // Проверяем, является ли это ошибкой отсутствующих тегов
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes('tag')) {
-          console.error('Возможно, в шаблоне отсутствуют необходимые теги или используются неправильные имена тегов');
-          console.error('Ожидаемые теги: {executor}, {Report_No}, {Report_start}, {report_date}, {%chart}, {Results_table}, {Acceptance_criteria}');
-        }
-        
-        throw new Error(`Ошибка рендеринга документа: ${errorMessage}`);
-      }
-
-      // Генерируем новый DOCX файл
-      console.log('Генерируем DOCX файл...');
-      const output = doc.getZip().generate({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      });
-
-      console.log('=== DOCX файл успешно сгенерирован ===');
-      console.log('Размер итогового файла:', output.size, 'байт');
-      return output;
-
-    } catch (error) {
-      console.error('=== КРИТИЧЕСКАЯ ОШИБКА ГЕНЕРАЦИИ ОТЧЕТА ===');
-      console.error('Тип ошибки:', error?.constructor?.name || 'Unknown');
-      console.error('Сообщение ошибки:', error instanceof Error ? error.message : String(error));
-      console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
-      
-      // Дополнительная диагностика
-      if (error instanceof Error) {
-        if (error.message.includes('PizZip')) {
-          console.error('Проблема с ZIP архивом - возможно, поврежден файл шаблона');
-        } else if (error.message.includes('ImageModule')) {
-          console.error('Проблема с модулем изображений - проверьте формат PNG файла');
-        } else if (error.message.includes('docxtemplater')) {
-          console.error('Проблема с docxtemplater - проверьте синтаксис тегов в шаблоне');
-        }
-      }
-      
-      throw new Error(`Не удалось создать отчет из шаблона: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
-  }
 
   private createResultsTable(analysisResults: any[]): string {
     if (!analysisResults || analysisResults.length === 0) {

@@ -416,7 +416,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportNumber: reportNumber || `REP-${Date.now()}`,
         reportStart: dateStr,
         dataType,
-        resultsTable: resultsTableHtml,
         acceptanceCriteria,
         testType: testType || 'Не выбрано',
         objectName: objectName || 'Не указано',
@@ -429,7 +428,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportStart: templateData.reportStart,
         reportDate: templateData.reportDate,
         chartBlobSize: chartBlob.size,
-        resultsTableLength: resultsTableHtml.length,
         acceptanceCriteriaLength: acceptanceCriteria.length,
         testType: templateData.testType,
         objectName: templateData.objectName,
@@ -502,41 +500,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     });
   };
 
-  // Функция для создания HTML таблицы результатов
-  const createResultsTableForTemplate = (results: any[]) => {
-    const tableRows = results.map(result => `
-      <tr>
-        <td>${result.zoneNumber}</td>
-        <td>${result.measurementLevel}</td>
-        <td>${result.loggerName}</td>
-        <td>${result.serialNumber}</td>
-        <td>${result.minTemp}</td>
-        <td>${result.maxTemp}</td>
-        <td>${result.avgTemp}</td>
-        <td>${result.meetsLimits}</td>
-      </tr>
-    `).join('');
-
-    return `
-      <table border="1" style="border-collapse: collapse; width: 100%;">
-        <thead>
-          <tr>
-            <th>№ зоны измерения</th>
-            <th>Уровень измерения (м.)</th>
-            <th>Наименование логгера (6 символов)</th>
-            <th>Серийный № логгера</th>
-            <th>Мин. t°C</th>
-            <th>Макс. t°C</th>
-            <th>Среднее t°C</th>
-            <th>Соответствие лимитам</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
-      </table>
-    `;
-  };
 
   // Функция для создания критериев приемки
   const createAcceptanceCriteria = () => {

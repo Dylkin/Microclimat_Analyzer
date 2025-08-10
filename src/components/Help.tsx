@@ -131,23 +131,6 @@ export const Help: React.FC = () => {
                 <h4 className="font-medium text-purple-900">Данные анализа:</h4>
                 <ul className="space-y-1 text-purple-800">
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{AcceptanceСriteria}'}</code> - Критерии приемки</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{results_table}'}</code> - Таблица результатов (текстовый формат)</li>
-                </ul>
-              </div>
-            </div>
-            <div className="mt-4 space-y-2">
-              <h4 className="font-medium text-purple-900">Таблица результатов (цикл):</h4>
-              <div className="bg-purple-100 p-3 rounded text-xs font-mono text-purple-800">
-                <div>{'{#results_table_data}'}</div>
-                <div>&nbsp;&nbsp;{'{zoneNumber}'} | {'{measurementLevel}'} | {'{loggerName}'} | {'{serialNumber}'}</div>
-                <div>&nbsp;&nbsp;{'{minTemp}'} | {'{maxTemp}'} | {'{avgTemp}'} | {'{meetsLimits}'}</div>
-                <div>{'{/results_table_data}'}</div>
-              </div>
-              <ul className="space-y-1 text-purple-800 text-sm">
-                <li>• <code className="bg-purple-100 px-1 rounded">{'{#results_table_data}'}</code> - начало цикла по строкам таблицы</li>
-                <li>• <code className="bg-purple-100 px-1 rounded">{'{/results_table_data}'}</code> - конец цикла</li>
-                <li>• <code className="bg-purple-100 px-1 rounded">{'{isCompliant}'}</code> - true если соответствует лимитам</li>
-                <li>• <code className="bg-purple-100 px-1 rounded">{'{isNonCompliant}'}</code> - true если не соответствует лимитам</li>
                 </ul>
               </div>
             </div>
@@ -160,9 +143,7 @@ export const Help: React.FC = () => {
             <div className="mt-4 p-3 bg-purple-100 rounded-lg">
               <p className="text-xs text-purple-700">
                 <strong>Примечание:</strong> Используется библиотека docx-templates. 
-                Для циклов используйте синтаксис <code>{'{#array}'}</code>...<code>{'{/array}'}</code>.
                 Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
-                Для условного форматирования используйте <code>{'{isCompliant}'}</code> и <code>{'{isNonCompliant}'}</code>.
               </p>
             </div>
           </div>
