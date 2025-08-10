@@ -39,12 +39,11 @@ export class TemplateReportGenerator {
       const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
       console.log('Изображение конвертировано в ArrayBuffer, размер:', chartImageBuffer.byteLength, 'байт');
       
-      // Конвертируем таблицу в base64 строку если она есть
-      let resultsTableBase64: string | undefined;
+      // Конвертируем таблицу в ArrayBuffer если она есть
+      let resultsTableBuffer: ArrayBuffer | undefined;
       if (data.resultsTableBlob) {
-        const resultsTableBuffer = await data.resultsTableBlob.arrayBuffer();
-        resultsTableBase64 = this.arrayBufferToBase64(resultsTableBuffer);
-        console.log('Таблица результатов конвертирована в base64, размер:', resultsTableBuffer.byteLength, 'байт');
+        resultsTableBuffer = await data.resultsTableBlob.arrayBuffer();
+        console.log('Таблица результатов конвертирована в ArrayBuffer, размер:', resultsTableBuffer.byteLength, 'байт');
       }
       
       // Подготавливаем данные для замены
@@ -54,9 +53,9 @@ export class TemplateReportGenerator {
         Report_start: data.reportStart,
         report_date: data.reportDate,
         chart: chartImageBuffer,
-        ResultsTable: resultsTableBase64 || '',
+        ResultsTable: resultsTableBuffer,
         Acceptance_criteria: data.acceptanceCriteria,
-        results_table_size: data.resultsTableBlob ? `${(await data.resultsTableBlob.arrayBuffer()).byteLength} байт` : 'не предоставлена',
+        TestType: data.testType || 'Не выбрано',
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
@@ -108,15 +107,6 @@ export class TemplateReportGenerator {
     }
   }
 
-  // Вспомогательный метод для конвертации ArrayBuffer в base64
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
