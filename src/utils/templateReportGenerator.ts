@@ -1,6 +1,7 @@
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
 import { Document, Table, TableRow, TableCell, Paragraph, TextRun, WidthType, Packer } from 'docx';
+import { htmlToDocx } from 'html-to-docx';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -219,7 +220,7 @@ export class TemplateReportGenerator {
       // Создаем простую текстовую таблицу для вставки в шаблон
       let resultsTableHtml = '';
       if (data.resultsTableData && data.resultsTableData.length > 0) {
-        resultsTableHtml = this.createHtmlTable(data.resultsTableData);
+        resultsTableHtml = await this.createHtmlTable(data.resultsTableData);
       }
       
       // Подготавливаем данные для docxtemplater (все значения должны быть строками)
@@ -283,57 +284,116 @@ export class TemplateReportGenerator {
   /**
    * Создание HTML таблицы для вставки в шаблон
    */
-  private createHtmlTable(resultsTableData: any[]): string {
+  private async createHtmlTable(resultsTableData: any[]): Promise<string> {
     let html = `
-      <table border="1" style="border-collapse: collapse; width: 100%;">
-        <thead>
-          <tr style="background-color: #f3f4f6;">
-            <th style="padding: 8px; text-align: center; font-weight: bold;">№ зоны</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Уровень (м.)</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Логгер</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">S/N</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Мин. t°C</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Макс. t°C</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Среднее t°C</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Соответствие</th>
-          </tr>
-        </thead>
-        <tbody>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+          }
+          th, td { 
+            border: 1px solid #000; 
+            padding: 6px; 
+            text-align: center; 
+            vertical-align: middle;
+          }
+          th { 
+            background-color: #f3f4f6; 
+            font-weight: bold; 
+          }
+          .min-temp { background-color: #dbeafe; }
+          .max-temp { background-color: #fecaca; }
+          .compliant { background-color: #dcfce7; color: #166534; }
+          .non-compliant { background-color: #fef2f2; color: #dc2626; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <thead>
+            <tr>
+              <th>№ зоны</th>
+              <th>Уровень (м.)</th>
+              <th>Логгер</th>
+              <th>S/N</th>
+              <th>Мин. t°C</th>
+              <th>Макс. t°C</th>
+              <th>Среднее t°C</th>
+              <th>Соответствие</th>
+            </tr>
+          </thead>
+          <tbody>
     `;
 
     resultsTableData.forEach(row => {
-      // Определяем цвет фона для минимальных и максимальных значений
-      const minTempStyle = row.isMinTemp ? 'background-color: #dbeafe;' : '';
-      const maxTempStyle = row.isMaxTemp ? 'background-color: #fecaca;' : '';
-      
-      // Определяем цвет для соответствия лимитам
-      let complianceStyle = '';
-      if (row.meetsLimits === 'Да') {
-        complianceStyle = 'background-color: #dcfce7; color: #166534;';
-      } else if (row.meetsLimits === 'Нет') {
-        complianceStyle = 'background-color: #fef2f2; color: #dc2626;';
-      }
+      const minTempClass = row.isMinTemp ? 'min-temp' : '';
+      const maxTempClass = row.isMaxTemp ? 'max-temp' : '';
+      const complianceClass = row.meetsLimits === 'Да' ? 'compliant' : 
+                             row.meetsLimits === 'Нет' ? 'non-compliant' : '';
 
       html += `
         <tr>
-          <td style="padding: 6px; text-align: center;">${row.zoneNumber || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.measurementLevel || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.loggerName || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.serialNumber || '-'}</td>
-          <td style="padding: 6px; text-align: center; ${minTempStyle}">${row.minTemp || '-'}</td>
-          <td style="padding: 6px; text-align: center; ${maxTempStyle}">${row.maxTemp || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.avgTemp || '-'}</td>
-          <td style="padding: 6px; text-align: center; ${complianceStyle}">${row.meetsLimits || '-'}</td>
+          <td>${row.zoneNumber || '-'}</td>
+          <td>${row.measurementLevel || '-'}</td>
+          <td>${row.loggerName || '-'}</td>
+          <td>${row.serialNumber || '-'}</td>
+          <td class="${minTempClass}">${row.minTemp || '-'}</td>
+          <td class="${maxTempClass}">${row.maxTemp || '-'}</td>
+          <td>${row.avgTemp || '-'}</td>
+          <td class="${complianceClass}">${row.meetsLimits || '-'}</td>
         </tr>
       `;
     });
 
     html += `
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </body>
+      </html>
     `;
 
-    return html;
+    try {
+      // Конвертируем HTML в DOCX буфер
+      const docxBuffer = await htmlToDocx(html, null, {
+        table: { 
+          width: 9000, // ~15cm
+          alignment: 'center'
+        },
+        page: { 
+          orientation: 'landscape',
+          margins: {
+            top: 1000,
+            right: 1000,
+            bottom: 1000,
+            left: 1000
+          }
+        },
+        font: {
+          name: 'Arial',
+          size: 20 // 10pt
+        }
+      });
+      
+      // Конвертируем буфер в base64 для вставки в шаблон
+      const uint8Array = new Uint8Array(docxBuffer);
+      let base64String = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        base64String += btoa(String.fromCharCode.apply(null, Array.from(chunk)));
+      }
+      
+      return base64String;
+    } catch (error) {
+      console.error('Ошибка конвертации таблицы в DOCX:', error);
+      // Возвращаем простую HTML таблицу как fallback
+      return html;
+    }
   }
 
 
