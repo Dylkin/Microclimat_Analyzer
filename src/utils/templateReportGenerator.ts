@@ -1,4 +1,4 @@
-import JSZip from 'jszip';
+import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 
 export interface TemplateReportData {
@@ -69,8 +69,8 @@ export class TemplateReportGenerator {
       console.log('CoolingSystemName:', data.coolingSystemName);
       console.log('tableXml_length:', tableXml.length);
 
-      // Загружаем шаблон в JSZip
-      const zip = new JSZip();
+      // Загружаем шаблон в PizZip
+      const zip = new PizZip();
       await zip.loadAsync(templateArrayBuffer);
 
       // Создаем docxtemplater
