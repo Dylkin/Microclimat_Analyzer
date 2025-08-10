@@ -41,8 +41,9 @@ export class DocxReportGenerator {
   }
 
   private async createNewDocument(data: ReportData): Promise<void> {
-    // Конвертируем изображение в ArrayBuffer
-    const imageBuffer = await data.chartImageBlob.arrayBuffer();
+    // Конвертируем изображение в Uint8Array
+    const imageArrayBuffer = await data.chartImageBlob.arrayBuffer();
+    const imageBuffer = new Uint8Array(imageArrayBuffer);
 
     this.sections = [
       {
@@ -160,8 +161,9 @@ export class DocxReportGenerator {
   }
 
   private async addSectionToExistingDoc(data: ReportData): Promise<void> {
-    // Конвертируем изображение в ArrayBuffer
-    const imageBuffer = await data.chartImageBlob.arrayBuffer();
+    // Конвертируем изображение в Uint8Array
+    const imageArrayBuffer = await data.chartImageBlob.arrayBuffer();
+    const imageBuffer = new Uint8Array(imageArrayBuffer);
 
     // Добавляем разрыв страницы и новую секцию
     const newSection = {
