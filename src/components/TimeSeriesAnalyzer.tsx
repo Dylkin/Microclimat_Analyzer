@@ -43,7 +43,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   });
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
-  const resultsTableRef = useRef<HTMLDivElement>(null);
   const [reportNumber, setReportNumber] = useState('');
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [testType, setTestType] = useState('');
@@ -58,9 +57,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // Ref для элемента графика
   const chartRef = useRef<HTMLDivElement>(null);
   
-  // Ref для таблицы результатов
-  const resultsTableRef = useRef<HTMLDivElement>(null);
-
   // Generate analysis results table data
   const analysisResults = useMemo(() => {
     if (!data || !data.points.length) return [];
