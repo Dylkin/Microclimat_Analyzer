@@ -219,7 +219,7 @@ export class TemplateReportGenerator {
       // Создаем простую текстовую таблицу для вставки в шаблон
       let resultsTableHtml = '';
       if (data.resultsTableData && data.resultsTableData.length > 0) {
-        resultsTableHtml = this.createHtmlTable(data.resultsTableData);
+        resultsTableHtml = this.createSimpleTable(data.resultsTableData);
       }
       
       // Подготавливаем данные для docxtemplater (все значения должны быть строками)
@@ -281,59 +281,25 @@ export class TemplateReportGenerator {
   }
 
   /**
-   * Создание HTML таблицы для вставки в шаблон
+   * Создание простой текстовой таблицы для вставки в шаблон
    */
-  private createHtmlTable(resultsTableData: any[]): string {
-    let html = `
-      <table border="1" style="border-collapse: collapse; width: 100%;">
-        <thead>
-          <tr style="background-color: #f3f4f6;">
-            <th style="padding: 8px; text-align: center; font-weight: bold;">№ зоны</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Уровень (м.)</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Логгер</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">S/N</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Мин. t°C</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Макс. t°C</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Среднее t°C</th>
-            <th style="padding: 8px; text-align: center; font-weight: bold;">Соответствие</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
+  private createSimpleTable(resultsTableData: any[]): string {
+    let table = '';
+    
+    // Заголовок таблицы
+    table += '№ зоны\tУровень (м.)\tЛоггер\tS/N\tМин. t°C\tМакс. t°C\tСреднее t°C\tСоответствие\n';
+    table += '─────────────────────────────────────────────────────────────────────────────────────────\n';
 
     resultsTableData.forEach(row => {
-      // Определяем цвет фона для минимальных и максимальных значений
-      const minTempStyle = row.isMinTemp ? 'background-color: #dbeafe;' : '';
-      const maxTempStyle = row.isMaxTemp ? 'background-color: #fecaca;' : '';
+      // Добавляем маркеры для выделения значений
+      const minTemp = row.isMinTemp ? `${row.minTemp || '-'} (МИН)` : (row.minTemp || '-');
+      const maxTemp = row.isMaxTemp ? `${row.maxTemp || '-'} (МАКС)` : (row.maxTemp || '-');
+      const compliance = row.meetsLimits === 'Да' ? '✓ Да' : row.meetsLimits === 'Нет' ? '✗ Нет' : '-';
       
-      // Определяем цвет для соответствия лимитам
-      let complianceStyle = '';
-      if (row.meetsLimits === 'Да') {
-        complianceStyle = 'background-color: #dcfce7; color: #166534;';
-      } else if (row.meetsLimits === 'Нет') {
-        complianceStyle = 'background-color: #fef2f2; color: #dc2626;';
-      }
-
-      html += `
-        <tr>
-          <td style="padding: 6px; text-align: center;">${row.zoneNumber || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.measurementLevel || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.loggerName || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.serialNumber || '-'}</td>
-          <td style="padding: 6px; text-align: center; ${minTempStyle}">${row.minTemp || '-'}</td>
-          <td style="padding: 6px; text-align: center; ${maxTempStyle}">${row.maxTemp || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${row.avgTemp || '-'}</td>
-          <td style="padding: 6px; text-align: center; ${complianceStyle}">${row.meetsLimits || '-'}</td>
-        </tr>
-      `;
+      table += `${row.zoneNumber || '-'}\t${row.measurementLevel || '-'}\t${row.loggerName || '-'}\t${row.serialNumber || '-'}\t${minTemp}\t${maxTemp}\t${row.avgTemp || '-'}\t${compliance}\n`;
     });
 
-    html += `
-        </tbody>
-      </table>
-    `;
-
-    return html;
+    return table;
   }
 
 
