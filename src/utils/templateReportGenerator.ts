@@ -237,57 +237,19 @@ export class TemplateReportGenerator {
     return table;
   }
 
-  private createHtmlTable(analysisResults: any[]): string {
-    if (!analysisResults || analysisResults.length === 0) {
-      return '<p>Нет данных для отображения</p>';
-    }
-
-    let html = `
-      <table border="1" style="border-collapse: collapse; width: 100%; font-family: 'Times New Roman', serif; font-size: 11px;">
-        <thead>
-          <tr style="background-color: #f0f0f0; font-weight: bold; font-family: 'Times New Roman', serif; font-size: 11px;">
-            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">№ зоны измерения</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Уровень измерения (м.)</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Наименование логгера (6 символов)</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Серийный № логгера</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Мин. t°C</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Макс. t°C</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Среднее t°C</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Соответствие лимитам</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
-
-    // Добавляем строки данных
-    analysisResults.forEach(result => {
-      const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
-      const complianceStyle = result.meetsLimits === 'Да' 
-        ? 'background-color: #d4edda; color: #155724;' 
-        : result.meetsLimits === 'Нет' 
-        ? 'background-color: #f8d7da; color: #721c24;' 
-        : '';
-      
-      html += `
-        <tr>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${zoneNumber}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.measurementLevel || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.loggerName || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.serialNumber || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.minTemp || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.maxTemp || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.avgTemp || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px; ${complianceStyle}">${result.meetsLimits || '-'}</td>
-        </tr>
-       `;
-     });
-
-    html += `
-        </tbody>
-      </table>
-    `;
-
-    return html;
+  private prepareTableDataForDocxTemplates(analysisResults: any[]): any[] {
+    return analysisResults.map(result => ({
+      zoneNumber: result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-'),
+      measurementLevel: result.measurementLevel || '-',
+      loggerName: result.loggerName || '-',
+      serialNumber: result.serialNumber || '-',
+      minTemp: result.minTemp || '-',
+      maxTemp: result.maxTemp || '-',
+      avgTemp: result.avgTemp || '-',
+      meetsLimits: result.meetsLimits || '-',
+      isCompliant: result.meetsLimits === 'Да',
+      isNonCompliant: result.meetsLimits === 'Нет'
+    }));
   }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {

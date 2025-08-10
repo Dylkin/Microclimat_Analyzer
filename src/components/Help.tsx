@@ -113,7 +113,7 @@ export const Help: React.FC = () => {
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-purple-900 mb-4">📋 Плейсхолдеры для DOCX шаблонов</h3>
             <p className="text-purple-800 mb-4">
-              При создании DOCX шаблона используйте следующие плейсхолдеры для автоматической вставки данных:
+              При создании DOCX шаблона используйте следующие плейсхолдеры для автоматической вставки данных (используется библиотека docx-templates):
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div className="space-y-2">
@@ -122,33 +122,47 @@ export const Help: React.FC = () => {
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{executor}'}</code> - ФИО исполнителя</li>
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{Report_No}'}</code> - Номер отчета</li>
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{Report_start}'}</code> - Дата отчета</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{report_date}'}</code> - Дата отчета (альтернативный)</li>
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ObjectName}'}</code> - Наименование объекта</li>
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{CoolingSystemName}'}</code> - Наименование холодильной установки</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{TestType}'}</code> - Тип испытания</li>
                 </ul>
               </div>
               <div className="space-y-2">
                 <h4 className="font-medium text-purple-900">Данные анализа:</h4>
                 <ul className="space-y-1 text-purple-800">
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{TestType}'}</code> - Тип испытания</li>
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{AcceptanceСriteria}'}</code> - Критерии приемки</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа (DOCX XML формат)</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{Results_table}'}</code> - Таблица результатов (альтернативный)</li>
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{results_table}'}</code> - Таблица результатов (текстовый формат)</li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              <h4 className="font-medium text-purple-900">Таблица результатов (цикл):</h4>
+              <div className="bg-purple-100 p-3 rounded text-xs font-mono text-purple-800">
+                <div>{'{#results_table_data}'}</div>
+                <div>&nbsp;&nbsp;{'{zoneNumber}'} | {'{measurementLevel}'} | {'{loggerName}'} | {'{serialNumber}'}</div>
+                <div>&nbsp;&nbsp;{'{minTemp}'} | {'{maxTemp}'} | {'{avgTemp}'} | {'{meetsLimits}'}</div>
+                <div>{'{/results_table_data}'}</div>
+              </div>
+              <ul className="space-y-1 text-purple-800 text-sm">
+                <li>• <code className="bg-purple-100 px-1 rounded">{'{#results_table_data}'}</code> - начало цикла по строкам таблицы</li>
+                <li>• <code className="bg-purple-100 px-1 rounded">{'{/results_table_data}'}</code> - конец цикла</li>
+                <li>• <code className="bg-purple-100 px-1 rounded">{'{isCompliant}'}</code> - true если соответствует лимитам</li>
+                <li>• <code className="bg-purple-100 px-1 rounded">{'{isNonCompliant}'}</code> - true если не соответствует лимитам</li>
                 </ul>
               </div>
             </div>
             <div className="mt-4 space-y-2">
               <h4 className="font-medium text-purple-900">Изображения:</h4>
               <ul className="space-y-1 text-purple-800">
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{%chart}'}</code> - График временных рядов (изображение)</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{chart_image}'}</code> - График временных рядов (изображение)</li>
               </ul>
             </div>
             <div className="mt-4 p-3 bg-purple-100 rounded-lg">
               <p className="text-xs text-purple-700">
-                <strong>Примечание:</strong> Для изображений используйте специальный синтаксис <code>{'{%chart}'}</code>. 
-                Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
-                Плейсхолдер <code>{'{ResultsTable}'}</code> вставляет полноценную DOCX таблицу с форматированием.
+                <strong>Примечание:</strong> Используется библиотека docx-templates. 
+                Для циклов используйте синтаксис <code>{'{#array}'}</code>...<code>{'{/array}'}</code>.
+                Обратите внимание на русскую букву "С" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
+                Для условного форматирования используйте <code>{'{isCompliant}'}</code> и <code>{'{isNonCompliant}'}</code>.
               </p>
             </div>
           </div>
