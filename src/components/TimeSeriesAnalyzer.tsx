@@ -8,7 +8,6 @@ import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxReportGenerator, ReportData } from '../utils/docxGenerator';
 import { TemplateReportGenerator, TemplateReportData } from '../utils/templateReportGenerator';
-import { TableExportUtils } from '../utils/tableExportUtils';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -58,9 +57,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // Ref для элемента графика
   const chartRef = useRef<HTMLDivElement>(null);
   
-  // Ref для таблицы результатов
-  const resultsTableRef = useRef<HTMLDivElement>(null);
-
   // Generate analysis results table data
   const analysisResults = useMemo(() => {
     if (!data || !data.points.length) return [];
@@ -356,22 +352,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
 
     try {
-      const docxBlob = await TableExportUtils.exportTableToDocx(
-        resultsTableRef.current, 
-        'таблица_результатов_анализа'
-      );
-      
-      // Автоматически скачиваем файл
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(docxBlob);
-      link.download = `таблица_результатов_${new Date().toISOString().slice(0, 10)}.docx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Очищаем URL
-      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-      
+      alert('Функция экспорта таблицы временно недоступна');
     } catch (error) {
       console.error('Ошибка экспорта таблицы:', error);
       alert('Ошибка при экспорте таблицы в DOCX');
@@ -448,13 +429,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         }, 'image/png', 1.0);
       });
 
-      // Создаем скриншот таблицы результатов
-      let resultsTableBlob: Blob | undefined;
-      if (resultsTableRef.current) {
-        console.log('Создаем скриншот таблицы результатов...');
-        resultsTableBlob = await TableExportUtils.createTableImage(resultsTableRef.current);
-      }
-      
       // Подготавливаем данные для шаблона
       const now = new Date();
       const dateStr = reportDate ? new Date(reportDate).toLocaleDateString('ru-RU') : now.toLocaleDateString('ru-RU');
@@ -467,7 +441,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
-        resultsTableBlob,
         executor: user?.fullName || 'Неизвестный пользователь',
         reportDate: dateStr,
         reportNumber: reportNumber || `REP-${Date.now()}`,
@@ -485,7 +458,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportStart: templateData.reportStart,
         reportDate: templateData.reportDate,
         chartBlobSize: chartBlob.size,
-        tableBlobSize: resultsTableBlob?.size || 0,
         testType: templateData.testType,
         objectName: templateData.objectName,
         coolingSystemName: templateData.coolingSystemName
@@ -823,13 +795,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Результаты анализа</h3>
-          <button
-            onClick={handleExportTable}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-          >
-            <Download className="w-4 h-4" />
-            <span>Экспорт таблицы в DOCX</span>
-          </button>
         </div>
         
         <div ref={resultsTableRef} className="overflow-x-auto">

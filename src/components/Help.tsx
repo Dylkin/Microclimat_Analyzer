@@ -252,14 +252,13 @@ export const Help: React.FC = () => {
           <div className="border-l-4 border-purple-500 pl-4">
             <h3 className="font-semibold text-gray-800">Как добавить маркеры на график?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Сделайте двойной клик по графику в нужном месте. Маркеры можно редактировать и удалять.
             </p>
           </div>
 
           <div className="border-l-4 border-red-500 pl-4">
             <h3 className="font-semibold text-gray-800">Как создать отчет?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Используйте таблицу результатов анализа для создания отчетов во внешних программах. Данные можно скопировать и вставить в документы.
+              График вставляется как PNG с высоким разрешением.
             </p>
           </div>
         </div>
