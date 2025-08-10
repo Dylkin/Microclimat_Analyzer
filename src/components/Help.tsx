@@ -279,6 +279,5 @@ export const Help: React.FC = () => {
       </div>
 
       </div>
-    </div>
   );
 };
