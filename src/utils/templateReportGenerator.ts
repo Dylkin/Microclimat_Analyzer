@@ -1,7 +1,7 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import ImageModule from 'docxtemplater-image-module-free';
 import html2canvas from 'html2canvas';
+import htmlToDocx from 'html-to-docx';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -80,20 +80,9 @@ export class TemplateReportGenerator {
       const zip = new PizZip(templateArrayBuffer);
 
       // Создаем docxtemplater
-      const imageModule = new ImageModule({
-        centered: false,
-        getImage: (tagValue: any) => {
-          return tagValue;
-        },
-        getSize: () => {
-          return [600, 400]; // Размер изображения в пикселях
-        }
-      });
-
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
-        modules: [imageModule]
       });
 
       // Устанавливаем данные
