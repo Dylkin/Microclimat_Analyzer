@@ -1,7 +1,6 @@
 import JSZip from 'jszip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
-import TableModule from 'docxtemplater-table-module';
 import PizZip from 'pizzip';
 
 export interface TemplateReportData {
@@ -83,13 +82,9 @@ export class TemplateReportGenerator {
       const imageModule = new ImageModule(imageOpts);
       console.log('ImageModule создан');
 
-      // Настраиваем модуль для таблиц
-      const tableModule = new TableModule();
-      console.log('TableModule создан');
-
       // Создаем экземпляр Docxtemplater с модулем изображений
       const doc = new Docxtemplater(zip, {
-        modules: [imageModule, tableModule],
+        modules: [imageModule],
         paragraphLoop: true,
         linebreaks: true,
       });
