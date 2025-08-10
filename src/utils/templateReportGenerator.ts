@@ -1,10 +1,9 @@
 import JSZip from 'jszip';
-import createReport from 'docx-templates';
+import Docxtemplater from 'docxtemplater';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
   analysisResults: any[];
-  resultsTableHtml: string;
   executor: string;
   reportDate: string;
   reportNumber: string;
@@ -40,19 +39,23 @@ export class TemplateReportGenerator {
       const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
       console.log('Изображение конвертировано в ArrayBuffer, размер:', chartImageBuffer.byteLength, 'байт');
       
+      // Создаем XML таблицу
+      const tableXml = this.createTableXml(data.analysisResults);
+      console.log('XML таблица создана, длина:', tableXml.length);
+      
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
         Report_No: data.reportNumber,
         Report_start: data.reportStart,
-        report_date: data.reportDate, // Оставляем для обратной совместимости
-        chart: chartImageBuffer, // ArrayBuffer изображения
+        report_date: data.reportDate,
+        chart: chartImageBuffer,
         Acceptance_criteria: data.acceptanceCriteria,
         TestType: data.testType || 'Не выбрано',
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        myTable: data.resultsTableHtml,
+        myTable: tableXml, // XML таблица
       };
 
       console.log('=== Данные для шаблона ===');
@@ -61,28 +64,40 @@ export class TemplateReportGenerator {
       console.log('Report_start:', data.reportStart);
       console.log('report_date:', data.reportDate);
       console.log('chart_image_size:', `${chartImageBuffer.byteLength} байт`);
-      console.log('Acceptance_criteria_length:', data.acceptanceCriteria?.length || 0);
       console.log('TestType:', data.testType);
-      console.log('AcceptanceСriteria_length:', data.acceptanceCriteria?.length || 0);
       console.log('ObjectName:', data.objectName);
       console.log('CoolingSystemName:', data.coolingSystemName);
-      console.log('resultsTableHtml_length:', data.resultsTableHtml?.length || 0);
+      console.log('tableXml_length:', tableXml.length);
 
-      // Генерируем отчет с помощью docx-templates
-      console.log('Начинаем генерацию отчета с docx-templates...');
-      const reportBuffer = await createReport({
-        template: templateArrayBuffer,
-        data: templateData,
-        cmdDelimiter: ['{', '}'],
-        literalXmlDelimiter: ['{{', '}}'],
-        processLineBreaks: true,
-        noSandBox: false,
+      // Загружаем шаблон в JSZip
+      const zip = new JSZip();
+      await zip.loadAsync(templateArrayBuffer);
+
+      // Создаем docxtemplater
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+      });
+
+      // Устанавливаем данные
+      doc.setData(templateData);
+
+      try {
+        // Рендерим документ
+        doc.render();
+      } catch (error) {
+        console.error('Ошибка рендеринга документа:', error);
+        throw new Error(`Ошибка заполнения шаблона: ${error}`);
+      }
+
+      // Генерируем итоговый документ
+      const output = doc.getZip().generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       });
       
       console.log('Отчет успешно сгенерирован');
-      return new Blob([reportBuffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-      });
+      return output;
       
     } catch (error) {
       console.error('Ошибка генерации отчета из шаблона:', error);
@@ -91,14 +106,14 @@ export class TemplateReportGenerator {
   }
 
   /**
-   * Создание HTML таблицы с inline стилями для вставки в DOCX
+   * Создание XML таблицы для вставки в DOCX
    */
-  static createHtmlTable(analysisResults: any[]): string {
+  private createTableXml(analysisResults: any[]): string {
     if (!analysisResults || analysisResults.length === 0) {
-      return '<p>Нет данных для отображения</p>';
+      return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
     }
 
-    // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
+    // Вычисляем глобальные минимальные и максимальные значения
     const nonExternalResults = analysisResults.filter(result => !result.isExternal);
     const minTempValues = nonExternalResults
       .map(result => parseFloat(result.minTemp))
@@ -110,95 +125,179 @@ export class TemplateReportGenerator {
     const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
     const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
 
-    // Базовые стили для таблицы
-    const tableStyle = `
-      border-collapse: collapse;
-      width: 100%;
-      font-family: Arial, sans-serif;
-      font-size: 12px;
-    `;
-
-    const headerCellStyle = `
-      border: 1px solid #000000;
-      background-color: #D9D9D9;
-      padding: 8px;
-      text-align: center;
-      font-weight: bold;
-    `;
-
-    const dataCellStyle = `
-      border: 1px solid #000000;
-      padding: 8px;
-      text-align: center;
-    `;
-
-    const evenRowStyle = `background-color: #F8F9FA;`;
-    const oddRowStyle = `background-color: #FFFFFF;`;
-    const minTempStyle = `background-color: #CCE5FF;`; // Голубой для минимума
-    const maxTempStyle = `background-color: #FFCCDD;`; // Розовый для максимума
-    const compliantStyle = `color: #28A745;`; // Зеленый для соответствия
-    const nonCompliantStyle = `color: #DC3545;`; // Красный для несоответствия
-
-    let html = `
-      <table style="${tableStyle}">
-        <thead>
-          <tr>
-            <th style="${headerCellStyle}">№ зоны измерения</th>
-            <th style="${headerCellStyle}">Уровень измерения (м.)</th>
-            <th style="${headerCellStyle}">Наименование логгера</th>
-            <th style="${headerCellStyle}">Серийный № логгера</th>
-            <th style="${headerCellStyle}">Мин. t°C</th>
-            <th style="${headerCellStyle}">Макс. t°C</th>
-            <th style="${headerCellStyle}">Среднее t°C</th>
-            <th style="${headerCellStyle}">Соответствие лимитам</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
+    // Начало таблицы
+    let tableXml = `
+    <w:tbl>
+      <w:tblPr>
+        <w:tblStyle w:val="TableGrid"/>
+        <w:tblW w:w="0" w:type="auto"/>
+        <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
+      </w:tblPr>
+      <w:tblGrid>
+        <w:gridCol w:w="1200"/>
+        <w:gridCol w:w="1200"/>
+        <w:gridCol w:w="1200"/>
+        <w:gridCol w:w="1200"/>
+        <w:gridCol w:w="1000"/>
+        <w:gridCol w:w="1000"/>
+        <w:gridCol w:w="1000"/>
+        <w:gridCol w:w="1400"/>
+      </w:tblGrid>
+      
+      <!-- Заголовок таблицы -->
+      <w:tr>
+        <w:trPr>
+          <w:tblHeader/>
+        </w:trPr>
+        ${this.createHeaderCell('№ зоны измерения')}
+        ${this.createHeaderCell('Уровень измерения (м.)')}
+        ${this.createHeaderCell('Наименование логгера')}
+        ${this.createHeaderCell('Серийный № логгера')}
+        ${this.createHeaderCell('Мин. t°C')}
+        ${this.createHeaderCell('Макс. t°C')}
+        ${this.createHeaderCell('Среднее t°C')}
+        ${this.createHeaderCell('Соответствие лимитам')}
+      </w:tr>`;
 
     // Добавляем строки данных
     analysisResults.forEach((result, index) => {
-      const isMinTemp = !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
-                       globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp;
-      const isMaxTemp = !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
-                       globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp;
-      
-      const rowBgStyle = index % 2 === 0 ? evenRowStyle : oddRowStyle;
-      
-      // Стили для ячеек температуры
-      const minTempCellStyle = `${dataCellStyle} ${rowBgStyle} ${isMinTemp ? minTempStyle : ''}`;
-      const maxTempCellStyle = `${dataCellStyle} ${rowBgStyle} ${isMaxTemp ? maxTempStyle : ''}`;
-      const regularCellStyle = `${dataCellStyle} ${rowBgStyle}`;
-      
-      // Стиль для ячейки соответствия лимитам
-      let complianceStyle = regularCellStyle;
-      if (result.meetsLimits === 'Да') {
-        complianceStyle += ` ${compliantStyle}`;
-      } else if (result.meetsLimits === 'Нет') {
-        complianceStyle += ` ${nonCompliantStyle}`;
-      }
+      const isMinTemp = !result.isExternal && globalMinTemp !== null && 
+                       !isNaN(parseFloat(result.minTemp)) && parseFloat(result.minTemp) === globalMinTemp;
+      const isMaxTemp = !result.isExternal && globalMaxTemp !== null && 
+                       !isNaN(parseFloat(result.maxTemp)) && parseFloat(result.maxTemp) === globalMaxTemp;
 
-      html += `
-        <tr>
-          <td style="${regularCellStyle}">${result.zoneNumber || '-'}</td>
-          <td style="${regularCellStyle}">${result.measurementLevel || '-'}</td>
-          <td style="${regularCellStyle}">${result.loggerName || '-'}</td>
-          <td style="${regularCellStyle}">${result.serialNumber || '-'}</td>
-          <td style="${minTempCellStyle}">${result.minTemp || '-'}</td>
-          <td style="${maxTempCellStyle}">${result.maxTemp || '-'}</td>
-          <td style="${regularCellStyle}">${result.avgTemp || '-'}</td>
-          <td style="${complianceStyle}"><strong>${result.meetsLimits || '-'}</strong></td>
-        </tr>
-      `;
+      const rowBgColor = index % 2 === 0 ? 'F8F9FA' : 'FFFFFF';
+
+      tableXml += `
+      <w:tr>
+        ${this.createDataCell(result.zoneNumber || '-', rowBgColor)}
+        ${this.createDataCell(result.measurementLevel || '-', rowBgColor)}
+        ${this.createDataCell(result.loggerName || '-', rowBgColor)}
+        ${this.createDataCell(result.serialNumber || '-', rowBgColor)}
+        ${this.createTempCell(result.minTemp || '-', isMinTemp ? 'CCE5FF' : rowBgColor)}
+        ${this.createTempCell(result.maxTemp || '-', isMaxTemp ? 'FFCCDD' : rowBgColor)}
+        ${this.createDataCell(result.avgTemp || '-', rowBgColor)}
+        ${this.createComplianceCell(result.meetsLimits || '-', rowBgColor)}
+      </w:tr>`;
     });
 
-    html += `
-        </tbody>
-      </table>
-    return html;
+    // Закрываем таблицу
+    tableXml += `
+    </w:tbl>`;
+
+    return tableXml;
   }
-    `;
+
+  private createHeaderCell(content: string): string {
+    return `
+    <w:tc>
+      <w:tcPr>
+        <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
+        <w:tcBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tcBorders>
+      </w:tcPr>
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="center"/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:b/>
+          </w:rPr>
+          <w:t>${this.escapeXml(content)}</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>`;
   }
+
+  private createDataCell(content: string, bgColor: string): string {
+    return `
+    <w:tc>
+      <w:tcPr>
+        <w:shd w:val="clear" w:color="auto" w:fill="${bgColor}"/>
+        <w:tcBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tcBorders>
+      </w:tcPr>
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="center"/>
+        </w:pPr>
+        <w:r>
+          <w:t>${this.escapeXml(content)}</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>`;
+  }
+
+  private createTempCell(content: string, bgColor: string): string {
+    return `
+    <w:tc>
+      <w:tcPr>
+        <w:shd w:val="clear" w:color="auto" w:fill="${bgColor}"/>
+        <w:tcBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tcBorders>
+      </w:tcPr>
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="center"/>
+        </w:pPr>
+        <w:r>
+          <w:t>${this.escapeXml(content)}</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>`;
+  }
+
+  private createComplianceCell(content: string, bgColor: string): string {
+    const textColor = content === 'Да' ? '28A745' : content === 'Нет' ? 'DC3545' : '000000';
+    
+    return `
+    <w:tc>
+      <w:tcPr>
+        <w:shd w:val="clear" w:color="auto" w:fill="${bgColor}"/>
+        <w:tcBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tcBorders>
+      </w:tcPr>
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="center"/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:color w:val="${textColor}"/>
+            <w:b/>
+          </w:rPr>
+          <w:t>${this.escapeXml(content)}</w:t>
+        </w:r>
+      </w:p>
+    </w:tc>`;
+  }
+
+  private escapeXml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
