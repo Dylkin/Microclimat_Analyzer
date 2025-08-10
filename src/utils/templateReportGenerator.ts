@@ -95,9 +95,6 @@ export class TemplateReportGenerator {
       const resultsTable = this.createResultsTable(data.analysisResults);
       console.log('Таблица результатов создана, длина:', resultsTable.length);
 
-      // Создаем таблицу результатов для вставки в docx-templates
-      const resultsTableForTemplate = this.prepareTableDataForDocxTemplates(data.analysisResults);
-
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
@@ -111,17 +108,16 @@ export class TemplateReportGenerator {
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
         analysis_table: resultsTable,
-        ResultsTable: resultsTableForTemplate,
         // Добавляем отдельные поля для каждого столбца таблицы
-        tableRows: resultsTableForTemplate.map(row => ({
-          zoneNumber: String(row.zoneNumber),
-          measurementLevel: String(row.measurementLevel),
-          loggerName: String(row.loggerName),
-          serialNumber: String(row.serialNumber),
-          minTemp: String(row.minTemp),
-          maxTemp: String(row.maxTemp),
-          avgTemp: String(row.avgTemp),
-          meetsLimits: String(row.meetsLimits)
+        tableRows: data.analysisResults.map(result => ({
+          zoneNumber: String(result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-')),
+          measurementLevel: String(result.measurementLevel || '-'),
+          loggerName: String(result.loggerName || '-'),
+          serialNumber: String(result.serialNumber || '-'),
+          minTemp: String(result.minTemp || '-'),
+          maxTemp: String(result.maxTemp || '-'),
+          avgTemp: String(result.avgTemp || '-'),
+          meetsLimits: String(result.meetsLimits || '-')
         }))
       };
 
