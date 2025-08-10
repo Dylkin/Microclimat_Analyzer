@@ -15,8 +15,6 @@ export interface TemplateReportData {
   testType: string;
   objectName: string;
   coolingSystemName: string;
-  resultsTableRows: any[];
-  resultsTableXml?: string;
 }
 
 export class TemplateReportGenerator {
@@ -86,13 +84,6 @@ export class TemplateReportGenerator {
       console.log('ImageModule создан');
 
       // Создаем HTML таблицу
-      const tableRows = this.createTableRowsData(data.analysisResults);
-      console.log('Данные таблицы созданы, строк:', tableRows.length);
-      
-      // Создаем XML таблицу для вставки в DOCX
-      const tableXml = this.createDocxTable(data.analysisResults);
-      console.log('XML таблица создана');
-
       // Создаем экземпляр Docxtemplater с модулем изображений
       const doc = new Docxtemplater(zip, {
         modules: [imageModule],
@@ -101,7 +92,6 @@ export class TemplateReportGenerator {
       });
       console.log('Docxtemplater создан с ImageModule');
 
-      // Создаем таблицу результатов в текстовом формате
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
@@ -114,9 +104,6 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        resultsTable: tableRows,
-        resultsTableXml: tableXml,
-        ResultsTable: tableXml // Добавляем для совместимости с разными названиями плейсхолдеров
       };
 
       console.log('=== Данные для шаблона ===');
@@ -165,210 +152,6 @@ export class TemplateReportGenerator {
     }
   }
 
-  private createTableRowsData(analysisResults: any[]): any[] {
-    if (!analysisResults || analysisResults.length === 0) {
-      return [];
-    }
-
-    // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
-    const nonExternalResults = analysisResults.filter(result => !result.isExternal);
-    const minTempValues = nonExternalResults
-      .map(result => parseFloat(result.minTemp))
-      .filter(val => !isNaN(val));
-    const maxTempValues = nonExternalResults
-      .map(result => parseFloat(result.maxTemp))
-      .filter(val => !isNaN(val));
-    
-    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
-    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
-
-    // Создаем массив строк для таблицы
-    const tableRows = analysisResults.map((result, index) => {
-      const isMinTemp = !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
-                       globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp;
-      const isMaxTemp = !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
-                       globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp;
-      
-      return {
-        zoneNumber: result.zoneNumber,
-        measurementLevel: result.measurementLevel,
-        loggerName: result.loggerName,
-        serialNumber: result.serialNumber,
-        minTemp: result.minTemp,
-        maxTemp: result.maxTemp,
-        avgTemp: result.avgTemp,
-        meetsLimits: result.meetsLimits,
-        isMinTemp,
-        isMaxTemp,
-        isCompliant: result.meetsLimits === 'Да',
-        isNonCompliant: result.meetsLimits === 'Нет'
-      };
-    });
-
-    return tableRows;
-  }
-
-  private createDocxTable(analysisResults: any[]): string {
-    if (!analysisResults || analysisResults.length === 0) {
-        return `
-        <w:p>
-            <w:r>
-                <w:t>Нет данных для отображения</w:t>
-            </w:r>
-        </w:p>`;
-    }
-
-    // Вычисляем глобальные минимальные и максимальные значения
-    const minTempValues = analysisResults
-        .filter(result => !result.isExternal)
-        .map(result => parseFloat(result.minTemp))
-        .filter(val => !isNaN(val));
-    
-    const maxTempValues = analysisResults
-        .filter(result => !result.isExternal)
-        .map(result => parseFloat(result.maxTemp))
-        .filter(val => !isNaN(val));
-
-    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
-    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
-
-    // Начало таблицы
-    let tableXml = `
-    <w:tbl>
-        <w:tblPr>
-            <w:tblStyle w:val="TableGrid"/>
-            <w:tblW w:w="10000" w:type="pct"/>
-            <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
-        </w:tblPr>
-        <w:tblGrid>
-            <w:gridCol w:w="1200"/>
-            <w:gridCol w:w="1200"/>
-            <w:gridCol w:w="1200"/>
-            <w:gridCol w:w="1200"/>
-            <w:gridCol w:w="1000"/>
-            <w:gridCol w:w="1000"/>
-            <w:gridCol w:w="1000"/>
-            <w:gridCol w:w="1400"/>
-        </w:tblGrid>
-        
-        <!-- Заголовок таблицы -->
-        <w:tr>
-            <w:trPr>
-                <w:tblHeader/>
-            </w:trPr>
-            ${this.createHeaderCell('№ зоны измерения')}
-            ${this.createHeaderCell('Уровень измерения')}
-            ${this.createHeaderCell('Логгер')}
-            ${this.createHeaderCell('Серийный номер')}
-            ${this.createHeaderCell('Мин. темп.')}
-            ${this.createHeaderCell('Макс. темп.')}
-            ${this.createHeaderCell('Ср. темп.')}
-            ${this.createHeaderCell('Соответствие')}
-        </w:tr>`;
-
-    // Добавляем строки данных
-    analysisResults.forEach((result, index) => {
-        const isMinTemp = !result.isExternal && globalMinTemp !== null && 
-                         parseFloat(result.minTemp) === globalMinTemp;
-        const isMaxTemp = !result.isExternal && globalMaxTemp !== null && 
-                         parseFloat(result.maxTemp) === globalMaxTemp;
-
-        const rowBgColor = index % 2 === 0 ? 'F8F9FA' : 'FFFFFF';
-
-        tableXml += `
-        <w:tr>
-            ${this.createDataCell(result.zoneNumber || '-', rowBgColor)}
-            ${this.createDataCell(result.measurementLevel || '-', rowBgColor)}
-            ${this.createDataCell(result.loggerName || '-', rowBgColor)}
-            ${this.createDataCell(result.serialNumber || '-', rowBgColor)}
-            ${this.createTempCell(result.minTemp, isMinTemp, rowBgColor)}
-            ${this.createTempCell(result.maxTemp, isMaxTemp, rowBgColor)}
-            ${this.createDataCell(result.avgTemp || '-', rowBgColor)}
-            ${this.createDataCell(result.meetsLimits || '-', rowBgColor)}
-        </w:tr>`;
-    });
-
-    // Закрываем таблицу
-    tableXml += `
-    </w:tbl>`;
-
-    return tableXml;
-  }
-
-  private createHeaderCell(content: string): string {
-    return `
-    <w:tc>
-        <w:tcPr>
-            <w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>
-            <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-        </w:tcPr>
-        <w:p>
-            <w:pPr>
-                <w:jc w:val="center"/>
-            </w:pPr>
-            <w:r>
-                <w:rPr>
-                    <w:b/>
-                </w:rPr>
-                <w:t>${content}</w:t>
-            </w:r>
-        </w:p>
-    </w:tc>`;
-  }
-
-  private createDataCell(content: string, bgColor: string): string {
-    return `
-    <w:tc>
-        <w:tcPr>
-            <w:shd w:val="clear" w:color="auto" w:fill="${bgColor}"/>
-            <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-        </w:tcPr>
-        <w:p>
-            <w:pPr>
-                <w:jc w:val="center"/>
-            </w:pPr>
-            <w:r>
-                <w:t>${content}</w:t>
-            </w:r>
-        </w:p>
-    </w:tc>`;
-  }
-
-  private createTempCell(tempValue: string, isHighlight: boolean, bgColor: string): string {
-    const cellColor = isHighlight ? 'FF0000' : bgColor;
-    const value = tempValue || '-';
-    
-    return `
-    <w:tc>
-        <w:tcPr>
-            <w:shd w:val="clear" w:color="auto" w:fill="${cellColor}"/>
-            <w:tcBorders>
-                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-        </w:tcPr>
-        <w:p>
-            <w:pPr>
-                <w:jc w:val="center"/>
-            </w:pPr>
-            <w:r>
-                <w:t>${value}</w:t>
-            </w:r>
-        </w:p>
-    </w:tc>`;
-  }
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
