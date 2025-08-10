@@ -1,6 +1,5 @@
 import { saveAs } from 'file-saver';
-import html2canvas from 'html2canvas';
-import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } from 'docx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType } from 'docx';
 import { UploadedFile } from '../types/FileData';
 import { AuthUser } from '../types/User';
 import { ChartLimits, VerticalMarker } from '../types/TimeSeriesData';
@@ -18,13 +17,11 @@ interface ReportData {
   user: AuthUser;
   director?: string;
   dataType: 'temperature' | 'humidity';
-  chartImageData: string;
 }
 
 export class ReportGenerator {
   private static instance: ReportGenerator;
   private generatedReports: Map<string, Blob> = new Map();
-  private generatedCharts: Map<string, Blob> = new Map();
   private masterReport: Blob | null = null;
   private masterReportName: string | null = null;
 
@@ -40,8 +37,7 @@ export class ReportGenerator {
    */
   async generateReport(
     templateFile: File,
-    reportData: ReportData,
-    chartElement?: HTMLElement
+    reportData: ReportData
   ): Promise<{ success: boolean; fileName: string; error?: string }> {
     try {
       console.log('Начинаем генерацию отчета с docx.js...');
@@ -55,47 +51,8 @@ export class ReportGenerator {
         this.masterReportName = fileName;
       }
 
-      // Определяем имя файла для графика
-      const chartFileName = fileName.replace('.docx', '_график.png');
-
-      // Получаем изображение графика если элемент предоставлен
-      let chartImageBuffer: ArrayBuffer | null = null;
-      
-      if (chartElement) {
-        try {
-          const canvas = await html2canvas(chartElement, {
-            backgroundColor: '#ffffff',
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            width: 1200,
-            height: 400
-          });
-          
-          console.log('График успешно конвертирован в canvas');
-          
-          // Создаем Buffer для PNG файла
-          const chartBlob = await new Promise<Blob | null>((resolve) => {
-            canvas.toBlob((blob) => {
-              resolve(blob);
-            }, 'image/png');
-          });
-          
-          if (chartBlob) {
-            chartImageBuffer = await chartBlob.arrayBuffer();
-            
-            // Сохраняем график для отдельного скачивания
-            this.generatedCharts.set(chartFileName, chartBlob);
-            console.log('График сохранен как:', chartFileName);
-          }
-          
-        } catch (error) {
-          console.warn('Ошибка конвертации графика:', error);
-        }
-      }
-
       // Создаем документ с помощью docx.js
-      const doc = await this.createDocxDocument(reportData, chartImageBuffer);
+      const doc = await this.createDocxDocument(reportData);
 
       // Генерируем итоговый документ
       const output = await Packer.toBlob(doc);
@@ -130,7 +87,7 @@ export class ReportGenerator {
   /**
    * Создание DOCX документа с помощью docx.js
    */
-  private async createDocxDocument(reportData: ReportData, chartImageBuffer: ArrayBuffer | null): Promise<Document> {
+  private async createDocxDocument(reportData: ReportData): Promise<Document> {
     // Получаем информацию о временном периоде
     const testPeriodInfo = this.getTestPeriodInfo(reportData.markers);
     
@@ -275,33 +232,6 @@ export class ReportGenerator {
     // Создаем таблицу результатов
     const resultsTable = this.createResultsTable(reportData.resultsTableData);
     children.push(resultsTable);
-
-    // График
-    if (chartImageBuffer) {
-      children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
-      
-      children.push(
-        new Paragraph({
-          children: [new TextRun({ text: 'График:', bold: true })],
-          heading: HeadingLevel.HEADING_2
-        })
-      );
-
-      children.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: chartImageBuffer,
-              transformation: {
-                width: 600,
-                height: 200
-              }
-            })
-          ],
-          alignment: AlignmentType.CENTER
-        })
-      );
-    }
 
     // Заключение
     children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
@@ -519,21 +449,10 @@ export class ReportGenerator {
   }
 
   /**
-   * Получение списка сгенерированных графиков
-   */
-  getGeneratedCharts(): string[] {
-    return Array.from(this.generatedCharts.keys());
-  }
-
-  /**
    * Удаление сгенерированного отчета
    */
   deleteReport(fileName: string): boolean {
-    const reportDeleted = this.generatedReports.delete(fileName);
-    // Также удаляем соответствующий график
-    const chartFileName = fileName.replace('.docx', '_график.png');
-    this.generatedCharts.delete(chartFileName);
-    return reportDeleted;
+    return this.generatedReports.delete(fileName);
   }
 
   /**
@@ -544,31 +463,12 @@ export class ReportGenerator {
   }
 
   /**
-   * Проверка существования графика
-   */
-  hasChart(fileName: string): boolean {
-    return this.generatedCharts.has(fileName);
-  }
-
-  /**
    * Получение отчета для повторного скачивания
    */
   downloadReport(fileName: string): boolean {
     const report = this.generatedReports.get(fileName);
     if (report) {
       saveAs(report, fileName);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Получение графика для повторного скачивания
-   */
-  downloadChart(fileName: string): boolean {
-    const chart = this.generatedCharts.get(fileName);
-    if (chart) {
-      saveAs(chart, fileName);
       return true;
     }
     return false;
