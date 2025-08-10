@@ -3,6 +3,13 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    port: 5173,
+    host: true,
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'credentialless'
+    }
+  },
   define: {
     global: 'globalThis',
     'process.env': {},
@@ -16,9 +23,5 @@ export default defineConfig({
       'd3-time-format',
       'd3-zoom',
     ],
-  },
-  server: {
-    port: 5173,
-    host: true
   },
 })
