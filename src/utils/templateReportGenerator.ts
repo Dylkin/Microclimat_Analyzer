@@ -107,8 +107,7 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        analysis_table: resultsTable,
-        TestType: data.testType || 'Не выбрано'
+        analysis_table: resultsTable
       };
 
       console.log('=== Данные для шаблона ===');
