@@ -132,7 +132,7 @@ export const Help: React.FC = () => {
                 <ul className="space-y-1 text-purple-800">
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{TestType}'}</code> - Тип испытания</li>
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{AcceptanceСriteria}'}</code> - Критерии приемки</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа (DOCX XML формат)</li>
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{Results_table}'}</code> - Таблица результатов (альтернативный)</li>
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{results_table}'}</code> - Таблица результатов (текстовый формат)</li>
                 </ul>
@@ -148,6 +148,7 @@ export const Help: React.FC = () => {
               <p className="text-xs text-purple-700">
                 <strong>Примечание:</strong> Для изображений используйте специальный синтаксис <code>{'{%chart}'}</code>. 
                 Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
+                Плейсхолдер <code>{'{ResultsTable}'}</code> вставляет полноценную DOCX таблицу с форматированием.
               </p>
             </div>
           </div>

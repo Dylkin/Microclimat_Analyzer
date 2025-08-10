@@ -237,6 +237,58 @@ export class TemplateReportGenerator {
     return table;
   }
 
+  private createHtmlTable(analysisResults: any[]): string {
+    if (!analysisResults || analysisResults.length === 0) {
+      return '<p>Нет данных для отображения</p>';
+    }
+
+    let html = `
+      <table border="1" style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px;">
+        <thead>
+          <tr style="background-color: #f0f0f0; font-weight: bold;">
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">№ зоны измерения</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Уровень измерения (м.)</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Наименование логгера (6 символов)</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Серийный № логгера</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Мин. t°C</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Макс. t°C</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Среднее t°C</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Соответствие лимитам</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    // Добавляем строки данных
+    analysisResults.forEach(result => {
+      const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
+      const complianceStyle = result.meetsLimits === 'Да' 
+        ? 'background-color: #d4edda; color: #155724;' 
+        : result.meetsLimits === 'Нет' 
+        ? 'background-color: #f8d7da; color: #721c24;' 
+        : '';
+      
+      html += `
+        <tr>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${zoneNumber}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.measurementLevel || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.loggerName || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.serialNumber || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.minTemp || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.maxTemp || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.avgTemp || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center; ${complianceStyle}">${result.meetsLimits || '-'}</td>
+        </tr>
+    });
+
+    html += `
+        </tbody>
+      </table>
+    `;
+
+    return html;
+  }
+
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
