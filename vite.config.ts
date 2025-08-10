@@ -17,6 +17,8 @@ export default defineConfig({
       'd3-time-format',
       'd3-zoom',
       'html-to-docx',
+    ],
+    exclude: [
       'docxtemplater-html-module',
     ],
   },
