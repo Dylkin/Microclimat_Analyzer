@@ -84,6 +84,7 @@ export class TemplateReportGenerator {
     return new Blob([reportBuffer], {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     });
+  }
 
 
 
