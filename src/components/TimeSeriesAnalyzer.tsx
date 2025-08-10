@@ -325,6 +325,24 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
   };
 
+  // Функция для получения пользовательского названия типа испытания
+  const getTestTypeDisplayName = (testType: string) => {
+    switch (testType) {
+      case 'empty_volume':
+        return 'Испытание на соответствие критериям в пустом объеме';
+      case 'loaded_volume':
+        return 'Испытание на соответствие критериям в загруженном объеме';
+      case 'temperature_recovery':
+        return 'Испытание по восстановлению температуры после открытия двери';
+      case 'power_off':
+        return 'Испытание на отключение электропитания';
+      case 'power_on':
+        return 'Испытание на включение электропитания';
+      default:
+        return testType || 'Не выбрано';
+    }
+  };
+
   const handleGenerateTemplateReport = async () => {
     if (!templateFile) {
       alert('Пожалуйста, загрузите шаблон отчета');
@@ -414,7 +432,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportStart: dateStr,
         dataType,
         acceptanceCriteria,
-        testType: testType || 'Не выбрано',
+        testType: getTestTypeDisplayName(testType),
         objectName: objectName || 'Не указано',
         coolingSystemName: coolingSystemName || 'Не указано'
       };
