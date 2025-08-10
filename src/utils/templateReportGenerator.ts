@@ -115,7 +115,6 @@ export class TemplateReportGenerator {
       console.log('report_date:', data.reportDate);
       console.log('chart_image_size:', `${chartImageBuffer.byteLength} байт`);
       console.log('Acceptance_criteria_length:', data.acceptanceCriteria?.length || 0);
-      console.log('TestType:', data.testType);
       console.log('AcceptanceСriteria_length:', data.acceptanceCriteria?.length || 0);
       console.log('ObjectName:', data.objectName);
       console.log('CoolingSystemName:', data.coolingSystemName);
