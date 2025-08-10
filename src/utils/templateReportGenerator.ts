@@ -15,7 +15,6 @@ export interface TemplateReportData {
   testType: string;
   objectName: string;
   coolingSystemName: string;
-  ResultsTable?: string;
 }
 
 export class TemplateReportGenerator {
@@ -105,7 +104,7 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        ResultsTable: data.ResultsTable || ''
+        ResultsTable: htmlTable
       };
 
       console.log('=== Данные для шаблона ===');
