@@ -213,7 +213,6 @@ export const Help: React.FC = () => {
         </div>
       </div>
 
-      {/* Технические требования */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center space-x-3 mb-6">
           <Code className="w-6 h-6 text-purple-600" />
