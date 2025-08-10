@@ -131,21 +131,22 @@ export const Help: React.FC = () => {
                 <h4 className="font-medium text-purple-900">Данные анализа:</h4>
                 <ul className="space-y-1 text-purple-800">
                   <li><code className="bg-purple-100 px-2 py-1 rounded">{'{AcceptanceСriteria}'}</code> - Критерии приемки</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{~ResultsTable}'}</code> - Таблица результатов анализа (HTML таблица)</li>
                 </ul>
               </div>
             </div>
             <div className="mt-4 space-y-2">
-              <h4 className="font-medium text-purple-900">Изображения:</h4>
+              <h4 className="font-medium text-purple-900">Изображения и таблицы:</h4>
               <ul className="space-y-1 text-purple-800">
                 <li><code className="bg-purple-100 px-2 py-1 rounded">{'{chart_image}'}</code> - График временных рядов (изображение)</li>
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа (HTML таблица)</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{~ResultsTable}'}</code> - Таблица результатов (HTML таблица с тильдой ~)</li>
               </ul>
             </div>
             <div className="mt-4 p-3 bg-purple-100 rounded-lg">
               <p className="text-xs text-purple-700">
-                <strong>Примечание:</strong> Используется библиотека docx-templates. 
+                <strong>Примечание:</strong> Используется библиотека docxtemplater с модулем docxtemplater-html-module. 
                 Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
-                График вставляется как PNG изображение с высоким разрешением (scale: 2), таблица - как HTML таблица.
+                График вставляется как PNG изображение с высоким разрешением (scale: 2), таблица - как HTML таблица с префиксом ~.
               </p>
             </div>
           </div>

@@ -1,7 +1,6 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import html2canvas from 'html2canvas';
-import htmlToDocx from 'html-to-docx';
+const HtmlModule = require('docxtemplater-html-module');
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -61,7 +60,7 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        ResultsTable: resultsTableHtml,
+        '~ResultsTable': data.resultsTableHtml, // Префикс ~ для HTML модуля
       };
 
       console.log('=== Данные для шаблона ===');
@@ -82,6 +81,7 @@ export class TemplateReportGenerator {
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
+        modules: [new HtmlModule({})],
       });
 
       // Устанавливаем данные
