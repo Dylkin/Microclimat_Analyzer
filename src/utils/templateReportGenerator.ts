@@ -1,7 +1,5 @@
 import JSZip from 'jszip';
-import Docxtemplater from 'docxtemplater';
-import ImageModule from 'docxtemplater-image-module-free';
-import PizZip from 'pizzip';
+import createReport from 'docx-templates';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -42,64 +40,13 @@ export class TemplateReportGenerator {
       const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
       console.log('Изображение конвертировано в ArrayBuffer, размер:', chartImageBuffer.byteLength, 'байт');
       
-      // Создаем ZIP из шаблона
-      const zip = new PizZip(templateArrayBuffer);
-      console.log('ZIP архив создан из шаблона');
-      
-      // Настраиваем модуль для изображений
-      const imageOpts = {
-        centered: false,
-        fileType: 'docx',
-        getImage: (tagValue: string, tagName: string) => {
-          console.log(`Обработка изображения для тега: ${tagName}, значение: ${tagValue}`);
-          if (tagName === 'chart') {
-            console.log('Возвращаем ArrayBuffer изображения для тега chart');
-            return chartImageBuffer;
-          }
-          console.error(`Неизвестный тег изображения: ${tagName}`);
-          throw new Error(`Неизвестный тег изображения: ${tagName}`);
-        },
-        getSize: (img: ArrayBuffer, tagValue: string, tagName: string) => {
-          console.log(`Установка размера изображения для тега: ${tagName}`);
-          if (tagName === 'chart') {
-            console.log('Устанавливаем размер изображения: 600x800 пикселей');
-            return [600, 800];
-          }
-          console.log('Возвращаем null для размера (размер по умолчанию)');
-          return [400, 300]; // Размер по умолчанию
-        },
-        getProps: (img: ArrayBuffer, tagValue: string, tagName: string) => {
-          console.log(`Установка свойств изображения для тега: ${tagName}`);
-          if (tagName === 'chart') {
-            return {
-              extension: 'png',
-              mime: 'image/png'
-            };
-          }
-          return null;
-        }
-      };
-
-      console.log('Настройки ImageModule подготовлены');
-      const imageModule = new ImageModule(imageOpts);
-      console.log('ImageModule создан');
-
-      // Создаем HTML таблицу
-      // Создаем экземпляр Docxtemplater с модулем изображений
-      const doc = new Docxtemplater(zip, {
-        modules: [imageModule],
-        paragraphLoop: true,
-        linebreaks: true,
-      });
-      console.log('Docxtemplater создан с ImageModule');
-
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
         Report_No: data.reportNumber,
         Report_start: data.reportStart,
         report_date: data.reportDate, // Оставляем для обратной совместимости
-        chart: 'chart_placeholder', // Значение для ImageModule
+        chart: chartImageBuffer, // ArrayBuffer изображения
         Acceptance_criteria: data.acceptanceCriteria,
         TestType: data.testType || 'Не выбрано',
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
@@ -121,31 +68,19 @@ export class TemplateReportGenerator {
       console.log('CoolingSystemName:', data.coolingSystemName);
       console.log('resultsTableHtml_length:', data.resultsTableHtml?.length || 0);
 
-      // Заполняем шаблон данными
-      console.log('Устанавливаем данные в шаблон...');
-      doc.setData(templateData);
-
-      try {
-        // Рендерим документ
-        console.log('Начинаем рендеринг документа...');
-        doc.render();
-        console.log('Документ успешно отрендерен с ImageModule');
-      } catch (error) {
-        console.error('Ошибка рендеринга документа:', error);
-        
-        // Выводим подробную информацию об ошибке
-        if (error && typeof error === 'object' && 'properties' in error) {
-          const errorProps = (error as any).properties;
-          if (errorProps && errorProps.errors instanceof Array) {
-          }
-        }
-        
-        throw error;
-      }
+      // Генерируем отчет с помощью docx-templates
+      console.log('Начинаем генерацию отчета с docx-templates...');
+      const reportBuffer = await createReport({
+        template: templateArrayBuffer,
+        data: templateData,
+        cmdDelimiter: ['{', '}'],
+        literalXmlDelimiter: ['{{', '}}'],
+        processLineBreaks: true,
+        noSandBox: false,
+      });
       
-      // Генерируем DOCX файл
-      const buf = doc.getZip().generate({ type: 'arraybuffer' });
-      return new Blob([buf], { 
+      console.log('Отчет успешно сгенерирован');
+      return new Blob([reportBuffer], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       });
       
