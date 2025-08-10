@@ -454,7 +454,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       };
 
       console.log('Данные для шаблона подготовлены:', {
-        resultsTableHtml: templateData.resultsTableHtml ? 'HTML table created' : 'No table'
+        resultsTableHtml: templateData.resultsTableHtml ? 'HTML table created' : 'No table',
         reportNumber: templateData.reportNumber,
         reportStart: templateData.reportStart,
         reportDate: templateData.reportDate,
