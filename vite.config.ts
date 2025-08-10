@@ -16,6 +16,9 @@ export default defineConfig({
       'd3-time-format',
       'd3-zoom',
     ],
+    exclude: [
+      'xmlbuilder2',
+    ],
   },
   server: {
     port: 5173,
