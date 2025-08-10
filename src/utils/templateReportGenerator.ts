@@ -217,13 +217,13 @@ export class TemplateReportGenerator {
       executor: String(data.executor || ''),
       Report_No: String(data.reportNumber || ''),
       Report_start: String(data.reportStart || ''),
-      report_date: String(data.reportDate || ''),
-      chart_image: chartImageData, // Передаем напрямую Uint8Array
+      reportDate: String(data.reportDate || ''),
+      chart_image: chartImageData,
       TestType: String(data.testType || 'Не выбрано'),
       EligibilityCriteria: String(data.acceptanceCriteria || ''),
       ObjectName: String(data.objectName || ''),
       CoolingSystemName: String(data.coolingSystemName || ''),
-      ResultsTable: String(resultsTableHtml || ''), // Убеждаемся, что это строка
+      ResultsTable: resultsTableHtml || '', // HTML строка
     };
 
     // Читаем шаблон
