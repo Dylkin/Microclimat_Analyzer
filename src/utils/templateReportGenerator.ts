@@ -94,10 +94,6 @@ export class TemplateReportGenerator {
       const resultsTable = this.createResultsTable(data.analysisResults);
       console.log('Таблица результатов создана, длина:', resultsTable.length);
 
-      // Создаем форматированную таблицу для вставки
-      const formattedTable = this.createFormattedTable(data.analysisResults);
-      console.log('Форматированная таблица создана');
-
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
@@ -110,8 +106,7 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName || 'Не указано',
-        analysis_table: resultsTable,
-        ResultsTable: formattedTable
+        analysis_table: resultsTable
       };
 
       console.log('=== Данные для шаблона ===');
@@ -211,26 +206,6 @@ export class TemplateReportGenerator {
       isCompliant: result.meetsLimits === 'Да',
       isNonCompliant: result.meetsLimits === 'Нет'
     }));
-  }
-
-  private createFormattedTable(analysisResults: any[]): any {
-    if (!analysisResults || analysisResults.length === 0) {
-      return { rows: [] };
-    }
-
-    // Создаем строки таблицы
-    const rows = analysisResults.map(result => ({
-      zoneNumber: result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-'),
-      measurementLevel: result.measurementLevel || '-',
-      loggerName: result.loggerName || '-',
-      serialNumber: result.serialNumber || '-',
-      minTemp: result.minTemp || '-',
-      maxTemp: result.maxTemp || '-',
-      avgTemp: result.avgTemp || '-',
-      meetsLimits: result.meetsLimits || '-'
-    }));
-
-    return { rows };
   }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
