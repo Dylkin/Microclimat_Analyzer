@@ -158,6 +158,7 @@ export class TemplateReportGenerator {
       console.error('Ошибка генерации отчета из шаблона:', error);
       throw error;
     }
+  }
   private createResultsTable(analysisResults: any[]): string {
     if (!analysisResults || analysisResults.length === 0) {
       return 'Нет данных для отображения';
