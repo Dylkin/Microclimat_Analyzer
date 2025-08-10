@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
+import TableModule from 'docxtemplater-table-module';
 import PizZip from 'pizzip';
 
 export interface TemplateReportData {
@@ -83,9 +84,13 @@ export class TemplateReportGenerator {
       const imageModule = new ImageModule(imageOpts);
       console.log('ImageModule создан');
 
+      // Настраиваем модуль для таблиц
+      const tableModule = new TableModule();
+      console.log('TableModule создан');
+
       // Создаем экземпляр Docxtemplater с модулем изображений
       const doc = new Docxtemplater(zip, {
-        modules: [imageModule],
+        modules: [imageModule, tableModule],
         paragraphLoop: true,
         linebreaks: true,
       });
@@ -94,6 +99,10 @@ export class TemplateReportGenerator {
       // Создаем таблицу результатов в текстовом формате
       const resultsTable = this.createResultsTable(data.analysisResults);
       console.log('Таблица результатов создана, длина:', resultsTable.length);
+
+      // Создаем форматированную таблицу для вставки
+      const formattedTable = this.createFormattedTable(data.analysisResults);
+      console.log('Форматированная таблица создана');
 
       // Подготавливаем данные для замены
       const templateData = {
@@ -108,19 +117,7 @@ export class TemplateReportGenerator {
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
         analysis_table: resultsTable,
-        // Создаем простую строку таблицы для вставки
-        ResultsTable: data.analysisResults.map(result => {
-          const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
-          const measurementLevel = result.measurementLevel || '-';
-          const loggerName = result.loggerName || '-';
-          const serialNumber = result.serialNumber || '-';
-          const minTemp = result.minTemp || '-';
-          const maxTemp = result.maxTemp || '-';
-          const avgTemp = result.avgTemp || '-';
-          const meetsLimits = result.meetsLimits || '-';
-          
-          return `${zoneNumber}\t${measurementLevel}\t${loggerName}\t${serialNumber}\t${minTemp}\t${maxTemp}\t${avgTemp}\t${meetsLimits}`;
-        }).join('\n')
+        ResultsTable: formattedTable
       };
 
       console.log('=== Данные для шаблона ===');
@@ -167,6 +164,72 @@ export class TemplateReportGenerator {
       console.error('Ошибка генерации отчета из шаблона:', error);
       throw error;
     }
+  }
+
+  private createFormattedTable(analysisResults: any[]): any {
+    if (!analysisResults || analysisResults.length === 0) {
+      return {
+        headers: [],
+        rows: []
+      };
+    }
+
+    // Заголовки таблицы
+    const headers = [
+      { text: '№ зоны измерения', style: { bold: true, backgroundColor: '#E3F2FD' } },
+      { text: 'Уровень измерения (м.)', style: { bold: true, backgroundColor: '#E3F2FD' } },
+      { text: 'Наименование логгера', style: { bold: true, backgroundColor: '#E3F2FD' } },
+      { text: 'Серийный № логгера', style: { bold: true, backgroundColor: '#E3F2FD' } },
+      { text: 'Мин. t°C', style: { bold: true, backgroundColor: '#E3F2FD' } },
+      { text: 'Макс. t°C', style: { bold: true, backgroundColor: '#E3F2FD' } },
+      { text: 'Среднее t°C', style: { bold: true, backgroundColor: '#E3F2FD' } },
+      { text: 'Соответствие лимитам', style: { bold: true, backgroundColor: '#E3F2FD' } }
+    ];
+
+    // Строки данных
+    const rows = analysisResults.map((result, index) => {
+      const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : String(result.zoneNumber || '-');
+      const measurementLevel = String(result.measurementLevel || '-');
+      const loggerName = String(result.loggerName || '-');
+      const serialNumber = String(result.serialNumber || '-');
+      const minTemp = String(result.minTemp || '-');
+      const maxTemp = String(result.maxTemp || '-');
+      const avgTemp = String(result.avgTemp || '-');
+      const meetsLimits = String(result.meetsLimits || '-');
+
+      // Определяем цвет фона строки
+      const isEven = index % 2 === 0;
+      const backgroundColor = isEven ? '#F5F5F5' : '#FFFFFF';
+      
+      // Цвет для соответствия лимитам
+      let limitsBackgroundColor = backgroundColor;
+      if (meetsLimits === 'Да') {
+        limitsBackgroundColor = '#E8F5E8';
+      } else if (meetsLimits === 'Нет') {
+        limitsBackgroundColor = '#FFEBEE';
+      }
+
+      return [
+        { text: zoneNumber, style: { backgroundColor } },
+        { text: measurementLevel, style: { backgroundColor } },
+        { text: loggerName, style: { backgroundColor } },
+        { text: serialNumber, style: { backgroundColor } },
+        { text: minTemp, style: { backgroundColor } },
+        { text: maxTemp, style: { backgroundColor } },
+        { text: avgTemp, style: { backgroundColor } },
+        { text: meetsLimits, style: { backgroundColor: limitsBackgroundColor } }
+      ];
+    });
+
+    return {
+      headers,
+      rows,
+      tableStyle: {
+        border: '1px solid #CCCCCC',
+        borderCollapse: 'collapse',
+        width: '100%'
+      }
+    };
   }
 
   private createResultsTable(analysisResults: any[]): string {
