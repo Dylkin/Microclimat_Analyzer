@@ -106,7 +106,7 @@ export class TemplateReportGenerator {
         Results_table: data.resultsTable,
         results_table: resultsTable, // Оставляем для обратной совместимости
         Acceptance_criteria: data.acceptanceCriteria,
-        TestType: data.testType,
+        TestType: data.testType || 'Не выбрано',
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ResultsTable: data.resultsTable,
         ObjectName: data.objectName,
