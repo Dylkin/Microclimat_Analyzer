@@ -359,68 +359,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
   };
 
-  // Функция для создания HTML строки таблицы
-  const createTableHtml = (tableElement: HTMLElement): string => {
-    try {
-      console.log('Создаем HTML таблицы для шаблона...');
-      
-      // Клонируем элемент для безопасного изменения
-      const clonedTable = tableElement.cloneNode(true) as HTMLElement;
-      
-      // Применяем стили для лучшего отображения в DOCX
-      enhanceTableHtmlForDocx(clonedTable);
-      
-      const tableHtml = clonedTable.outerHTML;
-      console.log('HTML таблицы создан, длина:', tableHtml.length, 'символов');
-      
-      return tableHtml;
-      
-    } catch (error) {
-      console.error('Ошибка создания HTML таблицы:', error);
-      throw new Error(`Ошибка создания HTML таблицы: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
-  };
-
-  // Функция для улучшения HTML таблицы для отображения в DOCX
-  const enhanceTableHtmlForDocx = (tableElement: HTMLElement): void => {
-    // Добавляем инлайн стили для лучшего отображения в DOCX
-    const table = tableElement.querySelector('table');
-    if (table) {
-      table.style.borderCollapse = 'collapse';
-      table.style.width = '100%';
-      table.style.fontSize = '12pt';
-      table.style.fontFamily = 'Arial, sans-serif';
-    }
-    
-    // Стилизуем заголовки
-    const headers = tableElement.querySelectorAll('th');
-    headers.forEach(th => {
-      const htmlTh = th as HTMLElement;
-      htmlTh.style.backgroundColor = '#f3f4f6';
-      htmlTh.style.border = '1px solid #d1d5db';
-      htmlTh.style.padding = '8px';
-      htmlTh.style.fontWeight = 'bold';
-      htmlTh.style.textAlign = 'left';
-    });
-    
-    // Стилизуем ячейки
-    const cells = tableElement.querySelectorAll('td');
-    cells.forEach(td => {
-      const htmlTd = td as HTMLElement;
-      htmlTd.style.border = '1px solid #d1d5db';
-      htmlTd.style.padding = '8px';
-      htmlTd.style.textAlign = 'left';
-      
-      // Сохраняем цветовые выделения
-      if (htmlTd.classList.contains('bg-blue-200')) {
-        htmlTd.style.backgroundColor = '#bfdbfe';
-      }
-      if (htmlTd.classList.contains('bg-red-200')) {
-        htmlTd.style.backgroundColor = '#fecaca';
-      }
-    });
-  };
-
   const handleGenerateTemplateReport = async () => {
     if (!templateFile) {
       alert('Пожалуйста, загрузите шаблон отчета');
@@ -503,7 +441,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
-        resultsTableHtml: resultsTableRef.current ? createTableHtml(resultsTableRef.current) : undefined,
         executor: user?.fullName || 'Неизвестный пользователь',
         reportDate: dateStr,
         reportNumber: reportNumber || `REP-${Date.now()}`,
