@@ -19,7 +19,6 @@ export default defineConfig({
       'html-to-docx',
       'docx-templates',
     ],
-    ],
   },
   build: {
     commonjsOptions: {
