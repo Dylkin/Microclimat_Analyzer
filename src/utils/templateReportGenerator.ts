@@ -124,17 +124,6 @@ export class TemplateReportGenerator {
   }
 
   /**
-   * Конвертация DOCX таблицы в XML для вставки в документ
-   */
-  private convertTableToXml(table: Table): string {
-    // Это упрощенная реализация - в реальности нужна более сложная конвертация
-    // Для полной реализации потребуется использовать внутренние методы библиотеки docx
-    
-    // Временное решение: возвращаем HTML таблицу как fallback
-    console.warn('Конвертация DOCX таблицы в XML не реализована, используем HTML fallback');
-    return this.createHtmlTable([]); // Пустая таблица как fallback
-  }
-  /**
    * Создание DOCX документа с таблицей результатов
    */
   private async createDocxDocument(data: TemplateReportData): Promise<Blob> {
