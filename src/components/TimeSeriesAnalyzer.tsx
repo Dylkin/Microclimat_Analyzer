@@ -406,7 +406,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       // Создаем критерии приемки
       const acceptanceCriteria = createAcceptanceCriteria();
-      console.log('Критерии приемки созданы, длина:', acceptanceCriteria.length);
       
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
