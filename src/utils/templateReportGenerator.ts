@@ -95,6 +95,9 @@ export class TemplateReportGenerator {
       const resultsTable = this.createResultsTable(data.analysisResults);
       console.log('Таблица результатов создана, длина:', resultsTable.length);
 
+      // Создаем таблицу результатов для вставки в docx-templates
+      const resultsTableForTemplate = this.prepareTableDataForDocxTemplates(data.analysisResults);
+
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
@@ -107,7 +110,8 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        analysis_table: resultsTable
+        analysis_table: resultsTable,
+        ResultsTable: resultsTableForTemplate
       };
 
       console.log('=== Данные для шаблона ===');
