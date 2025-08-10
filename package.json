@@ -16,6 +16,7 @@
     "d3-time-format": "^4.1.0",
     "d3-zoom": "^3.0.0",
     "docx": "^9.5.1",
+    "docx-templates": "^4.14.1",
     "docxtemplater": "^3.65.2",
     "docxtemplater-html-module": "^3.0.0",
     "docxtemplater-image-module-free": "^1.1.1",

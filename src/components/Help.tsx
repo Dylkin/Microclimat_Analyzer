@@ -139,14 +139,14 @@ export const Help: React.FC = () => {
               <h4 className="font-medium text-purple-900">Изображения и таблицы:</h4>
               <ul className="space-y-1 text-purple-800">
                 <li><code className="bg-purple-100 px-2 py-1 rounded">{'{chart_image}'}</code> - График временных рядов (изображение)</li>
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов (текстовая таблица в формате Markdown)</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов (форматированная DOCX таблица с сохранением цветов)</li>
               </ul>
             </div>
             <div className="mt-4 p-3 bg-purple-100 rounded-lg">
               <p className="text-xs text-purple-700">
-                <strong>Примечание:</strong> Используется библиотека docxtemplater. 
+                <strong>Примечание:</strong> Используется библиотека docx-templates для лучшей поддержки таблиц. 
                 Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
-                График вставляется как PNG изображение с высоким разрешением (scale: 2), таблица - как текстовая таблица в формате Markdown.
+                График вставляется как PNG изображение с высоким разрешением (scale: 2), таблица - как форматированная DOCX таблица с сохранением цветового выделения минимальных и максимальных значений.
               </p>
             </div>
           </div>
