@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxReportGenerator, ReportData } from '../utils/docxGenerator';
 import { TemplateReportGenerator, TemplateReportData } from '../utils/templateReportGenerator';
+import { convertHtmlTableToDocx, saveDocxFile } from '../utils/htmlTableToDocxConverter';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -352,10 +353,38 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
 
     try {
-      alert('Функция экспорта таблицы временно недоступна');
+      console.log('Начинаем экспорт таблицы в DOCX...');
+      
+      // Находим HTML таблицу
+      const tableElement = resultsTableRef.current.querySelector('table') as HTMLTableElement;
+      if (!tableElement) {
+        alert('HTML таблица не найдена');
+        return;
+      }
+      
+      // Конвертируем в DOCX
+      const docxBlob = await convertHtmlTableToDocx(tableElement, {
+        keepFontStyles: true,
+        defaultColWidth: 1200, // Ширина колонки в DXA единицах
+        processCellContent: (cell) => {
+          // Обрабатываем содержимое ячейки, убираем лишние пробелы
+          return cell.textContent?.trim() || '';
+        }
+      });
+      
+      // Сохраняем файл
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10);
+      const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '-');
+      const filename = `таблица_результатов_${dateStr}_${timeStr}.docx`;
+      
+      await saveDocxFile(docxBlob, filename);
+      console.log('Таблица успешно экспортирована в DOCX');
+      
     } catch (error) {
       console.error('Ошибка экспорта таблицы:', error);
-      alert('Ошибка при экспорте таблицы в DOCX');
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      alert(`Ошибка при экспорте таблицы в DOCX:\n\n${errorMessage}`);
     }
   };
 
@@ -795,6 +824,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Результаты анализа</h3>
+          <button
+            onClick={handleExportTable}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+          >
+            <Download className="w-4 h-4" />
+            <span>Экспорт таблицы в DOCX</span>
+          </button>
         </div>
         
         <div ref={resultsTableRef} className="overflow-x-auto">
