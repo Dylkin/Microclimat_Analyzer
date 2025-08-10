@@ -95,6 +95,8 @@ export class TemplateReportGenerator {
       console.log('Таблица результатов создана, длина:', resultsTable.length);
 
       // Подготавливаем данные для замены
+      const resultsTable = this.createResultsTable(data.analysisResults);
+      
       const templateData = {
         executor: data.executor,
         Report_No: data.reportNumber,
@@ -105,7 +107,8 @@ export class TemplateReportGenerator {
         TestType: data.testType || 'Не выбрано',
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
-        CoolingSystemName: data.coolingSystemName
+        CoolingSystemName: data.coolingSystemName,
+        analysis_table: resultsTable
       };
 
       console.log('=== Данные для шаблона ===');

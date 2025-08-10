@@ -401,8 +401,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
       
       // Создаем таблицу результатов для вставки в шаблон
-      const resultsTableHtml = createResultsTableForTemplate(analysisResults);
-      console.log('HTML таблица создана, длина:', resultsTableHtml.length);
       
       // Создаем критерии приемки
       const acceptanceCriteria = createAcceptanceCriteria();
