@@ -46,9 +46,9 @@ export class TemplateReportGenerator {
   private async generateWithDocxTemplates(templateFile: File, data: TemplateReportData): Promise<Blob> {
     console.log('Используем docx-templates для генерации отчета');
     
-    // Конвертируем изображение в base64
+    // Конвертируем изображение в Uint8Array для docx-templates
     const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
-    const chartImageBase64 = this.arrayBufferToBase64(chartImageBuffer);
+    const chartImageData = new Uint8Array(chartImageBuffer);
     
     // Конвертируем HTML таблицу в DOCX формат если она есть
     let resultsTable = null;
@@ -86,7 +86,7 @@ export class TemplateReportGenerator {
       chart_image: {
         width: 15, // cm
         height: 10, // cm
-        data: chartImageBase64,
+        data: chartImageData,
         extension: '.png'
       },
       Acceptance_criteria: data.acceptanceCriteria,
@@ -123,18 +123,6 @@ export class TemplateReportGenerator {
 
 
 
-
-  /**
-   * Конвертирует ArrayBuffer в base64 строку
-   */
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
