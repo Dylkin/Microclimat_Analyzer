@@ -95,8 +95,6 @@ export class TemplateReportGenerator {
       console.log('Таблица результатов создана, длина:', resultsTable.length);
 
       // Подготавливаем данные для замены
-      const resultsTable = this.createResultsTable(data.analysisResults);
-      
       const templateData = {
         executor: data.executor,
         Report_No: data.reportNumber,
