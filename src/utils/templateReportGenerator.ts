@@ -284,6 +284,8 @@ export class TemplateReportGenerator {
     html += `
         </tbody>
       </table>
+    }
+    )
     `;
 
     return html;
@@ -299,5 +301,7 @@ export class TemplateReportGenerator {
     
     // Очищаем URL через некоторое время
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
+}
   }
 }
