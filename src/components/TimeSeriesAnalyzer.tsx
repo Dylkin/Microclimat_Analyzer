@@ -42,6 +42,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   });
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
+  const resultsTableRef = useRef<HTMLDivElement>(null);
   const [reportNumber, setReportNumber] = useState('');
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [testType, setTestType] = useState('');
@@ -413,6 +414,50 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         }, 'image/png', 1.0);
       });
 
+      // Создаем скриншот таблицы результатов
+      let resultsTableBlob: Blob | undefined;
+      if (resultsTableRef.current) {
+        console.log('Создаем скриншот таблицы результатов...');
+        
+        // Временно улучшаем стили для экспорта
+        const tableElement = resultsTableRef.current;
+        const originalStyles = {
+          fontSize: tableElement.style.fontSize,
+          boxShadow: tableElement.style.boxShadow,
+          transform: tableElement.style.transform
+        };
+        
+        // Применяем стили для лучшего качества экспорта
+        tableElement.style.fontSize = '12pt';
+        tableElement.style.boxShadow = 'none';
+        tableElement.style.transform = 'none';
+        
+        const tableCanvas = await html2canvas(tableElement, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          width: tableElement.offsetWidth,
+          height: tableElement.offsetHeight
+        });
+        
+        // Восстанавливаем оригинальные стили
+        tableElement.style.fontSize = originalStyles.fontSize;
+        tableElement.style.boxShadow = originalStyles.boxShadow;
+        tableElement.style.transform = originalStyles.transform;
+        
+        resultsTableBlob = await new Promise<Blob>((resolve, reject) => {
+          tableCanvas.toBlob((blob) => {
+            if (blob) {
+              console.log('Blob таблицы создан, размер:', blob.size, 'байт');
+              resolve(blob);
+            } else {
+              reject(new Error('Ошибка создания изображения таблицы'));
+            }
+          }, 'image/png', 1.0);
+        });
+      }
       // Подготавливаем данные для шаблона
       const now = new Date();
       const dateStr = reportDate ? new Date(reportDate).toLocaleDateString('ru-RU') : now.toLocaleDateString('ru-RU');
@@ -425,6 +470,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
+        resultsTableBlob,
         executor: user?.fullName || 'Неизвестный пользователь',
         reportDate: dateStr,
         reportNumber: reportNumber || `REP-${Date.now()}`,
@@ -442,6 +488,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportStart: templateData.reportStart,
         reportDate: templateData.reportDate,
         chartBlobSize: chartBlob.size,
+        tableBlobSize: resultsTableBlob?.size || 0,
         testType: templateData.testType,
         objectName: templateData.objectName,
         coolingSystemName: templateData.coolingSystemName
@@ -776,7 +823,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       )}
 
       {/* Analysis Results Table */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div ref={resultsTableRef} className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
         
         <div className="overflow-x-auto">

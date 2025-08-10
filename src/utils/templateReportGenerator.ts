@@ -3,6 +3,7 @@ import Docxtemplater from 'docxtemplater';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
+  resultsTableBlob?: Blob;
   executor: string;
   reportDate: string;
   reportNumber: string;
@@ -38,6 +39,13 @@ export class TemplateReportGenerator {
       const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
       console.log('Изображение конвертировано в ArrayBuffer, размер:', chartImageBuffer.byteLength, 'байт');
       
+      // Конвертируем таблицу в ArrayBuffer если она есть
+      let resultsTableBuffer: ArrayBuffer | undefined;
+      if (data.resultsTableBlob) {
+        resultsTableBuffer = await data.resultsTableBlob.arrayBuffer();
+        console.log('Таблица результатов конвертирована в ArrayBuffer, размер:', resultsTableBuffer.byteLength, 'байт');
+      }
+      
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
@@ -45,6 +53,7 @@ export class TemplateReportGenerator {
         Report_start: data.reportStart,
         report_date: data.reportDate,
         chart: chartImageBuffer,
+        ResultsTable: resultsTableBuffer,
         Acceptance_criteria: data.acceptanceCriteria,
         TestType: data.testType || 'Не выбрано',
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
@@ -58,6 +67,7 @@ export class TemplateReportGenerator {
       console.log('Report_start:', data.reportStart);
       console.log('report_date:', data.reportDate);
       console.log('chart_image_size:', `${chartImageBuffer.byteLength} байт`);
+      console.log('results_table_size:', resultsTableBuffer ? `${resultsTableBuffer.byteLength} байт` : 'не предоставлена');
       console.log('TestType:', data.testType);
       console.log('ObjectName:', data.objectName);
       console.log('CoolingSystemName:', data.coolingSystemName);
