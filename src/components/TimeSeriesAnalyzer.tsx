@@ -364,11 +364,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     try {
       console.log('Создаем HTML таблицы для шаблона...');
       
-      // Создаем чистую HTML таблицу без CSS классов
-      const cleanTableHtml = createCleanTableHtml();
-      console.log('HTML таблицы создан, длина:', cleanTableHtml.length, 'символов');
+      // Клонируем элемент для безопасного изменения
+      const clonedTable = tableElement.cloneNode(true) as HTMLElement;
       
-      return cleanTableHtml;
+      // Применяем стили для лучшего отображения в DOCX
+      enhanceTableHtmlForDocx(clonedTable);
+      
+      const tableHtml = clonedTable.outerHTML;
+      console.log('HTML таблицы создан, длина:', tableHtml.length, 'символов');
+      
+      return tableHtml;
       
     } catch (error) {
       console.error('Ошибка создания HTML таблицы:', error);
@@ -376,64 +381,44 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
   };
 
-  // Функция для создания чистой HTML таблицы без CSS классов
-  const createCleanTableHtml = (): string => {
-    const tableStyle = 'border-collapse: collapse; width: 100%; font-size: 12pt; font-family: Arial, sans-serif;';
-    const headerStyle = 'background-color: #f3f4f6; border: 1px solid #d1d5db; padding: 8px; font-weight: bold; text-align: left;';
-    const cellStyle = 'border: 1px solid #d1d5db; padding: 8px; text-align: left;';
-    const blueCellStyle = 'border: 1px solid #d1d5db; padding: 8px; text-align: left; background-color: #bfdbfe;';
-    const redCellStyle = 'border: 1px solid #d1d5db; padding: 8px; text-align: left; background-color: #fecaca;';
-
-    let html = `<table style="${tableStyle}">`;
+  // Функция для улучшения HTML таблицы для отображения в DOCX
+  const enhanceTableHtmlForDocx = (tableElement: HTMLElement): void => {
+    // Добавляем инлайн стили для лучшего отображения в DOCX
+    const table = tableElement.querySelector('table');
+    if (table) {
+      table.style.borderCollapse = 'collapse';
+      table.style.width = '100%';
+      table.style.fontSize = '12pt';
+      table.style.fontFamily = 'Arial, sans-serif';
+    }
     
-    // Заголовок таблицы
-    html += '<thead><tr>';
-    html += `<th style="${headerStyle}">№ зоны измерения</th>`;
-    html += `<th style="${headerStyle}">Уровень измерения (м.)</th>`;
-    html += `<th style="${headerStyle}">Наименование логгера (6 символов)</th>`;
-    html += `<th style="${headerStyle}">Серийный № логгера</th>`;
-    html += `<th style="${headerStyle}">Мин. t°C</th>`;
-    html += `<th style="${headerStyle}">Макс. t°C</th>`;
-    html += `<th style="${headerStyle}">Среднее t°C</th>`;
-    html += `<th style="${headerStyle}">Соответствие лимитам</th>`;
-    html += '</tr></thead>';
-    
-    // Тело таблицы
-    html += '<tbody>';
-    analysisResults.forEach((result) => {
-      html += '<tr>';
-      html += `<td style="${cellStyle}">${result.zoneNumber}</td>`;
-      html += `<td style="${cellStyle}">${result.measurementLevel}</td>`;
-      html += `<td style="${cellStyle}">${result.loggerName}</td>`;
-      html += `<td style="${cellStyle}">${result.serialNumber}</td>`;
-      
-      // Минимальная температура с выделением
-      const isMinTemp = !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
-                       globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp;
-      html += `<td style="${isMinTemp ? blueCellStyle : cellStyle}">${result.minTemp}</td>`;
-      
-      // Максимальная температура с выделением
-      const isMaxTemp = !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
-                       globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp;
-      html += `<td style="${isMaxTemp ? redCellStyle : cellStyle}">${result.maxTemp}</td>`;
-      
-      html += `<td style="${cellStyle}">${result.avgTemp}</td>`;
-      
-      // Соответствие лимитам с цветовым кодированием
-      let complianceStyle = cellStyle;
-      if (result.meetsLimits === 'Да') {
-        complianceStyle = 'border: 1px solid #d1d5db; padding: 8px; text-align: left; background-color: #dcfce7; color: #166534;';
-      } else if (result.meetsLimits === 'Нет') {
-        complianceStyle = 'border: 1px solid #d1d5db; padding: 8px; text-align: left; background-color: #fecaca; color: #991b1b;';
-      }
-      html += `<td style="${complianceStyle}">${result.meetsLimits}</td>`;
-      
-      html += '</tr>';
+    // Стилизуем заголовки
+    const headers = tableElement.querySelectorAll('th');
+    headers.forEach(th => {
+      const htmlTh = th as HTMLElement;
+      htmlTh.style.backgroundColor = '#f3f4f6';
+      htmlTh.style.border = '1px solid #d1d5db';
+      htmlTh.style.padding = '8px';
+      htmlTh.style.fontWeight = 'bold';
+      htmlTh.style.textAlign = 'left';
     });
-    html += '</tbody>';
-    html += '</table>';
     
-    return html;
+    // Стилизуем ячейки
+    const cells = tableElement.querySelectorAll('td');
+    cells.forEach(td => {
+      const htmlTd = td as HTMLElement;
+      htmlTd.style.border = '1px solid #d1d5db';
+      htmlTd.style.padding = '8px';
+      htmlTd.style.textAlign = 'left';
+      
+      // Сохраняем цветовые выделения
+      if (htmlTd.classList.contains('bg-blue-200')) {
+        htmlTd.style.backgroundColor = '#bfdbfe';
+      }
+      if (htmlTd.classList.contains('bg-red-200')) {
+        htmlTd.style.backgroundColor = '#fecaca';
+      }
+    });
   };
 
   const handleGenerateTemplateReport = async () => {
