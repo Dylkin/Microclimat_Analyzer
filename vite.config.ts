@@ -22,6 +22,7 @@ export default defineConfig({
       'd3-selection',
       'd3-time-format',
       'd3-zoom',
+      'docxtemplater-html-module',
     ],
   },
 })
