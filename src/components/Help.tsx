@@ -213,6 +213,8 @@ export const Help: React.FC = () => {
         </div>
       </div>
 
+      {/* Технические требования */}
+      <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center space-x-3 mb-6">
           <Code className="w-6 h-6 text-purple-600" />
           <h2 className="text-xl font-semibold text-gray-900">Технические требования</h2>
@@ -240,8 +242,10 @@ export const Help: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Часто задаваемые вопросы */}
+      {/* Часто задаваемые вопросы */}
+      <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center space-x-3 mb-6">
           <AlertTriangle className="w-6 h-6 text-orange-600" />
           <h2 className="text-xl font-semibold text-gray-900">Часто задаваемые вопросы</h2>
@@ -277,7 +281,6 @@ export const Help: React.FC = () => {
           </div>
         </div>
       </div>
-
-      </div>
+    </div>
   );
 };
