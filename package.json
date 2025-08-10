@@ -19,6 +19,7 @@
     "docx-templates": "^4.14.1",
     "docxtemplater": "^3.65.2",
     "docxtemplater-image-module-free": "^1.1.1",
+    "docxtemplater-table-module": "^3.0.0",
     "file-saver": "^2.0.5",
     "html-to-docx": "^1.8.0",
     "html2canvas": "^1.4.1",
