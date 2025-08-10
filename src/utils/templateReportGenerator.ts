@@ -1,6 +1,5 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import HtmlModule from 'docxtemplater-html-module';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -60,7 +59,7 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        '~ResultsTable': data.resultsTableHtml, // Префикс ~ для HTML модуля
+        ResultsTable: this.convertHtmlTableToText(data.resultsTableHtml), // Конвертируем HTML в текст
       };
 
       console.log('=== Данные для шаблона ===');
@@ -81,7 +80,6 @@ export class TemplateReportGenerator {
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
-        modules: [new HtmlModule({})],
       });
 
       // Устанавливаем данные
@@ -110,6 +108,59 @@ export class TemplateReportGenerator {
     }
   }
 
+  /**
+   * Конвертирует HTML таблицу в текстовое представление для DOCX
+   */
+  private convertHtmlTableToText(htmlTable?: string): string {
+    if (!htmlTable) {
+      return 'Таблица результатов недоступна';
+    }
+
+    try {
+      // Создаем временный DOM элемент для парсинга HTML
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlTable, 'text/html');
+      const table = doc.querySelector('table');
+      
+      if (!table) {
+        return 'Таблица не найдена';
+      }
+
+      let textTable = '';
+      
+      // Обрабатываем заголовки
+      const headers = table.querySelectorAll('thead th');
+      if (headers.length > 0) {
+        const headerTexts = Array.from(headers).map(th => th.textContent?.trim() || '');
+        textTable += headerTexts.join(' | ') + '\n';
+        textTable += headerTexts.map(() => '---').join(' | ') + '\n';
+      }
+      
+      // Обрабатываем строки данных
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const cellTexts = Array.from(cells).map(td => {
+          let text = td.textContent?.trim() || '';
+          // Добавляем индикаторы для цветовых выделений
+          if (td.style.backgroundColor === 'rgb(191, 219, 254)' || td.classList.contains('bg-blue-200')) {
+            text += ' (МИН)';
+          }
+          if (td.style.backgroundColor === 'rgb(254, 202, 202)' || td.classList.contains('bg-red-200')) {
+            text += ' (МАКС)';
+          }
+          return text;
+        });
+        textTable += cellTexts.join(' | ') + '\n';
+      });
+      
+      return textTable;
+      
+    } catch (error) {
+      console.error('Ошибка конвертации HTML таблицы:', error);
+      return 'Ошибка обработки таблицы результатов';
+    }
+  }
 
 
   /**

@@ -19,13 +19,11 @@ export default defineConfig({
       'html-to-docx',
     ],
     exclude: [
-      'docxtemplater-html-module',
     ],
   },
   build: {
     commonjsOptions: {
       include: [
-        /docxtemplater-html-module/,
         /node_modules/
       ]
     }
