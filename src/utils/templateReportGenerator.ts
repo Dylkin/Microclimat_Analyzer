@@ -94,7 +94,7 @@ export class TemplateReportGenerator {
       AcceptanceСriteria: data.acceptanceCriteria,
       ObjectName: data.objectName,
       CoolingSystemName: data.coolingSystemName,
-      ResultsTable: resultsTable
+      ResultsTable: resultsTable ? { _type: 'docx', data: resultsTable } : null
     };
 
     // Читаем шаблон
