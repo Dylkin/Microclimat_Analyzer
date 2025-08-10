@@ -226,7 +226,7 @@ export class TemplateReportGenerator {
       },
       Acceptance_criteria: String(data.acceptanceCriteria || ''),
       TestType: String(data.testType || 'Не выбрано'),
-      AcceptanceCriteria: String(data.acceptanceCriteria || ''),
+      AcceptanceСriteria: String(data.acceptanceCriteria || ''),
       ObjectName: String(data.objectName || ''),
       CoolingSystemName: String(data.coolingSystemName || ''),
       ResultsTable: resultsTableHtml,
