@@ -129,6 +129,28 @@ export class DocxReportGenerator {
           new Paragraph({
             children: [
               new TextRun({
+                text: 'Таблица результатов измерений',
+                bold: true,
+                size: 28, // 14pt
+              }),
+            ],
+            heading: HeadingLevel.HEADING_2,
+            spacing: { after: 200 },
+          }),
+
+          // Таблица результатов
+          this.createResultsTable(data.analysisResults),
+
+          // Пустая строка после таблицы
+          new Paragraph({
+            children: [new TextRun({ text: '' })],
+            spacing: { after: 400 },
+          }),
+
+          // Заголовок таблицы результатов
+          new Paragraph({
+            children: [
+              new TextRun({
                 text: 'Результаты анализа',
                 bold: true,
                 size: 28, // 14pt
