@@ -1,4 +1,5 @@
-import { createReport } from 'docx-templates';
+import Docxtemplater from 'docxtemplater';
+import PizZip from 'pizzip';
 import { Document, Table, TableRow, TableCell, Paragraph, TextRun, WidthType, Packer } from 'docx';
 
 export interface TemplateReportData {
@@ -197,48 +198,68 @@ export class TemplateReportGenerator {
     return buffer;
   }
   /**
-   * Генерация отчета с помощью docx-templates (поддерживает HTML таблицы)
+   * Генерация отчета с помощью docxtemplater
    */
   private async generateWithDocxTemplates(templateFile: File, data: TemplateReportData): Promise<Blob> {
-    console.log('Используем docx-templates для генерации отчета');
+    console.log('Используем docxtemplater для генерации отчета');
     
-    // Конвертируем изображение в Uint8Array для docx-templates
+    // Конвертируем изображение в base64 для docxtemplater
     const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
-    const chartImageData = new Uint8Array(chartImageBuffer);
+    const chartImageBase64 = btoa(String.fromCharCode(...new Uint8Array(chartImageBuffer)));
     
-    // Создаем HTML таблицу для вставки в шаблон
+    // Создаем простую текстовую таблицу для вставки в шаблон
     let resultsTableHtml = '';
     if (data.resultsTableData && data.resultsTableData.length > 0) {
       resultsTableHtml = this.createHtmlTable(data.resultsTableData);
     }
     
-    // Подготавливаем данные для docx-templates
+    // Подготавливаем данные для docxtemplater (все значения должны быть строками)
     const templateData = {
       executor: String(data.executor || ''),
       Report_No: String(data.reportNumber || ''),
       Report_start: String(data.reportStart || ''),
       reportDate: String(data.reportDate || ''),
-      chart_image: chartImageData,
+      chart_image: chartImageBase64,
       TestType: String(data.testType || 'Не выбрано'),
       EligibilityCriteria: String(data.acceptanceCriteria || ''),
       ObjectName: String(data.objectName || ''),
       CoolingSystemName: String(data.coolingSystemName || ''),
-      ResultsTable: resultsTableHtml || '', // HTML строка
+      ResultsTable: String(resultsTableHtml || ''),
     };
 
-    // Читаем шаблон
-    const templateBuffer = await templateFile.arrayBuffer();
-    
-    // Генерируем отчет
-    const reportBuffer = await createReport({
-      template: templateBuffer,
-      data: templateData,
-      // Убираем additionalJsContext, так как он может вызывать проблемы с типами
-    });
-    
-    return new Blob([reportBuffer], {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    });
+    try {
+      // 1. Загрузка шаблона с правильной кодировкой
+      const templateBuffer = await templateFile.arrayBuffer();
+      const content = new Uint8Array(templateBuffer);
+      const zip = new PizZip(content);
+
+      // 2. Инициализация docxtemplater
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+      });
+
+      // 3. Рендер документа с подготовленными данными
+      doc.render(templateData);
+
+      // 4. Генерация файла
+      const out = doc.getZip().generate({ 
+        type: "blob",
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+      
+      return out;
+    } catch (error) {
+      console.error("Ошибка генерации документа:", error);
+      
+      // Добавляем дополнительную обработку ошибок
+      if (error instanceof Error && error.message.includes("charCodeAt")) {
+        console.warn("Проверьте, что все передаваемые данные являются строками");
+        throw new Error("Ошибка обработки данных шаблона. Убедитесь, что все поля заполнены корректно.");
+      }
+      
+      throw error;
+    }
   }
 
   /**
