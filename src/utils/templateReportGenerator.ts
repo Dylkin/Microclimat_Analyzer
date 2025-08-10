@@ -111,7 +111,18 @@ export class TemplateReportGenerator {
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
         analysis_table: resultsTable,
-        ResultsTable: resultsTableForTemplate
+        ResultsTable: resultsTableForTemplate,
+        // Добавляем отдельные поля для каждого столбца таблицы
+        tableRows: resultsTableForTemplate.map(row => ({
+          zoneNumber: String(row.zoneNumber),
+          measurementLevel: String(row.measurementLevel),
+          loggerName: String(row.loggerName),
+          serialNumber: String(row.serialNumber),
+          minTemp: String(row.minTemp),
+          maxTemp: String(row.maxTemp),
+          avgTemp: String(row.avgTemp),
+          meetsLimits: String(row.meetsLimits)
+        }))
       };
 
       console.log('=== Данные для шаблона ===');
