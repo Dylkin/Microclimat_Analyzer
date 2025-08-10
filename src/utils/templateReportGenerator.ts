@@ -1,10 +1,8 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-const HtmlModule = require('docxtemplater-html-module');
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
-  analysisResults: any[];
   executor: string;
   reportDate: string;
   reportNumber: string;
@@ -40,10 +38,6 @@ export class TemplateReportGenerator {
       const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
       console.log('Изображение конвертировано в ArrayBuffer, размер:', chartImageBuffer.byteLength, 'байт');
       
-      // Создаем XML таблицу
-      const tableXml = this.createTableXml(data.analysisResults);
-      console.log('XML таблица создана, длина:', tableXml.length);
-      
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
@@ -56,8 +50,6 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        myTable: tableXml, // XML таблица
-        myTable: this.createTableHtml(data.analysisResults), // HTML таблица
       };
 
       console.log('=== Данные для шаблона ===');
@@ -69,7 +61,6 @@ export class TemplateReportGenerator {
       console.log('TestType:', data.testType);
       console.log('ObjectName:', data.objectName);
       console.log('CoolingSystemName:', data.coolingSystemName);
-      console.log('tableXml_length:', tableXml.length);
 
       // Загружаем шаблон в PizZip
       const zip = new PizZip(templateArrayBuffer);
@@ -78,7 +69,6 @@ export class TemplateReportGenerator {
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
-        modules: [new HtmlModule({})],
       });
 
       // Устанавливаем данные
@@ -107,91 +97,6 @@ export class TemplateReportGenerator {
     }
   }
 
-  /**
-   * Создание HTML таблицы для вставки в DOCX
-   */
-  private createTableHtml(analysisResults: any[]): string {
-    if (!analysisResults || analysisResults.length === 0) {
-      return '<p>Нет данных для отображения</p>';
-    }
-
-    // Вычисляем глобальные минимальные и максимальные значения
-    const nonExternalResults = analysisResults.filter(result => !result.isExternal);
-    const minTempValues = nonExternalResults
-      .map(result => parseFloat(result.minTemp))
-      .filter(val => !isNaN(val));
-    const maxTempValues = nonExternalResults
-      .map(result => parseFloat(result.maxTemp))
-      .filter(val => !isNaN(val));
-    
-    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
-    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
-
-    // Создаем HTML таблицу
-    let tableHtml = `
-    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 10pt;">
-      <thead>
-        <tr style="background-color: #D9D9D9; font-weight: bold;">
-          <th style="padding: 8px; text-align: center; border: 1px solid #000;">№ зоны измерения</th>
-          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Уровень измерения (м.)</th>
-          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Наименование логгера</th>
-          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Серийный № логгера</th>
-          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Мин. t°C</th>
-          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Макс. t°C</th>
-          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Среднее t°C</th>
-          <th style="padding: 8px; text-align: center; border: 1px solid #000;">Соответствие лимитам</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-    // Добавляем строки данных
-    analysisResults.forEach((result, index) => {
-      const isMinTemp = !result.isExternal && globalMinTemp !== null && 
-                       !isNaN(parseFloat(result.minTemp)) && parseFloat(result.minTemp) === globalMinTemp;
-      const isMaxTemp = !result.isExternal && globalMaxTemp !== null && 
-                       !isNaN(parseFloat(result.maxTemp)) && parseFloat(result.maxTemp) === globalMaxTemp;
-
-      const rowBgColor = index % 2 === 0 ? '#F8F9FA' : '#FFFFFF';
-      const minTempBgColor = isMinTemp ? '#CCE5FF' : rowBgColor;
-      const maxTempBgColor = isMaxTemp ? '#FFCCDD' : rowBgColor;
-
-      const complianceColor = result.meetsLimits === 'Да' ? '#28A745' : 
-                             result.meetsLimits === 'Нет' ? '#DC3545' : '#000000';
-
-      tableHtml += `
-        <tr>
-          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor};">${this.escapeHtml(result.zoneNumber || '-')}</td>
-          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor};">${this.escapeHtml(result.measurementLevel || '-')}</td>
-          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor};">${this.escapeHtml(result.loggerName || '-')}</td>
-          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor};">${this.escapeHtml(result.serialNumber || '-')}</td>
-          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${minTempBgColor};">${this.escapeHtml(result.minTemp || '-')}</td>
-          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${maxTempBgColor};">${this.escapeHtml(result.maxTemp || '-')}</td>
-          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor};">${this.escapeHtml(result.avgTemp || '-')}</td>
-          <td style="padding: 6px; text-align: center; border: 1px solid #000; background-color: ${rowBgColor}; color: ${complianceColor}; font-weight: bold;">${this.escapeHtml(result.meetsLimits || '-')}</td>
-        </tr>`;
-    });
-
-    // Закрываем таблицу
-    tableHtml += `
-      </tbody>
-    </table>`;
-
-    return tableHtml;
-  }
-
-  private escapeHtml(text: string): string {
-    // Проверяем, что text является строкой
-    if (typeof text !== 'string') {
-      text = String(text);
-    }
-    
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');

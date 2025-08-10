@@ -425,7 +425,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
-        analysisResults,
         executor: user?.fullName || 'Неизвестный пользователь',
         reportDate: dateStr,
         reportNumber: reportNumber || `REP-${Date.now()}`,
@@ -443,7 +442,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportStart: templateData.reportStart,
         reportDate: templateData.reportDate,
         chartBlobSize: chartBlob.size,
-        acceptanceCriteriaLength: acceptanceCriteria.length,
         testType: templateData.testType,
         objectName: templateData.objectName,
         coolingSystemName: templateData.coolingSystemName
