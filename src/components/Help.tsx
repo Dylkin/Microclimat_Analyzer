@@ -168,6 +168,9 @@ export const Help: React.FC = () => {
           </div>
         </div>
 
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6">
         <div className="space-y-6">
           {/* Загрузка файлов */}
           <div>
