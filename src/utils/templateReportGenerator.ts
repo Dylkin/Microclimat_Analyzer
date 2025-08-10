@@ -138,7 +138,19 @@ export class TemplateReportGenerator {
           if (errorProps && errorProps.errors instanceof Array) {
           }
         }
+        
+        throw error;
       }
+      
+      // Генерируем DOCX файл
+      const buf = doc.getZip().generate({ type: 'arraybuffer' });
+      return new Blob([buf], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      
+    } catch (error) {
+      console.error('Ошибка генерации отчета из шаблона:', error);
+      throw error;
     }
   }
 
