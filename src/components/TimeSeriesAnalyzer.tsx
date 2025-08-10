@@ -504,36 +504,38 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   // Функция для создания HTML таблицы результатов
   const createResultsTableForTemplate = (results: any[]) => {
-    if (!results || results.length === 0) {
-      return 'Нет данных для отображения';
-    }
+    const tableRows = results.map(result => `
+      <tr>
+        <td>${result.zoneNumber}</td>
+        <td>${result.measurementLevel}</td>
+        <td>${result.loggerName}</td>
+        <td>${result.serialNumber}</td>
+        <td>${result.minTemp}</td>
+        <td>${result.maxTemp}</td>
+        <td>${result.avgTemp}</td>
+        <td>${result.meetsLimits}</td>
+      </tr>
+    `).join('');
 
-    // Создаем простую текстовую таблицу для DOCX
-    let table = '';
-    
-    // Заголовок таблицы с рамкой
-    table += '┌─────────┬─────────────┬────────┬──────────┬──────────┬───────────┬─────────────┬─────────────┐\n';
-    table += '│ № зоны  │ Уровень(м.)│ Логгер │   S/N    │ Мин. t°C │ Макс. t°C │ Среднее t°C │ Соответствие│\n';
-    table += '├─────────┼─────────────┼────────┼──────────┼──────────┼───────────┼─────────────┼─────────────┤\n';
-    
-    // Строки данных
-    results.forEach(result => {
-      const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
-      const zone = String(zoneNumber).padEnd(7);
-      const level = String(result.measurementLevel || '-').padEnd(11);
-      const logger = String(result.loggerName || '-').padEnd(6);
-      const serial = String(result.serialNumber || '-').padEnd(8);
-      const minTemp = String(result.minTemp || '-').padEnd(8);
-      const maxTemp = String(result.maxTemp || '-').padEnd(9);
-      const avgTemp = String(result.avgTemp || '-').padEnd(11);
-      const meets = String(result.meetsLimits || '-').padEnd(11);
-      
-      table += `│ ${zone} │ ${level} │ ${logger} │ ${serial} │ ${minTemp} │ ${maxTemp} │ ${avgTemp} │ ${meets} │\n`;
-    });
-
-    table += '└─────────┴─────────────┴────────┴──────────┴──────────┴───────────┴─────────────┴─────────────┘';
-    
-    return table;
+    return `
+      <table border="1" style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr>
+            <th>№ зоны измерения</th>
+            <th>Уровень измерения (м.)</th>
+            <th>Наименование логгера (6 символов)</th>
+            <th>Серийный № логгера</th>
+            <th>Мин. t°C</th>
+            <th>Макс. t°C</th>
+            <th>Среднее t°C</th>
+            <th>Соответствие лимитам</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+    `;
   };
 
   // Функция для создания критериев приемки
