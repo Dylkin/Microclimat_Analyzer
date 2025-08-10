@@ -212,7 +212,6 @@ export const Help: React.FC = () => {
           </div>
         </div>
       </div>
-      </div>
 
       {/* Технические требования */}
       <div className="bg-white rounded-lg shadow p-6">
