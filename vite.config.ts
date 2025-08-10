@@ -17,6 +17,7 @@ export default defineConfig({
       'd3-time-format',
       'd3-zoom',
       'html-to-docx',
+      'docxtemplater-html-module',
     ],
   },
   server: {
