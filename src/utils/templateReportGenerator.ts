@@ -157,6 +157,107 @@ export class TemplateReportGenerator {
     }
   }
 
+  private createFormattedHtmlTable(analysisResults: any[]): string {
+    if (!analysisResults || analysisResults.length === 0) {
+      return '<p>Нет данных для отображения</p>';
+    }
+
+    // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
+    const nonExternalResults = analysisResults.filter(result => !result.isExternal);
+    const minTempValues = nonExternalResults
+      .map(result => parseFloat(result.minTemp))
+      .filter(val => !isNaN(val));
+    const maxTempValues = nonExternalResults
+      .map(result => parseFloat(result.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
+    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
+
+    let html = `
+      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-family: Arial, sans-serif;">
+        <thead>
+          <tr style="background-color: #f8f9fa;">
+            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">№ зоны измерения</th>
+            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Уровень измерения (м.)</th>
+            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Наименование логгера</th>
+            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Серийный № логгера</th>
+            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Мин. t°C</th>
+            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Макс. t°C</th>
+            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Среднее t°C</th>
+            <th style="border: 1px solid #dee2e6; padding: 12px; text-align: left; font-weight: bold;">Соответствие лимитам</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    analysisResults.forEach((result, index) => {
+      // Определяем цвет фона для минимальных и максимальных значений
+      let minTempStyle = 'border: 1px solid #dee2e6; padding: 8px;';
+      let maxTempStyle = 'border: 1px solid #dee2e6; padding: 8px;';
+      
+      if (!result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
+          globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp) {
+        minTempStyle += ' background-color: #cce5ff;'; // Голубой фон для минимума
+      }
+      
+      if (!result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
+          globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp) {
+        maxTempStyle += ' background-color: #ffcccc;'; // Розовый фон для максимума
+      }
+
+      // Определяем цвет для соответствия лимитам
+      let complianceStyle = 'border: 1px solid #dee2e6; padding: 8px;';
+      let complianceColor = '';
+      if (result.meetsLimits === 'Да') {
+        complianceColor = 'color: #28a745; font-weight: bold;';
+      } else if (result.meetsLimits === 'Нет') {
+        complianceColor = 'color: #dc3545; font-weight: bold;';
+      }
+
+      html += `
+        <tr style="${index % 2 === 0 ? 'background-color: #f8f9fa;' : ''}">
+          <td style="border: 1px solid #dee2e6; padding: 8px;">${result.zoneNumber}</td>
+          <td style="border: 1px solid #dee2e6; padding: 8px;">${result.measurementLevel}</td>
+          <td style="border: 1px solid #dee2e6; padding: 8px;">${result.loggerName}</td>
+          <td style="border: 1px solid #dee2e6; padding: 8px;">${result.serialNumber}</td>
+          <td style="${minTempStyle}">${result.minTemp}</td>
+          <td style="${maxTempStyle}">${result.maxTemp}</td>
+          <td style="border: 1px solid #dee2e6; padding: 8px;">${result.avgTemp}</td>
+          <td style="${complianceStyle} ${complianceColor}">${result.meetsLimits}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+      </table>
+      
+      <div style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; font-family: Arial, sans-serif;">
+        <h4 style="margin-top: 0; color: #495057;">Обозначения:</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div style="display: flex; align-items: center;">
+            <div style="width: 20px; height: 15px; background-color: #cce5ff; margin-right: 8px; border: 1px solid #999;"></div>
+            <span style="font-size: 14px;">Минимальное значение в выбранном периоде</span>
+          </div>
+          <div style="display: flex; align-items: center;">
+            <div style="width: 20px; height: 15px; background-color: #ffcccc; margin-right: 8px; border: 1px solid #999;"></div>
+            <span style="font-size: 14px;">Максимальное значение в выбранном периоде</span>
+          </div>
+          <div style="display: flex; align-items: center;">
+            <span style="color: #28a745; font-weight: bold; margin-right: 8px;">Да</span>
+            <span style="font-size: 14px;">Соответствует лимитам</span>
+          </div>
+          <div style="display: flex; align-items: center;">
+            <span style="color: #dc3545; font-weight: bold; margin-right: 8px;">Нет</span>
+            <span style="font-size: 14px;">Не соответствует лимитам</span>
+          </div>
+        </div>
+        <div style="margin-top: 15px; font-size: 12px; color: #6c757d;">
+          <strong>Примечание:</strong> При изменении масштаба графика статистика пересчитывается только для выбранного временного периода.
+        </div>
+      </div>
+    `;
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -167,5 +268,7 @@ export class TemplateReportGenerator {
     
     // Очищаем URL через некоторое время
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
+    return html;
   }
 }
