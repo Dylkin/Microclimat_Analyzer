@@ -14,6 +14,8 @@ export interface TemplateReportData {
   acceptanceCriteria: string;
   testType: string;
   objectName: string;
+  coolingSystemName: string;
+  ResultsTable?: string;
 }
 
 export class TemplateReportGenerator {
