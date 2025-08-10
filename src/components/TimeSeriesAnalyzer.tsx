@@ -58,6 +58,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // Ref для элемента графика
   const chartRef = useRef<HTMLDivElement>(null);
   
+  // Ref для таблицы результатов
+  const resultsTableRef = useRef<HTMLDivElement>(null);
+
   // Generate analysis results table data
   const analysisResults = useMemo(() => {
     if (!data || !data.points.length) return [];
