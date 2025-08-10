@@ -70,8 +70,7 @@ export class TemplateReportGenerator {
       console.log('tableXml_length:', tableXml.length);
 
       // Загружаем шаблон в PizZip
-      const zip = new PizZip();
-      await zip.loadAsync(templateArrayBuffer);
+      const zip = new PizZip(templateArrayBuffer);
 
       // Создаем docxtemplater
       const doc = new Docxtemplater(zip, {
