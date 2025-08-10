@@ -203,31 +203,39 @@ export class TemplateReportGenerator {
   private async generateWithDocxTemplates(templateFile: File, data: TemplateReportData): Promise<Blob> {
     console.log('Используем docxtemplater для генерации отчета');
     
-    // Конвертируем изображение в base64 для docxtemplater
-    const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
-    const chartImageBase64 = btoa(String.fromCharCode(...new Uint8Array(chartImageBuffer)));
-    
-    // Создаем простую текстовую таблицу для вставки в шаблон
-    let resultsTableHtml = '';
-    if (data.resultsTableData && data.resultsTableData.length > 0) {
-      resultsTableHtml = this.createHtmlTable(data.resultsTableData);
-    }
-    
-    // Подготавливаем данные для docxtemplater (все значения должны быть строками)
-    const templateData = {
-      executor: String(data.executor || ''),
-      Report_No: String(data.reportNumber || ''),
-      Report_start: String(data.reportStart || ''),
-      reportDate: String(data.reportDate || ''),
-      chart_image: chartImageBase64,
-      TestType: String(data.testType || 'Не выбрано'),
-      EligibilityCriteria: String(data.acceptanceCriteria || ''),
-      ObjectName: String(data.objectName || ''),
-      CoolingSystemName: String(data.coolingSystemName || ''),
-      ResultsTable: String(resultsTableHtml || ''),
-    };
-
     try {
+      // Конвертируем изображение в base64 для docxtemplater
+      const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(chartImageBuffer);
+      
+      // Конвертируем по частям для избежания переполнения стека
+      let chartImageBase64 = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        chartImageBase64 += btoa(String.fromCharCode.apply(null, Array.from(chunk)));
+      }
+      
+      // Создаем простую текстовую таблицу для вставки в шаблон
+      let resultsTableHtml = '';
+      if (data.resultsTableData && data.resultsTableData.length > 0) {
+        resultsTableHtml = this.createHtmlTable(data.resultsTableData);
+      }
+      
+      // Подготавливаем данные для docxtemplater (все значения должны быть строками)
+      const templateData = {
+        executor: data.executor || '',
+        Report_No: data.reportNumber || '',
+        Report_start: data.reportStart || '',
+        reportDate: data.reportDate || '',
+        chart_image: chartImageBase64,
+        TestType: data.testType || 'Не выбрано',
+        EligibilityCriteria: data.acceptanceCriteria || '',
+        ObjectName: data.objectName || '',
+        CoolingSystemName: data.coolingSystemName || '',
+        ResultsTable: resultsTableHtml || '',
+      };
+
       // 1. Загрузка шаблона с правильной кодировкой
       const templateBuffer = await templateFile.arrayBuffer();
       const content = new Uint8Array(templateBuffer);
@@ -237,6 +245,7 @@ export class TemplateReportGenerator {
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
+        nullGetter: () => '', // Возвращаем пустую строку для null/undefined значений
       });
 
       // 3. Рендер документа с подготовленными данными
@@ -245,7 +254,11 @@ export class TemplateReportGenerator {
       // 4. Генерация файла
       const out = doc.getZip().generate({ 
         type: "blob",
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        compression: "DEFLATE",
+        compressionOptions: {
+          level: 6
+        }
       });
       
       return out;
@@ -253,9 +266,14 @@ export class TemplateReportGenerator {
       console.error("Ошибка генерации документа:", error);
       
       // Добавляем дополнительную обработку ошибок
-      if (error instanceof Error && error.message.includes("charCodeAt")) {
-        console.warn("Проверьте, что все передаваемые данные являются строками");
-        throw new Error("Ошибка обработки данных шаблона. Убедитесь, что все поля заполнены корректно.");
+      if (error instanceof Error) {
+        if (error.message.includes("charCodeAt")) {
+          console.warn("Проверьте, что все передаваемые данные являются строками");
+          throw new Error("Ошибка обработки данных шаблона. Убедитесь, что все поля заполнены корректно.");
+        } else if (error.message.includes("Maximum call stack")) {
+          console.warn("Переполнение стека - возможно, слишком большое изображение или циклические ссылки");
+          throw new Error("Ошибка обработки данных - слишком большой объем данных или циклические ссылки.");
+        }
       }
       
       throw error;
