@@ -243,17 +243,17 @@ export class TemplateReportGenerator {
     }
 
     let html = `
-      <table border="1" style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px;">
+      <table border="1" style="border-collapse: collapse; width: 100%; font-family: 'Times New Roman', serif; font-size: 11px;">
         <thead>
-          <tr style="background-color: #f0f0f0; font-weight: bold;">
-            <th style="border: 1px solid #000; padding: 8px; text-align: center;">№ зоны измерения</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Уровень измерения (м.)</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Наименование логгера (6 символов)</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Серийный № логгера</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Мин. t°C</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Макс. t°C</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Среднее t°C</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Соответствие лимитам</th>
+          <tr style="background-color: #f0f0f0; font-weight: bold; font-family: 'Times New Roman', serif; font-size: 11px;">
+            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">№ зоны измерения</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Уровень измерения (м.)</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Наименование логгера (6 символов)</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Серийный № логгера</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Мин. t°C</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Макс. t°C</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Среднее t°C</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">Соответствие лимитам</th>
           </tr>
         </thead>
         <tbody>
@@ -270,14 +270,14 @@ export class TemplateReportGenerator {
       
       html += `
         <tr>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${zoneNumber}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.measurementLevel || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.loggerName || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.serialNumber || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.minTemp || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.maxTemp || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center;">${result.avgTemp || '-'}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: center; ${complianceStyle}">${result.meetsLimits || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${zoneNumber}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.measurementLevel || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.loggerName || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.serialNumber || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.minTemp || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.maxTemp || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px;">${result.avgTemp || '-'}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Times New Roman', serif; font-size: 11px; ${complianceStyle}">${result.meetsLimits || '-'}</td>
         </tr>
        `;
      });
