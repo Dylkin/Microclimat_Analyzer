@@ -6,6 +6,7 @@ import PizZip from 'pizzip';
 export interface TemplateReportData {
   chartImageBlob: Blob;
   analysisResults: any[];
+  resultsTableHtml: string;
   executor: string;
   reportDate: string;
   reportNumber: string;
@@ -104,6 +105,7 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
+        myTable: data.resultsTableHtml,
       };
 
       console.log('=== Данные для шаблона ===');
@@ -117,6 +119,7 @@ export class TemplateReportGenerator {
       console.log('AcceptanceСriteria_length:', data.acceptanceCriteria?.length || 0);
       console.log('ObjectName:', data.objectName);
       console.log('CoolingSystemName:', data.coolingSystemName);
+      console.log('resultsTableHtml_length:', data.resultsTableHtml?.length || 0);
 
       // Заполняем шаблон данными
       console.log('Устанавливаем данные в шаблон...');
@@ -152,6 +155,114 @@ export class TemplateReportGenerator {
     }
   }
 
+  /**
+   * Создание HTML таблицы с inline стилями для вставки в DOCX
+   */
+  static createHtmlTable(analysisResults: any[]): string {
+    if (!analysisResults || analysisResults.length === 0) {
+      return '<p>Нет данных для отображения</p>';
+    }
+
+    // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
+    const nonExternalResults = analysisResults.filter(result => !result.isExternal);
+    const minTempValues = nonExternalResults
+      .map(result => parseFloat(result.minTemp))
+      .filter(val => !isNaN(val));
+    const maxTempValues = nonExternalResults
+      .map(result => parseFloat(result.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
+    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
+
+    // Базовые стили для таблицы
+    const tableStyle = `
+      border-collapse: collapse;
+      width: 100%;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+    `;
+
+    const headerCellStyle = `
+      border: 1px solid #000000;
+      background-color: #D9D9D9;
+      padding: 8px;
+      text-align: center;
+      font-weight: bold;
+    `;
+
+    const dataCellStyle = `
+      border: 1px solid #000000;
+      padding: 8px;
+      text-align: center;
+    `;
+
+    const evenRowStyle = `background-color: #F8F9FA;`;
+    const oddRowStyle = `background-color: #FFFFFF;`;
+    const minTempStyle = `background-color: #CCE5FF;`; // Голубой для минимума
+    const maxTempStyle = `background-color: #FFCCDD;`; // Розовый для максимума
+    const compliantStyle = `color: #28A745;`; // Зеленый для соответствия
+    const nonCompliantStyle = `color: #DC3545;`; // Красный для несоответствия
+
+    let html = `
+      <table style="${tableStyle}">
+        <thead>
+          <tr>
+            <th style="${headerCellStyle}">№ зоны измерения</th>
+            <th style="${headerCellStyle}">Уровень измерения (м.)</th>
+            <th style="${headerCellStyle}">Наименование логгера</th>
+            <th style="${headerCellStyle}">Серийный № логгера</th>
+            <th style="${headerCellStyle}">Мин. t°C</th>
+            <th style="${headerCellStyle}">Макс. t°C</th>
+            <th style="${headerCellStyle}">Среднее t°C</th>
+            <th style="${headerCellStyle}">Соответствие лимитам</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    // Добавляем строки данных
+    analysisResults.forEach((result, index) => {
+      const isMinTemp = !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
+                       globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp;
+      const isMaxTemp = !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
+                       globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp;
+      
+      const rowBgStyle = index % 2 === 0 ? evenRowStyle : oddRowStyle;
+      
+      // Стили для ячеек температуры
+      const minTempCellStyle = `${dataCellStyle} ${rowBgStyle} ${isMinTemp ? minTempStyle : ''}`;
+      const maxTempCellStyle = `${dataCellStyle} ${rowBgStyle} ${isMaxTemp ? maxTempStyle : ''}`;
+      const regularCellStyle = `${dataCellStyle} ${rowBgStyle}`;
+      
+      // Стиль для ячейки соответствия лимитам
+      let complianceStyle = regularCellStyle;
+      if (result.meetsLimits === 'Да') {
+        complianceStyle += ` ${compliantStyle}`;
+      } else if (result.meetsLimits === 'Нет') {
+        complianceStyle += ` ${nonCompliantStyle}`;
+      }
+
+      html += `
+        <tr>
+          <td style="${regularCellStyle}">${result.zoneNumber || '-'}</td>
+          <td style="${regularCellStyle}">${result.measurementLevel || '-'}</td>
+          <td style="${regularCellStyle}">${result.loggerName || '-'}</td>
+          <td style="${regularCellStyle}">${result.serialNumber || '-'}</td>
+          <td style="${minTempCellStyle}">${result.minTemp || '-'}</td>
+          <td style="${maxTempCellStyle}">${result.maxTemp || '-'}</td>
+          <td style="${regularCellStyle}">${result.avgTemp || '-'}</td>
+          <td style="${complianceStyle}"><strong>${result.meetsLimits || '-'}</strong></td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+      </table>
+    return html;
+  }
+    `;
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);

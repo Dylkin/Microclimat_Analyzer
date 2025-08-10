@@ -423,9 +423,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Создаем критерии приемки
       const acceptanceCriteria = createAcceptanceCriteria();
       
+      // Создаем HTML таблицу для вставки в отчет
+      const resultsTableHtml = TemplateReportGenerator.createHtmlTable(analysisResults);
+      
       const templateData: TemplateReportData = {
         chartImageBlob: chartBlob,
         analysisResults,
+        resultsTableHtml,
         executor: user?.fullName || 'Неизвестный пользователь',
         reportDate: dateStr,
         reportNumber: reportNumber || `REP-${Date.now()}`,
