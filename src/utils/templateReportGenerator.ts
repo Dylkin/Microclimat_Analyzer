@@ -91,13 +91,6 @@ export class TemplateReportGenerator {
       console.log('Docxtemplater создан с ImageModule');
 
       // Создаем таблицу результатов в текстовом формате
-      const resultsTable = this.createResultsTable(data.analysisResults);
-      console.log('Таблица результатов создана, длина:', resultsTable.length);
-
-      // Создаем форматированную таблицу для вставки
-      const formattedTable = this.createFormattedTable(data.analysisResults);
-      console.log('Форматированная таблица создана');
-
       // Подготавливаем данные для замены
       const templateData = {
         executor: data.executor,
@@ -110,8 +103,6 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        analysis_table: resultsTable,
-        ResultsTable: formattedTable
       };
 
       console.log('=== Данные для шаблона ===');
@@ -158,59 +149,6 @@ export class TemplateReportGenerator {
       console.error('Ошибка генерации отчета из шаблона:', error);
       throw error;
     }
-  }
-  private createResultsTable(analysisResults: any[]): string {
-    if (!analysisResults || analysisResults.length === 0) {
-      return 'Нет данных для отображения';
-    }
-
-    let table = 'РЕЗУЛЬТАТЫ АНАЛИЗА:\n\n';
-    
-    // Заголовок таблицы
-    table += '№ зоны | Уровень (м.) | Логгер | S/N | Мин. t°C | Макс. t°C | Среднее t°C | Соответствие\n';
-    table += '-------|-------------|--------|-----|----------|-----------|-------------|-------------\n';
-    
-    // Строки данных
-    analysisResults.forEach(result => {
-      const zoneNumber = result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-');
-      table += `${zoneNumber} | ${result.measurementLevel || '-'} | ${result.loggerName || '-'} | ${result.serialNumber || '-'} | ${result.minTemp || '-'} | ${result.maxTemp || '-'} | ${result.avgTemp || '-'} | ${result.meetsLimits || '-'}\n`;
-    });
-
-    table += '\n';
-    
-    // Добавляем статистику
-    const validResults = analysisResults.filter(r => !r.isExternal && r.minTemp !== '-');
-    const externalSensors = analysisResults.filter(r => r.isExternal).length;
-    
-    table += `\nОбщая статистика:\n`;
-    table += `- Всего датчиков: ${analysisResults.length}\n`;
-    table += `- Внутренние датчики: ${validResults.length}\n`;
-    table += `- Внешние датчики: ${externalSensors}\n`;
-    
-    const compliantCount = analysisResults.filter(r => r.meetsLimits === 'Да').length;
-    const nonCompliantCount = analysisResults.filter(r => r.meetsLimits === 'Нет').length;
-    
-    if (compliantCount > 0 || nonCompliantCount > 0) {
-      table += `- Соответствуют лимитам: ${compliantCount}\n`;
-      table += `- Не соответствуют лимитам: ${nonCompliantCount}\n`;
-    }
-
-    return table;
-  }
-
-  private prepareTableDataForDocxTemplates(analysisResults: any[]): any[] {
-    return analysisResults.map(result => ({
-      zoneNumber: result.zoneNumber === 999 ? 'Внешний' : (result.zoneNumber || '-'),
-      measurementLevel: result.measurementLevel || '-',
-      loggerName: result.loggerName || '-',
-      serialNumber: result.serialNumber || '-',
-      minTemp: result.minTemp || '-',
-      maxTemp: result.maxTemp || '-',
-      avgTemp: result.avgTemp || '-',
-      meetsLimits: result.meetsLimits || '-',
-      isCompliant: result.meetsLimits === 'Да',
-      isNonCompliant: result.meetsLimits === 'Нет'
-    }));
   }
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
