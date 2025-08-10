@@ -214,21 +214,21 @@ export class TemplateReportGenerator {
     
     // Подготавливаем данные для docx-templates
     const templateData = {
-      executor: data.executor,
-      Report_No: data.reportNumber,
-      Report_start: data.reportStart,
-      report_date: data.reportDate,
+      executor: String(data.executor || ''),
+      Report_No: String(data.reportNumber || ''),
+      Report_start: String(data.reportStart || ''),
+      report_date: String(data.reportDate || ''),
       chart_image: {
         width: 15, // cm
         height: 10, // cm
         data: chartImageData,
         extension: '.png'
       },
-      Acceptance_criteria: data.acceptanceCriteria,
-      TestType: data.testType || 'Не выбрано',
-      AcceptanceСriteria: data.acceptanceCriteria,
-      ObjectName: data.objectName,
-      CoolingSystemName: data.coolingSystemName,
+      Acceptance_criteria: String(data.acceptanceCriteria || ''),
+      TestType: String(data.testType || 'Не выбрано'),
+      AcceptanceСriteria: String(data.acceptanceCriteria || ''),
+      ObjectName: String(data.objectName || ''),
+      CoolingSystemName: String(data.coolingSystemName || ''),
       ResultsTable: resultsTableHtml,
     };
 
