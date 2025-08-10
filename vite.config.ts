@@ -22,6 +22,14 @@ export default defineConfig({
       'docxtemplater-html-module',
     ],
   },
+  build: {
+    commonjsOptions: {
+      include: [
+        /docxtemplater-html-module/,
+        /node_modules/
+      ]
+    }
+  },
   server: {
     port: 5173,
     host: true
