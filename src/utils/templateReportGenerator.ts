@@ -83,6 +83,10 @@ export class TemplateReportGenerator {
       const imageModule = new ImageModule(imageOpts);
       console.log('ImageModule создан');
 
+      // Создаем HTML таблицу
+      const htmlTable = this.createFormattedHtmlTable(data.analysisResults);
+      console.log('HTML таблица создана, длина:', htmlTable.length);
+
       // Создаем экземпляр Docxtemplater с модулем изображений
       const doc = new Docxtemplater(zip, {
         modules: [imageModule],
@@ -104,7 +108,7 @@ export class TemplateReportGenerator {
         AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
         ObjectName: data.objectName,
         CoolingSystemName: data.coolingSystemName,
-        ResultsTable: htmlTable
+        ResultsTable: htmlTable || ''
       };
 
       console.log('=== Данные для шаблона ===');
