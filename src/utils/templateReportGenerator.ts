@@ -258,6 +258,9 @@ export class TemplateReportGenerator {
         </div>
       </div>
     `;
+    return html;
+  }
+
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -268,7 +271,5 @@ export class TemplateReportGenerator {
     
     // Очищаем URL через некоторое время
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-  }
-    return html;
   }
 }
