@@ -1,6 +1,6 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-const HtmlModule = require('docxtemplater-html-module');
+import HtmlModule from 'docxtemplater-html-module';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
