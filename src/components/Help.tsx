@@ -161,7 +161,7 @@ export const Help: React.FC = () => {
               <p className="text-xs text-purple-700">
                 <strong>Примечание:</strong> Используется библиотека docx-templates. 
                 Для циклов используйте синтаксис <code>{'{#array}'}</code>...<code>{'{/array}'}</code>.
-                Обратите внимание на русскую букву "С" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
+                Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
                 Для условного форматирования используйте <code>{'{isCompliant}'}</code> и <code>{'{isNonCompliant}'}</code>.
               </p>
             </div>
@@ -211,6 +211,7 @@ export const Help: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Технические требования */}
