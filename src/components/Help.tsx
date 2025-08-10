@@ -130,7 +130,7 @@ export const Help: React.FC = () => {
               <div className="space-y-2">
                 <h4 className="font-medium text-purple-900">Данные анализа:</h4>
                 <ul className="space-y-1 text-purple-800">
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{AcceptanceСriteria}'}</code> - Критерии приемки</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{EligibilityCriteria}'}</code> - Критерии приемки</li>
                 </ul>
               </div>
             </div>
@@ -144,7 +144,7 @@ export const Help: React.FC = () => {
             <div className="mt-4 p-3 bg-purple-100 rounded-lg">
               <p className="text-xs text-purple-700">
                 <strong>Примечание:</strong> Используется библиотека docx-templates для лучшей поддержки таблиц. 
-                Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
+                Плейсхолдер <code>{'{EligibilityCriteria}'}</code> используется для критериев приемки.
                 График вставляется как PNG изображение с высоким разрешением (scale: 2).
                 Таблица результатов вставляется как HTML таблица с сохранением стилей и цветовых выделений.
               </p>
