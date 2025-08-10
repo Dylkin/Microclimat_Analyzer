@@ -13,6 +13,7 @@ export interface TemplateReportData {
   dataType: 'temperature' | 'humidity';
   resultsTable: string;
   acceptanceCriteria: string;
+  testType: string;
 }
 
 export class TemplateReportGenerator {
@@ -102,7 +103,10 @@ export class TemplateReportGenerator {
         chart: 'chart_placeholder', // Значение для ImageModule
         Results_table: data.resultsTable,
         results_table: resultsTable, // Оставляем для обратной совместимости
-        Acceptance_criteria: data.acceptanceCriteria
+        Acceptance_criteria: data.acceptanceCriteria,
+        TestType: data.testType,
+        AcceptanceСriteria: data.acceptanceCriteria, // Русская С в AcceptanceСriteria
+        ResultsTable: data.resultsTable
       };
 
       console.log('=== Данные для шаблона ===');
@@ -113,6 +117,9 @@ export class TemplateReportGenerator {
       console.log('chart_image_size:', `${chartImageBuffer.byteLength} байт`);
       console.log('Results_table_length:', data.resultsTable?.length || 0);
       console.log('Acceptance_criteria_length:', data.acceptanceCriteria?.length || 0);
+      console.log('TestType:', data.testType);
+      console.log('AcceptanceСriteria_length:', data.acceptanceCriteria?.length || 0);
+      console.log('ResultsTable_length:', data.resultsTable?.length || 0);
 
       // Заполняем шаблон данными
       console.log('Устанавливаем данные в шаблон...');

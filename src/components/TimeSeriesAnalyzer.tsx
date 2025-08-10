@@ -415,7 +415,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportStart: dateStr,
         dataType,
         resultsTable: resultsTableHtml,
-        acceptanceCriteria
+        acceptanceCriteria,
+        testType: testType || 'Не выбрано'
       };
 
       console.log('Данные для шаблона подготовлены:', {
@@ -425,7 +426,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportDate: templateData.reportDate,
         chartBlobSize: chartBlob.size,
         resultsTableLength: resultsTableHtml.length,
-        acceptanceCriteriaLength: acceptanceCriteria.length
+        acceptanceCriteriaLength: acceptanceCriteria.length,
+        testType: templateData.testType
       });
 
       // Генерируем отчет из шаблона
