@@ -1,5 +1,6 @@
 import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
+import { DocxTableGenerator } from './docxTableGenerator';
 
 export interface ReportData {
   title: string;
@@ -139,7 +140,7 @@ export class DocxReportGenerator {
           }),
 
           // Таблица результатов
-          this.createResultsTable(data.analysisResults),
+          DocxTableGenerator.createResultsTable(data.analysisResults),
 
           // Пустая строка после таблицы
           new Paragraph({
