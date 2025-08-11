@@ -21,7 +21,6 @@ export default defineConfig({
       'docx-templates',
     ],
     exclude: [
-      'xmlbuilder2'
     ],
   },
   build: {
