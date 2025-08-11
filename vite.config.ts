@@ -1,12 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      events: 'events',
-      stream: 'stream-browserify'
+      events: path.resolve(__dirname, 'node_modules/events'),
+      stream: path.resolve(__dirname, 'node_modules/stream-browserify')
     }
   },
   define: {
@@ -17,8 +18,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
-      'events',
-      'stream-browserify',
       'd3-array',
       'd3-scale',
       'd3-scale-chromatic',
@@ -27,8 +26,6 @@ export default defineConfig({
       'd3-zoom',
       'html-to-docx',
       'docx-templates',
-    ],
-    exclude: [
     ],
   },
   build: {
