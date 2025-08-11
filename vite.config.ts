@@ -17,6 +17,10 @@ export default defineConfig({
     Buffer: 'globalThis.Buffer',
   },
   optimizeDeps: {
+    exclude: [
+      'events',
+      'stream-browserify'
+    ],
     include: [
       'd3-array',
       'd3-scale',
