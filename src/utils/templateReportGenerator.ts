@@ -1,7 +1,7 @@
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
 import { Document, Table, TableRow, TableCell, Paragraph, TextRun, WidthType, Packer } from 'docx';
-import { htmlToDocx } from 'html-to-docx';
+import htmlToDocx from 'html-to-docx';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
