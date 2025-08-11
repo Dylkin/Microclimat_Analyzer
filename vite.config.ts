@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      events: path.resolve(__dirname, 'node_modules/events/index.js'),
-      stream: path.resolve(__dirname, 'node_modules/stream-browserify/index.js')
+      stream: 'stream-browserify',
+      events: 'events'
     }
   },
   define: {
@@ -17,10 +17,6 @@ export default defineConfig({
     Buffer: 'globalThis.Buffer',
   },
   optimizeDeps: {
-    exclude: [
-      'events',
-      'stream-browserify'
-    ],
     include: [
       'd3-array',
       'd3-scale',
@@ -30,7 +26,9 @@ export default defineConfig({
       'd3-zoom',
       'html-to-docx',
       'docx-templates',
-    ],
+      'stream-browserify',
+      'events'
+    ]
   },
   build: {
     commonjsOptions: {
