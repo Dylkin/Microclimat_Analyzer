@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      events: 'events'
+    }
+  },
   define: {
     global: 'globalThis',
     'process.env': '{}',
@@ -11,6 +16,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
+      'events',
       'd3-array',
       'd3-scale',
       'd3-scale-chromatic',
