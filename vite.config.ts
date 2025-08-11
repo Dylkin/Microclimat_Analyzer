@@ -19,6 +19,8 @@ export default defineConfig({
       'd3-zoom',
       'html-to-docx',
       'docx-templates',
+    ],
+    exclude: [
       'xmlbuilder2'
     ],
   },
