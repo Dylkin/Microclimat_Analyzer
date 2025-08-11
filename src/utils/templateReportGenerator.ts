@@ -1,7 +1,6 @@
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
 import { Document, Table, TableRow, TableCell, Paragraph, TextRun, WidthType, Packer } from 'docx';
-import htmlToDocx from 'html-to-docx';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -218,9 +217,9 @@ export class TemplateReportGenerator {
       }
       
       // Создаем простую текстовую таблицу для вставки в шаблон
-      let resultsTableHtml = '';
+      let resultsTableText = '';
       if (data.resultsTableData && data.resultsTableData.length > 0) {
-        resultsTableHtml = await this.createHtmlTable(data.resultsTableData);
+        resultsTableText = await this.createSimpleTable(data.resultsTableData);
       }
       
       // Подготавливаем данные для docxtemplater (все значения должны быть строками)
@@ -234,7 +233,7 @@ export class TemplateReportGenerator {
         EligibilityCriteria: data.acceptanceCriteria || '',
         ObjectName: data.objectName || '',
         CoolingSystemName: data.coolingSystemName || '',
-        ResultsTable: resultsTableHtml || '',
+        ResultsTable: resultsTableText || '',
       };
 
       // 1. Загрузка шаблона с правильной кодировкой
@@ -282,118 +281,25 @@ export class TemplateReportGenerator {
   }
 
   /**
-   * Создание HTML таблицы для вставки в шаблон
+   * Создание простой текстовой таблицы для вставки в шаблон
    */
-  private async createHtmlTable(resultsTableData: any[]): Promise<string> {
-    let html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          table { 
-            border-collapse: collapse; 
-            width: 100%; 
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-          }
-          th, td { 
-            border: 1px solid #000; 
-            padding: 6px; 
-            text-align: center; 
-            vertical-align: middle;
-          }
-          th { 
-            background-color: #f3f4f6; 
-            font-weight: bold; 
-          }
-          .min-temp { background-color: #dbeafe; }
-          .max-temp { background-color: #fecaca; }
-          .compliant { background-color: #dcfce7; color: #166534; }
-          .non-compliant { background-color: #fef2f2; color: #dc2626; }
-        </style>
-      </head>
-      <body>
-        <table>
-          <thead>
-            <tr>
-              <th>№ зоны</th>
-              <th>Уровень (м.)</th>
-              <th>Логгер</th>
-              <th>S/N</th>
-              <th>Мин. t°C</th>
-              <th>Макс. t°C</th>
-              <th>Среднее t°C</th>
-              <th>Соответствие</th>
-            </tr>
-          </thead>
-          <tbody>
-    `;
+  private async createSimpleTable(resultsTableData: any[]): Promise<string> {
+    let tableText = '';
+    
+    // Заголовок таблицы
+    tableText += '№ зоны\tУровень (м.)\tЛоггер\tS/N\tМин. t°C\tМакс. t°C\tСреднее t°C\tСоответствие\n';
+    tableText += '─'.repeat(80) + '\n';
 
     resultsTableData.forEach(row => {
-      const minTempClass = row.isMinTemp ? 'min-temp' : '';
-      const maxTempClass = row.isMaxTemp ? 'max-temp' : '';
-      const complianceClass = row.meetsLimits === 'Да' ? 'compliant' : 
-                             row.meetsLimits === 'Нет' ? 'non-compliant' : '';
-
-      html += `
-        <tr>
-          <td>${row.zoneNumber || '-'}</td>
-          <td>${row.measurementLevel || '-'}</td>
-          <td>${row.loggerName || '-'}</td>
-          <td>${row.serialNumber || '-'}</td>
-          <td class="${minTempClass}">${row.minTemp || '-'}</td>
-          <td class="${maxTempClass}">${row.maxTemp || '-'}</td>
-          <td>${row.avgTemp || '-'}</td>
-          <td class="${complianceClass}">${row.meetsLimits || '-'}</td>
-        </tr>
-      `;
+      const minTemp = row.isMinTemp ? `${row.minTemp}*` : (row.minTemp || '-');
+      const maxTemp = row.isMaxTemp ? `${row.maxTemp}*` : (row.maxTemp || '-');
+      
+      tableText += `${row.zoneNumber || '-'}\t${row.measurementLevel || '-'}\t${row.loggerName || '-'}\t${row.serialNumber || '-'}\t${minTemp}\t${maxTemp}\t${row.avgTemp || '-'}\t${row.meetsLimits || '-'}\n`;
     });
 
-    html += `
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
-
-    try {
-      // Конвертируем HTML в DOCX буфер
-      const docxBuffer = await htmlToDocx(html, null, {
-        table: { 
-          width: 9000, // ~15cm
-          alignment: 'center'
-        },
-        page: { 
-          orientation: 'landscape',
-          margins: {
-            top: 1000,
-            right: 1000,
-            bottom: 1000,
-            left: 1000
-          }
-        },
-        font: {
-          name: 'Arial',
-          size: 20 // 10pt
-        }
-      });
-      
-      // Конвертируем буфер в base64 для вставки в шаблон
-      const uint8Array = new Uint8Array(docxBuffer);
-      let base64String = '';
-      const chunkSize = 8192;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        base64String += btoa(String.fromCharCode.apply(null, Array.from(chunk)));
-      }
-      
-      return base64String;
-    } catch (error) {
-      console.error('Ошибка конвертации таблицы в DOCX:', error);
-      // Возвращаем простую HTML таблицу как fallback
-      return html;
-    }
+    tableText += '\n* - минимальное/максимальное значение в выбранном периоде\n';
+    
+    return tableText;
   }
 
 
