@@ -5,7 +5,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      events: 'events'
+      events: 'events',
+      stream: 'stream-browserify'
     }
   },
   define: {
@@ -17,6 +18,7 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'events',
+      'stream-browserify',
       'd3-array',
       'd3-scale',
       'd3-scale-chromatic',
