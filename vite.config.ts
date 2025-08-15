@@ -18,6 +18,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
+      'docx',
       'd3-array',
       'd3-scale',
       'd3-scale-chromatic',
