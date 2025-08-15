@@ -12,6 +12,7 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'd3-array',
+      'stream-browserify',
       'd3-scale',
       'd3-scale-chromatic',
       'd3-selection',
@@ -26,6 +27,8 @@ export default defineConfig({
       include: [
         /node_modules/
       ]
+      events: 'events',
+      stream: 'stream-browserify'
     }
   },
   server: {
