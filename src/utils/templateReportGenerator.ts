@@ -75,20 +75,13 @@ export class TemplateReportGenerator {
       // 2. Настройка модуля изображений
       const imageModule = new ImageModule({
         centered: false,
-        getImage: function(tagValue: any, tagName: string) {
+        getImage(tagValue: any, tagName: string) {
           console.log('getImage вызван для тега:', tagName, 'тип значения:', typeof tagValue);
-          if (tagValue instanceof ArrayBuffer) {
-            return tagValue;
-          }
-          if (tagValue instanceof Uint8Array) {
-            return tagValue.buffer;
-          }
-          console.error('Неподдерживаемый тип данных изображения:', typeof tagValue);
           return tagValue;
         },
-        getSize: function(img: any, tagValue: any, tagName: string) {
+        getSize(img: any, tagValue: any, tagName: string) {
           console.log('getSize вызван для тега:', tagName);
-          return [400, 300]; // ширина, высота в пикселях  
+          return [400, 300]; // ширина, высота в пикселях
         }
       });
 
@@ -97,18 +90,19 @@ export class TemplateReportGenerator {
         paragraphLoop: true,
         linebreaks: true,
         modules: [imageModule],
-        nullGetter: function(part: any) {
-          console.log('nullGetter вызван для:', part);
-          if (part.module === 'docxtemplater-image-module-free') {
+        nullGetter(part: any) {
+          if (part.module === 'docxtemplater-image-module-free' && !part.value) {
+            console.warn('Изображение не найдено для тега:', part.tag);
             return '';
           }
-          return '';
-        }
+          return part.value || '';
+        },
+        errorLogging: true
       });
 
       // 4. Рендер документа с подготовленными данными
       console.log('Данные для рендера:', Object.keys(templateData));
-      console.log('Тип chart_image:', typeof templateData.chart_image);
+      console.log('Тип chart_image:', typeof templateData.chart_image, 'размер:', templateData.chart_image.byteLength);
       doc.render(templateData);
 
       // 5. Генерация файла
