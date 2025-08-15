@@ -207,70 +207,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleGenerateReport = async () => {
-    if (!chartRef.current) {
-      alert('График не найден для сохранения');
-      return;
-    }
-
     setReportStatus(prev => ({ ...prev, isGenerating: true }));
 
     try {
-      // Временно скрываем кнопку сохранения
-      const saveButton = chartRef.current.querySelector('button[title="Сформировать отчет с графиком"]') as HTMLElement;
-      const originalDisplay = saveButton ? saveButton.style.display : '';
-      if (saveButton) {
-        saveButton.style.display = 'none';
-      }
-
-      // Находим контейнер с графиком и легендой (исключая кнопку)
-      const chartContainer = chartRef.current;
-      
-      // Создаем скриншот с высоким качеством
-      const canvas = await html2canvas(chartContainer, {
-        scale: 2, // Увеличиваем разрешение для лучшего качества
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        width: chartContainer.offsetWidth,
-        height: chartContainer.offsetHeight
-      });
-
-      // Восстанавливаем отображение кнопки
-      if (saveButton) {
-        saveButton.style.display = originalDisplay;
-      }
-
-      // Создаем новый canvas для поворота изображения на 90° против часовой стрелки
-      const rotatedCanvas = document.createElement('canvas');
-      const ctx = rotatedCanvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error('Ошибка создания контекста для поворота изображения');
-      }
-
-      // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
-      rotatedCanvas.width = canvas.height;
-      rotatedCanvas.height = canvas.width;
-
-      // Поворачиваем контекст на 90° против часовой стрелки
-      ctx.translate(0, canvas.width);
-      ctx.rotate(-Math.PI / 2);
-
-      // Рисуем исходное изображение на повернутом canvas
-      ctx.drawImage(canvas, 0, 0);
-
-      // Конвертируем повернутый canvas в blob
-      const chartBlob = await new Promise<Blob>((resolve, reject) => {
-        rotatedCanvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Ошибка создания изображения графика'));
-          }
-        }, 'image/png', 1.0);
-      });
-
       // Генерируем данные для отчета
       const now = new Date();
       const dateStr = now.toLocaleDateString('ru-RU');
@@ -281,7 +220,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
         date: `${dateStr} ${timeStr}`,
         dataType,
-        chartImageBlob: chartBlob,
         analysisResults
       };
 
@@ -303,15 +241,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       });
       
     } catch (error) {
-      console.error('Ошибка сохранения графика:', error);
-      alert('Ошибка при сохранении графика');
+      console.error('Ошибка генерации отчета:', error);
+      alert('Ошибка при генерации отчета');
       setReportStatus(prev => ({ ...prev, isGenerating: false }));
-    } finally {
-      // Убеждаемся, что кнопка восстановлена в случае ошибки
-      const saveButton = chartRef.current?.querySelector('button[title="Сформировать отчет с графиком"]') as HTMLElement;
-      if (saveButton && saveButton.style.display === 'none') {
-        saveButton.style.display = '';
-      }
     }
   };
 
@@ -365,11 +297,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return;
     }
 
-    if (!chartRef.current) {
-      alert('График не найден для сохранения');
-      return;
-    }
-
     console.log('=== Начало создания отчета из шаблона ===');
     console.log('Файл шаблона:', templateFile.name);
     console.log('Номер отчета:', reportNumber);
@@ -378,69 +305,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setReportStatus(prev => ({ ...prev, isGeneratingFromTemplate: true }));
 
     try {
-      // Создаем скриншот графика
-      console.log('Создаем скриншот графика...');
-      const saveButton = chartRef.current.querySelector('button[title="Сформировать отчет с графиком"]') as HTMLElement;
-      const originalDisplay = saveButton ? saveButton.style.display : '';
-      if (saveButton) {
-        saveButton.style.display = 'none';
-      }
-
-      const chartContainer = chartRef.current;
-      const canvas = await html2canvas(chartContainer, {
-        scale: 2,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        width: chartContainer.offsetWidth,
-        height: chartContainer.offsetHeight
-      });
-      console.log('Скриншот создан, размер:', canvas.width, 'x', canvas.height);
-
-      if (saveButton) {
-        saveButton.style.display = originalDisplay;
-      }
-
-      // Поворачиваем изображение на 90° против часовой стрелки
-      console.log('Поворачиваем изображение на 90°...');
-      const rotatedCanvas = document.createElement('canvas');
-      const ctx = rotatedCanvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error('Ошибка создания контекста для поворота изображения');
-      }
-
-      rotatedCanvas.width = canvas.height;
-      rotatedCanvas.height = canvas.width;
-      ctx.translate(0, canvas.width);
-      ctx.rotate(-Math.PI / 2);
-      ctx.drawImage(canvas, 0, 0);
-      console.log('Изображение повернуто, новый размер:', rotatedCanvas.width, 'x', rotatedCanvas.height);
-
-      const chartBlob = await new Promise<Blob>((resolve, reject) => {
-        rotatedCanvas.toBlob((blob) => {
-          if (blob) {
-            console.log('Blob изображения создан, размер:', blob.size, 'байт');
-            resolve(blob);
-          } else {
-            reject(new Error('Ошибка создания изображения графика'));
-          }
-        }, 'image/png', 1.0);
-      });
-
       // Подготавливаем данные для шаблона
       const now = new Date();
       const dateStr = reportDate ? new Date(reportDate).toLocaleDateString('ru-RU') : now.toLocaleDateString('ru-RU');
       const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
       
-      // Создаем таблицу результатов для вставки в шаблон
-      
       // Создаем критерии приемки
       const acceptanceCriteria = createAcceptanceCriteria();
       
       const templateData: TemplateReportData = {
-        chartImageBlob: chartBlob,
         executor: user?.fullName || 'Неизвестный пользователь',
         reportDate: dateStr,
         reportNumber: reportNumber || `REP-${Date.now()}`,
@@ -456,7 +329,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportNumber: templateData.reportNumber,
         reportStart: templateData.reportStart,
         reportDate: templateData.reportDate,
-        chartBlobSize: chartBlob.size,
         testType: templateData.testType,
         objectName: templateData.objectName,
         coolingSystemName: templateData.coolingSystemName

@@ -1,11 +1,9 @@
 import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel } from 'docx';
-import { saveAs } from 'file-saver';
 
 export interface ReportData {
   title: string;
   date: string;
   dataType: 'temperature' | 'humidity';
-  chartImageBlob: Blob;
   analysisResults: any[];
 }
 
@@ -41,9 +39,6 @@ export class DocxReportGenerator {
   }
 
   private async createNewDocument(data: ReportData): Promise<void> {
-    // Конвертируем изображение в Uint8Array
-    const imageArrayBuffer = await data.chartImageBlob.arrayBuffer();
-    const imageBuffer = new Uint8Array(imageArrayBuffer);
 
     this.sections = [
       {
@@ -84,47 +79,6 @@ export class DocxReportGenerator {
             spacing: { after: 400 },
           }),
 
-          // Заголовок графика
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: 'График временных рядов',
-                bold: true,
-                size: 28, // 14pt
-              }),
-            ],
-            heading: HeadingLevel.HEADING_2,
-            spacing: { after: 200 },
-          }),
-
-          // График (повернутый на 90°)
-          new Paragraph({
-            children: [
-              new ImageRun({
-                data: imageBuffer,
-                transformation: {
-                  width: 560, // Увеличено на 40%
-                  height: 840, // Увеличено на 40%
-                },
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 400 },
-          }),
-
-          // Примечание о повороте
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: 'Примечание: График повернут на 90° против часовой стрелки для оптимального размещения в отчете.',
-                italics: true,
-                size: 20, // 10pt
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 400 },
-          }),
-
           // Заголовок таблицы результатов
           new Paragraph({
             children: [
@@ -161,9 +115,6 @@ export class DocxReportGenerator {
   }
 
   private async addSectionToExistingDoc(data: ReportData): Promise<void> {
-    // Конвертируем изображение в Uint8Array
-    const imageArrayBuffer = await data.chartImageBlob.arrayBuffer();
-    const imageBuffer = new Uint8Array(imageArrayBuffer);
 
     // Добавляем разрыв страницы и новую секцию
     const newSection = {
@@ -201,21 +152,6 @@ export class DocxReportGenerator {
               size: 24,
             }),
           ],
-          spacing: { after: 400 },
-        }),
-
-        // График
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: imageBuffer,
-              transformation: {
-                width: 400,
-                height: 600,
-              },
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
           spacing: { after: 400 },
         }),
 
@@ -369,15 +305,6 @@ export class DocxReportGenerator {
     }
 
     return paragraphs;
-  }
-
-  async saveReport(filename: string): Promise<void> {
-    if (!this.currentDoc) {
-      throw new Error('Нет документа для сохранения');
-    }
-
-    const buffer = await Packer.toBlob(this.currentDoc);
-    saveAs(buffer, filename);
   }
 
   hasExistingDocument(): boolean {
