@@ -18,6 +18,10 @@ export class TemplateProcessor {
    */
   static async processTemplate(templateBuffer: ArrayBuffer, data: TemplateData): Promise<ArrayBuffer> {
     try {
+      console.log('Начинаем обработку шаблона...');
+      console.log('Размер шаблона:', templateBuffer.byteLength, 'байт');
+      console.log('Размер изображения графика:', data.CHART.byteLength, 'байт');
+      
       // Создаем новый документ с данными из шаблона
       const doc = new Document({
         sections: [
@@ -134,11 +138,15 @@ export class TemplateProcessor {
         ],
       });
 
-      return await Packer.toBuffer(doc);
+      console.log('Генерируем DOCX документ...');
+      const buffer = await Packer.toBuffer(doc);
+      console.log('DOCX документ сгенерирован, размер:', buffer.byteLength, 'байт');
+      
+      return buffer;
       
     } catch (error) {
       console.error('Ошибка обработки шаблона:', error);
-      throw new Error('Не удалось обработать шаблон');
+      throw new Error(`Не удалось обработать шаблон: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   }
 

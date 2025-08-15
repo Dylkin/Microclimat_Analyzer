@@ -211,38 +211,52 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleGenerateReport = async () => {
-    if (!chartRef.current) {
-      alert('График не найден для сохранения');
-      return;
-    }
-
     setReportStatus(prev => ({ ...prev, isGenerating: true }));
 
     try {
-      // Временно скрываем кнопку сохранения
-      const saveButton = chartRef.current.querySelector('button[title="Сформировать отчет с графиком"]') as HTMLElement;
-      const originalDisplay = saveButton ? saveButton.style.display : '';
-      if (saveButton) {
-        saveButton.style.display = 'none';
+      if (!chartRef.current) {
+        throw new Error('График не найден для сохранения');
       }
 
-      // Находим контейнер с графиком и легендой (исключая кнопку)
+      // Находим контейнер с графиком
       const chartContainer = chartRef.current;
       
-      // Создаем скриншот с высоким качеством
-      const canvas = await html2canvas(chartContainer, {
-        scale: 2, // Увеличиваем разрешение для лучшего качества
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        width: chartContainer.offsetWidth,
-        height: chartContainer.offsetHeight
+      // Временно скрываем все кнопки в области графика
+      const buttons = chartContainer.querySelectorAll('button');
+      const originalDisplays: string[] = [];
+      buttons.forEach((button, index) => {
+        originalDisplays[index] = button.style.display;
+        button.style.display = 'none';
       });
+      
+      // Создаем скриншот с высоким качеством
+      let canvas;
+      try {
+        canvas = await html2canvas(chartContainer, {
+          scale: 2, // Увеличиваем разрешение для лучшего качества
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          width: chartContainer.offsetWidth,
+          height: chartContainer.offsetHeight,
+          onclone: (clonedDoc) => {
+            // Убеждаемся, что в клонированном документе тоже скрыты кнопки
+            const clonedButtons = clonedDoc.querySelectorAll('button');
+            clonedButtons.forEach(button => {
+              button.style.display = 'none';
+            });
+          }
+        });
+      } finally {
+        // Восстанавливаем отображение кнопок
+        buttons.forEach((button, index) => {
+          button.style.display = originalDisplays[index] || '';
+        });
+      }
 
-      // Восстанавливаем отображение кнопки
-      if (saveButton) {
-        saveButton.style.display = originalDisplay;
+      if (!canvas) {
+        throw new Error('Не удалось создать скриншот графика');
       }
 
       // Создаем новый canvas для поворота изображения на 90° против часовой стрелки
@@ -301,22 +315,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       // Обновляем состояние
       setReportStatus({
+        ...reportStatus,
         isGenerating: false,
         hasReport: true,
         reportUrl,
-        reportFilename
+        reportFilename,
+        templateFile: reportStatus.templateFile
       });
       
     } catch (error) {
       console.error('Ошибка сохранения графика:', error);
-      alert('Ошибка при сохранении графика');
+      alert(`Ошибка при формировании отчета: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       setReportStatus(prev => ({ ...prev, isGenerating: false }));
-    } finally {
-      // Убеждаемся, что кнопка восстановлена в случае ошибки
-      const saveButton = chartRef.current?.querySelector('button[title="Сформировать отчет с графиком"]') as HTMLElement;
-      if (saveButton && saveButton.style.display === 'none') {
-        saveButton.style.display = '';
-      }
     }
   };
 
