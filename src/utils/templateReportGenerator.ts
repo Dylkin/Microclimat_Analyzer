@@ -39,16 +39,16 @@ export class TemplateReportGenerator {
   }
 
   /**
-   * Генерация отчета с помощью docx-templates (поддерживает HTML таблицы)
+   * Генерация отчета с помощью docxtemplater
    */
   private async generateWithDocxTemplates(templateFile: File, data: TemplateReportData): Promise<Blob> {
-    console.log('Используем docx-templates для генерации отчета');
+    // Создаем простую текстовую таблицу для вставки в шаблон
     
-    // Конвертируем изображение в Uint8Array для docx-templates
+    // Конвертируем изображение в base64 для docxtemplater
     const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
-    const chartImageData = new Uint8Array(chartImageBuffer);
+    const chartImageBase64 = btoa(String.fromCharCode(...new Uint8Array(chartImageBuffer)));
     
-    // Подготавливаем данные для docx-templates
+    // Подготавливаем данные для docxtemplater (все значения должны быть строками)
     const templateData = {
       executor: data.executor,
       Report_No: data.reportNumber,
@@ -57,42 +57,54 @@ export class TemplateReportGenerator {
       chart_image: {
         width: 15, // cm
         height: 10, // cm
-        data: chartImageData,
+        data: chartImageBase64,
         extension: '.png'
       },
       Acceptance_criteria: data.acceptanceCriteria,
       TestType: data.testType || 'Не выбрано',
       AcceptanceСriteria: data.acceptanceCriteria,
       ObjectName: data.objectName,
-      CoolingSystemName: data.coolingSystemName,
+      ResultsTable: String(''),
     };
 
     // Читаем шаблон
     const templateBuffer = await templateFile.arrayBuffer();
     
     // Генерируем отчет
-    const reportBuffer = await createReport({
-      template: templateBuffer,
-      data: templateData,
-      additionalJsContext: {
-        // Дополнительные функции для обработки данных
-        formatNumber: (num: number) => num.toFixed(1),
-        isExternal: (zoneNumber: number) => zoneNumber === 999
+    try {
+      // 1. Загрузка шаблона с правильной кодировкой
+      const templateBuffer = await templateFile.arrayBuffer();
+      const content = new Uint8Array(templateBuffer);
+      const zip = new PizZip(content);
+
+      // 2. Инициализация docxtemplater
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+      });
+
+      // 3. Рендер документа с подготовленными данными
+      doc.render(templateData);
+
+      // 4. Генерация файла
+      const out = doc.getZip().generate({ 
+        type: "blob",
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+      
+      return out;
+    } catch (error) {
+      console.error("Ошибка генерации документа:", error);
+      
+      // Добавляем дополнительную обработку ошибок
+      if (error instanceof Error && error.message.includes("charCodeAt")) {
+        console.warn("Проверьте, что все передаваемые данные являются строками");
+        throw new Error("Ошибка обработки данных шаблона. Убедитесь, что все поля заполнены корректно.");
       }
-    });
-    
-    return new Blob([reportBuffer], {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    });
+      
+      throw error;
+    }
   }
-
-
-
-
-
-
-
-
 
   async saveReport(blob: Blob, filename: string): Promise<void> {
     const link = document.createElement('a');
