@@ -1,5 +1,4 @@
 import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel } from 'docx';
-import { saveAs } from 'file-saver';
 import { TemplateProcessor, TemplateData } from './templateProcessor';
 
 export interface ReportData {
@@ -24,6 +23,8 @@ export class DocxReportGenerator {
 
   async generateReport(data: ReportData): Promise<Blob> {
     try {
+      console.log('Создание стандартного отчета...');
+      
       // Если документ уже существует, добавляем в него новую секцию
       if (this.currentDoc) {
         await this.addSectionToExistingDoc(data);
@@ -33,7 +34,9 @@ export class DocxReportGenerator {
       }
 
       // Генерируем DOCX файл
+      console.log('Генерируем DOCX файл...');
       const buffer = await Packer.toBlob(this.currentDoc!);
+      console.log('DOCX файл создан успешно, размер:', buffer.size, 'байт');
       return buffer;
     } catch (error) {
       console.error('Ошибка генерации DOCX отчета:', error);
@@ -74,7 +77,10 @@ export class DocxReportGenerator {
       
     } catch (error) {
       console.error('Ошибка генерации отчета из шаблона:', error);
-      throw new Error(`Не удалось создать отчет из шаблона: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      
+      // Если не удалось обработать шаблон, создаем стандартный отчет
+      console.log('Переключаемся на создание стандартного отчета...');
+      return this.generateReport(data);
     }
   }
 
@@ -407,14 +413,6 @@ export class DocxReportGenerator {
     return paragraphs;
   }
 
-  async saveReport(filename: string): Promise<void> {
-    if (!this.currentDoc) {
-      throw new Error('Нет документа для сохранения');
-    }
-
-    const buffer = await Packer.toBlob(this.currentDoc);
-    saveAs(buffer, filename);
-  }
 
   hasExistingDocument(): boolean {
     return this.currentDoc !== null;

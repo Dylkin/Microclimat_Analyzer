@@ -1,4 +1,5 @@
-import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, Table, TableRow, TableCell, WidthType } from 'docx';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
 
 export interface TemplateData {
   DATE: string;
@@ -8,8 +9,8 @@ export interface TemplateData {
 }
 
 /**
- * Процессор шаблонов DOCX
- * Заменяет плейсхолдеры в шаблоне на актуальные данные
+ * Процессор шаблонов DOCX для браузерной среды
+ * Использует docxtemplater для замены плейсхолдеров
  */
 export class TemplateProcessor {
   
@@ -20,129 +21,40 @@ export class TemplateProcessor {
     try {
       console.log('Начинаем обработку шаблона...');
       console.log('Размер шаблона:', templateBuffer.byteLength, 'байт');
-      console.log('Размер изображения графика:', data.CHART.byteLength, 'байт');
       
-      // Создаем новый документ с данными из шаблона
-      const doc = new Document({
-        sections: [
-          {
-            children: [
-              // Заголовок
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: `Отчет по анализу временных рядов - ${data.DATA_TYPE}`,
-                    bold: true,
-                    size: 32,
-                  }),
-                ],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 400 },
-              }),
-
-              // Дата
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: `Дата создания отчета: ${data.DATE}`,
-                    size: 24,
-                  }),
-                ],
-                spacing: { after: 400 },
-              }),
-
-              // График
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: 'График временных рядов',
-                    bold: true,
-                    size: 28,
-                  }),
-                ],
-                spacing: { after: 200 },
-              }),
-
-              new Paragraph({
-                children: [
-                  new ImageRun({
-                    data: data.CHART,
-                    transformation: {
-                      width: 560,
-                      height: 840,
-                    },
-                  }),
-                ],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 400 },
-              }),
-
-              // Таблица результатов
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: 'Результаты анализа',
-                    bold: true,
-                    size: 28,
-                  }),
-                ],
-                spacing: { after: 200 },
-              }),
-
-              // Создаем таблицу
-              this.createResultsTable(data.TABLE),
-
-              // Примечания
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: 'Примечания:',
-                    bold: true,
-                    size: 24,
-                  }),
-                ],
-                spacing: { before: 400, after: 200 },
-              }),
-
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: '• График повернут на 90° против часовой стрелки для оптимального размещения',
-                    size: 22,
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: '• Синим цветом выделены минимальные значения в периоде',
-                    size: 22,
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: '• Красным цветом выделены максимальные значения в периоде',
-                    size: 22,
-                  }),
-                ],
-                spacing: { after: 100 },
-              }),
-            ],
-          },
-        ],
+      // Создаем ZIP из шаблона
+      const zip = new PizZip(templateBuffer);
+      
+      // Создаем docxtemplater
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
       });
 
-      console.log('Генерируем DOCX документ...');
-      const buffer = await Packer.toBuffer(doc);
-      console.log('DOCX документ сгенерирован, размер:', buffer.byteLength, 'байт');
+      // Подготавливаем данные для замены
+      const templateData = {
+        DATE: data.DATE,
+        DATA_TYPE: data.DATA_TYPE,
+        // Для таблицы создаем текстовое представление
+        TABLE: this.formatTableForTemplate(data.TABLE),
+        // Для графика пока используем заглушку
+        CHART: '[ГРАФИК БУДЕТ ВСТАВЛЕН]'
+      };
+
+      console.log('Данные для шаблона подготовлены:', templateData);
+
+      // Заменяем плейсхолдеры
+      doc.render(templateData);
+
+      // Генерируем новый DOCX
+      const output = doc.getZip().generate({
+        type: 'arraybuffer',
+        compression: 'DEFLATE',
+      });
+
+      console.log('Шаблон обработан успешно, размер результата:', output.byteLength, 'байт');
       
-      return buffer;
+      return output;
       
     } catch (error) {
       console.error('Ошибка обработки шаблона:', error);
@@ -151,71 +63,21 @@ export class TemplateProcessor {
   }
 
   /**
-   * Создание таблицы результатов
+   * Форматирование таблицы для вставки в шаблон
    */
-  private static createResultsTable(results: any[]): Table {
-    const headerRow = new TableRow({
-      children: [
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: '№ зоны', bold: true, size: 20 })] })],
-          width: { size: 10, type: WidthType.PERCENTAGE },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: 'Уровень (м.)', bold: true, size: 20 })] })],
-          width: { size: 15, type: WidthType.PERCENTAGE },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: 'Логгер', bold: true, size: 20 })] })],
-          width: { size: 15, type: WidthType.PERCENTAGE },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: 'S/N', bold: true, size: 20 })] })],
-          width: { size: 15, type: WidthType.PERCENTAGE },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: 'Мин. t°C', bold: true, size: 20 })] })],
-          width: { size: 15, type: WidthType.PERCENTAGE },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: 'Макс. t°C', bold: true, size: 20 })] })],
-          width: { size: 15, type: WidthType.PERCENTAGE },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: 'Среднее t°C', bold: true, size: 20 })] })],
-          width: { size: 15, type: WidthType.PERCENTAGE },
-        }),
-      ],
+  private static formatTableForTemplate(results: any[]): string {
+    if (!results || results.length === 0) {
+      return 'Нет данных для отображения';
+    }
+
+    let tableText = 'РЕЗУЛЬТАТЫ АНАЛИЗА\n\n';
+    tableText += '№ зоны | Уровень (м.) | Логгер | S/N | Мин. t°C | Макс. t°C | Среднее t°C | Соответствие\n';
+    tableText += '-------|-------------|--------|-----|----------|-----------|-------------|-------------\n';
+
+    results.forEach(result => {
+      tableText += `${result.zoneNumber} | ${result.measurementLevel} | ${result.loggerName} | ${result.serialNumber} | ${result.minTemp} | ${result.maxTemp} | ${result.avgTemp} | ${result.meetsLimits}\n`;
     });
 
-    const dataRows = results.map(result => new TableRow({
-      children: [
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: String(result.zoneNumber), size: 18 })] })],
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: String(result.measurementLevel), size: 18 })] })],
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: String(result.loggerName), size: 18 })] })],
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: String(result.serialNumber), size: 18 })] })],
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: String(result.minTemp), size: 18 })] })],
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: String(result.maxTemp), size: 18 })] })],
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: String(result.avgTemp), size: 18 })] })],
-        }),
-      ],
-    }));
-
-    return new Table({
-      rows: [headerRow, ...dataRows],
-      width: { size: 100, type: WidthType.PERCENTAGE },
-    });
+    return tableText;
   }
 }
