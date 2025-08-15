@@ -1,7 +1,4 @@
 import { createReport } from 'docx-templates';
-import PizZip from 'pizzip';
-import Docxtemplater from 'docxtemplater';
-import ImageModule from 'docxtemplater-image-module-free';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -32,7 +29,7 @@ export class TemplateReportGenerator {
       console.log('Имя файла шаблона:', templateFile.name);
       console.log('Размер файла шаблона:', templateFile.size, 'байт');
       
-      // Используем только docx-templates для полной поддержки HTML таблиц
+      // Используем docx-templates для генерации отчета
       return await this.generateWithDocxTemplates(templateFile, data);
       
     } catch (error) {
@@ -42,74 +39,57 @@ export class TemplateReportGenerator {
   }
 
   /**
-   * Генерация отчета с помощью docxtemplater
+   * Генерация отчета с помощью docx-templates
    */
   private async generateWithDocxTemplates(templateFile: File, data: TemplateReportData): Promise<Blob> {
-    // Конвертируем изображение в ArrayBuffer для модуля изображений
-    const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
+    console.log('Используем docx-templates для генерации отчета...');
     
-    // Подготавливаем данные для docxtemplater
+    // Подготавливаем данные для docx-templates
     const templateData = {
       executor: data.executor,
       Report_No: data.reportNumber,
       Report_start: data.reportStart,
       report_date: data.reportDate,
-      chart_image: chartImageBuffer,
-      Acceptance_criteria: data.acceptanceCriteria,
-      TestType: data.testType || 'Не выбрано',
+      chart_image: data.chartImageBlob, // Передаем Blob напрямую
       AcceptanceСriteria: data.acceptanceCriteria,
+      TestType: data.testType || 'Не выбрано',
       ObjectName: data.objectName,
       CoolingSystemName: data.coolingSystemName,
     };
 
-    // Читаем шаблон
+    console.log('Данные для шаблона подготовлены');
+
+    // Читаем шаблон как ArrayBuffer
     const templateBuffer = await templateFile.arrayBuffer();
     
-    // Генерируем отчет
+    // Генерируем отчет с помощью docx-templates
     try {
-      // 1. Загрузка шаблона с правильной кодировкой
-      const templateBuffer = await templateFile.arrayBuffer();
-      const content = new Uint8Array(templateBuffer);
-      const zip = new PizZip(content);
-
-      // 2. Настройка модуля изображений
-      const imageModule = new ImageModule({
-        centered: false,
-        getImage: function(tagValue: any) {
-          return tagValue;
+      console.log('Запускаем createReport...');
+      
+      const reportBuffer = await createReport({
+        template: templateBuffer,
+        data: templateData,
+        additionalJsContext: {
+          // Дополнительные функции для обработки данных
         },
-        getSize: function() {
-          return [400, 300]; // ширина, высота в пикселях
-        }
-      });
-
-      // 3. Инициализация docxtemplater с модулем изображений
-      const doc = new Docxtemplater(zip, {
-        paragraphLoop: true,
-        linebreaks: true,
-        modules: [imageModule]
-      });
-
-      // 4. Рендер документа с подготовленными данными
-      doc.render(templateData);
-
-      // 5. Генерация файла
-      const out = doc.getZip().generate({ 
-        type: "blob",
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        cmdDelimiter: ['{', '}'], // Используем стандартные разделители
+        processLineBreaks: true,
+        noSandBox: false
       });
       
-      return out;
+      console.log('Отчет успешно сгенерирован');
+      return new Blob([reportBuffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      
     } catch (error) {
-      console.error("Ошибка генерации документа:", error);
+      console.error('Ошибка генерации документа:', error);
       
-      // Добавляем дополнительную обработку ошибок
-      if (error instanceof Error && error.message.includes("charCodeAt")) {
-        console.warn("Проверьте, что все передаваемые данные являются строками");
-        throw new Error("Ошибка обработки данных шаблона. Убедитесь, что все поля заполнены корректно.");
+      if (error instanceof Error) {
+        throw new Error(`Ошибка создания отчета: ${error.message}`);
+      } else {
+        throw new Error('Неизвестная ошибка при создании отчета');
       }
-      
-      throw error;
     }
   }
 
