@@ -1,4 +1,6 @@
 import { createReport } from 'docx-templates';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
