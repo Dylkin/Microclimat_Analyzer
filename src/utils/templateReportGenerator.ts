@@ -1,7 +1,7 @@
 import { createReport } from 'docx-templates';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-const ImageModule = require('docxtemplater-image-module-free');
+import ImageModule from 'docxtemplater-image-module-free';
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
