@@ -27,8 +27,12 @@ export default defineConfig({
       include: [
         /node_modules/
       ]
-      events: 'events',
-      stream: 'stream-browserify'
+    },
+    resolve: {
+      alias: {
+        events: 'events',
+        stream: 'stream-browserify'
+      }
     }
   },
   server: {
