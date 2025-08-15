@@ -661,10 +661,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 w-full max-w-2xl">
               <h4 className="text-sm font-medium text-blue-900 mb-2">Использование шаблона</h4>
               <div className="text-xs text-blue-800 space-y-1">
-                <p>• График будет вставлен в место плейсхолдера <code className="bg-blue-100 px-1 rounded">{{CHART}}</code></p>
-                <p>• Таблица результатов заменит плейсхолдер <code className="bg-blue-100 px-1 rounded">{{TABLE}}</code></p>
-                <p>• Дата отчета заменит <code className="bg-blue-100 px-1 rounded">{{DATE}}</code></p>
-                <p>• Тип данных заменит <code className="bg-blue-100 px-1 rounded">{{DATA_TYPE}}</code></p>
+                <p>• График будет вставлен в место плейсхолдера <code className="bg-blue-100 px-1 rounded">{'{{CHART}}'}</code></p>
+                <p>• Таблица результатов заменит плейсхолдер <code className="bg-blue-100 px-1 rounded">{'{{TABLE}}'}</code></p>
+                <p>• Дата отчета заменит <code className="bg-blue-100 px-1 rounded">{'{{DATE}}'}</code></p>
+                <p>• Тип данных заменит <code className="bg-blue-100 px-1 rounded">{'{{DATA_TYPE}}'}</code></p>
               </div>
             </div>
           )}
