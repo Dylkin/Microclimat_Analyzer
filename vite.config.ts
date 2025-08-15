@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      stream: 'stream-browserify',
-      events: 'events'
+      stream: path.resolve(__dirname, 'node_modules/stream-browserify'),
+      events: path.resolve(__dirname, 'node_modules/events')
     }
   },
   define: {
