@@ -137,8 +137,15 @@ export const Help: React.FC = () => {
             <div className="mt-4 space-y-2">
               <h4 className="font-medium text-purple-900">Изображения и таблицы:</h4>
               <ul className="space-y-1 text-purple-800">
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа (редактируемая DOCX таблица)</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{chart_image}'}</code> - График временных рядов (изображение)</li>
               </ul>
+            </div>
+            <div className="mt-4 p-3 bg-purple-100 rounded-lg">
+              <p className="text-xs text-purple-700">
+                <strong>Примечание:</strong> Используется библиотека docx-templates для лучшей поддержки таблиц. 
+                Обратите внимание на русскую букву "С\" в плейсхолдере <code>{'{AcceptanceСriteria}'}</code>.
+                График вставляется как PNG изображение с высоким разрешением (scale: 2).
+              </p>
             </div>
           </div>
         </div>
@@ -244,15 +251,14 @@ export const Help: React.FC = () => {
           <div className="border-l-4 border-purple-500 pl-4">
             <h3 className="font-semibold text-gray-800">Как добавить маркеры на график?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Двойной клик по графику добавляет вертикальный маркер в выбранной точке времени. Маркеры можно редактировать и удалять.
+              <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов анализа (редактируемая DOCX таблица)</li>
             </p>
           </div>
 
           <div className="border-l-4 border-red-500 pl-4">
-            <h3 className="font-semibold text-gray-800">Как создать отчет из шаблона?</h3>
+              <strong>Примечание:</strong> Используется библиотека docx-templates для полной поддержки таблиц. 
             <p className="text-sm text-gray-600 mt-1">
-              Используется библиотека docx-templates для полной поддержки таблиц. 
-              Обратите внимание на русскую букву "С" в плейсхолдере AcceptanceСriteria.
+              График вставляется как PNG изображение с высоким разрешением (scale: 2).
               Таблица результатов конвертируется из HTML в полноценную DOCX таблицу с сохранением всех стилей и цветовых выделений.
             </p>
           </div>

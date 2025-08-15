@@ -1,6 +1,7 @@
 import { createReport } from 'docx-templates';
 
 export interface TemplateReportData {
+  chartImageBlob: Blob;
   executor: string;
   reportDate: string;
   reportNumber: string;
@@ -43,12 +44,22 @@ export class TemplateReportGenerator {
   private async generateWithDocxTemplates(templateFile: File, data: TemplateReportData): Promise<Blob> {
     // Создаем простую текстовую таблицу для вставки в шаблон
     
+    // Конвертируем изображение в base64 для docxtemplater
+    const chartImageBuffer = await data.chartImageBlob.arrayBuffer();
+    const chartImageBase64 = btoa(String.fromCharCode(...new Uint8Array(chartImageBuffer)));
+    
     // Подготавливаем данные для docxtemplater (все значения должны быть строками)
     const templateData = {
       executor: data.executor,
       Report_No: data.reportNumber,
       Report_start: data.reportStart,
       report_date: data.reportDate,
+      chart_image: {
+        width: 15, // cm
+        height: 10, // cm
+        data: chartImageBase64,
+        extension: '.png'
+      },
       Acceptance_criteria: data.acceptanceCriteria,
       TestType: data.testType || 'Не выбрано',
       AcceptanceСriteria: data.acceptanceCriteria,
@@ -95,4 +106,15 @@ export class TemplateReportGenerator {
     }
   }
 
+  async saveReport(blob: Blob, filename: string): Promise<void> {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Очищаем URL через некоторое время
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
 }
