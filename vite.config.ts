@@ -14,7 +14,9 @@ export default defineConfig({
       'd3-scale-chromatic',
       'd3-selection',
       'd3-time-format',
-      'd3-zoom'
+      'd3-zoom',
+      'pizzip',
+      'docxtemplater'
     ],
   },
   server: {
