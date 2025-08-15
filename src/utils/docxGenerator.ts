@@ -1,5 +1,6 @@
 import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
+import { TemplateProcessor, TemplateData } from './templateProcessor';
 
 export interface ReportData {
   title: string;
@@ -37,6 +38,38 @@ export class DocxReportGenerator {
     } catch (error) {
       console.error('Ошибка генерации DOCX отчета:', error);
       throw new Error('Не удалось создать отчет');
+    }
+  }
+
+  async generateReportFromTemplate(data: ReportData, templateFile: File): Promise<Blob> {
+    try {
+      console.log('Генерация отчета на основе шаблона:', templateFile.name);
+      
+      // Читаем шаблон как ArrayBuffer
+      const templateBuffer = await templateFile.arrayBuffer();
+      
+      // Конвертируем изображение графика в ArrayBuffer
+      const imageBuffer = await data.chartImageBlob.arrayBuffer();
+      
+      // Подготавливаем данные для шаблона
+      const templateData: TemplateData = {
+        DATE: data.date,
+        DATA_TYPE: data.dataType === 'temperature' ? 'Температура' : 'Влажность',
+        CHART: imageBuffer,
+        TABLE: data.analysisResults
+      };
+      
+      // Обрабатываем шаблон
+      const processedBuffer = await TemplateProcessor.processTemplate(templateBuffer, templateData);
+      
+      // Возвращаем как Blob
+      return new Blob([processedBuffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      
+    } catch (error) {
+      console.error('Ошибка генерации отчета из шаблона:', error);
+      throw new Error('Не удалось создать отчет из шаблона: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
     }
   }
 

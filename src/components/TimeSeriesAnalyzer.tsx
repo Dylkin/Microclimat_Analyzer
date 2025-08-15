@@ -31,11 +31,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     hasReport: boolean;
     reportUrl: string | null;
     reportFilename: string | null;
+    templateFile: File | null;
   }>({
     isGenerating: false,
     hasReport: false,
     reportUrl: null,
-    reportFilename: null
+    reportFilename: null,
+    templateFile: null
   });
   
   // Chart dimensions
@@ -195,6 +197,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setZoomState(undefined);
   };
 
+  const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.name.toLowerCase().endsWith('.docx')) {
+      setReportStatus(prev => ({ ...prev, templateFile: file }));
+    } else {
+      alert('Пожалуйста, выберите файл в формате .docx');
+    }
+  };
+
+  const handleRemoveTemplate = () => {
+    setReportStatus(prev => ({ ...prev, templateFile: null }));
+  };
+
   const handleGenerateReport = async () => {
     if (!chartRef.current) {
       alert('График не найден для сохранения');
@@ -276,7 +291,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       // Генерируем DOCX отчет
       const docxGenerator = DocxReportGenerator.getInstance();
-      const docxBlob = await docxGenerator.generateReport(reportData);
+      const docxBlob = reportStatus.templateFile 
+        ? await docxGenerator.generateReportFromTemplate(reportData, reportStatus.templateFile)
+        : await docxGenerator.generateReport(reportData);
 
       // Создаем URL для скачивания
       const reportUrl = URL.createObjectURL(docxBlob);
@@ -327,7 +344,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       isGenerating: false,
       hasReport: false,
       reportUrl: null,
-      reportFilename: null
+      reportFilename: null,
+      templateFile: null
     });
   };
 
@@ -554,7 +572,50 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       {/* Кнопка формирования отчета */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex flex-col items-center space-y-4">
+        <div className="flex flex-col items-center space-y-6">
+          {/* Загрузка шаблона */}
+          <div className="w-full max-w-md">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Шаблон отчета (необязательно)
+            </label>
+            {reportStatus.templateFile ? (
+              <div className="flex items-center justify-between bg-gray-50 border border-gray-300 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm text-gray-700">{reportStatus.templateFile.name}</span>
+                </div>
+                <button
+                  onClick={handleRemoveTemplate}
+                  className="text-red-600 hover:text-red-800 transition-colors"
+                  title="Удалить шаблон"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center">
+                <input
+                  type="file"
+                  accept=".docx"
+                  onChange={handleTemplateUpload}
+                  className="hidden"
+                  id="template-upload"
+                />
+                <label
+                  htmlFor="template-upload"
+                  className="cursor-pointer bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2 border border-gray-300"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Загрузить шаблон DOCX</span>
+                </label>
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Если шаблон не загружен, будет создан стандартный отчет
+            </p>
+          </div>
+
+          {/* Кнопка генерации отчета */}
           <button
             onClick={handleGenerateReport}
             disabled={reportStatus.isGenerating}
@@ -592,6 +653,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               >
                 <Trash2 className="w-4 h-4" />
               </button>
+            </div>
+          )}
+
+          {/* Информация о шаблоне */}
+          {reportStatus.templateFile && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 w-full max-w-2xl">
+              <h4 className="text-sm font-medium text-blue-900 mb-2">Использование шаблона</h4>
+              <div className="text-xs text-blue-800 space-y-1">
+                <p>• График будет вставлен в место плейсхолдера <code className="bg-blue-100 px-1 rounded">{{CHART}}</code></p>
+                <p>• Таблица результатов заменит плейсхолдер <code className="bg-blue-100 px-1 rounded">{{TABLE}}</code></p>
+                <p>• Дата отчета заменит <code className="bg-blue-100 px-1 rounded">{{DATE}}</code></p>
+                <p>• Тип данных заменит <code className="bg-blue-100 px-1 rounded">{{DATA_TYPE}}</code></p>
+              </div>
             </div>
           )}
         </div>
