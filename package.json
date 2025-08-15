@@ -26,7 +26,7 @@
     "html2canvas": "^1.4.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.532.0",
-    "pizzip": "^3.2.1",
+    "pizzip": "^3.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^3.1.0"
