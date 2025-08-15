@@ -1,7 +1,7 @@
 import { createReport } from 'docx-templates';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import ImageModule from 'docxtemplater-image-module-free';
+const ImageModule = require('docxtemplater-image-module-free');
 
 export interface TemplateReportData {
   chartImageBlob: Blob;
@@ -75,11 +75,20 @@ export class TemplateReportGenerator {
       // 2. Настройка модуля изображений
       const imageModule = new ImageModule({
         centered: false,
-        getImage: function(tagValue: any) {
+        getImage: function(tagValue: any, tagName: string) {
+          console.log('getImage вызван для тега:', tagName, 'тип значения:', typeof tagValue);
+          if (tagValue instanceof ArrayBuffer) {
+            return tagValue;
+          }
+          if (tagValue instanceof Uint8Array) {
+            return tagValue.buffer;
+          }
+          console.error('Неподдерживаемый тип данных изображения:', typeof tagValue);
           return tagValue;
         },
-        getSize: function() {
-          return [400, 300]; // ширина, высота в пикселях
+        getSize: function(img: any, tagValue: any, tagName: string) {
+          console.log('getSize вызван для тега:', tagName);
+          return [400, 300]; // ширина, высота в пикселях  
         }
       });
 
@@ -87,10 +96,19 @@ export class TemplateReportGenerator {
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
-        modules: [imageModule]
+        modules: [imageModule],
+        nullGetter: function(part: any) {
+          console.log('nullGetter вызван для:', part);
+          if (part.module === 'docxtemplater-image-module-free') {
+            return '';
+          }
+          return '';
+        }
       });
 
       // 4. Рендер документа с подготовленными данными
+      console.log('Данные для рендера:', Object.keys(templateData));
+      console.log('Тип chart_image:', typeof templateData.chart_image);
       doc.render(templateData);
 
       // 5. Генерация файла
