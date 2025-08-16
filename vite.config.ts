@@ -4,6 +4,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    alias: {
+      'docxtemplater-table-module': 'docxtemplater-table-module/build/docxtemplater-table-module.js'
+    }
   },
   define: {
     global: 'globalThis',
