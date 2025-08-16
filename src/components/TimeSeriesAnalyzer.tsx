@@ -210,56 +210,44 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setReportStatus(prev => ({ ...prev, templateFile: null }));
   };
 
-  const handleGenerateReport = async () => {
-    setReportStatus(prev => ({ ...prev, isGenerating: true }));
+  /**
+   * Создание PNG изображения графика с поворотом на 90°
+   */
+  const createChartPNG = async (): Promise<Blob> => {
+    if (!chartRef.current) {
+      throw new Error('График не найден для сохранения');
+    }
 
+    const chartContainer = chartRef.current;
+    
+    // 1. Временно скрываем все кнопки в области графика
+    const buttons = chartContainer.querySelectorAll('button');
+    const originalDisplays: string[] = [];
+    buttons.forEach((button, index) => {
+      originalDisplays[index] = button.style.display;
+      button.style.display = 'none';
+    });
+    
     try {
-      if (!chartRef.current) {
-        throw new Error('График не найден для сохранения');
-      }
-
-      // Находим контейнер с графиком
-      const chartContainer = chartRef.current;
-      
-      // Временно скрываем все кнопки в области графика
-      const buttons = chartContainer.querySelectorAll('button');
-      const originalDisplays: string[] = [];
-      buttons.forEach((button, index) => {
-        originalDisplays[index] = button.style.display;
-        button.style.display = 'none';
+      // 2. Создаем скриншот с высоким качеством
+      const canvas = await html2canvas(chartContainer, {
+        scale: 2, // Увеличиваем разрешение в 2 раза
+        backgroundColor: '#ffffff', // Белый фон
+        useCORS: true, // Поддержка CORS для внешних ресурсов
+        allowTaint: true, // Разрешаем "загрязненные" canvas
+        logging: false, // Отключаем логирование
+        width: chartContainer.offsetWidth,
+        height: chartContainer.offsetHeight,
+        onclone: (clonedDoc) => {
+          // Убеждаемся, что в клонированном документе тоже скрыты кнопки
+          const clonedButtons = clonedDoc.querySelectorAll('button');
+          clonedButtons.forEach(button => {
+            button.style.display = 'none';
+          });
+        }
       });
-      
-      // Создаем скриншот с высоким качеством
-      let canvas;
-      try {
-        canvas = await html2canvas(chartContainer, {
-          scale: 2, // Увеличиваем разрешение для лучшего качества
-          backgroundColor: '#ffffff',
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          width: chartContainer.offsetWidth,
-          height: chartContainer.offsetHeight,
-          onclone: (clonedDoc) => {
-            // Убеждаемся, что в клонированном документе тоже скрыты кнопки
-            const clonedButtons = clonedDoc.querySelectorAll('button');
-            clonedButtons.forEach(button => {
-              button.style.display = 'none';
-            });
-          }
-        });
-      } finally {
-        // Восстанавливаем отображение кнопок
-        buttons.forEach((button, index) => {
-          button.style.display = originalDisplays[index] || '';
-        });
-      }
 
-      if (!canvas) {
-        throw new Error('Не удалось создать скриншот графика');
-      }
-
-      // Создаем новый canvas для поворота изображения на 90° против часовой стрелки
+      // 3. Создаем новый canvas для поворота изображения на 90° против часовой стрелки
       const rotatedCanvas = document.createElement('canvas');
       const ctx = rotatedCanvas.getContext('2d');
       
@@ -267,18 +255,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         throw new Error('Ошибка создания контекста для поворота изображения');
       }
 
-      // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
+      // 4. Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
       rotatedCanvas.width = canvas.height;
       rotatedCanvas.height = canvas.width;
 
-      // Поворачиваем контекст на 90° против часовой стрелки
+      // 5. Поворачиваем контекст на 90° против часовой стрелки
       ctx.translate(0, canvas.width);
       ctx.rotate(-Math.PI / 2);
 
-      // Рисуем исходное изображение на повернутом canvas
+      // 6. Рисуем исходное изображение на повернутом canvas
       ctx.drawImage(canvas, 0, 0);
 
-      // Конвертируем повернутый canvas в blob
+      // 7. Конвертируем повернутый canvas в blob
       const chartBlob = await new Promise<Blob>((resolve, reject) => {
         rotatedCanvas.toBlob((blob) => {
           if (blob) {
@@ -286,8 +274,24 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           } else {
             reject(new Error('Ошибка создания изображения графика'));
           }
-        }, 'image/png', 1.0);
+        }, 'image/png', 1.0); // PNG формат, максимальное качество
       });
+
+      return chartBlob;
+      
+    } finally {
+      // 8. Восстанавливаем отображение кнопок
+      buttons.forEach((button, index) => {
+        button.style.display = originalDisplays[index] || '';
+      });
+    }
+  };
+  const handleGenerateReport = async () => {
+    setReportStatus(prev => ({ ...prev, isGenerating: true }));
+
+    try {
+      // Создаем PNG изображение графика
+      const chartBlob = await createChartPNG();
 
       // Генерируем данные для отчета
       const now = new Date();
@@ -305,9 +309,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       // Генерируем DOCX отчет
       const docxGenerator = DocxReportGenerator.getInstance();
-      const docxBlob = reportStatus.templateFile 
-        ? await docxGenerator.generateReportFromTemplate(reportData, reportStatus.templateFile)
-        : await docxGenerator.generateReport(reportData);
+      
+      let docxBlob: Blob;
+      if (reportStatus.templateFile) {
+        // Используем шаблон с PNG изображением
+        docxBlob = await docxGenerator.generateReportFromTemplate(reportData, reportStatus.templateFile);
+      } else {
+        // Стандартная генерация отчета
+        docxBlob = await docxGenerator.generateReport(reportData);
+      }
 
       // Создаем URL для скачивания
       const reportUrl = URL.createObjectURL(docxBlob);
@@ -583,6 +593,46 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       {/* Кнопка формирования отчета */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-col items-center space-y-6">
+          {/* Загрузка шаблона */}
+          <div className="w-full max-w-md">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Шаблон отчета (необязательно)
+            </label>
+            <div className="flex items-center space-x-3">
+              <input
+                type="file"
+                accept=".docx"
+                onChange={handleTemplateUpload}
+                className="hidden"
+                id="template-upload"
+              />
+              <label
+                htmlFor="template-upload"
+                className="cursor-pointer bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Выбрать шаблон DOCX</span>
+              </label>
+              {reportStatus.templateFile && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-green-600">{reportStatus.templateFile.name}</span>
+                  <button
+                    onClick={handleRemoveTemplate}
+                    className="text-red-600 hover:text-red-800 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+            {reportStatus.templateFile && (
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  <strong>Доступные плейсхолдеры:</strong> {'{date}'}, {'{data_type}'}, {'{chart_image}'}, {'{table}'}, {'{title}'}, {'{analysis_summary}'}
+                </p>
+              </div>
+            )}
+          </div>
           {/* Загрузка шаблона */}
 
           {/* Кнопка генерации отчета */}

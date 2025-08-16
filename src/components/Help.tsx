@@ -143,10 +143,27 @@ export const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-800 mb-3">3. Генерация отчетов</h3>
             <div className="bg-gray-50 rounded-lg p-4">
               <ul className="space-y-2 text-sm text-gray-700">
-                <li>• Нажмите кнопку "Сформировать отчет"</li>
-                <li>• Система автоматически создаст отчет с таблицей результатов и графиком</li>
-                <li>• График поворачивается на 90° против часовой стрелки</li>
+                <li>• <strong>Стандартный отчет:</strong> Нажмите "Сформировать отчет" без шаблона</li>
+                <li>• <strong>Отчет по шаблону:</strong> Загрузите DOCX шаблон с плейсхолдерами</li>
+                <li>• График автоматически поворачивается на 90° против часовой стрелки</li>
+                <li>• PNG изображение графика вставляется в высоком разрешении</li>
                 <li>• Готовый отчет сохраняется в формате DOCX</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Работа с шаблонами */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">4. Работа с шаблонами DOCX</h3>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <ul className="space-y-2 text-sm text-gray-700">
+                <li>• Создайте DOCX документ с плейсхолдерами в фигурных скобках</li>
+                <li>• <strong>{'{date}'}</strong> - дата создания отчета</li>
+                <li>• <strong>{'{data_type}'}</strong> - тип данных (Температура/Влажность)</li>
+                <li>• <strong>{'{chart_image}'}</strong> - PNG изображение графика</li>
+                <li>• <strong>{'{table}'}</strong> - HTML таблица результатов анализа</li>
+                <li>• <strong>{'{title}'}</strong> - заголовок отчета</li>
+                <li>• <strong>{'{analysis_summary}'}</strong> - краткая сводка анализа</li>
               </ul>
             </div>
           </div>
@@ -202,9 +219,9 @@ export const Help: React.FC = () => {
           </div>
 
           <div className="border-l-4 border-green-500 pl-4">
-            <h3 className="font-semibold text-gray-800">Как создать шаблон отчета?</h3>
+            <h3 className="font-semibold text-gray-800">Как работают шаблоны отчетов?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Нажмите кнопку "Сформировать отчет". Система автоматически создаст отчет с графиком и таблицей результатов в формате DOCX.
+              Создайте DOCX файл с плейсхолдерами типа {'{chart_image}'} для изображения графика. Система автоматически заменит их на реальные данные и PNG изображение графика.
             </p>
           </div>
 
@@ -216,9 +233,9 @@ export const Help: React.FC = () => {
           </div>
 
           <div className="border-l-4 border-red-500 pl-4">
-            <h3 className="font-semibold text-gray-800">Как создать отчет?</h3>
+            <h3 className="font-semibold text-gray-800">Почему график не отображается в шаблоне?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Используйте таблицу результатов анализа для создания отчетов во внешних программах. Данные можно скопировать и вставить в документы.
+              Убедитесь, что в шаблоне используется плейсхолдер {'{chart_image}'} в том месте, где должен быть график. Изображение автоматически вставляется в PNG формате с высоким разрешением.
             </p>
           </div>
         </div>

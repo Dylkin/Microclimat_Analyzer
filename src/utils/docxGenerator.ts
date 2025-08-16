@@ -1,4 +1,5 @@
 import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel } from 'docx';
+import { TemplateProcessor, TemplateData } from './templateProcessor';
 
 export interface ReportData {
   title: string;
@@ -45,13 +46,38 @@ export class DocxReportGenerator {
 
   async generateReportFromTemplate(data: ReportData, templateFile: File): Promise<Blob> {
     try {
-      console.log('Функциональность шаблонов отключена');
-      console.log('Переключаемся на создание стандартного отчета...');
-      return this.generateReport(data);
+      console.log('Генерация отчета из шаблона с PNG графиком...');
+      
+      // 1. Конвертируем изображение графика в base64
+      const templateProcessor = new TemplateProcessor();
+      const chartImageBase64 = await templateProcessor.convertBlobToBase64(data.chartImageBlob);
+      
+      // 2. Создаем HTML таблицу результатов
+      const analysisTable = templateProcessor.createAnalysisTable(data.analysisResults);
+      
+      // 3. Подготавливаем данные для шаблона
+      const templateData: TemplateData = {
+        date: data.date,
+        data_type: data.dataType === 'temperature' ? 'Температура' : 'Влажность',
+        chart_image: chartImageBase64,
+        table: analysisTable,
+        title: data.title,
+        analysis_summary: this.createAnalysisSummary(data.analysisResults, data.dataType),
+        file_count: data.analysisResults.length,
+        temperature_range: this.getTemperatureRange(data.analysisResults),
+        humidity_range: this.getHumidityRange(data.analysisResults),
+        time_period: this.getTimePeriod(data.analysisResults)
+      };
+      
+      // 4. Обрабатываем шаблон
+      const reportBlob = await templateProcessor.processTemplate(templateFile, templateData);
+      
+      console.log('Отчет из шаблона успешно создан');
+      return reportBlob;
+      
     } catch (error) {
-      console.error('Ошибка генерации отчета:', error);
-      console.log('Переключаемся на создание стандартного отчета...');
-      return this.generateReport(data);
+      console.error('Ошибка генерации отчета из шаблона:', error);
+      throw new Error(`Ошибка генерации отчета из шаблона: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   }
 
@@ -384,6 +410,80 @@ export class DocxReportGenerator {
     return paragraphs;
   }
 
+  /**
+   * Создание краткой сводки анализа
+   */
+  private createAnalysisSummary(results: any[], dataType: 'temperature' | 'humidity'): string {
+    const validResults = results.filter(r => !r.isExternal && r.minTemp !== '-');
+    const totalFiles = validResults.length;
+    const externalSensors = results.filter(r => r.isExternal).length;
+    const compliantCount = results.filter(r => r.meetsLimits === 'Да').length;
+    const nonCompliantCount = results.filter(r => r.meetsLimits === 'Нет').length;
+
+    let summary = `Общее количество датчиков: ${results.length}\n`;
+    summary += `Внутренние датчики: ${totalFiles}\n`;
+    summary += `Внешние датчики: ${externalSensors}\n\n`;
+    
+    if (dataType === 'temperature' && validResults.length > 0) {
+      const temperatures = validResults.map(r => parseFloat(r.avgTemp)).filter(t => !isNaN(t));
+      if (temperatures.length > 0) {
+        const minTemp = Math.min(...temperatures);
+        const maxTemp = Math.max(...temperatures);
+        const avgTemp = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+        
+        summary += `Температурная статистика:\n`;
+        summary += `• Минимальная средняя температура: ${minTemp.toFixed(1)}°C\n`;
+        summary += `• Максимальная средняя температура: ${maxTemp.toFixed(1)}°C\n`;
+        summary += `• Общая средняя температура: ${avgTemp.toFixed(1)}°C\n\n`;
+      }
+    }
+    
+    if (compliantCount > 0 || nonCompliantCount > 0) {
+      summary += `Соответствие лимитам:\n`;
+      summary += `• Соответствуют: ${compliantCount} датчиков\n`;
+      summary += `• Не соответствуют: ${nonCompliantCount} датчиков`;
+    }
+    
+    return summary;
+  }
+
+  /**
+   * Получение диапазона температур
+   */
+  private getTemperatureRange(results: any[]): string {
+    const validResults = results.filter(r => !r.isExternal && r.minTemp !== '-');
+    if (validResults.length === 0) return 'Нет данных';
+    
+    const temperatures = validResults.map(r => parseFloat(r.avgTemp)).filter(t => !isNaN(t));
+    if (temperatures.length === 0) return 'Нет данных';
+    
+    const min = Math.min(...temperatures);
+    const max = Math.max(...temperatures);
+    return `${min.toFixed(1)}°C - ${max.toFixed(1)}°C`;
+  }
+
+  /**
+   * Получение диапазона влажности
+   */
+  private getHumidityRange(results: any[]): string {
+    const validResults = results.filter(r => !r.isExternal && r.minHumidity !== '-');
+    if (validResults.length === 0) return 'Нет данных';
+    
+    const humidities = validResults.map(r => parseFloat(r.avgHumidity)).filter(h => !isNaN(h));
+    if (humidities.length === 0) return 'Нет данных';
+    
+    const min = Math.min(...humidities);
+    const max = Math.max(...humidities);
+    return `${min.toFixed(1)}% - ${max.toFixed(1)}%`;
+  }
+
+  /**
+   * Получение временного периода
+   */
+  private getTimePeriod(results: any[]): string {
+    // Это упрощенная версия, в реальности нужно получать данные из файлов
+    return 'Период анализа определяется загруженными данными';
+  }
 
   hasExistingDocument(): boolean {
     return this.currentDoc !== null;
