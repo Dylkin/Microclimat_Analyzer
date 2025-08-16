@@ -196,10 +196,11 @@ export class DocxTemplateProcessor {
 
       // Заменяем плейсхолдер на XML изображения
       const updatedDocumentXml = this.replaceChartPlaceholder(documentXml, relationshipId);
-      zip.file('word/document.xml', updatedDocumentXml);
-
-      // Обрабатываем другие плейсхолдеры
+      
+      // Обрабатываем текстовые плейсхолдеры ПОСЛЕ замены изображения
+      console.log('Processing text placeholders...');
       const finalDocumentXml = this.processTextPlaceholders(updatedDocumentXml, data);
+      console.log('Text placeholders processed, saving document...');
       zip.file('word/document.xml', finalDocumentXml);
 
       // Генерируем итоговый DOCX файл
@@ -260,7 +261,11 @@ export class DocxTemplateProcessor {
       
       // Обрабатываем шаблон с новыми данными
       let processedTemplateXml = this.replaceChartPlaceholder(templateDocumentXml, newRelationshipId);
+      
+      // Обрабатываем текстовые плейсхолдеры
+      console.log('Processing text placeholders for existing document...');
       processedTemplateXml = this.processTextPlaceholders(processedTemplateXml, data);
+      console.log('Text placeholders processed for existing document');
       
       // Читаем существующий документ
       const existingDocumentXml = existingZip.files['word/document.xml'].asText();
@@ -461,6 +466,12 @@ export class DocxTemplateProcessor {
 
     // Функция для более надежной замены плейсхолдеров
     const replacePlaceholder = (xml: string, placeholder: string, value: string): string => {
+      console.log(`Attempting to replace {${placeholder}} with: "${value}"`);
+      
+      // Подсчитываем количество вхождений до замены
+      const beforeCount = (xml.match(new RegExp(`\\{${placeholder}\\}`, 'g')) || []).length;
+      console.log(`Found ${beforeCount} occurrences of {${placeholder}} in document`);
+      
       // Заменяем обычные плейсхолдеры
       let updatedXml = xml.replace(new RegExp(`\\{${placeholder}\\}`, 'g'), this.escapeXml(value));
       
@@ -479,8 +490,28 @@ export class DocxTemplateProcessor {
       );
       updatedXml = updatedXml.replace(spacedPlaceholderPattern, `<w:t>${this.escapeXml(value)}</w:t>`);
       
+      // Подсчитываем количество вхождений после замены
+      const afterCount = (updatedXml.match(new RegExp(`\\{${placeholder}\\}`, 'g')) || []).length;
+      console.log(`After replacement: ${afterCount} occurrences of {${placeholder}} remain`);
+      
+      if (beforeCount > 0 && afterCount === beforeCount) {
+        console.warn(`WARNING: No replacements made for {${placeholder}}! Trying alternative patterns...`);
+        
+        // Попробуем более агрессивные паттерны
+        const aggressivePattern1 = new RegExp(`\\{${placeholder}\\}`, 'gi');
+        const aggressivePattern2 = new RegExp(`\\{\\s*${placeholder}\\s*\\}`, 'gi');
+        
+        updatedXml = updatedXml.replace(aggressivePattern1, this.escapeXml(value));
+        updatedXml = updatedXml.replace(aggressivePattern2, this.escapeXml(value));
+        
+        // Проверяем результат
+        const finalCount = (updatedXml.match(new RegExp(`\\{${placeholder}\\}`, 'g')) || []).length;
+        console.log(`After aggressive replacement: ${finalCount} occurrences remain`);
+      }
+      
       return updatedXml;
     };
+    
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
       result = replacePlaceholder(result, 'Result', data.conclusions);
