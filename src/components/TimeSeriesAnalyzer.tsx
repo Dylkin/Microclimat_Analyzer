@@ -675,6 +675,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <p>• Таблица результатов заменит плейсхолдер <code className="bg-blue-100 px-1 rounded">{'{{TABLE}}'}</code></p>
                 <p>• Дата отчета заменит <code className="bg-blue-100 px-1 rounded">{'{{DATE}}'}</code></p>
                 <p>• Тип данных заменит <code className="bg-blue-100 px-1 rounded">{'{{DATA_TYPE}}'}</code></p>
+                <p className="text-red-700 font-medium">• ВАЖНО: Используйте ТОЧНО двойные фигурные скобки! Неправильно: {'{{{DATE}}}'}, правильно: {'{{DATE}}'}</p>
                 <p className="text-orange-700 font-medium">• Примечание: Вставка изображений в шаблон пока не поддерживается в браузерной версии</p>
               </div>
             </div>

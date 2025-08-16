@@ -25,6 +25,18 @@ export class TemplateProcessor {
       // Создаем ZIP из шаблона
       const zip = new PizZip(templateBuffer);
       
+      // Проверяем содержимое document.xml на корректность плейсхолдеров
+      try {
+        const documentXml = zip.file('word/document.xml');
+        if (documentXml) {
+          const xmlContent = documentXml.asText();
+          this.validatePlaceholders(xmlContent);
+        }
+      } catch (validationError) {
+        console.warn('Предупреждение при валидации шаблона:', validationError);
+        // Продолжаем выполнение, но предупреждаем пользователя
+      }
+      
       // Создаем docxtemplater
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
@@ -103,14 +115,53 @@ export class TemplateProcessor {
         errorMessage += '. ПОДСКАЗКА: Вставка изображений в шаблоны не поддерживается в браузерной версии. Удалите все плейсхолдеры изображений из шаблона.';
       }
       
-      if (errorMessage.includes('Multi error')) {
-        errorMessage += '. ПОДСКАЗКА: Проверьте корректность всех плейсхолдеров в шаблоне. Убедитесь, что они заключены в двойные фигурные скобки {{placeholder}}.';
+      if (errorMessage.includes('Multi error') || errorMessage.includes('Duplicate')) {
+        errorMessage += '. ПОДСКАЗКА: В шаблоне найдены некорректные плейсхолдеры. Проверьте, что все плейсхолдеры заключены ТОЧНО в двойные фигурные скобки {{placeholder}}. Удалите лишние фигурные скобки (например, измените {{{DATE}}} на {{DATE}}).';
+      }
+      
+      if (errorMessage.includes('open tag') || errorMessage.includes('close tag')) {
+        errorMessage += '. ОШИБКА ШАБЛОНА: Найдены плейсхолдеры с неправильным количеством фигурных скобок. Откройте ваш DOCX файл и исправьте плейсхолдеры: используйте ТОЛЬКО {{DATE}}, {{DATA_TYPE}}, {{CHART}}, {{TABLE}} (ровно 2 открывающие и 2 закрывающие скобки).';
       }
       
       throw new Error(`Не удалось обработать шаблон: ${errorMessage}`);
     }
   }
 
+  /**
+   * Валидация плейсхолдеров в XML содержимом документа
+   */
+  private static validatePlaceholders(xmlContent: string): void {
+    // Ищем потенциально проблемные плейсхолдеры
+    const problematicPatterns = [
+      /\{\{\{[^}]+\}\}\}/g,  // Тройные открывающие скобки
+      /\{\{[^}]+\}\}\}/g,    // Тройные закрывающие скобки
+      /\{[^{][^}]*\}/g,      // Одинарные скобки
+    ];
+    
+    const issues: string[] = [];
+    
+    problematicPatterns.forEach((pattern, index) => {
+      const matches = xmlContent.match(pattern);
+      if (matches) {
+        switch (index) {
+          case 0:
+            issues.push(`Найдены плейсхолдеры с тройными открывающими скобками: ${matches.slice(0, 3).join(', ')}`);
+            break;
+          case 1:
+            issues.push(`Найдены плейсхолдеры с тройными закрывающими скобками: ${matches.slice(0, 3).join(', ')}`);
+            break;
+          case 2:
+            issues.push(`Найдены плейсхолдеры с одинарными скобками: ${matches.slice(0, 3).join(', ')}`);
+            break;
+        }
+      }
+    });
+    
+    if (issues.length > 0) {
+      console.warn('Обнаружены потенциальные проблемы в шаблоне:', issues);
+      throw new Error(`Проблемы с плейсхолдерами в шаблоне: ${issues.join('; ')}`);
+    }
+  }
   /**
    * Форматирование таблицы для вставки в шаблон
    */
