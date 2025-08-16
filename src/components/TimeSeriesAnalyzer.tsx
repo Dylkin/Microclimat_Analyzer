@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxReportGenerator, ReportData } from '../utils/docxGenerator';
 import { DocxImageGenerator, ImageReportData } from '../utils/docxImageGenerator';
+import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -33,12 +34,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     reportUrl: string | null;
     reportFilename: string | null;
     templateFile: File | null;
+    templateValidation: { isValid: boolean; errors: string[] } | null;
   }>({
     isGenerating: false,
     hasReport: false,
     reportUrl: null,
     reportFilename: null,
-    templateFile: null
+    templateFile: null,
+    templateValidation: null
   });
   
   // Chart dimensions
@@ -201,14 +204,49 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.name.toLowerCase().endsWith('.docx')) {
-      setReportStatus(prev => ({ ...prev, templateFile: file }));
+      setReportStatus(prev => ({ 
+        ...prev, 
+        templateFile: file,
+        templateValidation: null 
+      }));
+      
+      // Валидируем шаблон
+      validateTemplate(file);
     } else {
       alert('Пожалуйста, выберите файл в формате .docx');
     }
   };
 
+  const validateTemplate = async (file: File) => {
+    try {
+      const processor = DocxTemplateProcessor.getInstance();
+      const validation = await processor.validateTemplate(file);
+      
+      setReportStatus(prev => ({ 
+        ...prev, 
+        templateValidation: validation 
+      }));
+      
+      if (!validation.isValid) {
+        console.warn('Ошибки валидации шаблона:', validation.errors);
+      }
+    } catch (error) {
+      console.error('Ошибка валидации шаблона:', error);
+      setReportStatus(prev => ({ 
+        ...prev, 
+        templateValidation: { 
+          isValid: false, 
+          errors: ['Ошибка чтения файла шаблона'] 
+        } 
+      }));
+    }
+  };
   const handleRemoveTemplate = () => {
-    setReportStatus(prev => ({ ...prev, templateFile: null }));
+    setReportStatus(prev => ({ 
+      ...prev, 
+      templateFile: null,
+      templateValidation: null 
+    }));
   };
 
   const handleGenerateReport = async () => {
@@ -373,6 +411,61 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     } catch (error) {
       console.error('Ошибка создания отчета с PNG изображением:', error);
       alert(`Ошибка при формировании отчета с PNG: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      setReportStatus(prev => ({ ...prev, isGenerating: false }));
+    }
+  };
+
+  const handleGenerateTemplateReport = async () => {
+    if (!reportStatus.templateFile || !chartRef.current) {
+      alert('Необходимо загрузить шаблон и убедиться, что график отображается');
+      return;
+    }
+
+    if (reportStatus.templateValidation && !reportStatus.templateValidation.isValid) {
+      alert('Шаблон содержит ошибки. Пожалуйста, исправьте их перед генерацией отчета.');
+      return;
+    }
+
+    setReportStatus(prev => ({ ...prev, isGenerating: true }));
+
+    try {
+      // Генерируем данные для шаблона
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('ru-RU');
+      const timeStr = now.toLocaleTimeString('ru-RU');
+      const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
+      
+      const templateData: TemplateReportData = {
+        title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
+        date: `${dateStr} ${timeStr}`,
+        dataType,
+        analysisResults
+      };
+
+      // Обрабатываем шаблон
+      const processor = DocxTemplateProcessor.getInstance();
+      const docxBlob = await processor.processTemplate(
+        reportStatus.templateFile,
+        templateData,
+        chartRef.current
+      );
+
+      // Создаем URL для скачивания
+      const reportUrl = URL.createObjectURL(docxBlob);
+      const reportFilename = `отчет_шаблон_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
+
+      // Обновляем состояние
+      setReportStatus(prev => ({
+        ...prev,
+        isGenerating: false,
+        hasReport: true,
+        reportUrl,
+        reportFilename
+      }));
+      
+    } catch (error) {
+      console.error('Ошибка генерации отчета по шаблону:', error);
+      alert(`Ошибка при формировании отчета по шаблону: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       setReportStatus(prev => ({ ...prev, isGenerating: false }));
     }
   };
@@ -630,47 +723,149 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       {/* Кнопка формирования отчета */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-col items-center space-y-6">
-          {/* Загрузка шаблона */}
+          {/* Загрузка шаблона DOCX */}
+          <div className="w-full max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+              Использование пользовательского шаблона
+            </h3>
+            
+            {!reportStatus.templateFile ? (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept=".docx"
+                  onChange={handleTemplateUpload}
+                  className="hidden"
+                  id="template-upload"
+                />
+                <label
+                  htmlFor="template-upload"
+                  className="cursor-pointer flex flex-col items-center space-y-2"
+                >
+                  <FileText className="w-8 h-8 text-gray-400" />
+                  <span className="text-sm text-gray-600">
+                    Загрузить DOCX шаблон с плейсхолдером {'{chart}'}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Нажмите для выбора файла
+                  </span>
+                </label>
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-5 h-5 text-green-600" />
+                    <span className="text-sm font-medium text-gray-900">
+                      {reportStatus.templateFile.name}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleRemoveTemplate}
+                    className="text-red-600 hover:text-red-800 transition-colors"
+                    title="Удалить шаблон"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                {/* Результат валидации */}
+                {reportStatus.templateValidation && (
+                  <div className={`mt-2 p-2 rounded text-xs ${
+                    reportStatus.templateValidation.isValid 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {reportStatus.templateValidation.isValid ? (
+                      <div className="flex items-center space-x-1">
+                        <CheckCircle className="w-3 h-3" />
+                        <span>Шаблон валиден, найден плейсхолдер {'{chart}'}</span>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center space-x-1 mb-1">
+                          <XCircle className="w-3 h-3" />
+                          <span>Ошибки в шаблоне:</span>
+                        </div>
+                        <ul className="list-disc list-inside ml-4">
+                          {reportStatus.templateValidation.errors.map((error, index) => (
+                            <li key={index}>{error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Кнопка генерации отчета */}
-          <button
-            onClick={handleGenerateReport}
-            disabled={reportStatus.isGenerating}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed mr-4"
-            title="Сформировать отчет с графиком"
-          >
-            {reportStatus.isGenerating ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Формирование отчета...</span>
-              </>
-            ) : (
-              <>
-                <FileText className="w-5 h-5" />
-                <span>{reportStatus.hasReport ? 'Обновить отчет' : 'Сформировать отчет'}</span>
-              </>
-            )}
-          </button>
-          
-          {/* Кнопка генерации отчета с PNG изображением */}
-          <button
-            onClick={handleGenerateImageReport}
-            disabled={reportStatus.isGenerating}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-            title="Сформировать отчет с PNG изображением графика"
-          >
-            {reportStatus.isGenerating ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Формирование отчета...</span>
-              </>
-            ) : (
-              <>
-                <FileText className="w-5 h-5" />
-                <span>Отчет с PNG графиком</span>
-              </>
-            )}
-          </button>
+          <div className="flex flex-wrap justify-center gap-4">
+            {/* Стандартный отчет */}
+            <button
+              onClick={handleGenerateReport}
+              disabled={reportStatus.isGenerating}
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+              title="Сформировать стандартный отчет с графиком"
+            >
+              {reportStatus.isGenerating ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <span>Формирование отчета...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-5 h-5" />
+                  <span>Стандартный отчет</span>
+                </>
+              )}
+            </button>
+            
+            {/* Отчет с PNG изображением */}
+            <button
+              onClick={handleGenerateImageReport}
+              disabled={reportStatus.isGenerating}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+              title="Сформировать отчет с PNG изображением графика"
+            >
+              {reportStatus.isGenerating ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <span>Формирование отчета...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-5 h-5" />
+                  <span>Отчет с PNG графиком</span>
+                </>
+              )}
+            </button>
+            
+            {/* Отчет по шаблону */}
+            <button
+              onClick={handleGenerateTemplateReport}
+              disabled={
+                reportStatus.isGenerating || 
+                !reportStatus.templateFile || 
+                (reportStatus.templateValidation && !reportStatus.templateValidation.isValid)
+              }
+              className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+              title="Сформировать отчет по загруженному шаблону"
+            >
+              {reportStatus.isGenerating ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <span>Формирование отчета...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-5 h-5" />
+                  <span>Отчет по шаблону</span>
+                </>
+              )}
+            </button>
+          </div>
           
           {/* Ссылка для скачивания и кнопка удаления */}
           {reportStatus.hasReport && reportStatus.reportUrl && (
@@ -692,6 +887,26 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </button>
             </div>
           )}
+          
+          {/* Информация о плейсхолдерах для шаблона */}
+          <div className="w-full max-w-2xl bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-blue-900 mb-2">
+              Доступные плейсхолдеры для шаблона:
+            </h4>
+            <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
+              <div><code>{'{chart}'}</code> - Изображение графика (PNG)</div>
+              <div><code>{'{title}'}</code> - Заголовок отчета</div>
+              <div><code>{'{date}'}</code> - Дата создания</div>
+              <div><code>{'{dataType}'}</code> - Тип данных</div>
+              <div><code>{'{totalSensors}'}</code> - Общее количество датчиков</div>
+              <div><code>{'{internalSensors}'}</code> - Внутренние датчики</div>
+              <div><code>{'{externalSensors}'}</code> - Внешние датчики</div>
+              <div><code>{'{compliantSensors}'}</code> - Соответствуют лимитам</div>
+            </div>
+            <p className="text-xs text-blue-600 mt-2">
+              <strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для вставки изображения графика.
+            </p>
+          </div>
 
         </div>
       </div>

@@ -143,10 +143,25 @@ export const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-800 mb-3">3. Генерация отчетов</h3>
             <div className="bg-gray-50 rounded-lg p-4">
               <ul className="space-y-2 text-sm text-gray-700">
-                <li>• Нажмите кнопку "Сформировать отчет"</li>
-                <li>• Система автоматически создаст отчет с таблицей результатов и графиком</li>
-                <li>• График поворачивается на 90° против часовой стрелки</li>
-                <li>• Готовый отчет сохраняется в формате DOCX</li>
+                <li>• <strong>Стандартный отчет:</strong> Автоматически создается с таблицей результатов и графиком</li>
+                <li>• <strong>Отчет с PNG графиком:</strong> Содержит высококачественное изображение графика</li>
+                <li>• <strong>Отчет по шаблону:</strong> Использует загруженный DOCX шаблон с плейсхолдерами</li>
+                <li>• График автоматически поворачивается на 90° против часовой стрелки</li>
+                <li>• Все отчеты сохраняются в формате DOCX</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Работа с шаблонами */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">4. Работа с пользовательскими шаблонами</h3>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <ul className="space-y-2 text-sm text-gray-700">
+                <li>• Загрузите DOCX файл с плейсхолдерами в фигурных скобках</li>
+                <li>• Обязательный плейсхолдер: <code className="bg-gray-200 px-1 rounded">{'{chart}'}</code> - для вставки изображения графика</li>
+                <li>• Дополнительные плейсхолдеры: <code className="bg-gray-200 px-1 rounded">{'{title}'}</code>, <code className="bg-gray-200 px-1 rounded">{'{date}'}</code>, <code className="bg-gray-200 px-1 rounded">{'{dataType}'}</code></li>
+                <li>• Система автоматически валидирует шаблон перед использованием</li>
+                <li>• График вставляется как PNG изображение с высоким разрешением</li>
               </ul>
             </div>
           </div>
@@ -204,7 +219,7 @@ export const Help: React.FC = () => {
           <div className="border-l-4 border-green-500 pl-4">
             <h3 className="font-semibold text-gray-800">Как создать шаблон отчета?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Нажмите кнопку "Сформировать отчет". Система автоматически создаст отчет с графиком и таблицей результатов в формате DOCX.
+              Создайте DOCX файл с плейсхолдерами в фигурных скобках, загрузите его и нажмите "Отчет по шаблону". Обязательно включите плейсхолдер {'{chart}'} для вставки графика.
             </p>
           </div>
 
@@ -218,7 +233,14 @@ export const Help: React.FC = () => {
           <div className="border-l-4 border-red-500 pl-4">
             <h3 className="font-semibold text-gray-800">Как создать отчет?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Используйте таблицу результатов анализа для создания отчетов во внешних программах. Данные можно скопировать и вставить в документы.
+              Выберите один из трех вариантов: стандартный отчет, отчет с PNG графиком или отчет по пользовательскому шаблону. Все варианты создают готовые DOCX файлы.
+            </p>
+          </div>
+
+          <div className="border-l-4 border-orange-500 pl-4">
+            <h3 className="font-semibold text-gray-800">Какие плейсхолдеры поддерживаются в шаблонах?</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Основные: {'{chart}'} (изображение), {'{title}'}, {'{date}'}, {'{dataType}'}. Статистические: {'{totalSensors}'}, {'{compliantSensors}'}. Полный список доступен в интерфейсе.
             </p>
           </div>
         </div>
