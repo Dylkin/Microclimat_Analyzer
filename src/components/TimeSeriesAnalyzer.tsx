@@ -704,23 +704,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               Поддерживаемые плейсхолдеры в шаблоне:
             </h4>
             <div className="text-xs text-blue-800 space-y-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div>
-                  <p><strong>Основные:</strong></p>
-                  <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
-                  <p>• <code>{'{title}'}</code> - заголовок отчета</p>
-                  <p>• <code>{'{date}'}</code> - дата создания</p>
-                  <p>• <code>{'{dataType}'}</code> - тип данных</p>
-                  <p>• <code>{'{resultsTable}'}</code> - таблица результатов</p>
-                </div>
-                <div>
-                  <p><strong>Статистика:</strong></p>
-                  <p>• <code>{'{totalSensors}'}</code> - всего датчиков</p>
-                  <p>• <code>{'{internalSensors}'}</code> - внутренних</p>
-                  <p>• <code>{'{externalSensors}'}</code> - внешних</p>
-                  <p>• <code>{'{compliantSensors}'}</code> - соответствуют лимитам</p>
-                </div>
-              </div>
+              <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
+              <p>• <code>{'{resultsTable}'}</code> - таблица результатов анализа</p>
             </div>
           </div>
 
