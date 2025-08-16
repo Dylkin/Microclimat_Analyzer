@@ -140,12 +140,12 @@ export class DocxTemplateProcessor {
           
           if (tagName === 'chart') {
             // Возвращаем размеры для отображения в документе
-            // Размеры в пикселях, которые будут преобразованы в EMU (English Metric Units)
+            // Размеры в twips (1/20 точки)
             const elementRect = chartElement.getBoundingClientRect();
             
             // После поворота на 90° меняем местами ширину и высоту
-            const displayWidth = Math.min(600, elementRect.height * 0.8); // Ограничиваем ширину
-            const displayHeight = Math.min(800, elementRect.width * 0.8); // Ограничиваем высоту
+            const displayWidth = Math.min(500, elementRect.height * 0.6); // Ограничиваем ширину
+            const displayHeight = Math.min(700, elementRect.width * 0.6); // Ограничиваем высоту
             
             return [displayWidth, displayHeight];
           }
@@ -169,7 +169,7 @@ export class DocxTemplateProcessor {
         dataType: data.dataType === 'temperature' ? 'Температура' : 'Влажность',
         
         // Изображение графика
-        chart: chartImageBuffer, // Передаем ArrayBuffer напрямую
+        chart: 'chart_placeholder', // Значение для модуля изображений
         
         // Статистические данные
         totalSensors: data.analysisResults.length,
