@@ -6,6 +6,7 @@ export interface TemplateReportData {
   date: string;
   dataType: 'temperature' | 'humidity';
   analysisResults: any[];
+  conclusions?: string;
 }
 
 export class DocxTemplateProcessor {
@@ -449,6 +450,11 @@ export class DocxTemplateProcessor {
    */
   private processTextPlaceholders(documentXml: string, data: TemplateReportData): string {
     let result = documentXml;
+
+    // Обработка плейсхолдера {Result} для выводов
+    if (data.conclusions) {
+      result = result.replace(/{Result}/g, this.escapeXml(data.conclusions));
+    }
 
     // Обработка плейсхолдера таблицы результатов
     result = this.processTablePlaceholder(result, data);

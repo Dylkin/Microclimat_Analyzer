@@ -300,7 +300,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
         date: `${dateStr} ${timeStr}`,
         dataType,
-        analysisResults
+        analysisResults,
+        conclusions
       };
 
       // Обрабатываем шаблон
@@ -1005,6 +1006,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             <div className="text-xs text-blue-800 space-y-1">
               <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
               <p>• <code>{'{resultsTable}'}</code> - таблица результатов анализа</p>
+              <p>• <code>{'{Result}'}</code> - текст выводов из поля "Выводы"</p>
             </div>
           </div>
 
