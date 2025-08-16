@@ -483,6 +483,7 @@ export class DocxTemplateProcessor {
     // Обработка плейсхолдера {ConditioningSystem} для климатической установки
     if (data.conditioningSystem) {
       console.log('Before ConditioningSystem replacement, XML contains:', result.includes('{ConditioningSystem}'));
+      console.log('XML snippet around ConditioningSystem:', this.findXmlSnippet(result, 'ConditioningSystem'));
       console.log('Searching for {ConditioningSystem} in XML...');
       const matches = result.match(/{ConditioningSystem}/g);
       console.log('Found matches:', matches ? matches.length : 0);
@@ -504,30 +505,43 @@ export class DocxTemplateProcessor {
    * Объединяет разбитые текстовые узлы в DOCX
    */
   private normalizeXmlText(xml: string): string {
-    // Список плейсхолдеров для нормализации
-    const placeholders = ['{Result}', '{Object}', '{ConditioningSystem}', '{chart}', '{resultsTable}'];
+    console.log('Starting XML normalization...');
     
+    // Более агрессивная нормализация - объединяем все соседние текстовые узлы
     let result = xml;
     
+    // Шаг 1: Объединяем соседние текстовые узлы
+    result = result.replace(/<\/w:t>\s*<w:t[^>]*>/g, '');
+    
+    // Шаг 2: Ищем и восстанавливаем разбитые плейсхолдеры более агрессивно
+    const placeholders = ['{Result}', '{Object}', '{ConditioningSystem}', '{chart}', '{resultsTable}'];
+    
     placeholders.forEach(placeholder => {
-      // Создаем регулярное выражение для поиска разбитого плейсхолдера
-      // Например: {<w:t>Res</w:t><w:t>ult</w:t>} -> {Result}
-      const escapedPlaceholder = placeholder.replace(/[{}]/g, '\\$&');
-      const parts = placeholder.slice(1, -1).split(''); // Убираем {} и разбиваем на символы
+      console.log(`Normalizing placeholder: ${placeholder}`);
       
-      // Создаем паттерн для поиска разбитого текста
-      let pattern = '\\{';
-      for (let i = 0; i < parts.length; i++) {
-        if (i > 0) {
-          pattern += '(?:</w:t>\\s*<w:t[^>]*>)?'; // Возможный разрыв между символами
+      // Создаем очень гибкий паттерн для поиска разбитого плейсхолдера
+      const chars = placeholder.split('');
+      let pattern = '';
+      
+      for (let i = 0; i < chars.length; i++) {
+        const char = chars[i].replace(/[{}]/g, '\\$&');
+        if (i === 0) {
+          pattern += char;
+        } else {
+          // Между любыми символами может быть разрыв XML тегов
+          pattern += `(?:</w:t>\\s*<w:t[^>]*>\\s*)?${char}`;
         }
-        pattern += parts[i];
       }
-      pattern += '\\}';
       
-      const regex = new RegExp(pattern, 'g');
-      result = result.replace(regex, placeholder);
+      const regex = new RegExp(pattern, 'gi');
+      const matches = result.match(regex);
+      if (matches) {
+        console.log(`Found broken placeholder matches for ${placeholder}:`, matches);
+        result = result.replace(regex, placeholder);
+      }
     });
+    
+    console.log('XML normalization completed');
     
     return result;
   }
@@ -839,6 +853,19 @@ export class DocxTemplateProcessor {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
+  }
+
+  /**
+   * Поиск фрагмента XML вокруг указанного текста для отладки
+   */
+  private findXmlSnippet(xml: string, searchText: string, contextLength: number = 200): string {
+    const index = xml.toLowerCase().indexOf(searchText.toLowerCase());
+    if (index === -1) return 'Not found';
+    
+    const start = Math.max(0, index - contextLength);
+    const end = Math.min(xml.length, index + searchText.length + contextLength);
+    
+    return xml.substring(start, end);
   }
 
   /**
