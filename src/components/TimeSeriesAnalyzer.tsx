@@ -1038,24 +1038,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           {/* Информация о плейсхолдерах для шаблона */}
           <div className="w-full max-w-2xl bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="text-sm font-medium text-blue-900 mb-2">
-              Поддерживаемые плейсхолдеры в шаблоне:
+              Информация о шаблонах:
             </h4>
             <div className="text-xs text-blue-800 space-y-1">
-              <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
-              <p>• <code>{'{resultsTable}'}</code> - таблица результатов анализа</p>
-              <p>• <code>{'{Result}'}</code> - текст выводов из поля "Выводы"</p>
-              <p>• <code>{'{Object}'}</code> - объект исследования</p>
-              <p>• <code>{'{ConditioningSystem}'}</code> - климатическая установка</p>
-              <p>• <code>{'{System}'}</code> - климатическая установка</p>
-              <p>• <code>{'{NameTest}'}</code> - тип испытания</p>
-              <p>• <code>{'{Limits}'}</code> - установленные лимиты с единицами измерения</p>
-              <p>• <code>{'{Executor}'}</code> - ФИО исполнителя (текущий пользователь)</p>
-              <p>• <code>{'{TestDate}'}</code> - дата испытания (текущая дата)</p>
-              <p>• <code>{'{ReportNo}'}</code> - номер договора из настроек анализа</p>
-              <p>• <code>{'{ReportDate}'}</code> - дата договора из настроек анализа</p>
+              <p>• Создайте DOCX файл с плейсхолдером <code>{'{chart}'}</code> для вставки графика</p>
+              <p>• Используйте различные плейсхолдеры для автоматического заполнения данных</p>
+              <p>• Плейсхолдеры работают как в основном тексте, так и в колонтитулах</p>
+              <p>• Подробную информацию о всех плейсхолдерах смотрите в разделе <strong>"Справка"</strong></p>
             </div>
-            <p className="text-xs mt-2"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки.</p>
-            <p className="text-xs mt-1"><strong>Колонтитулы:</strong> Все плейсхолдеры также работают в верхних и нижних колонтитулах документа (header1.xml, header2.xml, header3.xml, footer1.xml, footer2.xml, footer3.xml).</p>
           </div>
         </div>
       </div>
