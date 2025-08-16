@@ -726,7 +726,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </div>
             ))}
           </div>
-                <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code> и <code>{'{Object}'}</code> заменяются на соответствующие текстовые данные.</p>
         </div>
       )}
 
@@ -1014,7 +1013,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <p>• <code>{'{ConditioningSystem}'}</code> - климатическая установка</p>
             </div>
             <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code>, <code>{'{Object}'}</code> и <code>{'{ConditioningSystem}'}</code> заменяются на соответствующие текстовые данные.</p>
-
+          </div>
         </div>
       </div>
     </div>
