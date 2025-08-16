@@ -9,6 +9,7 @@ export default defineConfig({
     global: 'globalThis',
     'process.env': {},
     'Buffer': 'buffer/index.js',
+    'buffer': 'buffer',
   },
   optimizeDeps: {
     include: [
@@ -21,10 +22,10 @@ export default defineConfig({
       'pizzip',
       'docxtemplater',
       'docxtemplater-image-module',
-      'buffer'
+      'buffer',
+      'docxtemplater-table-module'
     ],
     exclude: [
-      'docxtemplater-table-module'
     ],
   },
   server: {
