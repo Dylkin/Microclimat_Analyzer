@@ -671,12 +671,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 w-full max-w-2xl">
               <h4 className="text-sm font-medium text-blue-900 mb-2">Использование шаблона</h4>
               <div className="text-xs text-blue-800 space-y-1">
-                <p>• График будет заменен текстом в месте плейсхолдера <code className="bg-blue-100 px-1 rounded">{'{CHART}'}</code></p>
+                <p>• Плейсхолдер <code className="bg-blue-100 px-1 rounded">{'{CHART}'}</code> будет заменен на текстовое описание (изображения не поддерживаются в браузере)</p>
                 <p>• Таблица результатов заменит плейсхолдер <code className="bg-blue-100 px-1 rounded">{'{TABLE}'}</code></p>
                 <p>• Дата отчета заменит <code className="bg-blue-100 px-1 rounded">{'{DATE}'}</code></p>
                 <p>• Тип данных заменит <code className="bg-blue-100 px-1 rounded">{'{DATA_TYPE}'}</code></p>
                 <p className="text-red-700 font-medium">• ВАЖНО: Используйте ТОЧНО одинарные фигурные скобки! Неправильно: {'{{DATE}}'}, правильно: {'{DATE}'}</p>
-                <p className="text-orange-700 font-medium">• Примечание: Вставка изображений в шаблон пока не поддерживается в браузерной версии</p>
+                <p className="text-orange-700 font-medium">• Ограничение: Автоматическая вставка изображений графиков не поддерживается в браузерной версии</p>
+                <p className="text-green-700 font-medium">• Совет: Для получения отчета с графиком используйте стандартную генерацию без шаблона</p>
               </div>
             </div>
           )}

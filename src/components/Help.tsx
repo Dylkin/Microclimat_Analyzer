@@ -85,7 +85,7 @@ export const Help: React.FC = () => {
                 <h4 className="font-semibold mb-2">Таблицы и данные:</h4>
                 <div className="grid grid-cols-1 gap-2 font-mono text-xs">
                   <div><code className="bg-blue-100 px-2 py-1 rounded">{TABLE}</code> - Таблица результатов анализа</div>
-                  <div><code className="bg-blue-100 px-2 py-1 rounded">{CHART}</code> - График (не поддерживается в браузере)</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{'{CHART}'}</code> - Описание графика (изображения не поддерживаются в браузере)</div>
                   <div><code className="bg-blue-100 px-2 py-1 rounded">{ResultsTable}</code> - Таблица результатов (альт.)</div>
                 </div>
               </div>
