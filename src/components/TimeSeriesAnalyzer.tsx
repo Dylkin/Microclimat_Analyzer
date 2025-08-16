@@ -726,7 +726,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           {/* Загрузка шаблона DOCX */}
           <div className="w-full max-w-md">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-              Использование пользовательского шаблона
+              Использование пользовательского шаблона с плейсхолдером {'{chart}'}
             </h3>
             
             {!reportStatus.templateFile ? (
@@ -744,10 +744,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 >
                   <FileText className="w-8 h-8 text-gray-400" />
                   <span className="text-sm text-gray-600">
-                    Загрузить DOCX шаблон с плейсхолдером {'{chart}'}
+                    Загрузить DOCX шаблон
                   </span>
                   <span className="text-xs text-gray-500">
-                    Нажмите для выбора файла
+                    Должен содержать плейсхолдер {'{chart}'} для вставки графика
                   </span>
                 </label>
               </div>
@@ -779,7 +779,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     {reportStatus.templateValidation.isValid ? (
                       <div className="flex items-center space-x-1">
                         <CheckCircle className="w-3 h-3" />
-                        <span>Шаблон валиден, найден плейсхолдер {'{chart}'}</span>
+                        <span>Шаблон валиден</span>
                       </div>
                     ) : (
                       <div>
@@ -891,13 +891,26 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           {/* Информация о плейсхолдерах для шаблона */}
           <div className="w-full max-w-2xl bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="text-sm font-medium text-blue-900 mb-2">
-              Информация о шаблонах:
+              Поддерживаемые плейсхолдеры в шаблоне:
             </h4>
             <div className="text-xs text-blue-800 space-y-1">
-              <p>• Загруженный DOCX файл будет использован как основа для отчета</p>
-              <p>• График будет автоматически вставлен в формате PNG с высоким разрешением</p>
-              <p>• Изображение сохраняется в папке word/media внутри DOCX файла</p>
-              <p>• Плейсхолдер <code>{'{chart}'}</code> в шаблоне не обязателен - график добавляется автоматически</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <p><strong>Основные:</strong></p>
+                  <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
+                  <p>• <code>{'{title}'}</code> - заголовок отчета</p>
+                  <p>• <code>{'{date}'}</code> - дата создания</p>
+                  <p>• <code>{'{dataType}'}</code> - тип данных</p>
+                </div>
+                <div>
+                  <p><strong>Статистика:</strong></p>
+                  <p>• <code>{'{totalSensors}'}</code> - всего датчиков</p>
+                  <p>• <code>{'{internalSensors}'}</code> - внутренних</p>
+                  <p>• <code>{'{externalSensors}'}</code> - внешних</p>
+                  <p>• <code>{'{compliantSensors}'}</code> - соответствуют лимитам</p>
+                </div>
+              </div>
+              <p className="mt-2"><strong>Таблицы:</strong> <code>{'{#results}'}</code>...{'{/results}'} - цикл по результатам анализа</p>
             </div>
           </div>
 

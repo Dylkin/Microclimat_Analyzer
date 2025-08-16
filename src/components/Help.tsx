@@ -157,10 +157,10 @@ export const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-800 mb-3">4. Работа с пользовательскими шаблонами</h3>
             <div className="bg-gray-50 rounded-lg p-4">
               <ul className="space-y-2 text-sm text-gray-700">
-                <li>• Загрузите любой DOCX файл в качестве шаблона</li>
-                <li>• График автоматически добавляется в начало документа в формате PNG</li>
-                <li>• Изображение сохраняется в папке word/media внутри DOCX структуры</li>
-                <li>• Плейсхолдеры не требуются - график вставляется автоматически</li>
+                <li>• Создайте DOCX шаблон с плейсхолдером <code className="bg-gray-200 px-1 rounded">{'{chart}'}</code></li>
+                <li>• График будет вставлен в место плейсхолдера в формате PNG</li>
+                <li>• Изображение автоматически сохраняется в папке word/media</li>
+                <li>• Поддерживаются дополнительные плейсхолдеры для данных анализа</li>
                 <li>• Высокое разрешение изображения (scale: 2) для четкого отображения</li>
               </ul>
             </div>
@@ -219,7 +219,7 @@ export const Help: React.FC = () => {
           <div className="border-l-4 border-green-500 pl-4">
             <h3 className="font-semibold text-gray-800">Как создать шаблон отчета?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Создайте DOCX файл с плейсхолдерами в фигурных скобках, загрузите его и нажмите "Отчет по шаблону". Обязательно включите плейсхолдер {'{chart}'} для вставки графика.
+              Создайте DOCX файл с плейсхолдером {'{chart}'} в том месте, где должен быть график. Дополнительно можно использовать плейсхолдеры для данных: {'{title}'}, {'{date}'}, {'{totalSensors}'} и другие.
             </p>
           </div>
 
@@ -240,7 +240,7 @@ export const Help: React.FC = () => {
           <div className="border-l-4 border-orange-500 pl-4">
             <h3 className="font-semibold text-gray-800">Какие плейсхолдеры поддерживаются в шаблонах?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Основные: {'{chart}'} (изображение), {'{title}'}, {'{date}'}, {'{dataType}'}. Статистические: {'{totalSensors}'}, {'{compliantSensors}'}. Полный список доступен в интерфейсе.
+              Основные: {'{chart}'} (изображение), {'{title}'}, {'{date}'}, {'{dataType}'}. Статистические: {'{totalSensors}'}, {'{internalSensors}'}, {'{externalSensors}'}, {'{compliantSensors}'}. Для таблиц: {'{#results}'}...{'{/results}'}.
             </p>
           </div>
         </div>

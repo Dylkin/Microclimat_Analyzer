@@ -1,5 +1,7 @@
-import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel } from 'docx';
 import html2canvas from 'html2canvas';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
+import ImageModule from 'docxtemplater-image-module';
 
 export interface TemplateReportData {
   title: string;
@@ -111,282 +113,172 @@ export class DocxTemplateProcessor {
     try {
       console.log('Создание отчета по шаблону с PNG изображением...');
       
+      // Читаем шаблон как ArrayBuffer
+      const templateBuffer = await templateFile.arrayBuffer();
+      
       // Создаем скриншот графика
       console.log('Создаем скриншот графика...');
       const chartImageBuffer = await this.createRotatedScreenshot(chartElement);
       console.log('Скриншот создан, размер:', chartImageBuffer.byteLength, 'байт');
 
-      // Создаем DOCX документ с изображением (аналогично DocxImageGenerator)
-      const doc = new Document({
-        sections: [
-          {
-            children: [
-              // Заголовок отчета
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: data.title,
-                    bold: true,
-                    size: 32, // 16pt
-                  }),
-                ],
-                alignment: AlignmentType.CENTER,
-                heading: HeadingLevel.HEADING_1,
-                spacing: { after: 400 },
-              }),
+      // Загружаем шаблон в PizZip
+      const zip = new PizZip(templateBuffer);
 
-              // Дата создания
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: `Дата создания отчета: ${data.date}`,
-                    size: 24, // 12pt
-                  }),
-                ],
-                spacing: { after: 200 },
-              }),
+      // Настройка модуля изображений
+      const imageOpts = {
+        getImage: (tagValue: any) => {
+          // Возвращаем данные изображения
+          return tagValue.data;
+        },
+        getSize: (img: any, tagValue: any) => {
+          // Возвращаем размеры изображения [ширина, высота]
+          return [tagValue.size.width, tagValue.size.height];
+        }
+      };
 
-              // Тип данных
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: `Тип анализируемых данных: ${data.dataType === 'temperature' ? 'Температура' : 'Влажность'}`,
-                    size: 24, // 12pt
-                  }),
-                ],
-                spacing: { after: 400 },
-              }),
-
-              // Заголовок графика
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: 'График временных рядов',
-                    bold: true,
-                    size: 28, // 14pt
-                  }),
-                ],
-                heading: HeadingLevel.HEADING_2,
-                spacing: { after: 200 },
-              }),
-
-              // Вставка изображения графика
-              new Paragraph({
-                children: [
-                  new ImageRun({
-                    data: chartImageBuffer,
-                    transformation: {
-                      width: Math.min(600, chartElement.getBoundingClientRect().height * 0.8),
-                      height: Math.min(800, chartElement.getBoundingClientRect().width * 0.8),
-                    },
-                  }),
-                ],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 400 },
-              }),
-
-              // Примечание о повороте
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: 'Примечание: График повернут на 90° против часовой стрелки для оптимального размещения в отчете.',
-                    italics: true,
-                    size: 20, // 10pt
-                  }),
-                ],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 400 },
-              }),
-
-              // Заголовок таблицы результатов
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: 'Результаты анализа',
-                    bold: true,
-                    size: 28, // 14pt
-                  }),
-                ],
-                heading: HeadingLevel.HEADING_2,
-                spacing: { after: 200 },
-              }),
-
-              // Описание результатов
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: 'Статистические данные по измерениям:',
-                    size: 24, // 12pt
-                  }),
-                ],
-                spacing: { after: 200 },
-              }),
-
-              // Сводка по результатам
-              ...this.createResultsSummary(data.analysisResults, data.dataType),
-            ],
-          },
-        ],
+      // Создаем экземпляр Docxtemplater с модулем изображений
+      const doc = new Docxtemplater(zip, {
+        modules: [new ImageModule(imageOpts)],
+        paragraphLoop: true,
+        linebreaks: true
       });
 
-      // Генерируем DOCX файл
-      console.log('Генерируем DOCX файл...');
-      const buffer = await Packer.toBlob(doc);
-      console.log('DOCX файл создан успешно, размер:', buffer.size, 'байт');
+      // Подготавливаем данные для шаблона
+      const templateData = {
+        // Основные данные
+        title: data.title,
+        date: data.date,
+        dataType: data.dataType === 'temperature' ? 'Температура' : 'Влажность',
+        
+        // Изображение графика
+        chart: {
+          data: Buffer.from(chartImageBuffer),
+          size: {
+            width: Math.min(600, chartElement.getBoundingClientRect().height * 0.8),
+            height: Math.min(800, chartElement.getBoundingClientRect().width * 0.8)
+          },
+          extension: '.png',
+          path: 'word/media/chart.png' // Явное указание пути
+        },
+
+        // Статистика датчиков
+        totalSensors: data.analysisResults.length,
+        internalSensors: data.analysisResults.filter(r => !r.isExternal).length,
+        externalSensors: data.analysisResults.filter(r => r.isExternal).length,
+        compliantSensors: data.analysisResults.filter(r => r.meetsLimits === 'Да').length,
+        nonCompliantSensors: data.analysisResults.filter(r => r.meetsLimits === 'Нет').length,
+
+        // Массив результатов для таблиц
+        results: data.analysisResults.map(result => ({
+          zoneNumber: result.zoneNumber,
+          measurementLevel: result.measurementLevel,
+          loggerName: result.loggerName,
+          serialNumber: result.serialNumber,
+          minTemp: result.minTemp,
+          maxTemp: result.maxTemp,
+          avgTemp: result.avgTemp,
+          minHumidity: result.minHumidity,
+          maxHumidity: result.maxHumidity,
+          avgHumidity: result.avgHumidity,
+          meetsLimits: result.meetsLimits,
+          isExternal: result.isExternal
+        }))
+      };
+
+      // Рендерим документ с данными
+      console.log('Обрабатываем шаблон с данными...');
+      doc.render(templateData);
+
+      // Генерируем итоговый DOCX файл
+      console.log('Генерируем итоговый DOCX файл...');
+      const buffer = doc.getZip().generate({ 
+        type: 'nodebuffer',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
       
-      return buffer;
+      // Конвертируем в Blob
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      
+      console.log('DOCX файл создан успешно, размер:', blob.size, 'байт');
+      
+      return blob;
 
     } catch (error) {
       console.error('Ошибка генерации отчета по шаблону:', error);
+      
+      // Детальная информация об ошибке
+      if (error instanceof Error) {
+        console.error('Детали ошибки:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      
       throw new Error(`Не удалось создать отчет по шаблону: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   }
 
   /**
-   * Создание сводки результатов анализа
-   */
-  private createResultsSummary(results: any[], dataType: 'temperature' | 'humidity'): Paragraph[] {
-    const paragraphs: Paragraph[] = [];
-
-    // Подсчитываем общую статистику
-    const validResults = results.filter(r => !r.isExternal && r.minTemp !== '-');
-    const totalFiles = validResults.length;
-    const externalSensors = results.filter(r => r.isExternal).length;
-
-    // Общая информация
-    paragraphs.push(
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: `Общее количество датчиков: ${results.length}`,
-            size: 24,
-          }),
-        ],
-        spacing: { after: 100 },
-      }),
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: `Внутренние датчики: ${totalFiles}`,
-            size: 24,
-          }),
-        ],
-        spacing: { after: 100 },
-      }),
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: `Внешние датчики: ${externalSensors}`,
-            size: 24,
-          }),
-        ],
-        spacing: { after: 200 },
-      })
-    );
-
-    if (dataType === 'temperature' && validResults.length > 0) {
-      // Температурная статистика
-      const temperatures = validResults.map(r => parseFloat(r.avgTemp)).filter(t => !isNaN(t));
-      const minTemp = Math.min(...temperatures);
-      const maxTemp = Math.max(...temperatures);
-      const avgTemp = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
-
-      paragraphs.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: 'Температурная статистика:',
-              bold: true,
-              size: 24,
-            }),
-          ],
-          spacing: { after: 100 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `• Минимальная средняя температура: ${minTemp.toFixed(1)}°C`,
-              size: 22,
-            }),
-          ],
-          spacing: { after: 50 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `• Максимальная средняя температура: ${maxTemp.toFixed(1)}°C`,
-              size: 22,
-            }),
-          ],
-          spacing: { after: 50 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `• Общая средняя температура: ${avgTemp.toFixed(1)}°C`,
-              size: 22,
-            }),
-          ],
-          spacing: { after: 200 },
-        })
-      );
-    }
-
-    // Соответствие лимитам
-    const compliantCount = results.filter(r => r.meetsLimits === 'Да').length;
-    const nonCompliantCount = results.filter(r => r.meetsLimits === 'Нет').length;
-
-    if (compliantCount > 0 || nonCompliantCount > 0) {
-      paragraphs.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: 'Соответствие установленным лимитам:',
-              bold: true,
-              size: 24,
-            }),
-          ],
-          spacing: { after: 100 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `• Соответствуют лимитам: ${compliantCount} датчиков`,
-              size: 22,
-            }),
-          ],
-          spacing: { after: 50 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `• Не соответствуют лимитам: ${nonCompliantCount} датчиков`,
-              size: 22,
-            }),
-          ],
-          spacing: { after: 200 },
-        })
-      );
-    }
-
-    return paragraphs;
-  }
-
-  /**
-   * Упрощенная валидация DOCX шаблона
+   * Валидация DOCX шаблона
    */
   async validateTemplate(templateFile: File): Promise<{ isValid: boolean; errors: string[] }> {
-    // Упрощенная валидация - проверяем только расширение файла
-    if (!templateFile.name.toLowerCase().endsWith('.docx')) {
+    try {
+      // Проверяем расширение файла
+      if (!templateFile.name.toLowerCase().endsWith('.docx')) {
+        return {
+          isValid: false,
+          errors: ['Файл должен иметь расширение .docx']
+        };
+      }
+
+      // Читаем файл как ArrayBuffer
+      const buffer = await templateFile.arrayBuffer();
+      
+      // Проверяем, что это валидный ZIP архив (DOCX)
+      try {
+        const zip = new PizZip(buffer);
+        
+        // Проверяем наличие основных файлов DOCX
+        if (!zip.files['word/document.xml']) {
+          return {
+            isValid: false,
+            errors: ['Файл не является корректным DOCX документом']
+          };
+        }
+
+        // Читаем содержимое документа
+        const documentXml = zip.files['word/document.xml'].asText();
+        
+        // Проверяем наличие плейсхолдера {chart}
+        if (!documentXml.includes('{chart}')) {
+          return {
+            isValid: false,
+            errors: ['В шаблоне не найден плейсхолдер {chart} для вставки изображения графика']
+          };
+        }
+
+        return {
+          isValid: true,
+          errors: []
+        };
+
+      } catch (zipError) {
+        return {
+          isValid: false,
+          errors: ['Не удалось прочитать DOCX файл. Возможно, файл поврежден.']
+        };
+      }
+
+    } catch (error) {
+      console.error('Ошибка валидации шаблона:', error);
       return {
         isValid: false,
-        errors: ['Файл должен иметь расширение .docx']
+        errors: ['Ошибка при проверке файла шаблона']
       };
     }
-
-    return {
-      isValid: true,
-      errors: []
-    };
   }
 }
