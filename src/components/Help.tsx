@@ -119,47 +119,47 @@ export const Help: React.FC = () => {
               <div className="space-y-2">
                 <h4 className="font-medium text-purple-900">Основные данные:</h4>
                 <ul className="space-y-1 text-purple-800">
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{executor}}'}</code> - ФИО исполнителя</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{Report_No}}'}</code> - Номер отчета</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{Report_start}}'}</code> - Дата отчета</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{reportDate}}'}</code> - Дата создания отчета</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{ObjectName}}'}</code> - Наименование объекта</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{CoolingSystemName}}'}</code> - Наименование холодильной установки</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{TestType}}'}</code> - Тип испытания</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{dataType}}'}</code> - Тип данных (температура/влажность)</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{executor}'}</code> - ФИО исполнителя</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{Report_No}'}</code> - Номер отчета</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{Report_start}'}</code> - Дата отчета</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{reportDate}'}</code> - Дата создания отчета</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ObjectName}'}</code> - Наименование объекта</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{CoolingSystemName}'}</code> - Наименование холодильной установки</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{TestType}'}</code> - Тип испытания</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{dataType}'}</code> - Тип данных (температура/влажность)</li>
                 </ul>
               </div>
               <div className="space-y-2">
                 <h4 className="font-medium text-purple-900">Данные анализа:</h4>
                 <ul className="space-y-1 text-purple-800">
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{EligibilityCriteria}}'}</code> - Критерии приемки</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{acceptanceCriteria}}'}</code> - Критерии приемки (альтернативный)</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{totalFiles}}'}</code> - Общее количество файлов</li>
-                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{analysisDate}}'}</code> - Дата анализа</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{EligibilityCriteria}'}</code> - Критерии приемки</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{acceptanceCriteria}'}</code> - Критерии приемки (альтернативный)</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{totalFiles}'}</code> - Общее количество файлов</li>
+                  <li><code className="bg-purple-100 px-2 py-1 rounded">{'{analysisDate}'}</code> - Дата анализа</li>
                 </ul>
               </div>
             </div>
             <div className="mt-4 space-y-2">
               <h4 className="font-medium text-purple-900">Таблицы и данные:</h4>
               <ul className="space-y-1 text-purple-800">
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{TABLE}}'}</code> - Таблица результатов анализа (текстовый формат)</li>
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{ResultsTable}}'}</code> - Таблица результатов (альтернативный)</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{TABLE}'}</code> - Таблица результатов анализа (текстовый формат)</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{ResultsTable}'}</code> - Таблица результатов (альтернативный)</li>
               </ul>
             </div>
             <div className="mt-4 space-y-2">
               <h4 className="font-medium text-purple-900">Статистические данные:</h4>
               <ul className="space-y-1 text-purple-800">
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{minTemp}}'}</code> - Минимальная температура</li>
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{maxTemp}}'}</code> - Максимальная температура</li>
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{avgTemp}}'}</code> - Средняя температура</li>
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{compliantCount}}'}</code> - Количество соответствующих лимитам</li>
-                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{{nonCompliantCount}}'}</code> - Количество не соответствующих лимитам</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{minTemp}'}</code> - Минимальная температура</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{maxTemp}'}</code> - Максимальная температура</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{avgTemp}'}</code> - Средняя температура</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{compliantCount}'}</code> - Количество соответствующих лимитам</li>
+                <li><code className="bg-purple-100 px-2 py-1 rounded">{'{nonCompliantCount}'}</code> - Количество не соответствующих лимитам</li>
               </ul>
             </div>
             <div className="mt-4 p-3 bg-purple-100 rounded-lg">
               <p className="text-xs text-purple-700">
                 <strong>Примечание:</strong> Используется библиотека docxtemplater для обработки шаблонов. 
-                Все плейсхолдеры должны быть заключены в двойные фигурные скобки: <code>{'{{placeholder}}'}</code>.
+                Все плейсхолдеры должны быть заключены в одинарные фигурные скобки: <code>{'{placeholder}'}</code>.
                 Таблица результатов вставляется в текстовом формате с табуляцией для разделения колонок.
                 В текущей версии изображения графиков не поддерживаются в пользовательских шаблонах.
               </p>
