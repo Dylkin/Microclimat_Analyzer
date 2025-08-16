@@ -196,11 +196,10 @@ export class DocxTemplateProcessor {
 
       // Заменяем плейсхолдер на XML изображения
       const updatedDocumentXml = this.replaceChartPlaceholder(documentXml, relationshipId);
-      
-      // Обрабатываем текстовые плейсхолдеры ПОСЛЕ замены изображения
-      console.log('Processing text placeholders...');
+      zip.file('word/document.xml', updatedDocumentXml);
+
+      // Обрабатываем другие плейсхолдеры
       const finalDocumentXml = this.processTextPlaceholders(updatedDocumentXml, data);
-      console.log('Text placeholders processed, saving document...');
       zip.file('word/document.xml', finalDocumentXml);
 
       // Генерируем итоговый DOCX файл
@@ -261,11 +260,7 @@ export class DocxTemplateProcessor {
       
       // Обрабатываем шаблон с новыми данными
       let processedTemplateXml = this.replaceChartPlaceholder(templateDocumentXml, newRelationshipId);
-      
-      // Обрабатываем текстовые плейсхолдеры
-      console.log('Processing text placeholders for existing document...');
       processedTemplateXml = this.processTextPlaceholders(processedTemplateXml, data);
-      console.log('Text placeholders processed for existing document');
       
       // Читаем существующий документ
       const existingDocumentXml = existingZip.files['word/document.xml'].asText();
@@ -464,127 +459,30 @@ export class DocxTemplateProcessor {
       conditioningSystem: data.conditioningSystem
     });
 
-    // Отладка: ищем все возможные варианты плейсхолдера ConditioningSystem
-    console.log('Searching for ConditioningSystem variants in document...');
-    const conditioningSystemVariants = [
-      '{ConditioningSystem}',
-      '{ ConditioningSystem }',
-      '{conditioningSystem}',
-      '{CONDITIONINGSYSTEM}',
-      'ConditioningSystem'
-    ];
-    
-    conditioningSystemVariants.forEach(variant => {
-      const count = (result.match(new RegExp(variant.replace(/[{}]/g, '\\$&'), 'gi')) || []).length;
-      if (count > 0) {
-        console.log(`Found ${count} occurrences of variant: "${variant}"`);
-      }
-    });
-
-    // Ищем разбитые плейсхолдеры
-    const brokenPatterns = [
-      /{[^}]*Conditioning[^}]*System[^}]*}/gi,
-      /Conditioning[^<]*System/gi,
-      /{[^}]*conditioning[^}]*system[^}]*}/gi
-    ];
-    
-    brokenPatterns.forEach((pattern, index) => {
-      const matches = result.match(pattern);
-      if (matches) {
-        console.log(`Broken pattern ${index + 1} matches:`, matches);
-      }
-    });
-    // Функция для более надежной замены плейсхолдеров
-    const replacePlaceholder = (xml: string, placeholder: string, value: string): string => {
-      console.log(`Attempting to replace {${placeholder}} with: "${value}"`);
-      
-      // Подсчитываем количество вхождений до замены
-      const beforeCount = (xml.match(new RegExp(`\\{${placeholder}\\}`, 'g')) || []).length;
-      console.log(`Found ${beforeCount} occurrences of {${placeholder}} in document`);
-      
-      // Заменяем обычные плейсхолдеры
-      let updatedXml = xml.replace(new RegExp(`\\{${placeholder}\\}`, 'g'), this.escapeXml(value));
-      
-      // Заменяем плейсхолдеры, которые могут быть разбиты на несколько XML элементов
-      // Например: <w:t>{</w:t><w:t>ConditioningSystem</w:t><w:t>}</w:t>
-      const brokenPlaceholderPattern = new RegExp(
-        `<w:t[^>]*>\\{</w:t>\\s*<w:t[^>]*>${placeholder}</w:t>\\s*<w:t[^>]*>\\}</w:t>`,
-        'gi'
-      );
-      updatedXml = updatedXml.replace(brokenPlaceholderPattern, `<w:t>${this.escapeXml(value)}</w:t>`);
-      
-      // Заменяем плейсхолдеры с дополнительными пробелами или символами
-      const spacedPlaceholderPattern = new RegExp(
-        `<w:t[^>]*>\\s*\\{\\s*${placeholder}\\s*\\}\\s*</w:t>`,
-        'gi'
-      );
-      updatedXml = updatedXml.replace(spacedPlaceholderPattern, `<w:t>${this.escapeXml(value)}</w:t>`);
-      
-      // Дополнительные паттерны для разбитых плейсхолдеров
-      const additionalPatterns = [
-        // Плейсхолдер разбит по словам
-        new RegExp(`<w:t[^>]*>\\{</w:t>[^<]*<w:t[^>]*>Conditioning</w:t>[^<]*<w:t[^>]*>System</w:t>[^<]*<w:t[^>]*>\\}</w:t>`, 'gi'),
-        // Плейсхолдер с разными регистрами
-        new RegExp(`\\{\\s*conditioning\\s*system\\s*\\}`, 'gi'),
-        new RegExp(`\\{\\s*CONDITIONING\\s*SYSTEM\\s*\\}`, 'gi'),
-        // Плейсхолдер без скобок (если они потерялись)
-        new RegExp(`\\b${placeholder}\\b`, 'gi')
-      ];
-      
-      additionalPatterns.forEach((pattern, index) => {
-        const beforeAdditional = (updatedXml.match(pattern) || []).length;
-        if (beforeAdditional > 0) {
-          console.log(`Additional pattern ${index + 1} found ${beforeAdditional} matches`);
-          updatedXml = updatedXml.replace(pattern, this.escapeXml(value));
-        }
-      });
-
-      // Подсчитываем количество вхождений после замены
-      const afterCount = (updatedXml.match(new RegExp(`\\{${placeholder}\\}`, 'g')) || []).length;
-      console.log(`After replacement: ${afterCount} occurrences of {${placeholder}} remain`);
-      
-      if (beforeCount > 0 && afterCount === beforeCount) {
-        console.warn(`WARNING: No replacements made for {${placeholder}}! Trying alternative patterns...`);
-        
-        // Попробуем более агрессивные паттерны
-        const aggressivePattern1 = new RegExp(`\\{${placeholder}\\}`, 'gi');
-        const aggressivePattern2 = new RegExp(`\\{\\s*${placeholder}\\s*\\}`, 'gi');
-        
-        updatedXml = updatedXml.replace(aggressivePattern1, this.escapeXml(value));
-        updatedXml = updatedXml.replace(aggressivePattern2, this.escapeXml(value));
-        
-        // Проверяем результат
-        const finalCount = (updatedXml.match(new RegExp(`\\{${placeholder}\\}`, 'g')) || []).length;
-        console.log(`After aggressive replacement: ${finalCount} occurrences remain`);
-      }
-      
-      return updatedXml;
-    };
-    
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
-      result = replacePlaceholder(result, 'Result', data.conclusions);
+      result = result.replace(/{Result}/g, this.escapeXml(data.conclusions));
       console.log('Replaced {Result} placeholder');
     } else {
-      result = replacePlaceholder(result, 'Result', '');
+      result = result.replace(/{Result}/g, '');
       console.log('Cleared {Result} placeholder (no data)');
     }
 
     // Обработка плейсхолдера {Object} для объекта исследования
     if (data.researchObject) {
-      result = replacePlaceholder(result, 'Object', data.researchObject);
+      result = result.replace(/{Object}/g, this.escapeXml(data.researchObject));
       console.log('Replaced {Object} placeholder');
     } else {
-      result = replacePlaceholder(result, 'Object', '');
+      result = result.replace(/{Object}/g, '');
       console.log('Cleared {Object} placeholder (no data)');
     }
 
     // Обработка плейсхолдера {ConditioningSystem} для климатической установки
     if (data.conditioningSystem) {
-      result = replacePlaceholder(result, 'ConditioningSystem', data.conditioningSystem);
+      result = result.replace(/{ConditioningSystem}/g, this.escapeXml(data.conditioningSystem));
       console.log('Replaced {ConditioningSystem} placeholder with:', data.conditioningSystem);
     } else {
-      result = replacePlaceholder(result, 'ConditioningSystem', '');
+      result = result.replace(/{ConditioningSystem}/g, '');
       console.log('Cleared {ConditioningSystem} placeholder (no data)');
     }
 
