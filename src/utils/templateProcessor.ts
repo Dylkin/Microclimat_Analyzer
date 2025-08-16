@@ -33,12 +33,28 @@ export class TemplateProcessor {
 
       // Подготавливаем данные для замены
       const templateData = {
-        DATE: data.DATE,
-        DATA_TYPE: data.DATA_TYPE,
+        executor: data.executor || '',
+        Report_No: data.Report_No || '',
+        Report_start: data.Report_start || data.DATE,
+        reportDate: data.DATE,
+        ObjectName: data.ObjectName || '',
+        CoolingSystemName: data.CoolingSystemName || '',
+        TestType: data.TestType || '',
+        dataType: data.DATA_TYPE,
+        EligibilityCriteria: data.EligibilityCriteria || '',
+        acceptanceCriteria: data.acceptanceCriteria || '',
+        totalFiles: data.totalFiles || 0,
+        analysisDate: data.DATE,
         // Для таблицы создаем текстовое представление
         TABLE: this.formatTableForTemplate(data.TABLE),
-        // Для графика пока используем заглушку
-        CHART: '[ГРАФИК БУДЕТ ВСТАВЛЕН]'
+        ResultsTable: this.formatTableForTemplate(data.TABLE),
+        // Для графика используем заглушку с пояснением
+        CHART: '[ВСТАВКА ИЗОБРАЖЕНИЙ В ШАБЛОНЫ НЕ ПОДДЕРЖИВАЕТСЯ В БРАУЗЕРНОЙ ВЕРСИИ]',
+        minTemp: data.minTemp || '',
+        maxTemp: data.maxTemp || '',
+        avgTemp: data.avgTemp || '',
+        compliantCount: data.compliantCount || 0,
+        nonCompliantCount: data.nonCompliantCount || 0
       };
 
       console.log('Данные для шаблона подготовлены:', templateData);
@@ -58,7 +74,38 @@ export class TemplateProcessor {
       
     } catch (error) {
       console.error('Ошибка обработки шаблона:', error);
-      throw new Error(`Не удалось обработать шаблон: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      
+      // Извлекаем детальную информацию об ошибках из docxtemplater
+      let errorMessage = 'Неизвестная ошибка';
+      
+      if (error && typeof error === 'object' && 'properties' in error) {
+        const docxError = error as any;
+        if (docxError.properties && docxError.properties.errors) {
+          const errors = docxError.properties.errors;
+          const errorDetails = errors.map((err: any) => {
+            if (err.properties && err.properties.explanation) {
+              return `${err.message}: ${err.properties.explanation}`;
+            }
+            return err.message || err.toString();
+          }).join('; ');
+          errorMessage = errorDetails;
+        } else if (docxError.message) {
+          errorMessage = docxError.message;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      // Добавляем подсказки для частых ошибок
+      if (errorMessage.includes('image')) {
+        errorMessage += '. ПОДСКАЗКА: Вставка изображений в шаблоны не поддерживается в браузерной версии. Удалите все плейсхолдеры изображений из шаблона.';
+      }
+      
+      if (errorMessage.includes('Multi error')) {
+        errorMessage += '. ПОДСКАЗКА: Проверьте корректность всех плейсхолдеров в шаблоне. Убедитесь, что они заключены в двойные фигурные скобки {{placeholder}}.';
+      }
+      
+      throw new Error(`Не удалось обработать шаблон: ${errorMessage}`);
     }
   }
 
