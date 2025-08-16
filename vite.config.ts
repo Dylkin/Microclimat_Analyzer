@@ -23,9 +23,9 @@ export default defineConfig({
       'docxtemplater',
       'docxtemplater-image-module',
       'buffer',
-      'docxtemplater-table-module'
     ],
     exclude: [
+      'docxtemplater-table-module'
     ],
   },
   server: {
