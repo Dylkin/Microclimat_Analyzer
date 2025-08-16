@@ -337,7 +337,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         executor: user?.fullName || '',
         testDate: dateStr,
         reportNo: contractFields.contractNumber || '',
-        reportDate: contractFields.contractDate || ''
+        reportDate: contractFields.contractDate ? 
+          new Date(contractFields.contractDate).toLocaleDateString('ru-RU') : ''
       };
 
       // Обрабатываем шаблон
