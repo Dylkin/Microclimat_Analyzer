@@ -296,6 +296,24 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const timeStr = now.toLocaleTimeString('ru-RU');
       const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
       
+      // Функция для получения читаемого названия типа испытания
+      const getTestTypeLabel = (testType: string): string => {
+        switch (testType) {
+          case 'empty_volume':
+            return 'Испытание на соответствие критериям в пустом объеме';
+          case 'loaded_volume':
+            return 'Испытание на соответствие критериям в загруженном объеме';
+          case 'temperature_recovery':
+            return 'Испытание по восстановлению температуры после открытия двери';
+          case 'power_off':
+            return 'Испытание на отключение электропитания';
+          case 'power_on':
+            return 'Испытание на включение электропитания';
+          default:
+            return testType;
+        }
+      };
+      
       const templateData: TemplateReportData = {
         title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
         date: `${dateStr} ${timeStr}`,
@@ -445,24 +463,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
     setConclusions(conclusionText);
   };
-
-  // Функция для получения читаемого названия типа испытания
-  const getTestTypeLabel = useCallback((testType: string): string => {
-    switch (testType) {
-      case 'empty_volume':
-        return 'Испытание на соответствие критериям в пустом объеме';
-      case 'loaded_volume':
-        return 'Испытание на соответствие критериям в загруженном объеме';
-      case 'temperature_recovery':
-        return 'Испытание по восстановлению температуры после открытия двери';
-      case 'power_off':
-        return 'Испытание на отключение электропитания';
-      case 'power_on':
-        return 'Испытание на включение электропитания';
-      default:
-        return testType;
-    }
-  }, []);
 
   if (loading) {
     return (
