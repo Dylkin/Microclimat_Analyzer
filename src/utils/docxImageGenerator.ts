@@ -31,6 +31,13 @@ export class DocxImageGenerator {
     });
 
     try {
+      // Получаем реальные размеры элемента
+      const elementRect = element.getBoundingClientRect();
+      const originalWidth = elementRect.width;
+      const originalHeight = elementRect.height;
+      
+      console.log('Оригинальные размеры элемента:', { width: originalWidth, height: originalHeight });
+
       // Создаем скриншот с высоким качеством
       const canvas = await html2canvas(element, {
         scale: 2, // Высокое разрешение
@@ -38,8 +45,8 @@ export class DocxImageGenerator {
         useCORS: true,
         allowTaint: true,
         logging: false,
-        width: element.offsetWidth,
-        height: element.offsetHeight,
+        width: originalWidth,
+        height: originalHeight,
         onclone: (clonedDoc) => {
           // Убеждаемся, что в клонированном документе тоже скрыты кнопки
           const clonedButtons = clonedDoc.querySelectorAll('button');
@@ -57,12 +64,18 @@ export class DocxImageGenerator {
         throw new Error('Ошибка создания контекста для поворота изображения');
       }
 
-      // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
-      rotatedCanvas.width = canvas.height;
-      rotatedCanvas.height = canvas.width;
+      // Устанавливаем размеры повернутого canvas
+      // После поворота на 90° ширина и высота меняются местами
+      const rotatedWidth = canvas.height;
+      const rotatedHeight = canvas.width;
+      
+      rotatedCanvas.width = rotatedWidth;
+      rotatedCanvas.height = rotatedHeight;
+      
+      console.log('Размеры после поворота:', { width: rotatedWidth, height: rotatedHeight });
 
       // Поворачиваем контекст на 90° против часовой стрелки
-      ctx.translate(0, canvas.width);
+      ctx.translate(0, rotatedHeight);
       ctx.rotate(-Math.PI / 2);
 
       // Рисуем исходное изображение на повернутом canvas
@@ -161,8 +174,8 @@ export class DocxImageGenerator {
                   new ImageRun({
                     data: imageBuffer,
                     transformation: {
-                      width: 560, // Ширина в пикселях
-                      height: 840, // Высота в пикселях
+                      width: Math.min(600, chartElement.getBoundingClientRect().height * 0.8), // Пропорциональная ширина
+                      height: Math.min(800, chartElement.getBoundingClientRect().width * 0.8), // Пропорциональная высота
                     },
                   }),
                 ],
