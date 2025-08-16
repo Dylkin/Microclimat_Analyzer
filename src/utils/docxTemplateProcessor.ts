@@ -192,15 +192,13 @@ export class DocxTemplateProcessor {
       // Генерируем итоговый DOCX файл
       console.log('Генерируем итоговый DOCX файл...');
       const buffer = doc.getZip().generate({ 
-        type: 'nodebuffer',
+        type: 'blob',
         compression: 'DEFLATE',
         compressionOptions: { level: 6 }
       });
       
-      // Конвертируем в Blob
-      const blob = new Blob([buffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-      });
+      // buffer уже является Blob
+      const blob = buffer as Blob;
       
       console.log('DOCX файл создан успешно, размер:', blob.size, 'байт');
       
