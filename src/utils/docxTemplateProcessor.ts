@@ -452,7 +452,11 @@ export class DocxTemplateProcessor {
    * Обработка текстовых плейсхолдеров
    */
   private processTextPlaceholders(documentXml: string, data: TemplateReportData): string {
+    console.log('Processing text placeholders, data.testType:', data.testType);
     let result = documentXml;
+
+    // Сначала нормализуем XML, объединяя разбитые плейсхолдеры
+    result = this.normalizePlaceholders(result);
 
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
@@ -493,6 +497,35 @@ export class DocxTemplateProcessor {
 
     // Обработка плейсхолдера таблицы результатов
     result = this.processTablePlaceholder(result, data);
+    
+    console.log('Final result after placeholder processing contains {NameTest}:', result.includes('{NameTest}'));
+    return result;
+  }
+
+  /**
+   * Нормализация плейсхолдеров - объединение разбитых плейсхолдеров
+   */
+  private normalizePlaceholders(xml: string): string {
+    // Список плейсхолдеров для нормализации
+    const placeholders = [
+      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'resultsTable'
+    ];
+    
+    let result = xml;
+    
+    placeholders.forEach(placeholder => {
+      // Регулярное выражение для поиска разбитых плейсхолдеров
+      // Ищем {, затем любые XML теги, затем части плейсхолдера, затем }
+      const regex = new RegExp(
+        `\\{(?:<[^>]*>)*${placeholder.split('').map(char => 
+          `${char}(?:<[^>]*>)*`
+        ).join('')}(?:<[^>]*>)*\\}`,
+        'gi'
+      );
+      
+      result = result.replace(regex, `{${placeholder}}`);
+    });
+    
     return result;
   }
 
