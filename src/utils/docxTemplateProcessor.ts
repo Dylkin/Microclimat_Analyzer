@@ -8,6 +8,7 @@ export interface TemplateReportData {
   analysisResults: any[];
   conclusions?: string;
   researchObject?: string;
+  conditioningSystem?: string;
 }
 
 export class DocxTemplateProcessor {
@@ -464,6 +465,13 @@ export class DocxTemplateProcessor {
       result = result.replace(/{Object}/g, this.escapeXml(data.researchObject));
     } else {
       result = result.replace(/{Object}/g, '');
+    }
+
+    // Обработка плейсхолдера {ConditioningSystem} для климатической установки
+    if (data.conditioningSystem) {
+      result = result.replace(/{ConditioningSystem}/g, this.escapeXml(data.conditioningSystem));
+    } else {
+      result = result.replace(/{ConditioningSystem}/g, '');
     }
 
     // Обработка плейсхолдера таблицы результатов
