@@ -503,11 +503,22 @@ export class DocxTemplateProcessor {
    const limitsText = this.formatLimitsText(data.limits, data.dataType);
    console.log('Replacing {Limits} with:', limitsText);
    result = result.replace(/{Limits}/g, this.escapeXml(limitsText));
+
+    // Обработка плейсхолдера {Executor} для исполнителя
+    if (data.executor) {
+      console.log('Replacing {Executor} with:', data.executor);
+      result = result.replace(/{Executor}/g, this.escapeXml(data.executor));
+    } else {
+      console.log('executor is empty or undefined:', data.executor, 'replacing {Executor} with empty string');
+      result = result.replace(/{Executor}/g, '');
+    }
+    
     // Обработка плейсхолдера таблицы результатов
     result = this.processTablePlaceholder(result, data);
     
     console.log('Final result after placeholder processing contains {NameTest}:', result.includes('{NameTest}'));
    console.log('Final result after placeholder processing contains {Limits}:', result.includes('{Limits}'));
+    console.log('Final result after placeholder processing contains {Executor}:', result.includes('{Executor}'));
     return result;
   }
 
