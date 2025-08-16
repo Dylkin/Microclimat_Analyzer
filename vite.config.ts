@@ -1,15 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { createRequire } from 'module'
-
-const require = createRequire(import.meta.url)
 
 export default defineConfig({
   plugins: [react()],
   define: {
     global: 'globalThis',
     'process.env': {},
-    'Buffer': 'buffer/index.js',
   },
   optimizeDeps: {
     include: [
@@ -20,12 +16,7 @@ export default defineConfig({
       'd3-time-format',
       'd3-zoom',
       'pizzip',
-      'docxtemplater',
-      'docxtemplater-image-module',
-      'buffer',
-    ],
-    exclude: [
-      'docxtemplater-table-module',
+      'docxtemplater'
     ],
   },
   server: {
