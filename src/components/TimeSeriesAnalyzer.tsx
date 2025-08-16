@@ -290,8 +290,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setReportStatus(prev => ({ ...prev, isGenerating: true }));
 
     try {
-      // Создаем PNG изображение графика
-      const chartBlob = await createChartPNG();
 
       // Генерируем данные для отчета
       const now = new Date();
@@ -303,8 +301,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
         date: `${dateStr} ${timeStr}`,
         dataType,
-        chartImageBlob: chartBlob,
-        analysisResults
+        analysisResults,
+        chartElement: chartRef.current || undefined
       };
 
       // Генерируем DOCX отчет
@@ -312,7 +310,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       let docxBlob: Blob;
       if (reportStatus.templateFile) {
-        // Используем шаблон с PNG изображением
+        // Используем продвинутый шаблон с изображением и таблицей
         docxBlob = await docxGenerator.generateReportFromTemplate(reportData, reportStatus.templateFile);
       } else {
         // Стандартная генерация отчета
@@ -671,7 +669,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 className="text-red-600 hover:text-red-800 transition-colors"
                 title="Удалить отчет"
               >
-                <Trash2 className="w-4 h-4" />
+                <strong>Доступные плейсхолдеры:</strong>
+              </p>
+              <ul className="text-xs text-blue-700 mt-1 space-y-1">
+                <li>• <strong>{'{date}'}</strong> - дата создания отчета</li>
+                <li>• <strong>{'{data_type}'}</strong> - тип данных</li>
+                <li>• <strong>{'{% image chart_image %}'}</strong> - PNG изображение графика (поворот 90°)</li>
+                <li>• <strong>{'{title}'}</strong> - заголовок отчета</li>
+                <li>• <strong>{'{analysis_summary}'}</strong> - краткая сводка</li>
+                <li>• <strong>{'{#table_data.rows}'}</strong> - начало таблицы данных</li>
+                <li>• <strong>{'{zone}, {level}, {logger}, {sn}'}</strong> - поля таблицы</li>
+                <li>• <strong>{'{/table_data.rows}'}</strong> - конец таблицы</li>
+              </ul>
+              <p className="text-xs text-blue-600 mt-2">
+                <strong>Примечание:</strong> График автоматически поворачивается на 90° против часовой стрелки для оптимального размещения в отчете.
               </button>
             </div>
           )}

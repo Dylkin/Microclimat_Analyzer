@@ -5,8 +5,8 @@ export interface ReportData {
   title: string;
   date: string;
   dataType: 'temperature' | 'humidity';
-  chartImageBlob: Blob;
   analysisResults: any[];
+  chartElement?: HTMLElement;
 }
 
 export class DocxReportGenerator {
@@ -25,6 +25,10 @@ export class DocxReportGenerator {
     try {
       console.log('Создание стандартного отчета...');
       
+      if (!data.chartElement) {
+        throw new Error('Элемент графика не найден для создания изображения');
+      }
+
       // Если документ уже существует, добавляем в него новую секцию
       if (this.currentDoc) {
         await this.addSectionToExistingDoc(data);
@@ -46,44 +50,40 @@ export class DocxReportGenerator {
 
   async generateReportFromTemplate(data: ReportData, templateFile: File): Promise<Blob> {
     try {
-      console.log('Генерация отчета из шаблона с PNG графиком...');
+      console.log('Генерация отчета из продвинутого DOCX шаблона...');
       
-      // 1. Конвертируем изображение графика в base64
+      if (!data.chartElement) {
+        throw new Error('Элемент графика не найден для создания изображения');
+      }
+
+      // 1. Создаем PNG изображение графика с поворотом
       const templateProcessor = new TemplateProcessor();
-      const chartImageBase64 = await templateProcessor.convertBlobToBase64(data.chartImageBlob);
+      const chartImageBuffer = await templateProcessor.createChartPNG(data.chartElement);
       
-      // 2. Создаем HTML таблицу результатов
-      const analysisTable = templateProcessor.createAnalysisTable(data.analysisResults);
-      
-      // 3. Подготавливаем данные для шаблона
-      const templateData: TemplateData = {
-        date: data.date,
-        data_type: data.dataType === 'temperature' ? 'Температура' : 'Влажность',
-        chart_image: chartImageBase64,
-        table: analysisTable,
+      // 2. Подготавливаем полные данные для шаблона
+      const templateData = await templateProcessor.createTemplateData({
         title: data.title,
-        analysis_summary: this.createAnalysisSummary(data.analysisResults, data.dataType),
-        file_count: data.analysisResults.length,
-        temperature_range: this.getTemperatureRange(data.analysisResults),
-        humidity_range: this.getHumidityRange(data.analysisResults),
-        time_period: this.getTimePeriod(data.analysisResults)
-      };
+        date: data.date,
+        dataType: data.dataType,
+        analysisResults: data.analysisResults
+      }, chartImageBuffer);
       
-      // 4. Обрабатываем шаблон
+      // 3. Обрабатываем шаблон
       const reportBlob = await templateProcessor.processTemplate(templateFile, templateData);
       
-      console.log('Отчет из шаблона успешно создан');
+      console.log('Продвинутый DOCX отчет успешно создан');
       return reportBlob;
       
     } catch (error) {
-      console.error('Ошибка генерации отчета из шаблона:', error);
-      throw new Error(`Ошибка генерации отчета из шаблона: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      console.error('Ошибка генерации продвинутого DOCX отчета:', error);
+      throw new Error(`Ошибка генерации отчета: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   }
 
   private async createNewDocument(data: ReportData): Promise<void> {
-    // Конвертируем изображение в ArrayBuffer
-    const imageBuffer = await data.chartImageBlob.arrayBuffer();
+    // Создаем PNG изображение графика
+    const templateProcessor = new TemplateProcessor();
+    const imageBuffer = await templateProcessor.createChartPNG(data.chartElement!);
 
     this.sections = [
       {
@@ -201,8 +201,9 @@ export class DocxReportGenerator {
   }
 
   private async addSectionToExistingDoc(data: ReportData): Promise<void> {
-    // Конвертируем изображение в ArrayBuffer
-    const imageBuffer = await data.chartImageBlob.arrayBuffer();
+    // Создаем PNG изображение графика
+    const templateProcessor = new TemplateProcessor();
+    const imageBuffer = await templateProcessor.createChartPNG(data.chartElement!);
 
     // Добавляем разрыв страницы и новую секцию
     const newSection = {
