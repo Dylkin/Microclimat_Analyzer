@@ -424,14 +424,6 @@ export class DocxTemplateProcessor {
         // Читаем содержимое документа
         const documentXml = zip.files['word/document.xml'].asText();
         
-        // Проверяем наличие плейсхолдера {chart}
-        if (!documentXml.includes('{chart}')) {
-          return {
-            isValid: false,
-            errors: ['В шаблоне не найден плейсхолдер {chart} для вставки изображения графика']
-          };
-        }
-
         return {
           isValid: true,
           errors: []
