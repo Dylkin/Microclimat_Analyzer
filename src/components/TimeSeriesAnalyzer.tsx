@@ -335,7 +335,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
        testType: convertedTestType || '',
         limits: limits,
         executor: user?.fullName || '',
-        testDate: dateStr
+        testDate: dateStr,
+        reportNo: contractFields.contractNumber || ''
       };
 
       // Обрабатываем шаблон
