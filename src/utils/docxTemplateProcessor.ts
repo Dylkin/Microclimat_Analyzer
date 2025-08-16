@@ -10,6 +10,7 @@ export interface TemplateReportData {
   researchObject?: string;
   conditioningSystem?: string;
   testType?: string;
+ limits?: any;
 }
 
 export class DocxTemplateProcessor {
@@ -453,6 +454,8 @@ export class DocxTemplateProcessor {
    */
   private processTextPlaceholders(documentXml: string, data: TemplateReportData): string {
     console.log('Processing text placeholders, data.testType:', data.testType);
+   console.log('Processing text placeholders, data.limits:', data.limits);
+   console.log('Processing text placeholders, data.dataType:', data.dataType);
     let result = documentXml;
 
     // Сначала нормализуем XML, объединяя разбитые плейсхолдеры
@@ -495,10 +498,15 @@ export class DocxTemplateProcessor {
       result = result.replace(/{NameTest}/g, '');
     }
 
+   // Обработка плейсхолдера {Limits} для лимитов
+   const limitsText = this.formatLimitsText(data.limits, data.dataType);
+   console.log('Replacing {Limits} with:', limitsText);
+   result = result.replace(/{Limits}/g, this.escapeXml(limitsText));
     // Обработка плейсхолдера таблицы результатов
     result = this.processTablePlaceholder(result, data);
     
     console.log('Final result after placeholder processing contains {NameTest}:', result.includes('{NameTest}'));
+   console.log('Final result after placeholder processing contains {Limits}:', result.includes('{Limits}'));
     return result;
   }
 
@@ -508,7 +516,7 @@ export class DocxTemplateProcessor {
   private normalizePlaceholders(xml: string): string {
     // Список плейсхолдеров для нормализации
     const placeholders = [
-      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'resultsTable'
+     'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'resultsTable', 'Limits'
     ];
     
     let result = xml;

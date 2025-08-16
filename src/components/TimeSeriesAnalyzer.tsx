@@ -299,6 +299,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Отладка: выводим все поля contractFields
       console.log('Contract fields:', contractFields);
       console.log('Test type value:', contractFields.testType);
+     console.log('Current limits:', limits);
+     console.log('Current dataType:', dataType);
       
       // Функция для получения читаемого названия типа испытания
       const getTestTypeLabel = (testType: string): string => {
@@ -330,7 +332,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         conclusions,
         researchObject: contractFields.researchObject || '',
         conditioningSystem: contractFields.climateInstallation || '',
-        testType: convertedTestType || ''
+       testType: convertedTestType || '',
+       limits: limits
       };
 
       // Обрабатываем шаблон
