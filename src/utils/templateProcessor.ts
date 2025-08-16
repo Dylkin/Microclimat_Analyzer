@@ -33,23 +33,25 @@ export class TemplateProcessor {
 
       // Подготавливаем данные для замены
       const templateData = {
+        // Основные плейсхолдеры - ключи должны точно соответствовать именам в шаблоне
+        DATE: data.DATE,
+        DATA_TYPE: data.DATA_TYPE,
+        CHART: '[ВСТАВКА ИЗОБРАЖЕНИЙ В ШАБЛОНЫ НЕ ПОДДЕРЖИВАЕТСЯ В БРАУЗЕРНОЙ ВЕРСИИ]',
+        TABLE: this.formatTableForTemplate(data.TABLE),
+        
+        // Дополнительные плейсхолдеры
         executor: data.executor || '',
         Report_No: data.Report_No || '',
         Report_start: data.Report_start || data.DATE,
-        reportDate: data.DATE,
         ObjectName: data.ObjectName || '',
         CoolingSystemName: data.CoolingSystemName || '',
         TestType: data.TestType || '',
-        dataType: data.DATA_TYPE,
         EligibilityCriteria: data.EligibilityCriteria || '',
         acceptanceCriteria: data.acceptanceCriteria || '',
         totalFiles: data.totalFiles || 0,
         analysisDate: data.DATE,
         // Для таблицы создаем текстовое представление
-        TABLE: this.formatTableForTemplate(data.TABLE),
         ResultsTable: this.formatTableForTemplate(data.TABLE),
-        // Для графика используем заглушку с пояснением
-        CHART: '[ВСТАВКА ИЗОБРАЖЕНИЙ В ШАБЛОНЫ НЕ ПОДДЕРЖИВАЕТСЯ В БРАУЗЕРНОЙ ВЕРСИИ]',
         minTemp: data.minTemp || '',
         maxTemp: data.maxTemp || '',
         avgTemp: data.avgTemp || '',
