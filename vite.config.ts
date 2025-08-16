@@ -24,9 +24,6 @@ export default defineConfig({
       'docxtemplater-image-module',
       'buffer',
     ],
-    exclude: [
-      'docxtemplater-table-module',
-    ],
   },
   server: {
     port: 5173,
