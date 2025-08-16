@@ -474,6 +474,12 @@ export class DocxTemplateProcessor {
       result = result.replace(/{ConditioningSystem}/g, '');
     }
 
+    // Обработка плейсхолдера {System} для климатической установки (альтернативный)
+    if (data.conditioningSystem) {
+      result = result.replace(/{System}/g, this.escapeXml(data.conditioningSystem));
+    } else {
+      result = result.replace(/{System}/g, '');
+    }
     // Обработка плейсхолдера таблицы результатов
     result = this.processTablePlaceholder(result, data);
     return result;
