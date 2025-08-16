@@ -296,8 +296,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const timeStr = now.toLocaleTimeString('ru-RU');
       const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
       
+      // Отладка: выводим все поля contractFields
+      console.log('Contract fields:', contractFields);
+      console.log('Test type value:', contractFields.testType);
+      
       // Функция для получения читаемого названия типа испытания
       const getTestTypeLabel = (testType: string): string => {
+        console.log('Converting test type:', testType);
         switch (testType) {
           case 'empty_volume':
             return 'Испытание на соответствие критериям в пустом объеме';
@@ -314,6 +319,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         }
       };
       
+      const convertedTestType = getTestTypeLabel(contractFields.testType || '');
+      console.log('Converted test type:', convertedTestType);
+      
       const templateData: TemplateReportData = {
         title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
         date: `${dateStr} ${timeStr}`,
@@ -322,7 +330,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         conclusions,
         researchObject: contractFields.researchObject || '',
         conditioningSystem: contractFields.climateInstallation || '',
-        testType: getTestTypeLabel(contractFields.testType || '') || ''
+        testType: convertedTestType || ''
       };
 
       // Обрабатываем шаблон
