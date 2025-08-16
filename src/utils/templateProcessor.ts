@@ -48,7 +48,7 @@ export class TemplateProcessor {
         // Основные плейсхолдеры - ключи должны точно соответствовать именам в шаблоне
         DATE: data.DATE,
         DATA_TYPE: data.DATA_TYPE,
-        CHART: '[ВСТАВКА ИЗОБРАЖЕНИЙ В ШАБЛОНЫ НЕ ПОДДЕРЖИВАЕТСЯ В БРАУЗЕРНОЙ ВЕРСИИ]',
+        CHART: '',
         TABLE: this.formatTableForTemplate(data.TABLE),
         
         // Дополнительные плейсхолдеры
