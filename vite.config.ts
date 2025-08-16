@@ -20,8 +20,10 @@ export default defineConfig({
       'd3-zoom',
       'pizzip',
       'docxtemplater',
-      'docxtemplater-table-module',
       'docxtemplater-image-module'
+    ],
+    exclude: [
+      'docxtemplater-table-module'
     ],
   },
   server: {
