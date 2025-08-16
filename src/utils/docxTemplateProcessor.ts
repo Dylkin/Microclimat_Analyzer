@@ -459,6 +459,9 @@ export class DocxTemplateProcessor {
       conditioningSystem: data.conditioningSystem
     });
 
+    // Нормализуем XML перед заменой плейсхолдеров
+    // Это объединяет разбитые текстовые узлы
+    result = this.normalizeXmlText(result);
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
       result = result.replace(/{Result}/g, this.escapeXml(data.conclusions));
@@ -479,7 +482,12 @@ export class DocxTemplateProcessor {
 
     // Обработка плейсхолдера {ConditioningSystem} для климатической установки
     if (data.conditioningSystem) {
+      console.log('Before ConditioningSystem replacement, XML contains:', result.includes('{ConditioningSystem}'));
+      console.log('Searching for {ConditioningSystem} in XML...');
+      const matches = result.match(/{ConditioningSystem}/g);
+      console.log('Found matches:', matches ? matches.length : 0);
       result = result.replace(/{ConditioningSystem}/g, this.escapeXml(data.conditioningSystem));
+      console.log('After ConditioningSystem replacement, XML still contains:', result.includes('{ConditioningSystem}'));
       console.log('Replaced {ConditioningSystem} placeholder with:', data.conditioningSystem);
     } else {
       result = result.replace(/{ConditioningSystem}/g, '');
@@ -491,6 +499,38 @@ export class DocxTemplateProcessor {
     return result;
   }
 
+  /**
+   * Нормализация XML текста для корректной замены плейсхолдеров
+   * Объединяет разбитые текстовые узлы в DOCX
+   */
+  private normalizeXmlText(xml: string): string {
+    // Список плейсхолдеров для нормализации
+    const placeholders = ['{Result}', '{Object}', '{ConditioningSystem}', '{chart}', '{resultsTable}'];
+    
+    let result = xml;
+    
+    placeholders.forEach(placeholder => {
+      // Создаем регулярное выражение для поиска разбитого плейсхолдера
+      // Например: {<w:t>Res</w:t><w:t>ult</w:t>} -> {Result}
+      const escapedPlaceholder = placeholder.replace(/[{}]/g, '\\$&');
+      const parts = placeholder.slice(1, -1).split(''); // Убираем {} и разбиваем на символы
+      
+      // Создаем паттерн для поиска разбитого текста
+      let pattern = '\\{';
+      for (let i = 0; i < parts.length; i++) {
+        if (i > 0) {
+          pattern += '(?:</w:t>\\s*<w:t[^>]*>)?'; // Возможный разрыв между символами
+        }
+        pattern += parts[i];
+      }
+      pattern += '\\}';
+      
+      const regex = new RegExp(pattern, 'g');
+      result = result.replace(regex, placeholder);
+    });
+    
+    return result;
+  }
   /**
    * Обработка плейсхолдера {resultsTable} для вставки таблицы результатов анализа
    */
