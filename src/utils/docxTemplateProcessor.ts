@@ -453,25 +453,37 @@ export class DocxTemplateProcessor {
   private processTextPlaceholders(documentXml: string, data: TemplateReportData): string {
     let result = documentXml;
 
+    console.log('Processing placeholders with data:', {
+      conclusions: data.conclusions,
+      researchObject: data.researchObject,
+      conditioningSystem: data.conditioningSystem
+    });
+
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
       result = result.replace(/{Result}/g, this.escapeXml(data.conclusions));
+      console.log('Replaced {Result} placeholder');
     } else {
       result = result.replace(/{Result}/g, '');
+      console.log('Cleared {Result} placeholder (no data)');
     }
 
     // Обработка плейсхолдера {Object} для объекта исследования
     if (data.researchObject) {
       result = result.replace(/{Object}/g, this.escapeXml(data.researchObject));
+      console.log('Replaced {Object} placeholder');
     } else {
       result = result.replace(/{Object}/g, '');
+      console.log('Cleared {Object} placeholder (no data)');
     }
 
     // Обработка плейсхолдера {ConditioningSystem} для климатической установки
     if (data.conditioningSystem) {
       result = result.replace(/{ConditioningSystem}/g, this.escapeXml(data.conditioningSystem));
+      console.log('Replaced {ConditioningSystem} placeholder with:', data.conditioningSystem);
     } else {
       result = result.replace(/{ConditioningSystem}/g, '');
+      console.log('Cleared {ConditioningSystem} placeholder (no data)');
     }
 
     // Обработка плейсхолдера таблицы результатов

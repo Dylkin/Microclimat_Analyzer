@@ -306,6 +306,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         conditioningSystem: contractFields.climateInstallation || ''
       };
 
+      // Отладочная информация
+      console.log('Contract fields:', contractFields);
+      console.log('Template data:', templateData);
+      console.log('Conditioning system value:', templateData.conditioningSystem);
+
       // Обрабатываем шаблон
       const docxBlob = await processor.processTemplate(
         reportStatus.templateFile,
