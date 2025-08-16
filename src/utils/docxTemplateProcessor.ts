@@ -10,12 +10,27 @@ export interface TemplateReportData {
 
 export class DocxTemplateProcessor {
   private static instance: DocxTemplateProcessor;
+  private existingReportBlob: Blob | null = null;
 
   static getInstance(): DocxTemplateProcessor {
     if (!DocxTemplateProcessor.instance) {
       DocxTemplateProcessor.instance = new DocxTemplateProcessor();
     }
     return DocxTemplateProcessor.instance;
+  }
+
+  /**
+   * Установка существующего отчета для добавления данных
+   */
+  setExistingReport(reportBlob: Blob | null): void {
+    this.existingReportBlob = reportBlob;
+  }
+
+  /**
+   * Проверка наличия существующего отчета
+   */
+  hasExistingReport(): boolean {
+    return this.existingReportBlob !== null;
   }
 
   /**
@@ -109,7 +124,38 @@ export class DocxTemplateProcessor {
     chartElement: HTMLElement
   ): Promise<Blob> {
     try {
-      console.log('Создание отчета по шаблону с PNG изображением...');
+      if (this.existingReportBlob) {
+        console.log('Добавление данных в существующий отчет...');
+        return this.appendToExistingReport(templateFile, data, chartElement);
+      } else {
+        console.log('Создание нового отчета по шаблону с PNG изображением...');
+        return this.createNewReport(templateFile, data, chartElement);
+      }
+    } catch (error) {
+      console.error('Ошибка генерации отчета по шаблону:', error);
+      
+      // Детальная информация об ошибке
+      if (error instanceof Error) {
+        console.error('Детали ошибки:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      
+      throw new Error(`Не удалось создать отчет по шаблону: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  }
+
+  /**
+   * Создание нового отчета
+   */
+  private async createNewReport(
+    templateFile: File,
+    data: TemplateReportData,
+    chartElement: HTMLElement
+  ): Promise<Blob> {
+    try {
       
       // Читаем шаблон как ArrayBuffer
       const templateBuffer = await templateFile.arrayBuffer();
@@ -164,21 +210,141 @@ export class DocxTemplateProcessor {
       console.log('DOCX файл создан успешно, размер:', buffer.size, 'байт');
       
       return buffer;
-
     } catch (error) {
-      console.error('Ошибка генерации отчета по шаблону:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Добавление данных в существующий отчет
+   */
+  private async appendToExistingReport(
+    templateFile: File,
+    data: TemplateReportData,
+    chartElement: HTMLElement
+  ): Promise<Blob> {
+    try {
+      // Читаем существующий отчет
+      const existingBuffer = await this.existingReportBlob!.arrayBuffer();
+      const existingZip = new PizZip(existingBuffer);
       
-      // Детальная информация об ошибке
-      if (error instanceof Error) {
-        console.error('Детали ошибки:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        });
+      // Читаем шаблон для новых данных
+      const templateBuffer = await templateFile.arrayBuffer();
+      const templateZip = new PizZip(templateBuffer);
+      
+      // Создаем скриншот нового графика
+      console.log('Создаем скриншот нового графика...');
+      const chartImageBuffer = await this.createRotatedScreenshot(chartElement);
+      
+      // Генерируем уникальное имя для нового изображения
+      const timestamp = Date.now();
+      const newImageName = `chart_${timestamp}.png`;
+      const newMediaPath = `word/media/${newImageName}`;
+      
+      // Добавляем новое изображение в существующий отчет
+      existingZip.file(newMediaPath, chartImageBuffer);
+      console.log('Новое изображение добавлено:', newMediaPath);
+      
+      // Генерируем новый ID для связи
+      const newRelationshipId = this.generateRelationshipId(existingZip);
+      console.log('Сгенерирован новый ID связи:', newRelationshipId);
+      
+      // Обновляем файл связей в существующем отчете
+      this.updateRelationships(existingZip, newRelationshipId, `media/${newImageName}`);
+      
+      // Читаем содержимое шаблона для получения структуры новых данных
+      const templateDocumentXml = templateZip.files['word/document.xml'].asText();
+      
+      // Обрабатываем шаблон с новыми данными
+      let processedTemplateXml = this.replaceChartPlaceholder(templateDocumentXml, newRelationshipId);
+      processedTemplateXml = this.processTextPlaceholders(processedTemplateXml, data);
+      
+      // Читаем существующий документ
+      const existingDocumentXml = existingZip.files['word/document.xml'].asText();
+      
+      // Добавляем новый контент в существующий документ
+      const updatedDocumentXml = this.appendContentToDocument(existingDocumentXml, processedTemplateXml);
+      
+      // Сохраняем обновленный документ
+      existingZip.file('word/document.xml', updatedDocumentXml);
+      
+      // Генерируем обновленный DOCX файл
+      console.log('Генерируем обновленный DOCX файл...');
+      const buffer = existingZip.generate({ 
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
+      
+      console.log('Данные успешно добавлены в существующий отчет, размер:', buffer.size, 'байт');
+      
+      return buffer;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Добавление нового контента в существующий документ
+   */
+  private appendContentToDocument(existingXml: string, newContentXml: string): string {
+    try {
+      // Извлекаем контент из шаблона (все что между <w:body> и </w:body>)
+      const bodyStartTag = '<w:body>';
+      const bodyEndTag = '</w:body>';
+      
+      const newContentStart = newContentXml.indexOf(bodyStartTag);
+      const newContentEnd = newContentXml.indexOf(bodyEndTag);
+      
+      if (newContentStart === -1 || newContentEnd === -1) {
+        throw new Error('Не удалось найти тело документа в шаблоне');
       }
       
-      throw new Error(`Не удалось создать отчет по шаблону: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      // Извлекаем только содержимое body (без тегов)
+      const newBodyContent = newContentXml.substring(
+        newContentStart + bodyStartTag.length,
+        newContentEnd
+      );
+      
+      // Добавляем разделитель страницы и новый контент перед закрывающим тегом body
+      const pageBreak = `
+        <w:p>
+          <w:r>
+            <w:br w:type="page"/>
+          </w:r>
+        </w:p>
+        <w:p>
+          <w:pPr>
+            <w:spacing w:before="400" w:after="400"/>
+            <w:jc w:val="center"/>
+          </w:pPr>
+          <w:r>
+            <w:rPr>
+              <w:b/>
+              <w:sz w:val="32"/>
+            </w:rPr>
+            <w:t>Дополнительный анализ - ${new Date().toLocaleString('ru-RU')}</w:t>
+          </w:r>
+        </w:p>`;
+      
+      // Вставляем новый контент перед закрывающим тегом </w:body>
+      const updatedXml = existingXml.replace(
+        bodyEndTag,
+        pageBreak + newBodyContent + bodyEndTag
+      );
+      
+      return updatedXml;
+    } catch (error) {
+      console.error('Ошибка добавления контента в документ:', error);
+      throw new Error('Не удалось добавить новый контент в существующий документ');
     }
+  }
+
+  /**
+   * Очистка существующего отчета
+   */
+  clearExistingReport(): void {
+    this.existingReportBlob = null;
   }
 
   /**

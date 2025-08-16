@@ -261,6 +261,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setReportStatus(prev => ({ ...prev, isGenerating: true }));
 
     try {
+      // Получаем экземпляр процессора
+      const processor = DocxTemplateProcessor.getInstance();
+      
+      // Если уже есть отчет, устанавливаем его для добавления данных
+      if (reportStatus.hasReport && reportStatus.reportUrl) {
+        const existingReportResponse = await fetch(reportStatus.reportUrl);
+        const existingReportBlob = await existingReportResponse.blob();
+        processor.setExistingReport(existingReportBlob);
+      } else {
+        processor.clearExistingReport();
+      }
+      
       // Генерируем данные для шаблона
       const now = new Date();
       const dateStr = now.toLocaleDateString('ru-RU');
@@ -275,16 +287,22 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       };
 
       // Обрабатываем шаблон
-      const processor = DocxTemplateProcessor.getInstance();
       const docxBlob = await processor.processTemplate(
         reportStatus.templateFile,
         templateData,
         chartRef.current
       );
 
+      // Освобождаем старый URL если он есть
+      if (reportStatus.reportUrl) {
+        URL.revokeObjectURL(reportStatus.reportUrl);
+      }
+
       // Создаем URL для скачивания
       const reportUrl = URL.createObjectURL(docxBlob);
-      const reportFilename = `отчет_шаблон_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
+      const reportFilename = reportStatus.hasReport 
+        ? reportStatus.reportFilename // Сохраняем старое имя файла
+        : `отчет_шаблон_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
 
       // Обновляем состояние
       setReportStatus(prev => ({
@@ -317,6 +335,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     if (reportStatus.reportUrl) {
       URL.revokeObjectURL(reportStatus.reportUrl);
     }
+
+    // Очищаем существующий отчет в процессоре
+    const processor = DocxTemplateProcessor.getInstance();
+    processor.clearExistingReport();
 
     setReportStatus({
       isGenerating: false,
