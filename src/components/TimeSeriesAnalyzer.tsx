@@ -303,7 +303,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         analysisResults,
         conclusions,
         researchObject: contractFields.researchObject || '',
-        conditioningSystem: contractFields.climateInstallation || ''
+        conditioningSystem: contractFields.climateInstallation || '',
+        testType: this.getTestTypeLabel(contractFields.testType) || ''
       };
 
       // Обрабатываем шаблон
@@ -443,6 +444,24 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 Результаты испытания ${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
 
     setConclusions(conclusionText);
+  };
+
+  // Функция для получения читаемого названия типа испытания
+  const getTestTypeLabel = (testType: string): string => {
+    switch (testType) {
+      case 'empty_volume':
+        return 'Испытание на соответствие критериям в пустом объеме';
+      case 'loaded_volume':
+        return 'Испытание на соответствие критериям в загруженном объеме';
+      case 'temperature_recovery':
+        return 'Испытание по восстановлению температуры после открытия двери';
+      case 'power_off':
+        return 'Испытание на отключение электропитания';
+      case 'power_on':
+        return 'Испытание на включение электропитания';
+      default:
+        return testType;
+    }
   };
 
   if (loading) {
@@ -1012,8 +1031,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <p>• <code>{'{Object}'}</code> - объект исследования</p>
               <p>• <code>{'{ConditioningSystem}'}</code> - климатическая установка</p>
               <p>• <code>{'{System}'}</code> - климатическая установка</p>
+              <p>• <code>{'{NameTest}'}</code> - тип испытания</p>
             </div>
-            <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code>, <code>{'{Object}'}</code>, <code>{'{ConditioningSystem}'}</code> и <code>{'{System}'}</code> заменяются на соответствующие текстовые данные.</p>
+            <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code>, <code>{'{Object}'}</code>, <code>{'{ConditioningSystem}'}</code>, <code>{'{System}'}</code> и <code>{'{NameTest}'}</code> заменяются на соответствующие текстовые данные.</p>
           </div>
         </div>
       </div>

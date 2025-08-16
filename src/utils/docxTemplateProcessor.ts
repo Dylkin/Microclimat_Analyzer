@@ -9,6 +9,7 @@ export interface TemplateReportData {
   conclusions?: string;
   researchObject?: string;
   conditioningSystem?: string;
+  testType?: string;
 }
 
 export class DocxTemplateProcessor {
@@ -480,6 +481,14 @@ export class DocxTemplateProcessor {
     } else {
       result = result.replace(/{System}/g, '');
     }
+
+    // Обработка плейсхолдера {NameTest} для типа испытания
+    if (data.testType) {
+      result = result.replace(/{NameTest}/g, this.escapeXml(data.testType));
+    } else {
+      result = result.replace(/{NameTest}/g, '');
+    }
+
     // Обработка плейсхолдера таблицы результатов
     result = this.processTablePlaceholder(result, data);
     return result;
