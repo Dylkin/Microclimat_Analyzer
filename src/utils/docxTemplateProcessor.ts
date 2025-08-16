@@ -518,6 +518,7 @@ export class DocxTemplateProcessor {
     // Список плейсхолдеров для нормализации
     const placeholders = [
      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'resultsTable', 'Limits'
+      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'resultsTable', 'Limits', 'Executor'
     ];
     
     let result = xml;
