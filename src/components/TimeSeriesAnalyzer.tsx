@@ -7,6 +7,7 @@ import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeS
 import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxReportGenerator, ReportData } from '../utils/docxGenerator';
+import { DocxImageGenerator, ImageReportData } from '../utils/docxImageGenerator';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -330,6 +331,52 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
   };
 
+  const handleGenerateImageReport = async () => {
+    setReportStatus(prev => ({ ...prev, isGenerating: true }));
+
+    try {
+      if (!chartRef.current) {
+        throw new Error('График не найден для сохранения');
+      }
+
+      // Генерируем данные для отчета
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('ru-RU');
+      const timeStr = now.toLocaleTimeString('ru-RU');
+      const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
+      
+      const imageReportData: ImageReportData = {
+        title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
+        date: `${dateStr} ${timeStr}`,
+        dataType,
+        analysisResults
+      };
+
+      // Генерируем DOCX отчет с PNG изображением
+      const docxImageGenerator = DocxImageGenerator.getInstance();
+      const docxBlob = await docxImageGenerator.generateReportWithImage(imageReportData, chartRef.current);
+
+      // Создаем URL для скачивания
+      const reportUrl = URL.createObjectURL(docxBlob);
+      const reportFilename = `отчет_PNG_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
+
+      // Обновляем состояние
+      setReportStatus({
+        ...reportStatus,
+        isGenerating: false,
+        hasReport: true,
+        reportUrl,
+        reportFilename,
+        templateFile: null
+      });
+      
+    } catch (error) {
+      console.error('Ошибка создания отчета с PNG изображением:', error);
+      alert(`Ошибка при формировании отчета с PNG: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      setReportStatus(prev => ({ ...prev, isGenerating: false }));
+    }
+  };
+
   const handleDownloadReport = () => {
     if (reportStatus.reportUrl && reportStatus.reportFilename) {
       const link = document.createElement('a');
@@ -589,7 +636,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <button
             onClick={handleGenerateReport}
             disabled={reportStatus.isGenerating}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed mr-4"
             title="Сформировать отчет с графиком"
           >
             {reportStatus.isGenerating ? (
@@ -601,6 +648,26 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <>
                 <FileText className="w-5 h-5" />
                 <span>{reportStatus.hasReport ? 'Обновить отчет' : 'Сформировать отчет'}</span>
+              </>
+            )}
+          </button>
+          
+          {/* Кнопка генерации отчета с PNG изображением */}
+          <button
+            onClick={handleGenerateImageReport}
+            disabled={reportStatus.isGenerating}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+            title="Сформировать отчет с PNG изображением графика"
+          >
+            {reportStatus.isGenerating ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span>Формирование отчета...</span>
+              </>
+            ) : (
+              <>
+                <FileText className="w-5 h-5" />
+                <span>Отчет с PNG графиком</span>
               </>
             )}
           </button>
