@@ -459,30 +459,52 @@ export class DocxTemplateProcessor {
       conditioningSystem: data.conditioningSystem
     });
 
+    // Функция для более надежной замены плейсхолдеров
+    const replacePlaceholder = (xml: string, placeholder: string, value: string): string => {
+      // Заменяем обычные плейсхолдеры
+      let updatedXml = xml.replace(new RegExp(`\\{${placeholder}\\}`, 'g'), this.escapeXml(value));
+      
+      // Заменяем плейсхолдеры, которые могут быть разбиты на несколько XML элементов
+      // Например: <w:t>{</w:t><w:t>ConditioningSystem</w:t><w:t>}</w:t>
+      const brokenPlaceholderPattern = new RegExp(
+        `<w:t[^>]*>\\{</w:t>\\s*<w:t[^>]*>${placeholder}</w:t>\\s*<w:t[^>]*>\\}</w:t>`,
+        'gi'
+      );
+      updatedXml = updatedXml.replace(brokenPlaceholderPattern, `<w:t>${this.escapeXml(value)}</w:t>`);
+      
+      // Заменяем плейсхолдеры с дополнительными пробелами или символами
+      const spacedPlaceholderPattern = new RegExp(
+        `<w:t[^>]*>\\s*\\{\\s*${placeholder}\\s*\\}\\s*</w:t>`,
+        'gi'
+      );
+      updatedXml = updatedXml.replace(spacedPlaceholderPattern, `<w:t>${this.escapeXml(value)}</w:t>`);
+      
+      return updatedXml;
+    };
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
-      result = result.replace(/{Result}/g, this.escapeXml(data.conclusions));
+      result = replacePlaceholder(result, 'Result', data.conclusions);
       console.log('Replaced {Result} placeholder');
     } else {
-      result = result.replace(/{Result}/g, '');
+      result = replacePlaceholder(result, 'Result', '');
       console.log('Cleared {Result} placeholder (no data)');
     }
 
     // Обработка плейсхолдера {Object} для объекта исследования
     if (data.researchObject) {
-      result = result.replace(/{Object}/g, this.escapeXml(data.researchObject));
+      result = replacePlaceholder(result, 'Object', data.researchObject);
       console.log('Replaced {Object} placeholder');
     } else {
-      result = result.replace(/{Object}/g, '');
+      result = replacePlaceholder(result, 'Object', '');
       console.log('Cleared {Object} placeholder (no data)');
     }
 
     // Обработка плейсхолдера {ConditioningSystem} для климатической установки
     if (data.conditioningSystem) {
-      result = result.replace(/{ConditioningSystem}/g, this.escapeXml(data.conditioningSystem));
+      result = replacePlaceholder(result, 'ConditioningSystem', data.conditioningSystem);
       console.log('Replaced {ConditioningSystem} placeholder with:', data.conditioningSystem);
     } else {
-      result = result.replace(/{ConditioningSystem}/g, '');
+      result = replacePlaceholder(result, 'ConditioningSystem', '');
       console.log('Cleared {ConditioningSystem} placeholder (no data)');
     }
 
