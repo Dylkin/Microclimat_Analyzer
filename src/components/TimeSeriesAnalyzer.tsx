@@ -336,7 +336,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         limits: limits,
         executor: user?.fullName || '',
         testDate: dateStr,
-        reportNo: contractFields.contractNumber || ''
+        reportNo: contractFields.contractNumber || '',
+        reportDate: contractFields.contractDate || ''
       };
 
       // Обрабатываем шаблон
@@ -1050,6 +1051,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <p>• <code>{'{Executor}'}</code> - ФИО исполнителя (текущий пользователь)</p>
               <p>• <code>{'{TestDate}'}</code> - дата испытания (текущая дата)</p>
               <p>• <code>{'{ReportNo}'}</code> - номер договора из настроек анализа</p>
+              <p>• <code>{'{ReportDate}'}</code> - дата договора из настроек анализа</p>
             </div>
             <p className="text-xs mt-2"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки.</p>
             <p className="text-xs mt-1"><strong>Колонтитулы:</strong> Все плейсхолдеры также работают в верхних и нижних колонтитулах документа (header1.xml, header2.xml, header3.xml, footer1.xml, footer2.xml, footer3.xml).</p>
