@@ -1048,6 +1048,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <p>• <code>{'{Limits}'}</code> - установленные лимиты с единицами измерения</p>
               <p>• <code>{'{Executor}'}</code> - ФИО исполнителя (текущий пользователь)</p>
               <p>• <code>{'{TestDate}'}</code> - дата испытания (текущая дата)</p>
+              <p>• <code>{'{ReportNo}'}</code> - номер договора из настроек анализа</p>
             </div>
             <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code>, <code>{'{Object}'}</code>, <code>{'{ConditioningSystem}'}</code>, <code>{'{System}'}</code>, <code>{'{NameTest}'}</code>, <code>{'{Limits}'}</code>, <code>{'{Executor}'}</code> и <code>{'{TestDate}'}</code> заменяются на соответствующие текстовые данные.</p>
           </div>
