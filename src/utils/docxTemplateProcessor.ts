@@ -453,46 +453,25 @@ export class DocxTemplateProcessor {
   private processTextPlaceholders(documentXml: string, data: TemplateReportData): string {
     let result = documentXml;
 
-    console.log('Processing placeholders with data:', {
-      conclusions: data.conclusions,
-      researchObject: data.researchObject,
-      conditioningSystem: data.conditioningSystem
-    });
-
-    // Нормализуем XML перед заменой плейсхолдеров
-    // Это объединяет разбитые текстовые узлы
-    result = this.normalizeXmlText(result);
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
       result = result.replace(/{Result}/g, this.escapeXml(data.conclusions));
-      console.log('Replaced {Result} placeholder');
     } else {
       result = result.replace(/{Result}/g, '');
-      console.log('Cleared {Result} placeholder (no data)');
     }
 
     // Обработка плейсхолдера {Object} для объекта исследования
     if (data.researchObject) {
       result = result.replace(/{Object}/g, this.escapeXml(data.researchObject));
-      console.log('Replaced {Object} placeholder');
     } else {
       result = result.replace(/{Object}/g, '');
-      console.log('Cleared {Object} placeholder (no data)');
     }
 
     // Обработка плейсхолдера {ConditioningSystem} для климатической установки
     if (data.conditioningSystem) {
-      console.log('Before ConditioningSystem replacement, XML contains:', result.includes('{ConditioningSystem}'));
-      console.log('XML snippet around ConditioningSystem:', this.findXmlSnippet(result, 'ConditioningSystem'));
-      console.log('Searching for {ConditioningSystem} in XML...');
-      const matches = result.match(/{ConditioningSystem}/g);
-      console.log('Found matches:', matches ? matches.length : 0);
       result = result.replace(/{ConditioningSystem}/g, this.escapeXml(data.conditioningSystem));
-      console.log('After ConditioningSystem replacement, XML still contains:', result.includes('{ConditioningSystem}'));
-      console.log('Replaced {ConditioningSystem} placeholder with:', data.conditioningSystem);
     } else {
       result = result.replace(/{ConditioningSystem}/g, '');
-      console.log('Cleared {ConditioningSystem} placeholder (no data)');
     }
 
     // Обработка плейсхолдера таблицы результатов
@@ -500,51 +479,6 @@ export class DocxTemplateProcessor {
     return result;
   }
 
-  /**
-   * Нормализация XML текста для корректной замены плейсхолдеров
-   * Объединяет разбитые текстовые узлы в DOCX
-   */
-  private normalizeXmlText(xml: string): string {
-    console.log('Starting XML normalization...');
-    
-    // Более агрессивная нормализация - объединяем все соседние текстовые узлы
-    let result = xml;
-    
-    // Шаг 1: Объединяем соседние текстовые узлы
-    result = result.replace(/<\/w:t>\s*<w:t[^>]*>/g, '');
-    
-    // Шаг 2: Ищем и восстанавливаем разбитые плейсхолдеры более агрессивно
-    const placeholders = ['{Result}', '{Object}', '{ConditioningSystem}', '{chart}', '{resultsTable}'];
-    
-    placeholders.forEach(placeholder => {
-      console.log(`Normalizing placeholder: ${placeholder}`);
-      
-      // Создаем очень гибкий паттерн для поиска разбитого плейсхолдера
-      const chars = placeholder.split('');
-      let pattern = '';
-      
-      for (let i = 0; i < chars.length; i++) {
-        const char = chars[i].replace(/[{}]/g, '\\$&');
-        if (i === 0) {
-          pattern += char;
-        } else {
-          // Между любыми символами может быть разрыв XML тегов
-          pattern += `(?:</w:t>\\s*<w:t[^>]*>\\s*)?${char}`;
-        }
-      }
-      
-      const regex = new RegExp(pattern, 'gi');
-      const matches = result.match(regex);
-      if (matches) {
-        console.log(`Found broken placeholder matches for ${placeholder}:`, matches);
-        result = result.replace(regex, placeholder);
-      }
-    });
-    
-    console.log('XML normalization completed');
-    
-    return result;
-  }
   /**
    * Обработка плейсхолдера {resultsTable} для вставки таблицы результатов анализа
    */
@@ -853,19 +787,6 @@ export class DocxTemplateProcessor {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
-  }
-
-  /**
-   * Поиск фрагмента XML вокруг указанного текста для отладки
-   */
-  private findXmlSnippet(xml: string, searchText: string, contextLength: number = 200): string {
-    const index = xml.toLowerCase().indexOf(searchText.toLowerCase());
-    if (index === -1) return 'Not found';
-    
-    const start = Math.max(0, index - contextLength);
-    const end = Math.min(xml.length, index + searchText.length + contextLength);
-    
-    return xml.substring(start, end);
   }
 
   /**
