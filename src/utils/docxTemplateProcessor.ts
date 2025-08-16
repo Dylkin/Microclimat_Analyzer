@@ -828,6 +828,33 @@ export class DocxTemplateProcessor {
   }
 
   /**
+   * Форматирование текста лимитов для вставки в документ
+   */
+  private formatLimitsText(limits: any, dataType: 'temperature' | 'humidity'): string {
+    if (!limits || !limits[dataType]) {
+      return 'Лимиты не установлены';
+    }
+
+    const currentLimits = limits[dataType];
+    const unit = dataType === 'temperature' ? '°C' : '%';
+    const dataTypeName = dataType === 'temperature' ? 'температуры' : 'влажности';
+    
+    const parts: string[] = [];
+    
+    if (currentLimits.min !== undefined && currentLimits.max !== undefined) {
+      parts.push(`Лимиты ${dataTypeName}: от ${currentLimits.min}${unit} до ${currentLimits.max}${unit}`);
+    } else if (currentLimits.min !== undefined) {
+      parts.push(`Минимальный лимит ${dataTypeName}: ${currentLimits.min}${unit}`);
+    } else if (currentLimits.max !== undefined) {
+      parts.push(`Максимальный лимит ${dataTypeName}: ${currentLimits.max}${unit}`);
+    } else {
+      return 'Лимиты не установлены';
+    }
+    
+    return parts.join(', ');
+  }
+
+  /**
    * Экранирование XML символов
    */
   private escapeXml(text: string): string {

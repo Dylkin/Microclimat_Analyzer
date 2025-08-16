@@ -1040,8 +1040,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <p>• <code>{'{ConditioningSystem}'}</code> - климатическая установка</p>
               <p>• <code>{'{System}'}</code> - климатическая установка</p>
               <p>• <code>{'{NameTest}'}</code> - тип испытания</p>
+              <p>• <code>{'{Limits}'}</code> - установленные лимиты с единицами измерения</p>
             </div>
-            <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code>, <code>{'{Object}'}</code>, <code>{'{ConditioningSystem}'}</code>, <code>{'{System}'}</code> и <code>{'{NameTest}'}</code> заменяются на соответствующие текстовые данные.</p>
+            <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code>, <code>{'{Object}'}</code>, <code>{'{ConditioningSystem}'}</code>, <code>{'{System}'}</code>, <code>{'{NameTest}'}</code> и <code>{'{Limits}'}</code> заменяются на соответствующие текстовые данные.</p>
           </div>
         </div>
       </div>
