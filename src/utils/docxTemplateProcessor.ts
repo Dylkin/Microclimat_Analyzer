@@ -7,8 +7,6 @@ export interface TemplateReportData {
   dataType: 'temperature' | 'humidity';
   analysisResults: any[];
   conclusions?: string;
-  conditioningSystem?: string;
-  researchObject?: string;
 }
 
 export class DocxTemplateProcessor {
@@ -456,16 +454,6 @@ export class DocxTemplateProcessor {
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
       result = result.replace(/{Result}/g, this.escapeXml(data.conclusions));
-    }
-
-    // Обработка плейсхолдера {ConditioningSystem} для климатической установки
-    if (data.conditioningSystem) {
-      result = result.replace(/{ConditioningSystem}/g, this.escapeXml(data.conditioningSystem));
-    }
-
-    // Обработка плейсхолдера {Object} для объекта исследования
-    if (data.researchObject) {
-      result = result.replace(/{Object}/g, this.escapeXml(data.researchObject));
     }
 
     // Обработка плейсхолдера таблицы результатов
