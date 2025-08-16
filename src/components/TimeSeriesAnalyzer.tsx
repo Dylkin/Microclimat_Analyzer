@@ -1050,7 +1050,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <p>• <code>{'{TestDate}'}</code> - дата испытания (текущая дата)</p>
               <p>• <code>{'{ReportNo}'}</code> - номер договора из настроек анализа</p>
             </div>
-            <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code>, <code>{'{Object}'}</code>, <code>{'{ConditioningSystem}'}</code>, <code>{'{System}'}</code>, <code>{'{NameTest}'}</code>, <code>{'{Limits}'}</code>, <code>{'{Executor}'}</code> и <code>{'{TestDate}'}</code> заменяются на соответствующие текстовые данные.</p>
+            <p className="text-xs mt-2"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки.</p>
+            <p className="text-xs mt-1"><strong>Колонтитулы:</strong> Все плейсхолдеры также работают в верхних и нижних колонтитулах документа (header1.xml, header2.xml, header3.xml, footer1.xml, footer2.xml, footer3.xml).</p>
           </div>
         </div>
       </div>

@@ -207,6 +207,9 @@ export class DocxTemplateProcessor {
       const finalDocumentXml = this.processTextPlaceholders(updatedDocumentXml, data);
       zip.file('word/document.xml', finalDocumentXml);
 
+      // Обрабатываем плейсхолдеры в колонтитулах
+      this.processHeaderFooterPlaceholders(zip, data);
+
       // Генерируем итоговый DOCX файл
       console.log('Генерируем итоговый DOCX файл...');
       const buffer = zip.generate({ 
@@ -275,6 +278,9 @@ export class DocxTemplateProcessor {
       
       // Сохраняем обновленный документ
       existingZip.file('word/document.xml', updatedDocumentXml);
+      
+      // Обрабатываем плейсхолдеры в колонтитулах
+      this.processHeaderFooterPlaceholders(existingZip, data);
       
       // Генерируем обновленный DOCX файл
       console.log('Генерируем обновленный DOCX файл...');
@@ -894,6 +900,55 @@ export class DocxTemplateProcessor {
     }
     
     return parts.join(', ');
+  }
+
+  /**
+   * Обработка плейсхолдеров в колонтитулах
+   */
+  private processHeaderFooterPlaceholders(zip: PizZip, data: TemplateReportData): void {
+    try {
+      console.log('Обработка плейсхолдеров в колонтитулах...');
+      
+      // Список возможных файлов колонтитулов
+      const headerFooterFiles = [
+        'word/header1.xml',
+        'word/header2.xml', 
+        'word/header3.xml',
+        'word/footer1.xml',
+        'word/footer2.xml',
+        'word/footer3.xml'
+      ];
+      
+      let processedCount = 0;
+      
+      headerFooterFiles.forEach(fileName => {
+        if (zip.files[fileName]) {
+          console.log(`Обрабатываем файл колонтитула: ${fileName}`);
+          
+          try {
+            // Читаем содержимое файла колонтитула
+            const headerFooterXml = zip.files[fileName].asText();
+            
+            // Обрабатываем плейсхолдеры
+            const processedXml = this.processTextPlaceholders(headerFooterXml, data);
+            
+            // Сохраняем обновленный файл
+            zip.file(fileName, processedXml);
+            processedCount++;
+            
+            console.log(`Файл ${fileName} успешно обработан`);
+          } catch (error) {
+            console.warn(`Ошибка обработки файла ${fileName}:`, error);
+          }
+        }
+      });
+      
+      console.log(`Обработано файлов колонтитулов: ${processedCount}`);
+      
+    } catch (error) {
+      console.error('Ошибка обработки колонтитулов:', error);
+      // Не прерываем выполнение, так как это не критическая ошибка
+    }
   }
 
   /**
