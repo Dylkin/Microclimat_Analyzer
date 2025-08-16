@@ -584,46 +584,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-col items-center space-y-6">
           {/* Загрузка шаблона */}
-          <div className="w-full max-w-md">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Шаблон отчета (необязательно)
-            </label>
-            {reportStatus.templateFile ? (
-              <div className="flex items-center justify-between bg-gray-50 border border-gray-300 rounded-lg p-3">
-                <div className="flex items-center space-x-2">
-                  <FileText className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm text-gray-700">{reportStatus.templateFile.name}</span>
-                </div>
-                <button
-                  onClick={handleRemoveTemplate}
-                  className="text-red-600 hover:text-red-800 transition-colors"
-                  title="Удалить шаблон"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center">
-                <input
-                  type="file"
-                  accept=".docx"
-                  onChange={handleTemplateUpload}
-                  className="hidden"
-                  id="template-upload"
-                />
-                <label
-                  htmlFor="template-upload"
-                  className="cursor-pointer bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2 border border-gray-300"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Загрузить шаблон DOCX</span>
-                </label>
-              </div>
-            )}
-            <p className="text-xs text-gray-500 mt-1">
-              Если шаблон не загружен, будет создан стандартный отчет
-            </p>
-          </div>
 
           {/* Кнопка генерации отчета */}
           <button
@@ -666,22 +626,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             </div>
           )}
 
-          {/* Информация о шаблоне */}
-          {reportStatus.templateFile && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 w-full max-w-2xl">
-              <h4 className="text-sm font-medium text-blue-900 mb-2">Использование шаблона</h4>
-              <div className="text-xs text-blue-800 space-y-1">
-                <p>• Плейсхолдер <code className="bg-blue-100 px-1 rounded">{'{CHART}'}</code> будет заменен на инструкцию по вставке PNG изображения</p>
-                <p>• Таблица результатов заменит плейсхолдер <code className="bg-blue-100 px-1 rounded">{'{TABLE}'}</code></p>
-                <p>• Дата отчета заменит <code className="bg-blue-100 px-1 rounded">{'{DATE}'}</code></p>
-                <p>• Тип данных заменит <code className="bg-blue-100 px-1 rounded">{'{DATA_TYPE}'}</code></p>
-                <p className="text-red-700 font-medium">• ВАЖНО: Используйте ТОЧНО одинарные фигурные скобки! Неправильно: {'{{DATE}}'}, правильно: {'{DATE}'}</p>
-                <p className="text-orange-700 font-medium">• Изображение графика: В шаблоне будет размещена инструкция по вставке PNG изображения</p>
-                <p className="text-green-700 font-medium">• Совет: Для получения отчета с графиком используйте стандартную генерацию без шаблона</p>
-                <p className="text-blue-700 font-medium">• Новое: Плейсхолдер {'{CHART}'} теперь содержит подробную инструкцию по сохранению и вставке графика в формате PNG</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

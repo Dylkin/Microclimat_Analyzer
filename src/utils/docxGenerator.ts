@@ -1,5 +1,4 @@
 import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel } from 'docx';
-import { TemplateProcessor, TemplateData } from './templateProcessor';
 
 export interface ReportData {
   title: string;
@@ -46,39 +45,11 @@ export class DocxReportGenerator {
 
   async generateReportFromTemplate(data: ReportData, templateFile: File): Promise<Blob> {
     try {
-      console.log('Генерация отчета на основе шаблона:', templateFile.name);
-      console.log('Размер файла шаблона:', templateFile.size, 'байт');
-      
-      // Читаем шаблон как ArrayBuffer
-      const templateBuffer = await templateFile.arrayBuffer();
-      console.log('Шаблон загружен в память');
-      
-      // Конвертируем изображение графика в ArrayBuffer
-      const imageBuffer = await data.chartImageBlob.arrayBuffer();
-      console.log('Изображение графика конвертировано, размер:', imageBuffer.byteLength, 'байт');
-      
-      // Подготавливаем данные для шаблона
-      const templateData: TemplateData = {
-        DATE: data.date,
-        DATA_TYPE: data.dataType === 'temperature' ? 'Температура' : 'Влажность',
-        CHART: imageBuffer,
-        TABLE: data.analysisResults
-      };
-      
-      // Обрабатываем шаблон
-      console.log('Начинаем обработку шаблона...');
-      const processedBuffer = await TemplateProcessor.processTemplate(templateBuffer, templateData);
-      console.log('Шаблон обработан успешно');
-      
-      // Возвращаем как Blob
-      return new Blob([processedBuffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-      });
-      
+      console.log('Функциональность шаблонов отключена');
+      console.log('Переключаемся на создание стандартного отчета...');
+      return this.generateReport(data);
     } catch (error) {
-      console.error('Ошибка генерации отчета из шаблона:', error);
-      
-      // Если не удалось обработать шаблон, создаем стандартный отчет
+      console.error('Ошибка генерации отчета:', error);
       console.log('Переключаемся на создание стандартного отчета...');
       return this.generateReport(data);
     }
