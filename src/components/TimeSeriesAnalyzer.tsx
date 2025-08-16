@@ -768,6 +768,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             <strong>Примечание:</strong> При изменении масштаба графика статистика пересчитывается только для выбранного временного периода.
           </div>
         </div>
+
+        {/* Поле для выводов */}
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Выводы
+          </label>
+          <textarea
+            value={conclusions}
+            onChange={(e) => setConclusions(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            rows={4}
+            placeholder="Введите выводы по результатам анализа..."
+          />
+        </div>
       </div>
 
       {/* Кнопка формирования отчета */}
