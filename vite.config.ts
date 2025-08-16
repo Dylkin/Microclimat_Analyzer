@@ -10,7 +10,6 @@ export default defineConfig({
     global: 'globalThis',
     'process.env': {},
     'Buffer': 'buffer/index.js',
-    'buffer': 'globalThis.Buffer',
   },
   optimizeDeps: {
     include: [
@@ -26,7 +25,6 @@ export default defineConfig({
       'buffer'
     ],
     exclude: [
-      'docxtemplater-table-module'
     ],
   },
   server: {
