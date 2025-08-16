@@ -143,52 +143,10 @@ export const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-800 mb-3">3. Генерация отчетов</h3>
             <div className="bg-gray-50 rounded-lg p-4">
               <ul className="space-y-2 text-sm text-gray-700">
-                <li>• <strong>Стандартный отчет:</strong> Нажмите "Сформировать отчет" без шаблона</li>
-                <li>• <strong>Отчет по шаблону:</strong> Загрузите DOCX шаблон с плейсхолдерами</li>
-                <li>• График автоматически поворачивается на 90° против часовой стрелки</li>
-                <li>• PNG изображение графика вставляется в высоком разрешении</li>
+                <li>• Нажмите кнопку "Сформировать отчет"</li>
+                <li>• Система автоматически создаст отчет с таблицей результатов и графиком</li>
+                <li>• График поворачивается на 90° против часовой стрелки</li>
                 <li>• Готовый отчет сохраняется в формате DOCX</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Работа с шаблонами */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">4. Работа с продвинутыми DOCX шаблонами</h3>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <ul className="space-y-2 text-sm text-gray-700">
-                <li>• Создайте DOCX документ с специальными плейсхолдерами</li>
-                <li>• <strong>{'{date}'}</strong> - дата создания отчета</li>
-                <li>• <strong>{'{data_type}'}</strong> - тип данных (Температура/Влажность)</li>
-                <li>• <strong>{'{% image chart_image %}'}</strong> - PNG изображение графика (повернуто на 90°)</li>
-                <li>• <strong>{'{title}'}</strong> - заголовок отчета</li>
-                <li>• <strong>{'{analysis_summary}'}</strong> - краткая сводка анализа</li>
-                <li>• <strong>Таблица данных:</strong> используйте специальный синтаксис для циклов</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Синтаксис таблицы */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">5. Синтаксис таблицы в шаблоне</h3>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="text-sm text-gray-700 mb-3">
-                <strong>Пример структуры таблицы в DOCX шаблоне:</strong>
-              </div>
-              <div className="bg-white border rounded p-3 font-mono text-xs">
-                <div>{'{#table_data.rows}'}</div>
-                <div>| {'{zone}'} | {'{level}'} | {'{logger}'} | {'{sn}'} | {'{minTemp}'} | {'{maxTemp}'} | {'{avgTemp}'} | {'{meetsLimits}'} |</div>
-                <div>{'{/table_data.rows}'}</div>
-              </div>
-              <ul className="space-y-1 text-sm text-gray-700 mt-3">
-                <li>• <strong>{'{#table_data.rows}'}</strong> - начало цикла по строкам таблицы</li>
-                <li>• <strong>{'{zone}'}</strong> - номер зоны измерения</li>
-                <li>• <strong>{'{level}'}</strong> - уровень измерения</li>
-                <li>• <strong>{'{logger}'}</strong> - название логгера</li>
-                <li>• <strong>{'{sn}'}</strong> - серийный номер</li>
-                <li>• <strong>{'{minTemp}, {maxTemp}, {avgTemp}'}</strong> - температурные данные</li>
-                <li>• <strong>{'{meetsLimits}'}</strong> - соответствие лимитам</li>
-                <li>• <strong>{'{/table_data.rows}'}</strong> - конец цикла</li>
               </ul>
             </div>
           </div>
@@ -244,9 +202,9 @@ export const Help: React.FC = () => {
           </div>
 
           <div className="border-l-4 border-green-500 pl-4">
-            <h3 className="font-semibold text-gray-800">Как работают продвинутые шаблоны отчетов?</h3>
+            <h3 className="font-semibold text-gray-800">Как создать шаблон отчета?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Создайте DOCX файл с плейсхолдерами типа {'{% image chart_image %}'} для изображения графика и {'{#table_data.rows}'} для таблицы. Система автоматически вставит PNG изображение графика (повернутое на 90°) и структурированную таблицу с данными.
+              Нажмите кнопку "Сформировать отчет". Система автоматически создаст отчет с графиком и таблицей результатов в формате DOCX.
             </p>
           </div>
 
@@ -258,9 +216,9 @@ export const Help: React.FC = () => {
           </div>
 
           <div className="border-l-4 border-red-500 pl-4">
-            <h3 className="font-semibold text-gray-800">Почему график или таблица не отображается в шаблоне?</h3>
+            <h3 className="font-semibold text-gray-800">Как создать отчет?</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Убедитесь, что используете правильный синтаксис: {'{% image chart_image %}'} для изображения и {'{#table_data.rows}'} для таблицы. Изображение автоматически вставляется в PNG формате с поворотом на 90°.
+              Используйте таблицу результатов анализа для создания отчетов во внешних программах. Данные можно скопировать и вставить в документы.
             </p>
           </div>
         </div>

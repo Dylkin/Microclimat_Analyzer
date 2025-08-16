@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "buffer": "^6.0.3",
     "d3-array": "^3.2.4",
     "d3-scale": "^4.0.2",
     "d3-scale-chromatic": "^3.1.0",
@@ -17,13 +16,10 @@
     "d3-time-format": "^4.1.0",
     "d3-zoom": "^3.0.0",
     "docx": "^9.5.1",
-    "docxtemplater": "^3.65.3",
-    "docxtemplater-image-module": "^3.1.0",
-    "docxtemplater-table-module": "^3.0.0",
     "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.532.0",
-    "pizzip": "^3.2.0",
+    "pizzip": "^3.1.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^3.1.0"

@@ -1,12 +1,11 @@
 import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel } from 'docx';
-import { TemplateProcessor, TemplateData } from './templateProcessor';
 
 export interface ReportData {
   title: string;
   date: string;
   dataType: 'temperature' | 'humidity';
+  chartImageBlob: Blob;
   analysisResults: any[];
-  chartElement?: HTMLElement;
 }
 
 export class DocxReportGenerator {
@@ -25,10 +24,6 @@ export class DocxReportGenerator {
     try {
       console.log('Создание стандартного отчета...');
       
-      if (!data.chartElement) {
-        throw new Error('Элемент графика не найден для создания изображения');
-      }
-
       // Если документ уже существует, добавляем в него новую секцию
       if (this.currentDoc) {
         await this.addSectionToExistingDoc(data);
@@ -50,40 +45,19 @@ export class DocxReportGenerator {
 
   async generateReportFromTemplate(data: ReportData, templateFile: File): Promise<Blob> {
     try {
-      console.log('Генерация отчета из продвинутого DOCX шаблона...');
-      
-      if (!data.chartElement) {
-        throw new Error('Элемент графика не найден для создания изображения');
-      }
-
-      // 1. Создаем PNG изображение графика с поворотом
-      const templateProcessor = new TemplateProcessor();
-      const chartImageBuffer = await templateProcessor.createChartPNG(data.chartElement);
-      
-      // 2. Подготавливаем полные данные для шаблона
-      const templateData = await templateProcessor.createTemplateData({
-        title: data.title,
-        date: data.date,
-        dataType: data.dataType,
-        analysisResults: data.analysisResults
-      }, chartImageBuffer);
-      
-      // 3. Обрабатываем шаблон
-      const reportBlob = await templateProcessor.processTemplate(templateFile, templateData);
-      
-      console.log('Продвинутый DOCX отчет успешно создан');
-      return reportBlob;
-      
+      console.log('Функциональность шаблонов отключена');
+      console.log('Переключаемся на создание стандартного отчета...');
+      return this.generateReport(data);
     } catch (error) {
-      console.error('Ошибка генерации продвинутого DOCX отчета:', error);
-      throw new Error(`Ошибка генерации отчета: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      console.error('Ошибка генерации отчета:', error);
+      console.log('Переключаемся на создание стандартного отчета...');
+      return this.generateReport(data);
     }
   }
 
   private async createNewDocument(data: ReportData): Promise<void> {
-    // Создаем PNG изображение графика
-    const templateProcessor = new TemplateProcessor();
-    const imageBuffer = await templateProcessor.createChartPNG(data.chartElement!);
+    // Конвертируем изображение в ArrayBuffer
+    const imageBuffer = await data.chartImageBlob.arrayBuffer();
 
     this.sections = [
       {
@@ -201,9 +175,8 @@ export class DocxReportGenerator {
   }
 
   private async addSectionToExistingDoc(data: ReportData): Promise<void> {
-    // Создаем PNG изображение графика
-    const templateProcessor = new TemplateProcessor();
-    const imageBuffer = await templateProcessor.createChartPNG(data.chartElement!);
+    // Конвертируем изображение в ArrayBuffer
+    const imageBuffer = await data.chartImageBlob.arrayBuffer();
 
     // Добавляем разрыв страницы и новую секцию
     const newSection = {
@@ -411,80 +384,6 @@ export class DocxReportGenerator {
     return paragraphs;
   }
 
-  /**
-   * Создание краткой сводки анализа
-   */
-  private createAnalysisSummary(results: any[], dataType: 'temperature' | 'humidity'): string {
-    const validResults = results.filter(r => !r.isExternal && r.minTemp !== '-');
-    const totalFiles = validResults.length;
-    const externalSensors = results.filter(r => r.isExternal).length;
-    const compliantCount = results.filter(r => r.meetsLimits === 'Да').length;
-    const nonCompliantCount = results.filter(r => r.meetsLimits === 'Нет').length;
-
-    let summary = `Общее количество датчиков: ${results.length}\n`;
-    summary += `Внутренние датчики: ${totalFiles}\n`;
-    summary += `Внешние датчики: ${externalSensors}\n\n`;
-    
-    if (dataType === 'temperature' && validResults.length > 0) {
-      const temperatures = validResults.map(r => parseFloat(r.avgTemp)).filter(t => !isNaN(t));
-      if (temperatures.length > 0) {
-        const minTemp = Math.min(...temperatures);
-        const maxTemp = Math.max(...temperatures);
-        const avgTemp = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
-        
-        summary += `Температурная статистика:\n`;
-        summary += `• Минимальная средняя температура: ${minTemp.toFixed(1)}°C\n`;
-        summary += `• Максимальная средняя температура: ${maxTemp.toFixed(1)}°C\n`;
-        summary += `• Общая средняя температура: ${avgTemp.toFixed(1)}°C\n\n`;
-      }
-    }
-    
-    if (compliantCount > 0 || nonCompliantCount > 0) {
-      summary += `Соответствие лимитам:\n`;
-      summary += `• Соответствуют: ${compliantCount} датчиков\n`;
-      summary += `• Не соответствуют: ${nonCompliantCount} датчиков`;
-    }
-    
-    return summary;
-  }
-
-  /**
-   * Получение диапазона температур
-   */
-  private getTemperatureRange(results: any[]): string {
-    const validResults = results.filter(r => !r.isExternal && r.minTemp !== '-');
-    if (validResults.length === 0) return 'Нет данных';
-    
-    const temperatures = validResults.map(r => parseFloat(r.avgTemp)).filter(t => !isNaN(t));
-    if (temperatures.length === 0) return 'Нет данных';
-    
-    const min = Math.min(...temperatures);
-    const max = Math.max(...temperatures);
-    return `${min.toFixed(1)}°C - ${max.toFixed(1)}°C`;
-  }
-
-  /**
-   * Получение диапазона влажности
-   */
-  private getHumidityRange(results: any[]): string {
-    const validResults = results.filter(r => !r.isExternal && r.minHumidity !== '-');
-    if (validResults.length === 0) return 'Нет данных';
-    
-    const humidities = validResults.map(r => parseFloat(r.avgHumidity)).filter(h => !isNaN(h));
-    if (humidities.length === 0) return 'Нет данных';
-    
-    const min = Math.min(...humidities);
-    const max = Math.max(...humidities);
-    return `${min.toFixed(1)}% - ${max.toFixed(1)}%`;
-  }
-
-  /**
-   * Получение временного периода
-   */
-  private getTimePeriod(results: any[]): string {
-    // Это упрощенная версия, в реальности нужно получать данные из файлов
-    return 'Период анализа определяется загруженными данными';
-  }
 
   hasExistingDocument(): boolean {
     return this.currentDoc !== null;
