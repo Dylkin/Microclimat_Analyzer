@@ -301,7 +301,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         date: `${dateStr} ${timeStr}`,
         dataType,
         analysisResults,
-        conclusions
+        conclusions,
+        conditioningSystem: contractFields.climateInstallation,
+        researchObject: contractFields.researchObject
       };
 
       // Обрабатываем шаблон
@@ -1007,6 +1009,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
               <p>• <code>{'{resultsTable}'}</code> - таблица результатов анализа</p>
               <p>• <code>{'{Result}'}</code> - текст выводов из поля "Выводы"</p>
+              <p>• <code>{'{ConditioningSystem}'}</code> - климатическая установка</p>
+              <p>• <code>{'{Object}'}</code> - объект исследования</p>
             </div>
           </div>
 
