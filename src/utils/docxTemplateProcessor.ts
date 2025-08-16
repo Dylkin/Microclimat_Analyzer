@@ -152,7 +152,7 @@ export class DocxTemplateProcessor {
         
         // Изображение графика
         chart: {
-          data: chartImageBuffer,
+          data: Buffer.from(chartImageBuffer),
           size: {
             width: Math.min(600, chartElement.getBoundingClientRect().height * 0.8),
             height: Math.min(800, chartElement.getBoundingClientRect().width * 0.8)
@@ -192,13 +192,15 @@ export class DocxTemplateProcessor {
       // Генерируем итоговый DOCX файл
       console.log('Генерируем итоговый DOCX файл...');
       const buffer = doc.getZip().generate({ 
-        type: 'blob',
+        type: 'nodebuffer',
         compression: 'DEFLATE',
         compressionOptions: { level: 6 }
       });
       
-      // buffer уже является Blob
-      const blob = buffer as Blob;
+      // Конвертируем в Blob
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
       
       console.log('DOCX файл создан успешно, размер:', blob.size, 'байт');
       
