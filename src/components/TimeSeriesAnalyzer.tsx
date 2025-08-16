@@ -435,11 +435,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU')}
 Завершение испытания: ${endTime.toLocaleString('ru-RU')}
 Длительность испытания: ${duration} минут
-
 Зафиксированное минимальное значение: ${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
-
 Зафиксированное максимальное значение: ${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.
-
 Результаты испытания ${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
 
     setConclusions(conclusionText);
