@@ -152,7 +152,7 @@ export class DocxTemplateProcessor {
         
         // Изображение графика
         chart: {
-          data: Buffer.from(chartImageBuffer),
+          data: chartImageBuffer,
           size: {
             width: Math.min(600, chartElement.getBoundingClientRect().height * 0.8),
             height: Math.min(800, chartElement.getBoundingClientRect().width * 0.8)
