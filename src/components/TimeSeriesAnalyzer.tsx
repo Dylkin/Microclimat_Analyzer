@@ -625,21 +625,24 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             </div>
             {reportStatus.templateFile && (
               <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs text-blue-700">
-                  <strong>Доступные плейсхолдеры:</strong> {'{date}'}, {'{data_type}'}, {'{chart_image}'}, {'{table}'}, {'{title}'}, {'{analysis_summary}'}
-                </p>
-              </div>
-            )}
-          </div>
-          {/* Загрузка шаблона */}
-
-          {/* Кнопка генерации отчета */}
-          <button
-            onClick={handleGenerateReport}
-            disabled={reportStatus.isGenerating}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-            title="Сформировать отчет с графиком"
-          >
+                <div>
+                  <p className="text-xs text-blue-700">
+                    <strong>Доступные плейсхолдеры:</strong>
+                  </p>
+                  <ul className="text-xs text-blue-700 mt-1 space-y-1">
+                    <li>• <strong>{'{date}'}</strong> - дата создания отчета</li>
+                    <li>• <strong>{'{data_type}'}</strong> - тип данных</li>
+                    <li>• <strong>{'{% image chart_image %}'}</strong> - PNG изображение графика</li>
+                    <li>• <strong>{'{title}'}</strong> - заголовок отчета</li>
+                    <li>• <strong>{'{analysis_summary}'}</strong> - краткая сводка</li>
+                    <li>• <strong>{'{#table_data.rows}'}</strong> - начало таблицы данных</li>
+                    <li>• <strong>{'{zone}, {level}, {logger}, {sn}'}</strong> - поля таблицы</li>
+                    <li>• <strong>{'{/table_data.rows}'}</strong> - конец таблицы</li>
+                  </ul>
+                  <p className="text-xs text-blue-600 mt-2">
+                    <strong>Примечание:</strong> График автоматически поворачивается на 90° против часовой стрелки для оптимального размещения в отчете.
+                  </p>
+                </div>
             {reportStatus.isGenerating ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -669,20 +672,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 className="text-red-600 hover:text-red-800 transition-colors"
                 title="Удалить отчет"
               >
-                <strong>Доступные плейсхолдеры:</strong>
-              </p>
-              <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                <li>• <strong>{'{date}'}</strong> - дата создания отчета</li>
-                <li>• <strong>{'{data_type}'}</strong> - тип данных</li>
-                <li>• <strong>{'{% image chart_image %}'}</strong> - PNG изображение графика (поворот 90°)</li>
-                <li>• <strong>{'{title}'}</strong> - заголовок отчета</li>
-                <li>• <strong>{'{analysis_summary}'}</strong> - краткая сводка</li>
-                <li>• <strong>{'{#table_data.rows}'}</strong> - начало таблицы данных</li>
-                <li>• <strong>{'{zone}, {level}, {logger}, {sn}'}</strong> - поля таблицы</li>
-                <li>• <strong>{'{/table_data.rows}'}</strong> - конец таблицы</li>
-              </ul>
-              <p className="text-xs text-blue-600 mt-2">
-                <strong>Примечание:</strong> График автоматически поворачивается на 90° против часовой стрелки для оптимального размещения в отчете.
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           )}

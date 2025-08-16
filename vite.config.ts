@@ -16,7 +16,8 @@ export default defineConfig({
       'd3-time-format',
       'd3-zoom',
       'pizzip',
-      'docxtemplater'
+      'docxtemplater',
+      'docxtemplater-table-module'
     ],
   },
   server: {
