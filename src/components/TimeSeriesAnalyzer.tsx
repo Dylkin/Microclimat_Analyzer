@@ -322,7 +322,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         conclusions,
         researchObject: contractFields.researchObject || '',
         conditioningSystem: contractFields.climateInstallation || '',
-        testType: getTestTypeLabel(contractFields.testType) || ''
+        testType: getTestTypeLabel(contractFields.testType || '') || ''
       };
 
       // Обрабатываем шаблон
