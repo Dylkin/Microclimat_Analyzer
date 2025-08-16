@@ -51,6 +51,71 @@ export const Help: React.FC = () => {
           </div>
         </div>
 
+        {/* Список плейсхолдеров для DOCX шаблонов */}
+        <div className="mb-8">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-blue-900 mb-4">📋 Список плейсхолдеров для DOCX шаблонов</h3>
+            
+            <div className="text-sm text-blue-800 space-y-4">
+              <div>
+                <h4 className="font-semibold mb-2">Основные данные:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 font-mono text-xs">
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{executor}</code> - ФИО исполнителя</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{Report_No}</code> - Номер отчета</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{Report_start}</code> - Дата отчета</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{DATE}</code> - Дата создания отчета</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{ObjectName}</code> - Наименование объекта</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{CoolingSystemName}</code> - Холодильная установка</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{TestType}</code> - Тип испытания</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{DATA_TYPE}</code> - Тип данных</div>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-semibold mb-2">Данные анализа:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 font-mono text-xs">
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{EligibilityCriteria}</code> - Критерии приемки</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{acceptanceCriteria}</code> - Критерии приемки (альт.)</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{totalFiles}</code> - Общее количество файлов</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{analysisDate}</code> - Дата анализа</div>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-semibold mb-2">Таблицы и данные:</h4>
+                <div className="grid grid-cols-1 gap-2 font-mono text-xs">
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{TABLE}</code> - Таблица результатов анализа</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{CHART}</code> - График (не поддерживается в браузере)</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{ResultsTable}</code> - Таблица результатов (альт.)</div>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-semibold mb-2">Статистические данные:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 font-mono text-xs">
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{minTemp}</code> - Минимальная температура</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{maxTemp}</code> - Максимальная температура</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{avgTemp}</code> - Средняя температура</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{compliantCount}</code> - Соответствуют лимитам</div>
+                  <div><code className="bg-blue-100 px-2 py-1 rounded">{nonCompliantCount}</code> - Не соответствуют лимитам</div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-100 rounded-lg">
+              <p className="text-xs text-blue-700">
+                <strong>Важно:</strong> Все плейсхолдеры должны быть заключены в одинарные фигурные скобки <code>{placeholder}</code>
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                <strong>Неправильно:</strong> <code>{'{{DATE}}'}</code> или <code>{'{{{DATE}}}'}</code>
+              </p>
+              <p className="text-xs text-blue-700">
+                <strong>Правильно:</strong> <code>{'{DATE}'}</code>
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Рекомендации по температуре и влажности */}
         <div className="mb-8 space-y-6">
           {/* Рекомендации по температуре */}
