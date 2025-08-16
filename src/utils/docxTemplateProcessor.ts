@@ -487,7 +487,7 @@ export class DocxTemplateProcessor {
       console.log('Replacing {NameTest} with:', data.testType);
       result = result.replace(/{NameTest}/g, this.escapeXml(data.testType));
     } else {
-      console.log('testType is empty, replacing {NameTest} with empty string');
+      console.log('testType is empty or undefined:', data.testType, 'replacing {NameTest} with empty string');
       result = result.replace(/{NameTest}/g, '');
     }
 

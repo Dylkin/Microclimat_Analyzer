@@ -315,11 +315,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           case 'power_on':
             return 'Испытание на включение электропитания';
           default:
-            return testType;
+            return testType || '';
         }
       };
       
-      const convertedTestType = getTestTypeLabel(contractFields.testType || '');
+      const convertedTestType = getTestTypeLabel(contractFields.testType);
       console.log('Converted test type:', convertedTestType);
       
       const templateData: TemplateReportData = {
