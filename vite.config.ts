@@ -21,8 +21,10 @@ export default defineConfig({
       'pizzip',
       'docxtemplater',
       'docxtemplater-image-module',
-      'docxtemplater-table-module',
       'buffer'
+    ],
+    exclude: [
+      'docxtemplater-table-module'
     ],
   },
   server: {
