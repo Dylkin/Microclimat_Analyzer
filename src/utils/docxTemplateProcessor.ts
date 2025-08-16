@@ -550,7 +550,6 @@ export class DocxTemplateProcessor {
   private normalizePlaceholders(xml: string): string {
     // Список плейсхолдеров для нормализации
     const placeholders = [
-      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'resultsTable', 'Limits', 'Executor', 'TestDate'
       'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'resultsTable', 'Limits', 'Executor', 'TestDate', 'ReportNo'
     ];
     
