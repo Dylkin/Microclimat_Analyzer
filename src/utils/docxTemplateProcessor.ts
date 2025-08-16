@@ -12,6 +12,7 @@ export interface TemplateReportData {
   testType?: string;
  limits?: any;
   executor?: string;
+  testDate?: string;
 }
 
 export class DocxTemplateProcessor {
@@ -513,12 +514,22 @@ export class DocxTemplateProcessor {
       result = result.replace(/{Executor}/g, '');
     }
     
+    // Обработка плейсхолдера {TestDate} для даты испытания
+    if (data.testDate) {
+      console.log('Replacing {TestDate} with:', data.testDate);
+      result = result.replace(/{TestDate}/g, this.escapeXml(data.testDate));
+    } else {
+      console.log('testDate is empty or undefined:', data.testDate, 'replacing {TestDate} with empty string');
+      result = result.replace(/{TestDate}/g, '');
+    }
+    
     // Обработка плейсхолдера таблицы результатов
     result = this.processTablePlaceholder(result, data);
     
     console.log('Final result after placeholder processing contains {NameTest}:', result.includes('{NameTest}'));
    console.log('Final result after placeholder processing contains {Limits}:', result.includes('{Limits}'));
     console.log('Final result after placeholder processing contains {Executor}:', result.includes('{Executor}'));
+    console.log('Final result after placeholder processing contains {TestDate}:', result.includes('{TestDate}'));
     return result;
   }
 
@@ -528,7 +539,7 @@ export class DocxTemplateProcessor {
   private normalizePlaceholders(xml: string): string {
     // Список плейсхолдеров для нормализации
     const placeholders = [
-      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'resultsTable', 'Limits', 'Executor'
+      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'resultsTable', 'Limits', 'Executor', 'TestDate'
     ];
     
     let result = xml;

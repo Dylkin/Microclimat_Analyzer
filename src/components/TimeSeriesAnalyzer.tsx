@@ -334,7 +334,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         conditioningSystem: contractFields.climateInstallation || '',
        testType: convertedTestType || '',
         limits: limits,
-        executor: user?.fullName || ''
+        executor: user?.fullName || '',
+        testDate: dateStr
       };
 
       // Обрабатываем шаблон
@@ -1045,9 +1046,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               <p>• <code>{'{System}'}</code> - климатическая установка</p>
               <p>• <code>{'{NameTest}'}</code> - тип испытания</p>
               <p>• <code>{'{Limits}'}</code> - установленные лимиты с единицами измерения</p>
+              <p>• <code>{'{Executor}'}</code> - ФИО исполнителя (текущий пользователь)</p>
+              <p>• <code>{'{TestDate}'}</code> - дата испытания (текущая дата)</p>
             </div>
-            <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code>, <code>{'{Object}'}</code>, <code>{'{ConditioningSystem}'}</code>, <code>{'{System}'}</code>, <code>{'{NameTest}'}</code> и <code>{'{Limits}'}</code> заменяются на соответствующие текстовые данные.</p>
-            <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code>, <code>{'{Object}'}</code>, <code>{'{ConditioningSystem}'}</code>, <code>{'{System}'}</code>, <code>{'{NameTest}'}</code>, <code>{'{Limits}'}</code> и <code>{'{Executor}'}</code> заменяются на соответствующие текстовые данные.</p>
+            <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа. Плейсхолдеры <code>{'{Result}'}</code>, <code>{'{Object}'}</code>, <code>{'{ConditioningSystem}'}</code>, <code>{'{System}'}</code>, <code>{'{NameTest}'}</code>, <code>{'{Limits}'}</code>, <code>{'{Executor}'}</code> и <code>{'{TestDate}'}</code> заменяются на соответствующие текстовые данные.</p>
           </div>
         </div>
       </div>
