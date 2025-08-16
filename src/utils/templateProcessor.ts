@@ -133,9 +133,8 @@ export class TemplateProcessor {
   private static validatePlaceholders(xmlContent: string): void {
     // Ищем потенциально проблемные плейсхолдеры
     const problematicPatterns = [
-      /\{\{\{[^}]+\}\}\}/g,  // Тройные открывающие скобки
-      /\{\{[^}]+\}\}\}/g,    // Тройные закрывающие скобки
-      /\{[^{][^}]*\}/g,      // Одинарные скобки
+      /\{\{[^}]+\}\}/g,      // Двойные скобки (теперь проблемные)
+      /\{\{\{[^}]+\}\}\}/g,  // Тройные скобки
     ];
     
     const issues: string[] = [];
@@ -145,13 +144,10 @@ export class TemplateProcessor {
       if (matches) {
         switch (index) {
           case 0:
-            issues.push(`Найдены плейсхолдеры с тройными открывающими скобками: ${matches.slice(0, 3).join(', ')}`);
+            issues.push(`Найдены плейсхолдеры с двойными скобками (должны быть одинарные): ${matches.slice(0, 3).join(', ')}`);
             break;
           case 1:
-            issues.push(`Найдены плейсхолдеры с тройными закрывающими скобками: ${matches.slice(0, 3).join(', ')}`);
-            break;
-          case 2:
-            issues.push(`Найдены плейсхолдеры с одинарными скобками: ${matches.slice(0, 3).join(', ')}`);
+            issues.push(`Найдены плейсхолдеры с тройными скобками: ${matches.slice(0, 3).join(', ')}`);
             break;
         }
       }
@@ -159,7 +155,7 @@ export class TemplateProcessor {
     
     if (issues.length > 0) {
       console.warn('Обнаружены потенциальные проблемы в шаблоне:', issues);
-      throw new Error(`Проблемы с плейсхолдерами в шаблоне: ${issues.join('; ')}`);
+      throw new Error(`Проблемы с плейсхолдерами в шаблоне: ${issues.join('; ')}. Используйте одинарные фигурные скобки {placeholder}`);
     }
   }
   /**
