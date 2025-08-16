@@ -450,18 +450,6 @@ export class DocxTemplateProcessor {
   private processTextPlaceholders(documentXml: string, data: TemplateReportData): string {
     let result = documentXml;
 
-    // Основные данные
-    result = result.replace(/{title}/g, this.escapeXml(data.title));
-    result = result.replace(/{date}/g, this.escapeXml(data.date));
-    result = result.replace(/{dataType}/g, this.escapeXml(data.dataType === 'temperature' ? 'Температура' : 'Влажность'));
-
-    // Статистика датчиков
-    result = result.replace(/{totalSensors}/g, data.analysisResults.length.toString());
-    result = result.replace(/{internalSensors}/g, data.analysisResults.filter(r => !r.isExternal).length.toString());
-    result = result.replace(/{externalSensors}/g, data.analysisResults.filter(r => r.isExternal).length.toString());
-    result = result.replace(/{compliantSensors}/g, data.analysisResults.filter(r => r.meetsLimits === 'Да').length.toString());
-    result = result.replace(/{nonCompliantSensors}/g, data.analysisResults.filter(r => r.meetsLimits === 'Нет').length.toString());
-
     // Обработка плейсхолдера таблицы результатов
     result = this.processTablePlaceholder(result, data);
     return result;
