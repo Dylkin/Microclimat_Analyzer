@@ -23,6 +23,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [markers, setMarkers] = useState<VerticalMarker[]>([]);
   const [zoomState, setZoomState] = useState<ZoomState | undefined>();
   
+  // Contract fields
+  const [contractFields, setContractFields] = useState({
+    contractNumber: '',
+    contractDate: '',
+    researchObject: '',
+    climateInstallation: ''
+  });
+  
   // UI state
   const [showSettings, setShowSettings] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
@@ -197,6 +205,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   const handleResetZoom = () => {
     setZoomState(undefined);
+  };
+
+  const handleContractFieldChange = (field: keyof typeof contractFields, value: string) => {
+    setContractFields(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -491,6 +506,52 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             </button>
           </div>
         )}
+
+        {/* Contract Information */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Информация о договоре</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">№ договора</label>
+              <input
+                type="text"
+                value={contractFields.contractNumber}
+                onChange={(e) => handleContractFieldChange('contractNumber', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Введите номер договора"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Дата договора</label>
+              <input
+                type="date"
+                value={contractFields.contractDate}
+                onChange={(e) => handleContractFieldChange('contractDate', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Объект исследования</label>
+              <input
+                type="text"
+                value={contractFields.researchObject}
+                onChange={(e) => handleContractFieldChange('researchObject', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Введите объект исследования"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Климатическая установка</label>
+              <input
+                type="text"
+                value={contractFields.climateInstallation}
+                onChange={(e) => handleContractFieldChange('climateInstallation', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Введите тип климатической установки"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Chart */}
