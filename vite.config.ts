@@ -17,7 +17,8 @@ export default defineConfig({
       'd3-zoom',
       'pizzip',
       'docxtemplater',
-      'docxtemplater-table-module'
+      'docxtemplater-table-module',
+      'docxtemplater-image-module'
     ],
   },
   server: {
