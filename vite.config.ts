@@ -8,7 +8,7 @@ export default defineConfig({
   define: {
     global: 'globalThis',
     'process.env': {},
-    'Buffer': 'Buffer',
+    'Buffer': 'buffer/index.js',
   },
   optimizeDeps: {
     include: [
@@ -20,10 +20,9 @@ export default defineConfig({
       'd3-zoom',
       'pizzip',
       'docxtemplater',
-      'docxtemplater-image-module'
-    ],
-    exclude: [
-      'docxtemplater-table-module'
+      'docxtemplater-image-module',
+      'docxtemplater-table-module',
+      'buffer'
     ],
   },
   server: {
