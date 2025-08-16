@@ -127,11 +127,9 @@ export class DocxTemplateProcessor {
       // Настройка модуля изображений
       const imageOpts = {
         getImage: (tagValue: any) => {
-          // Возвращаем данные изображения
           return tagValue.data;
         },
         getSize: (img: any, tagValue: any) => {
-          // Возвращаем размеры изображения [ширина, высота]
           return [tagValue.size.width, tagValue.size.height];
         }
       };
@@ -157,8 +155,7 @@ export class DocxTemplateProcessor {
             width: Math.min(600, chartElement.getBoundingClientRect().height * 0.8),
             height: Math.min(800, chartElement.getBoundingClientRect().width * 0.8)
           },
-          extension: '.png',
-          path: 'word/media/chart.png' // Явное указание пути
+          extension: '.png'
         },
 
         // Статистика датчиков
