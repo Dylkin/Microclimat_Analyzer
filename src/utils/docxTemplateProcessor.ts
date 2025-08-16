@@ -125,11 +125,6 @@ export class DocxTemplateProcessor {
       // Читаем основной документ
       const documentXml = zip.files['word/document.xml'].asText();
       
-      // Проверяем наличие плейсхолдера {chart}
-      if (!documentXml.includes('{chart}')) {
-        throw new Error('В шаблоне не найден плейсхолдер {chart}');
-      }
-
       // Добавляем изображение в папку word/media
       const imageName = 'chart.png';
       const mediaPath = `word/media/${imageName}`;
