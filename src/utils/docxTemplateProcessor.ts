@@ -464,6 +464,36 @@ export class DocxTemplateProcessor {
       conditioningSystem: data.conditioningSystem
     });
 
+    // Отладка: ищем все возможные варианты плейсхолдера ConditioningSystem
+    console.log('Searching for ConditioningSystem variants in document...');
+    const conditioningSystemVariants = [
+      '{ConditioningSystem}',
+      '{ ConditioningSystem }',
+      '{conditioningSystem}',
+      '{CONDITIONINGSYSTEM}',
+      'ConditioningSystem'
+    ];
+    
+    conditioningSystemVariants.forEach(variant => {
+      const count = (result.match(new RegExp(variant.replace(/[{}]/g, '\\$&'), 'gi')) || []).length;
+      if (count > 0) {
+        console.log(`Found ${count} occurrences of variant: "${variant}"`);
+      }
+    });
+
+    // Ищем разбитые плейсхолдеры
+    const brokenPatterns = [
+      /{[^}]*Conditioning[^}]*System[^}]*}/gi,
+      /Conditioning[^<]*System/gi,
+      /{[^}]*conditioning[^}]*system[^}]*}/gi
+    ];
+    
+    brokenPatterns.forEach((pattern, index) => {
+      const matches = result.match(pattern);
+      if (matches) {
+        console.log(`Broken pattern ${index + 1} matches:`, matches);
+      }
+    });
     // Функция для более надежной замены плейсхолдеров
     const replacePlaceholder = (xml: string, placeholder: string, value: string): string => {
       console.log(`Attempting to replace {${placeholder}} with: "${value}"`);
@@ -490,6 +520,25 @@ export class DocxTemplateProcessor {
       );
       updatedXml = updatedXml.replace(spacedPlaceholderPattern, `<w:t>${this.escapeXml(value)}</w:t>`);
       
+      // Дополнительные паттерны для разбитых плейсхолдеров
+      const additionalPatterns = [
+        // Плейсхолдер разбит по словам
+        new RegExp(`<w:t[^>]*>\\{</w:t>[^<]*<w:t[^>]*>Conditioning</w:t>[^<]*<w:t[^>]*>System</w:t>[^<]*<w:t[^>]*>\\}</w:t>`, 'gi'),
+        // Плейсхолдер с разными регистрами
+        new RegExp(`\\{\\s*conditioning\\s*system\\s*\\}`, 'gi'),
+        new RegExp(`\\{\\s*CONDITIONING\\s*SYSTEM\\s*\\}`, 'gi'),
+        // Плейсхолдер без скобок (если они потерялись)
+        new RegExp(`\\b${placeholder}\\b`, 'gi')
+      ];
+      
+      additionalPatterns.forEach((pattern, index) => {
+        const beforeAdditional = (updatedXml.match(pattern) || []).length;
+        if (beforeAdditional > 0) {
+          console.log(`Additional pattern ${index + 1} found ${beforeAdditional} matches`);
+          updatedXml = updatedXml.replace(pattern, this.escapeXml(value));
+        }
+      });
+
       // Подсчитываем количество вхождений после замены
       const afterCount = (updatedXml.match(new RegExp(`\\{${placeholder}\\}`, 'g')) || []).length;
       console.log(`After replacement: ${afterCount} occurrences of {${placeholder}} remain`);
