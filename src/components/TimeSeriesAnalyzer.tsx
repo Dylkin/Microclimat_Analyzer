@@ -367,6 +367,84 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     });
   };
 
+  const handleAutoFillConclusions = () => {
+    // Определяем временные рамки
+    let startTime: Date;
+    let endTime: Date;
+    let duration: number;
+
+    if (markers.length >= 2) {
+      // Если есть маркеры, используем первый и последний
+      const sortedMarkers = [...markers].sort((a, b) => a.timestamp - b.timestamp);
+      startTime = new Date(sortedMarkers[0].timestamp);
+      endTime = new Date(sortedMarkers[sortedMarkers.length - 1].timestamp);
+    } else if (zoomState) {
+      // Если применен зум, используем его границы
+      startTime = new Date(zoomState.startTime);
+      endTime = new Date(zoomState.endTime);
+    } else if (data) {
+      // Иначе используем полный диапазон данных
+      startTime = new Date(data.timeRange[0]);
+      endTime = new Date(data.timeRange[1]);
+    } else {
+      return; // Нет данных для анализа
+    }
+
+    duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // в минутах
+
+    // Находим минимальное и максимальное значения (исключая внешние датчики)
+    const nonExternalResults = analysisResults.filter(result => !result.isExternal);
+    const validResults = nonExternalResults.filter(result => 
+      result.minTemp !== '-' && result.maxTemp !== '-'
+    );
+
+    if (validResults.length === 0) {
+      setConclusions('Недостаточно данных для формирования выводов.');
+      return;
+    }
+
+    // Находим результат с минимальной температурой
+    const minTempResult = validResults.reduce((min, current) => {
+      const minTemp = parseFloat(min.minTemp);
+      const currentMinTemp = parseFloat(current.minTemp);
+      return currentMinTemp < minTemp ? current : min;
+    });
+
+    // Находим результат с максимальной температурой
+    const maxTempResult = validResults.reduce((max, current) => {
+      const maxTemp = parseFloat(max.maxTemp);
+      const currentMaxTemp = parseFloat(current.maxTemp);
+      return currentMaxTemp > maxTemp ? current : max;
+    });
+
+    // Проверяем соответствие лимитам
+    let meetsLimits = true;
+    if (limits.temperature) {
+      const minTemp = parseFloat(minTempResult.minTemp);
+      const maxTemp = parseFloat(maxTempResult.maxTemp);
+      
+      if (limits.temperature.min !== undefined && minTemp < limits.temperature.min) {
+        meetsLimits = false;
+      }
+      if (limits.temperature.max !== undefined && maxTemp > limits.temperature.max) {
+        meetsLimits = false;
+      }
+    }
+
+    // Формируем текст выводов
+    const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU')}
+Завершение испытания: ${endTime.toLocaleString('ru-RU')}
+Длительность испытания: ${duration} минут
+
+Зафиксированное минимальное значение: ${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
+
+Зафиксированное максимальное значение: ${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.
+
+Результаты испытания ${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
+
+    setConclusions(conclusionText);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -782,6 +860,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             rows={4}
             placeholder="Введите выводы по результатам анализа..."
           />
+          <button
+            onClick={handleAutoFillConclusions}
+            className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+          >
+            Заполнить
+          </button>
         </div>
       </div>
 
