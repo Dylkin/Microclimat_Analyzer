@@ -182,41 +182,16 @@ export const Help: React.FC = () => {
                   <p>• Создаются связи в файле <code>word/_rels/document.xml.rels</code></p>
                   <p>• Плейсхолдер <code>{'{chart}'}</code> заменяется на XML-структуру изображения</p>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <p><strong>Основные:</strong></p>
+                    <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
+                    <p>• <code>{'{resultsTable}'}</code> - таблица результатов анализа</p>
+                  </div>
+                </div>
                 <div className="mt-3 p-2 bg-blue-100 rounded">
                   <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа.</p>
                 </div>
-              </div>
-            </div>
-
-          {/* Поддерживаемые плейсхолдеры */}
-          <div className="w-full max-w-4xl bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-green-900 mb-2">
-              Поддерживаемые плейсхолдеры в шаблоне:
-            </h4>
-            <div className="text-xs text-green-800 space-y-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p><strong>Основные плейсхолдеры:</strong></p>
-                  <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
-                  <p>• <code>{'{resultsTable}'}</code> - таблица результатов анализа</p>
-                  <p>• <code>{'{Result}'}</code> - текст выводов из поля "Выводы"</p>
-                  <p>• <code>{'{Object}'}</code> - объект исследования</p>
-                  <p>• <code>{'{ConditioningSystem}'}</code> - климатическая установка</p>
-                  <p>• <code>{'{System}'}</code> - климатическая установка (альтернативный)</p>
-                </div>
-                <div>
-                  <p><strong>Информационные плейсхолдеры:</strong></p>
-                  <p>• <code>{'{NameTest}'}</code> - тип испытания</p>
-                  <p>• <code>{'{Limits}'}</code> - установленные лимиты с единицами измерения</p>
-                  <p>• <code>{'{Executor}'}</code> - ФИО исполнителя (текущий пользователь)</p>
-                  <p>• <code>{'{TestDate}'}</code> - дата испытания (текущая дата)</p>
-                  <p>• <code>{'{ReportNo}'}</code> - номер договора из настроек анализа</p>
-                  <p>• <code>{'{ReportDate}'}</code> - дата договора из настроек анализа (формат ДД.ММ.ГГГГ)</p>
-                </div>
-              </div>
-              <div className="mt-3 p-2 bg-green-100 rounded">
-                <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки.</p>
-                <p className="text-xs mt-1"><strong>Колонтитулы:</strong> Все плейсхолдеры также работают в верхних и нижних колонтитулах документа (header1.xml, header2.xml, header3.xml, footer1.xml, footer2.xml, footer3.xml).</p>
               </div>
             </div>
           </div>
