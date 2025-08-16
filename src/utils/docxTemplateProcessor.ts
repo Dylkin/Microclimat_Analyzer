@@ -11,6 +11,7 @@ export interface TemplateReportData {
   conditioningSystem?: string;
   testType?: string;
  limits?: any;
+  executor?: string;
 }
 
 export class DocxTemplateProcessor {
