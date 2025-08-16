@@ -901,6 +901,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                   <p>• <code>{'{title}'}</code> - заголовок отчета</p>
                   <p>• <code>{'{date}'}</code> - дата создания</p>
                   <p>• <code>{'{dataType}'}</code> - тип данных</p>
+                  <p>• <code>{'{resultsTable}'}</code> - таблица результатов</p>
                 </div>
                 <div>
                   <p><strong>Статистика:</strong></p>
@@ -910,7 +911,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                   <p>• <code>{'{compliantSensors}'}</code> - соответствуют лимитам</p>
                 </div>
               </div>
-              <p className="mt-2"><strong>Таблицы:</strong> <code>{'{#results}'}</code>...{'{/results}'} - цикл по результатам анализа</p>
             </div>
           </div>
 

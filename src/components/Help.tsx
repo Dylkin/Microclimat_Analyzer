@@ -189,6 +189,7 @@ export const Help: React.FC = () => {
                     <p>• <code>{'{title}'}</code> - заголовок отчета</p>
                     <p>• <code>{'{date}'}</code> - дата создания</p>
                     <p>• <code>{'{dataType}'}</code> - тип данных</p>
+                    <p>• <code>{'{resultsTable}'}</code> - таблица результатов анализа</p>
                   </div>
                   <div>
                     <p><strong>Статистика:</strong></p>
@@ -198,9 +199,8 @@ export const Help: React.FC = () => {
                     <p>• <code>{'{compliantSensors}'}</code> - соответствуют лимитам</p>
                   </div>
                 </div>
-                <p className="mt-2"><strong>Таблицы:</strong> <code>{'{#results}'}</code>...{'{/results}'} - цикл по результатам анализа</p>
                 <div className="mt-3 p-2 bg-blue-100 rounded">
-                  <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки.</p>
+                  <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки. Плейсхолдер <code>{'{resultsTable}'}</code> создает полную таблицу с результатами анализа.</p>
                 </div>
               </div>
             </div>
