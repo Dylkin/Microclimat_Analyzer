@@ -301,7 +301,84 @@ export class DocxTemplateProcessor {
     result = result.replace(/{compliantSensors}/g, data.analysisResults.filter(r => r.meetsLimits === 'Да').length.toString());
     result = result.replace(/{nonCompliantSensors}/g, data.analysisResults.filter(r => r.meetsLimits === 'Нет').length.toString());
 
+    // Обработка плейсхолдера таблицы результатов
+    result = this.processTablePlaceholder(result, data);
     return result;
+  }
+
+  /**
+   * Обработка плейсхолдера {resultsTable} для вставки таблицы результатов анализа
+   */
+  private processTablePlaceholder(documentXml: string, data: TemplateReportData): string {
+    // Проверяем наличие плейсхолдера {resultsTable}
+    if (!documentXml.includes('{resultsTable}')) {
+      return documentXml;
+    }
+
+    // Создаем XML структуру таблицы
+    const tableXml = this.createResultsTableXml(data.analysisResults, data.dataType);
+    
+    // Заменяем плейсхолдер на таблицу
+    return documentXml.replace(/{resultsTable}/g, tableXml);
+  }
+
+  /**
+   * Создание XML структуры таблицы результатов анализа
+   */
+  private createResultsTableXml(results: any[], dataType: 'temperature' | 'humidity'): string {
+    // Заголовок таблицы
+    const headerRow = `
+      <w:tr>
+        <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Логгер</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Серийный №</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Мин. t°C</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Макс. t°C</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Среднее t°C</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Соответствие</w:t></w:r></w:p></w:tc>
+      </w:tr>`;
+
+    // Строки данных
+    const dataRows = results.map(result => {
+      // Определяем цвет фона для соответствия лимитам
+      const complianceColor = result.meetsLimits === 'Да' ? 'C6EFCE' : 
+                             result.meetsLimits === 'Нет' ? 'FFC7CE' : 'FFFFFF';
+      
+      return `
+        <w:tr>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.zoneNumber.toString())}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.measurementLevel.toString())}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.loggerName)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.serialNumber)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.minTemp.toString())}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.maxTemp.toString())}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:p><w:r><w:t>${this.escapeXml(result.avgTemp.toString())}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="${complianceColor}"/></w:tcPr><w:p><w:r><w:t>${this.escapeXml(result.meetsLimits)}</w:t></w:r></w:p></w:tc>
+        </w:tr>`;
+    }).join('');
+
+    // Полная структура таблицы
+    return `
+      <w:tbl>
+        <w:tblPr>
+          <w:tblStyle w:val="TableGrid"/>
+          <w:tblW w:w="0" w:type="auto"/>
+          <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
+        </w:tblPr>
+        <w:tblGrid>
+          <w:gridCol w:w="1000"/>
+          <w:gridCol w:w="1200"/>
+          <w:gridCol w:w="1000"/>
+          <w:gridCol w:w="1200"/>
+          <w:gridCol w:w="1000"/>
+          <w:gridCol w:w="1000"/>
+          <w:gridCol w:w="1000"/>
+          <w:gridCol w:w="1200"/>
+        </w:tblGrid>
+        ${headerRow}
+        ${dataRows}
+      </w:tbl>`;
   }
 
   /**
