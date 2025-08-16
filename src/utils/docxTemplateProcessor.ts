@@ -455,11 +455,15 @@ export class DocxTemplateProcessor {
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
       result = result.replace(/{Result}/g, this.escapeXml(data.conclusions));
+    } else {
+      result = result.replace(/{Result}/g, '');
     }
 
     // Обработка плейсхолдера {Object} для объекта исследования
     if (data.researchObject) {
       result = result.replace(/{Object}/g, this.escapeXml(data.researchObject));
+    } else {
+      result = result.replace(/{Object}/g, '');
     }
 
     // Обработка плейсхолдера таблицы результатов

@@ -302,7 +302,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         dataType,
         analysisResults,
         conclusions,
-        researchObject: contractFields.researchObject
+        researchObject: contractFields.researchObject || ''
       };
 
       // Обрабатываем шаблон
