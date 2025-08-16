@@ -845,16 +845,16 @@ export class DocxTemplateProcessor {
 
     const currentLimits = limits[dataType];
     const unit = dataType === 'temperature' ? '°C' : '%';
-    const dataTypeName = dataType === 'temperature' ? 'температуры' : 'влажности';
+    const dataTypeName = dataType === 'temperature' ? 'Температура' : 'Влажность';
     
     const parts: string[] = [];
     
     if (currentLimits.min !== undefined && currentLimits.max !== undefined) {
-      parts.push(`Лимиты ${dataTypeName}: от ${currentLimits.min}${unit} до ${currentLimits.max}${unit}`);
+      parts.push(`${dataTypeName}: от ${currentLimits.min}${unit} до ${currentLimits.max}${unit}`);
     } else if (currentLimits.min !== undefined) {
-      parts.push(`Минимальный лимит ${dataTypeName}: ${currentLimits.min}${unit}`);
+      parts.push(`${dataTypeName}: минимум ${currentLimits.min}${unit}`);
     } else if (currentLimits.max !== undefined) {
-      parts.push(`Максимальный лимит ${dataTypeName}: ${currentLimits.max}${unit}`);
+      parts.push(`${dataTypeName}: максимум ${currentLimits.max}${unit}`);
     } else {
       return 'Лимиты не установлены';
     }
