@@ -1,8 +1,5 @@
 import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel } from 'docx';
 import html2canvas from 'html2canvas';
-import Docxtemplater from 'docxtemplater';
-import ImageModule from 'docxtemplater-image-module';
-import PizZip from 'pizzip';
 
 export interface TemplateReportData {
   title: string;
@@ -104,7 +101,7 @@ export class DocxTemplateProcessor {
   }
 
   /**
-   * Обработка DOCX шаблона с заменой плейсхолдера {chart} на изображение
+   * Создание отчета на основе шаблона с PNG изображением
    */
   async processTemplate(
     templateFile: File,
@@ -112,177 +109,284 @@ export class DocxTemplateProcessor {
     chartElement: HTMLElement
   ): Promise<Blob> {
     try {
-      console.log('Начинаем обработку DOCX шаблона...');
+      console.log('Создание отчета по шаблону с PNG изображением...');
       
-      // Читаем файл шаблона
-      const templateArrayBuffer = await templateFile.arrayBuffer();
-      const zip = new PizZip(templateArrayBuffer);
-
       // Создаем скриншот графика
       console.log('Создаем скриншот графика...');
       const chartImageBuffer = await this.createRotatedScreenshot(chartElement);
       console.log('Скриншот создан, размер:', chartImageBuffer.byteLength, 'байт');
 
-      // Настраиваем модуль для работы с изображениями
-      const imageModule = new ImageModule({
-        centered: true,
-        getImage: (tagValue: string, tagName: string) => {
-          console.log('Запрос изображения для тега:', tagName, 'значение:', tagValue);
-          
-          if (tagName === 'chart') {
-            return chartImageBuffer;
-          }
-          
-          throw new Error(`Неизвестный тег изображения: ${tagName}`);
-        },
-        getSize: (img: ArrayBuffer, tagValue: string, tagName: string) => {
-          console.log('Запрос размеров для тега:', tagName);
-          
-          if (tagName === 'chart') {
-            // Возвращаем размеры для отображения в документе
-            // Размеры в twips (1/20 точки)
-            const elementRect = chartElement.getBoundingClientRect();
-            
-            // После поворота на 90° меняем местами ширину и высоту
-            const displayWidth = Math.min(500, elementRect.height * 0.6); // Ограничиваем ширину
-            const displayHeight = Math.min(700, elementRect.width * 0.6); // Ограничиваем высоту
-            
-            return [displayWidth, displayHeight];
-          }
-          
-          return [400, 300]; // Размеры по умолчанию
-        }
+      // Создаем DOCX документ с изображением (аналогично DocxImageGenerator)
+      const doc = new Document({
+        sections: [
+          {
+            children: [
+              // Заголовок отчета
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: data.title,
+                    bold: true,
+                    size: 32, // 16pt
+                  }),
+                ],
+                alignment: AlignmentType.CENTER,
+                heading: HeadingLevel.HEADING_1,
+                spacing: { after: 400 },
+              }),
+
+              // Дата создания
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `Дата создания отчета: ${data.date}`,
+                    size: 24, // 12pt
+                  }),
+                ],
+                spacing: { after: 200 },
+              }),
+
+              // Тип данных
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `Тип анализируемых данных: ${data.dataType === 'temperature' ? 'Температура' : 'Влажность'}`,
+                    size: 24, // 12pt
+                  }),
+                ],
+                spacing: { after: 400 },
+              }),
+
+              // Заголовок графика
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: 'График временных рядов',
+                    bold: true,
+                    size: 28, // 14pt
+                  }),
+                ],
+                heading: HeadingLevel.HEADING_2,
+                spacing: { after: 200 },
+              }),
+
+              // Вставка изображения графика
+              new Paragraph({
+                children: [
+                  new ImageRun({
+                    data: chartImageBuffer,
+                    transformation: {
+                      width: Math.min(600, chartElement.getBoundingClientRect().height * 0.8),
+                      height: Math.min(800, chartElement.getBoundingClientRect().width * 0.8),
+                    },
+                  }),
+                ],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 400 },
+              }),
+
+              // Примечание о повороте
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: 'Примечание: График повернут на 90° против часовой стрелки для оптимального размещения в отчете.',
+                    italics: true,
+                    size: 20, // 10pt
+                  }),
+                ],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 400 },
+              }),
+
+              // Заголовок таблицы результатов
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: 'Результаты анализа',
+                    bold: true,
+                    size: 28, // 14pt
+                  }),
+                ],
+                heading: HeadingLevel.HEADING_2,
+                spacing: { after: 200 },
+              }),
+
+              // Описание результатов
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: 'Статистические данные по измерениям:',
+                    size: 24, // 12pt
+                  }),
+                ],
+                spacing: { after: 200 },
+              }),
+
+              // Сводка по результатам
+              ...this.createResultsSummary(data.analysisResults, data.dataType),
+            ],
+          },
+        ],
       });
 
-      // Создаем экземпляр docxtemplater с модулем изображений
-      const doc = new Docxtemplater(zip, {
-        modules: [imageModule],
-        paragraphLoop: true,
-        linebreaks: true,
-      });
-
-      // Подготавливаем данные для замены
-      const templateData = {
-        // Основные данные
-        title: data.title,
-        date: data.date,
-        dataType: data.dataType === 'temperature' ? 'Температура' : 'Влажность',
-        
-        // Изображение графика
-        chart: 'chart_placeholder', // Значение для модуля изображений
-        
-        // Статистические данные
-        totalSensors: data.analysisResults.length,
-        internalSensors: data.analysisResults.filter(r => !r.isExternal).length,
-        externalSensors: data.analysisResults.filter(r => r.isExternal).length,
-        
-        // Температурная статистика (если применимо)
-        ...(data.dataType === 'temperature' && data.analysisResults.length > 0 ? {
-          hasTemperatureStats: true,
-          minAvgTemp: Math.min(...data.analysisResults
-            .filter(r => !r.isExternal && !isNaN(parseFloat(r.avgTemp)))
-            .map(r => parseFloat(r.avgTemp))
-          ).toFixed(1),
-          maxAvgTemp: Math.max(...data.analysisResults
-            .filter(r => !r.isExternal && !isNaN(parseFloat(r.avgTemp)))
-            .map(r => parseFloat(r.avgTemp))
-          ).toFixed(1),
-          overallAvgTemp: (data.analysisResults
-            .filter(r => !r.isExternal && !isNaN(parseFloat(r.avgTemp)))
-            .map(r => parseFloat(r.avgTemp))
-            .reduce((sum, temp) => sum + temp, 0) / 
-            data.analysisResults.filter(r => !r.isExternal && !isNaN(parseFloat(r.avgTemp))).length
-          ).toFixed(1)
-        } : { hasTemperatureStats: false }),
-        
-        // Соответствие лимитам
-        compliantSensors: data.analysisResults.filter(r => r.meetsLimits === 'Да').length,
-        nonCompliantSensors: data.analysisResults.filter(r => r.meetsLimits === 'Нет').length,
-        
-        // Список результатов для таблиц
-        results: data.analysisResults.map(result => ({
-          zoneNumber: result.zoneNumber,
-          measurementLevel: result.measurementLevel,
-          loggerName: result.loggerName,
-          serialNumber: result.serialNumber,
-          minTemp: result.minTemp,
-          maxTemp: result.maxTemp,
-          avgTemp: result.avgTemp,
-          minHumidity: result.minHumidity,
-          maxHumidity: result.maxHumidity,
-          avgHumidity: result.avgHumidity,
-          meetsLimits: result.meetsLimits,
-          isExternal: result.isExternal
-        }))
-      };
-
-      console.log('Данные для шаблона:', templateData);
-
-      // Заполняем шаблон данными
-      doc.render(templateData);
-
-      // Генерируем итоговый документ
-      const output = doc.getZip().generate({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      });
-
-      console.log('DOCX документ с изображением создан успешно');
-      return output;
+      // Генерируем DOCX файл
+      console.log('Генерируем DOCX файл...');
+      const buffer = await Packer.toBlob(doc);
+      console.log('DOCX файл создан успешно, размер:', buffer.size, 'байт');
+      
+      return buffer;
 
     } catch (error) {
-      console.error('Ошибка обработки DOCX шаблона:', error);
-      
-      // Если ошибка связана с шаблоном, предоставляем подробную информацию
-      if (error instanceof Error) {
-        if (error.message.includes('Multi error')) {
-          throw new Error('Ошибка в шаблоне DOCX. Проверьте правильность плейсхолдеров и структуру документа.');
-        } else if (error.message.includes('chart')) {
-          throw new Error('Ошибка вставки изображения графика. Убедитесь, что в шаблоне используется плейсхолдер {chart}.');
-        }
-      }
-      
-      throw new Error(`Не удалось обработать шаблон: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      console.error('Ошибка генерации отчета по шаблону:', error);
+      throw new Error(`Не удалось создать отчет по шаблону: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   }
 
   /**
-   * Валидация DOCX шаблона
+   * Создание сводки результатов анализа
+   */
+  private createResultsSummary(results: any[], dataType: 'temperature' | 'humidity'): Paragraph[] {
+    const paragraphs: Paragraph[] = [];
+
+    // Подсчитываем общую статистику
+    const validResults = results.filter(r => !r.isExternal && r.minTemp !== '-');
+    const totalFiles = validResults.length;
+    const externalSensors = results.filter(r => r.isExternal).length;
+
+    // Общая информация
+    paragraphs.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `Общее количество датчиков: ${results.length}`,
+            size: 24,
+          }),
+        ],
+        spacing: { after: 100 },
+      }),
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `Внутренние датчики: ${totalFiles}`,
+            size: 24,
+          }),
+        ],
+        spacing: { after: 100 },
+      }),
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `Внешние датчики: ${externalSensors}`,
+            size: 24,
+          }),
+        ],
+        spacing: { after: 200 },
+      })
+    );
+
+    if (dataType === 'temperature' && validResults.length > 0) {
+      // Температурная статистика
+      const temperatures = validResults.map(r => parseFloat(r.avgTemp)).filter(t => !isNaN(t));
+      const minTemp = Math.min(...temperatures);
+      const maxTemp = Math.max(...temperatures);
+      const avgTemp = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+
+      paragraphs.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: 'Температурная статистика:',
+              bold: true,
+              size: 24,
+            }),
+          ],
+          spacing: { after: 100 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `• Минимальная средняя температура: ${minTemp.toFixed(1)}°C`,
+              size: 22,
+            }),
+          ],
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `• Максимальная средняя температура: ${maxTemp.toFixed(1)}°C`,
+              size: 22,
+            }),
+          ],
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `• Общая средняя температура: ${avgTemp.toFixed(1)}°C`,
+              size: 22,
+            }),
+          ],
+          spacing: { after: 200 },
+        })
+      );
+    }
+
+    // Соответствие лимитам
+    const compliantCount = results.filter(r => r.meetsLimits === 'Да').length;
+    const nonCompliantCount = results.filter(r => r.meetsLimits === 'Нет').length;
+
+    if (compliantCount > 0 || nonCompliantCount > 0) {
+      paragraphs.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: 'Соответствие установленным лимитам:',
+              bold: true,
+              size: 24,
+            }),
+          ],
+          spacing: { after: 100 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `• Соответствуют лимитам: ${compliantCount} датчиков`,
+              size: 22,
+            }),
+          ],
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `• Не соответствуют лимитам: ${nonCompliantCount} датчиков`,
+              size: 22,
+            }),
+          ],
+          spacing: { after: 200 },
+        })
+      );
+    }
+
+    return paragraphs;
+  }
+
+  /**
+   * Упрощенная валидация DOCX шаблона
    */
   async validateTemplate(templateFile: File): Promise<{ isValid: boolean; errors: string[] }> {
-    try {
-      const templateArrayBuffer = await templateFile.arrayBuffer();
-      const zip = new PizZip(templateArrayBuffer);
-      
-      // Проверяем, что это валидный DOCX файл
-      if (!zip.files['word/document.xml']) {
-        return {
-          isValid: false,
-          errors: ['Файл не является валидным DOCX документом']
-        };
-      }
-
-      // Читаем содержимое документа
-      const documentXml = zip.files['word/document.xml'].asText();
-      
-      // Проверяем наличие плейсхолдера {chart}
-      if (!documentXml.includes('{chart}')) {
-        return {
-          isValid: false,
-          errors: ['В шаблоне не найден плейсхолдер {chart} для вставки изображения графика']
-        };
-      }
-
-      return {
-        isValid: true,
-        errors: []
-      };
-
-    } catch (error) {
+    // Упрощенная валидация - проверяем только расширение файла
+    if (!templateFile.name.toLowerCase().endsWith('.docx')) {
       return {
         isValid: false,
-        errors: [`Ошибка чтения шаблона: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`]
+        errors: ['Файл должен иметь расширение .docx']
       };
     }
+
+    return {
+      isValid: true,
+      errors: []
+    };
   }
 }

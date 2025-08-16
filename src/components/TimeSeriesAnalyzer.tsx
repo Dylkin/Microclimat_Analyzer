@@ -891,21 +891,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           {/* Информация о плейсхолдерах для шаблона */}
           <div className="w-full max-w-2xl bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="text-sm font-medium text-blue-900 mb-2">
-              Доступные плейсхолдеры для шаблона:
+              Информация о шаблонах:
             </h4>
-            <div className="grid grid-cols-2 gap-2 text-xs text-blue-800">
-              <div><code>{'{chart}'}</code> - Изображение графика (PNG)</div>
-              <div><code>{'{title}'}</code> - Заголовок отчета</div>
-              <div><code>{'{date}'}</code> - Дата создания</div>
-              <div><code>{'{dataType}'}</code> - Тип данных</div>
-              <div><code>{'{totalSensors}'}</code> - Общее количество датчиков</div>
-              <div><code>{'{internalSensors}'}</code> - Внутренние датчики</div>
-              <div><code>{'{externalSensors}'}</code> - Внешние датчики</div>
-              <div><code>{'{compliantSensors}'}</code> - Соответствуют лимитам</div>
+            <div className="text-xs text-blue-800 space-y-1">
+              <p>• Загруженный DOCX файл будет использован как основа для отчета</p>
+              <p>• График будет автоматически вставлен в формате PNG с высоким разрешением</p>
+              <p>• Изображение сохраняется в папке word/media внутри DOCX файла</p>
+              <p>• Плейсхолдер <code>{'{chart}'}</code> в шаблоне не обязателен - график добавляется автоматически</p>
             </div>
-            <p className="text-xs text-blue-600 mt-2">
-              <strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для вставки изображения графика.
-            </p>
           </div>
 
         </div>

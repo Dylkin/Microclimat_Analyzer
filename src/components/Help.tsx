@@ -157,11 +157,11 @@ export const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-800 mb-3">4. Работа с пользовательскими шаблонами</h3>
             <div className="bg-gray-50 rounded-lg p-4">
               <ul className="space-y-2 text-sm text-gray-700">
-                <li>• Загрузите DOCX файл с плейсхолдерами в фигурных скобках</li>
-                <li>• Обязательный плейсхолдер: <code className="bg-gray-200 px-1 rounded">{'{chart}'}</code> - для вставки изображения графика</li>
-                <li>• Дополнительные плейсхолдеры: <code className="bg-gray-200 px-1 rounded">{'{title}'}</code>, <code className="bg-gray-200 px-1 rounded">{'{date}'}</code>, <code className="bg-gray-200 px-1 rounded">{'{dataType}'}</code></li>
-                <li>• Система автоматически валидирует шаблон перед использованием</li>
-                <li>• График вставляется как PNG изображение с высоким разрешением</li>
+                <li>• Загрузите любой DOCX файл в качестве шаблона</li>
+                <li>• График автоматически добавляется в начало документа в формате PNG</li>
+                <li>• Изображение сохраняется в папке word/media внутри DOCX структуры</li>
+                <li>• Плейсхолдеры не требуются - график вставляется автоматически</li>
+                <li>• Высокое разрешение изображения (scale: 2) для четкого отображения</li>
               </ul>
             </div>
           </div>
