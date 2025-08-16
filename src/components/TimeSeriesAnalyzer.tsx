@@ -6,8 +6,6 @@ import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
-import { DocxReportGenerator, ReportData } from '../utils/docxGenerator';
-import { DocxImageGenerator, ImageReportData } from '../utils/docxImageGenerator';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
 
 interface TimeSeriesAnalyzerProps {
@@ -249,172 +247,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }));
   };
 
-  const handleGenerateReport = async () => {
-    setReportStatus(prev => ({ ...prev, isGenerating: true }));
-
-    try {
-      if (!chartRef.current) {
-        throw new Error('График не найден для сохранения');
-      }
-
-      // Находим контейнер с графиком
-      const chartContainer = chartRef.current;
-      
-      // Временно скрываем все кнопки в области графика
-      const buttons = chartContainer.querySelectorAll('button');
-      const originalDisplays: string[] = [];
-      buttons.forEach((button, index) => {
-        originalDisplays[index] = button.style.display;
-        button.style.display = 'none';
-      });
-      
-      // Создаем скриншот с высоким качеством
-      let canvas;
-      try {
-        canvas = await html2canvas(chartContainer, {
-          scale: 2, // Увеличиваем разрешение для лучшего качества
-          backgroundColor: '#ffffff',
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          width: chartContainer.offsetWidth,
-          height: chartContainer.offsetHeight,
-          onclone: (clonedDoc) => {
-            // Убеждаемся, что в клонированном документе тоже скрыты кнопки
-            const clonedButtons = clonedDoc.querySelectorAll('button');
-            clonedButtons.forEach(button => {
-              button.style.display = 'none';
-            });
-          }
-        });
-      } finally {
-        // Восстанавливаем отображение кнопок
-        buttons.forEach((button, index) => {
-          button.style.display = originalDisplays[index] || '';
-        });
-      }
-
-      if (!canvas) {
-        throw new Error('Не удалось создать скриншот графика');
-      }
-
-      // Создаем новый canvas для поворота изображения на 90° против часовой стрелки
-      const rotatedCanvas = document.createElement('canvas');
-      const ctx = rotatedCanvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error('Ошибка создания контекста для поворота изображения');
-      }
-
-      // Устанавливаем размеры повернутого canvas (меняем местами ширину и высоту)
-      rotatedCanvas.width = canvas.height;
-      rotatedCanvas.height = canvas.width;
-
-      // Поворачиваем контекст на 90° против часовой стрелки
-      ctx.translate(0, canvas.width);
-      ctx.rotate(-Math.PI / 2);
-
-      // Рисуем исходное изображение на повернутом canvas
-      ctx.drawImage(canvas, 0, 0);
-
-      // Конвертируем повернутый canvas в blob
-      const chartBlob = await new Promise<Blob>((resolve, reject) => {
-        rotatedCanvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Ошибка создания изображения графика'));
-          }
-        }, 'image/png', 1.0);
-      });
-
-      // Генерируем данные для отчета
-      const now = new Date();
-      const dateStr = now.toLocaleDateString('ru-RU');
-      const timeStr = now.toLocaleTimeString('ru-RU');
-      const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
-      
-      const reportData: ReportData = {
-        title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
-        date: `${dateStr} ${timeStr}`,
-        dataType,
-        chartImageBlob: chartBlob,
-        analysisResults
-      };
-
-      // Генерируем DOCX отчет
-      const docxGenerator = DocxReportGenerator.getInstance();
-      const docxBlob = reportStatus.templateFile 
-        ? await docxGenerator.generateReportFromTemplate(reportData, reportStatus.templateFile)
-        : await docxGenerator.generateReport(reportData);
-
-      // Создаем URL для скачивания
-      const reportUrl = URL.createObjectURL(docxBlob);
-      const reportFilename = `отчет_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
-
-      // Обновляем состояние
-      setReportStatus({
-        ...reportStatus,
-        isGenerating: false,
-        hasReport: true,
-        reportUrl,
-        reportFilename,
-        templateFile: reportStatus.templateFile
-      });
-      
-    } catch (error) {
-      console.error('Ошибка сохранения графика:', error);
-      alert(`Ошибка при формировании отчета: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-      setReportStatus(prev => ({ ...prev, isGenerating: false }));
-    }
-  };
-
-  const handleGenerateImageReport = async () => {
-    setReportStatus(prev => ({ ...prev, isGenerating: true }));
-
-    try {
-      if (!chartRef.current) {
-        throw new Error('График не найден для сохранения');
-      }
-
-      // Генерируем данные для отчета
-      const now = new Date();
-      const dateStr = now.toLocaleDateString('ru-RU');
-      const timeStr = now.toLocaleTimeString('ru-RU');
-      const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
-      
-      const imageReportData: ImageReportData = {
-        title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
-        date: `${dateStr} ${timeStr}`,
-        dataType,
-        analysisResults
-      };
-
-      // Генерируем DOCX отчет с PNG изображением
-      const docxImageGenerator = DocxImageGenerator.getInstance();
-      const docxBlob = await docxImageGenerator.generateReportWithImage(imageReportData, chartRef.current);
-
-      // Создаем URL для скачивания
-      const reportUrl = URL.createObjectURL(docxBlob);
-      const reportFilename = `отчет_PNG_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
-
-      // Обновляем состояние
-      setReportStatus({
-        ...reportStatus,
-        isGenerating: false,
-        hasReport: true,
-        reportUrl,
-        reportFilename,
-        templateFile: null
-      });
-      
-    } catch (error) {
-      console.error('Ошибка создания отчета с PNG изображением:', error);
-      alert(`Ошибка при формировании отчета с PNG: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-      setReportStatus(prev => ({ ...prev, isGenerating: false }));
-    }
-  };
-
   const handleGenerateTemplateReport = async () => {
     if (!reportStatus.templateFile || !chartRef.current) {
       alert('Необходимо загрузить шаблон и убедиться, что график отображается');
@@ -485,17 +317,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     if (reportStatus.reportUrl) {
       URL.revokeObjectURL(reportStatus.reportUrl);
     }
-    
-    // Очищаем документ в генераторе
-    const docxGenerator = DocxReportGenerator.getInstance();
-    docxGenerator.clearDocument();
-    
+
     setReportStatus({
       isGenerating: false,
       hasReport: false,
       reportUrl: null,
       reportFilename: null,
-      templateFile: null
+      templateFile: null,
+      templateValidation: null
     });
   };
 
@@ -801,48 +630,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
 
           {/* Кнопка генерации отчета */}
-          <div className="flex flex-wrap justify-center gap-4">
-            {/* Стандартный отчет */}
-            <button
-              onClick={handleGenerateReport}
-              disabled={reportStatus.isGenerating}
-              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-              title="Сформировать стандартный отчет с графиком"
-            >
-              {reportStatus.isGenerating ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Формирование отчета...</span>
-                </>
-              ) : (
-                <>
-                  <FileText className="w-5 h-5" />
-                  <span>Стандартный отчет</span>
-                </>
-              )}
-            </button>
-            
-            {/* Отчет с PNG изображением */}
-            <button
-              onClick={handleGenerateImageReport}
-              disabled={reportStatus.isGenerating}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-              title="Сформировать отчет с PNG изображением графика"
-            >
-              {reportStatus.isGenerating ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Формирование отчета...</span>
-                </>
-              ) : (
-                <>
-                  <FileText className="w-5 h-5" />
-                  <span>Отчет с PNG графиком</span>
-                </>
-              )}
-            </button>
-            
-            {/* Отчет по шаблону */}
+          <div className="flex justify-center">
             <button
               onClick={handleGenerateTemplateReport}
               disabled={
@@ -861,7 +649,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               ) : (
                 <>
                   <FileText className="w-5 h-5" />
-                  <span>Отчет по шаблону</span>
+                  <span>Сформировать отчет</span>
                 </>
               )}
             </button>
