@@ -1,7 +1,5 @@
 import html2canvas from 'html2canvas';
 import PizZip from 'pizzip';
-import Docxtemplater from 'docxtemplater';
-import ImageModule from 'docxtemplater-image-module';
 
 export interface TemplateReportData {
   title: string;
@@ -124,84 +122,53 @@ export class DocxTemplateProcessor {
       // Загружаем шаблон в PizZip
       const zip = new PizZip(templateBuffer);
 
-      // Настройка модуля изображений
-      const imageOpts = {
-        getImage: (tagValue: any) => {
-          return tagValue.data;
-        },
-        getSize: (img: any, tagValue: any) => {
-          return [tagValue.size.width, tagValue.size.height];
-        }
-      };
+      // Читаем основной документ
+      const documentXml = zip.files['word/document.xml'].asText();
+      
+      // Проверяем наличие плейсхолдера {chart}
+      if (!documentXml.includes('{chart}')) {
+        throw new Error('В шаблоне не найден плейсхолдер {chart}');
+      }
 
-      // Создаем экземпляр Docxtemplater с модулем изображений
-      const doc = new Docxtemplater(zip, {
-        modules: [new ImageModule(imageOpts)],
-        paragraphLoop: true,
-        linebreaks: true
-      });
+      // Добавляем изображение в папку word/media
+      const imageName = 'chart.png';
+      const mediaPath = `word/media/${imageName}`;
+      
+      // Создаем папку media если её нет
+      if (!zip.files['word/media/']) {
+        zip.folder('word/media');
+      }
+      
+      // Добавляем изображение
+      zip.file(mediaPath, chartImageBuffer);
+      console.log('Изображение добавлено в:', mediaPath);
 
-      // Подготавливаем данные для шаблона
-      const templateData = {
-        // Основные данные
-        title: data.title,
-        date: data.date,
-        dataType: data.dataType === 'temperature' ? 'Температура' : 'Влажность',
-        
-        // Изображение графика
-        chart: {
-          data: chartImageBuffer,
-          size: {
-            width: Math.min(600, chartElement.getBoundingClientRect().height * 0.8),
-            height: Math.min(800, chartElement.getBoundingClientRect().width * 0.8)
-          },
-          extension: '.png'
-        },
+      // Генерируем уникальный ID для связи
+      const relationshipId = this.generateRelationshipId(zip);
+      console.log('Сгенерирован ID связи:', relationshipId);
 
-        // Статистика датчиков
-        totalSensors: data.analysisResults.length,
-        internalSensors: data.analysisResults.filter(r => !r.isExternal).length,
-        externalSensors: data.analysisResults.filter(r => r.isExternal).length,
-        compliantSensors: data.analysisResults.filter(r => r.meetsLimits === 'Да').length,
-        nonCompliantSensors: data.analysisResults.filter(r => r.meetsLimits === 'Нет').length,
+      // Обновляем файл связей
+      this.updateRelationships(zip, relationshipId, `media/${imageName}`);
 
-        // Массив результатов для таблиц
-        results: data.analysisResults.map(result => ({
-          zoneNumber: result.zoneNumber,
-          measurementLevel: result.measurementLevel,
-          loggerName: result.loggerName,
-          serialNumber: result.serialNumber,
-          minTemp: result.minTemp,
-          maxTemp: result.maxTemp,
-          avgTemp: result.avgTemp,
-          minHumidity: result.minHumidity,
-          maxHumidity: result.maxHumidity,
-          avgHumidity: result.avgHumidity,
-          meetsLimits: result.meetsLimits,
-          isExternal: result.isExternal
-        }))
-      };
+      // Заменяем плейсхолдер на XML изображения
+      const updatedDocumentXml = this.replaceChartPlaceholder(documentXml, relationshipId);
+      zip.file('word/document.xml', updatedDocumentXml);
 
-      // Рендерим документ с данными
-      console.log('Обрабатываем шаблон с данными...');
-      doc.render(templateData);
+      // Обрабатываем другие плейсхолдеры
+      const finalDocumentXml = this.processTextPlaceholders(updatedDocumentXml, data);
+      zip.file('word/document.xml', finalDocumentXml);
 
       // Генерируем итоговый DOCX файл
       console.log('Генерируем итоговый DOCX файл...');
-      const buffer = doc.getZip().generate({ 
+      const buffer = zip.generate({ 
         type: 'blob',
         compression: 'DEFLATE',
         compressionOptions: { level: 6 }
       });
       
-      // Конвертируем в Blob
-      const blob = buffer instanceof Blob ? buffer : new Blob([buffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
-      });
+      console.log('DOCX файл создан успешно, размер:', buffer.size, 'байт');
       
-      console.log('DOCX файл создан успешно, размер:', blob.size, 'байт');
-      
-      return blob;
+      return buffer;
 
     } catch (error) {
       console.error('Ошибка генерации отчета по шаблону:', error);
@@ -217,6 +184,136 @@ export class DocxTemplateProcessor {
       
       throw new Error(`Не удалось создать отчет по шаблону: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
+  }
+
+  /**
+   * Генерация уникального ID для связи
+   */
+  private generateRelationshipId(zip: PizZip): string {
+    const relsPath = 'word/_rels/document.xml.rels';
+    let maxId = 0;
+    
+    if (zip.files[relsPath]) {
+      const relsXml = zip.files[relsPath].asText();
+      const idMatches = relsXml.match(/Id="rId(\d+)"/g);
+      
+      if (idMatches) {
+        idMatches.forEach(match => {
+          const id = parseInt(match.match(/\d+/)?.[0] || '0');
+          if (id > maxId) maxId = id;
+        });
+      }
+    }
+    
+    return `rId${maxId + 1}`;
+  }
+
+  /**
+   * Обновление файла связей
+   */
+  private updateRelationships(zip: PizZip, relationshipId: string, imagePath: string): void {
+    const relsPath = 'word/_rels/document.xml.rels';
+    let relsXml: string;
+    
+    if (zip.files[relsPath]) {
+      relsXml = zip.files[relsPath].asText();
+    } else {
+      // Создаем базовый файл связей
+      relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`;
+    }
+
+    // Добавляем новую связь для изображения
+    const imageRelationship = `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${imagePath}"/>`;
+    
+    // Вставляем связь перед закрывающим тегом
+    relsXml = relsXml.replace('</Relationships>', `  ${imageRelationship}\n</Relationships>`);
+    
+    zip.file(relsPath, relsXml);
+    console.log('Обновлен файл связей:', relsPath);
+  }
+
+  /**
+   * Замена плейсхолдера {chart} на XML изображения
+   */
+  private replaceChartPlaceholder(documentXml: string, relationshipId: string): string {
+    // XML структура для вставки изображения
+    const imageXml = `<w:p>
+      <w:r>
+        <w:drawing>
+          <wp:inline distT="0" distB="0" distL="0" distR="0">
+            <wp:extent cx="5715000" cy="7620000"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:docPr id="1" name="Chart"/>
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+            </wp:cNvGraphicFramePr>
+            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="1" name="Chart"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="${relationshipId}"/>
+                    <a:stretch>
+                      <a:fillRect/>
+                    </a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="5715000" cy="7620000"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect">
+                      <a:avLst/>
+                    </a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>`;
+
+    // Заменяем плейсхолдер на XML изображения
+    return documentXml.replace(/{chart}/g, imageXml);
+  }
+
+  /**
+   * Обработка текстовых плейсхолдеров
+   */
+  private processTextPlaceholders(documentXml: string, data: TemplateReportData): string {
+    let result = documentXml;
+
+    // Основные данные
+    result = result.replace(/{title}/g, this.escapeXml(data.title));
+    result = result.replace(/{date}/g, this.escapeXml(data.date));
+    result = result.replace(/{dataType}/g, this.escapeXml(data.dataType === 'temperature' ? 'Температура' : 'Влажность'));
+
+    // Статистика датчиков
+    result = result.replace(/{totalSensors}/g, data.analysisResults.length.toString());
+    result = result.replace(/{internalSensors}/g, data.analysisResults.filter(r => !r.isExternal).length.toString());
+    result = result.replace(/{externalSensors}/g, data.analysisResults.filter(r => r.isExternal).length.toString());
+    result = result.replace(/{compliantSensors}/g, data.analysisResults.filter(r => r.meetsLimits === 'Да').length.toString());
+    result = result.replace(/{nonCompliantSensors}/g, data.analysisResults.filter(r => r.meetsLimits === 'Нет').length.toString());
+
+    return result;
+  }
+
+  /**
+   * Экранирование XML символов
+   */
+  private escapeXml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
   }
 
   /**
