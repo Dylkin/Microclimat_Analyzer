@@ -164,6 +164,46 @@ export const Help: React.FC = () => {
                 <li>• Высокое разрешение изображения (scale: 2) для четкого отображения</li>
               </ul>
             </div>
+            
+            <div className="w-full max-w-2xl bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-blue-900 mb-2">
+                Как создать шаблон DOCX с изображением:
+              </h4>
+              <div className="text-xs text-blue-800 space-y-1">
+                <div className="mb-3">
+                  <p><strong>1. Создание шаблона:</strong></p>
+                  <p>• Создайте DOCX файл в Microsoft Word или аналогичном редакторе</p>
+                  <p>• В том месте, где должен быть график, вставьте текст: <code>{'{chart}'}</code></p>
+                  <p>• Сохраните файл в формате DOCX</p>
+                </div>
+                <div className="mb-3">
+                  <p><strong>2. Как работает вставка изображения:</strong></p>
+                  <p>• Изображение автоматически сохраняется в папку <code>word/media/</code></p>
+                  <p>• Создаются связи в файле <code>word/_rels/document.xml.rels</code></p>
+                  <p>• Плейсхолдер <code>{'{chart}'}</code> заменяется на XML-структуру изображения</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <p><strong>Основные:</strong></p>
+                    <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
+                    <p>• <code>{'{title}'}</code> - заголовок отчета</p>
+                    <p>• <code>{'{date}'}</code> - дата создания</p>
+                    <p>• <code>{'{dataType}'}</code> - тип данных</p>
+                  </div>
+                  <div>
+                    <p><strong>Статистика:</strong></p>
+                    <p>• <code>{'{totalSensors}'}</code> - всего датчиков</p>
+                    <p>• <code>{'{internalSensors}'}</code> - внутренних</p>
+                    <p>• <code>{'{externalSensors}'}</code> - внешних</p>
+                    <p>• <code>{'{compliantSensors}'}</code> - соответствуют лимитам</p>
+                  </div>
+                </div>
+                <p className="mt-2"><strong>Таблицы:</strong> <code>{'{#results}'}</code>...{'{/results}'} - цикл по результатам анализа</p>
+                <div className="mt-3 p-2 bg-blue-100 rounded">
+                  <p className="text-xs"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
