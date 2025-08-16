@@ -28,7 +28,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     contractNumber: '',
     contractDate: '',
     researchObject: '',
-    climateInstallation: ''
+    climateInstallation: '',
+    testType: ''
   });
   
   // UI state
@@ -551,6 +552,23 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               />
             </div>
           </div>
+          
+          {/* Test Type Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Тип испытания</label>
+            <select
+              value={contractFields.testType}
+              onChange={(e) => handleContractFieldChange('testType', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="">Выберите тип испытания</option>
+              <option value="empty_volume">Испытание на соответствие критериям в пустом объеме</option>
+              <option value="loaded_volume">Испытание на соответствие критериям в загруженном объеме</option>
+              <option value="temperature_recovery">Испытание по восстановлению температуры после открытия двери</option>
+              <option value="power_off">Испытание на отключение электропитания</option>
+              <option value="power_on">Испытание на включение электропитания</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -755,9 +773,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       {/* Кнопка формирования отчета */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-col items-center space-y-6">
+          <h2 className="text-xl font-semibold text-gray-900 text-center">
+            Формирование приложения к отчету с результатами испытаний
+          </h2>
+          
           {/* Загрузка шаблона DOCX */}
           <div className="w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+            <h3 className="text-lg font-medium text-gray-700 mb-4 text-center">
               Использование пользовательского шаблона с плейсхолдером {'{chart}'}
             </h3>
             
