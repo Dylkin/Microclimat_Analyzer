@@ -45,6 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'specialist':
         return page === 'analyzer' || page === 'help'; // К анализатору и справке
       case 'manager':
+      case 'director':
         return page === 'users' || page === 'help'; // К справочнику пользователей и справке
       default:
         return false;

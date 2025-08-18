@@ -40,6 +40,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       case 'administrator': return 'Администратор';
       case 'specialist': return 'Специалист';
       case 'manager': return 'Руководитель';
+      case 'director': return 'Менеджер';
       default: return role;
     }
   };

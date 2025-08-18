@@ -28,19 +28,22 @@ export const UserManagement: React.FC = () => {
 
   const roleLabels = {
     administrator: 'Администратор',
-    manager: 'Руководитель',
+    manager: 'Руководитель', 
+    director: 'Менеджер',
     specialist: 'Специалист'
   };
 
   const roleIcons = {
     administrator: Shield,
     manager: UserCheck,
+    director: UserCheck,
     specialist: Settings
   };
 
   const roleColors = {
     administrator: 'bg-red-100 text-red-800',
     manager: 'bg-blue-100 text-blue-800',
+    director: 'bg-purple-100 text-purple-800',
     specialist: 'bg-green-100 text-green-800'
   };
 
@@ -158,6 +161,7 @@ export const UserManagement: React.FC = () => {
               >
                 <option value="specialist">Специалист</option>
                 <option value="manager">Руководитель</option>
+                <option value="director">Менеджер</option>
                 <option value="administrator">Администратор</option>
               </select>
             </div>
@@ -244,6 +248,7 @@ export const UserManagement: React.FC = () => {
                       >
                         <option value="specialist">Специалист</option>
                         <option value="manager">Руководитель</option>
+                        <option value="director">Менеджер</option>
                         <option value="administrator">Администратор</option>
                       </select>
                     ) : (
