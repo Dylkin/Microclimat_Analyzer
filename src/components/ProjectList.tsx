@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Project } from '../types/Project';
+import { useProjects } from '../contexts/ProjectContext';
 import { 
   Calendar, 
   User, 
@@ -10,7 +11,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  DollarSign
+  DollarSign,
+  Edit3
 } from 'lucide-react';
 
 interface ProjectListProps {
@@ -18,8 +20,20 @@ interface ProjectListProps {
 }
 
 export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
+  const { updateProject } = useProjects();
   const [sortField, setSortField] = useState<keyof Project>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [editingStatus, setEditingStatus] = useState<string | null>(null);
+
+  const statusOptions = [
+    { value: 'draft', label: 'Черновик', color: 'bg-gray-100 text-gray-800' },
+    { value: 'preparation', label: 'Подготовка', color: 'bg-blue-100 text-blue-800' },
+    { value: 'testing', label: 'Испытания', color: 'bg-yellow-100 text-yellow-800' },
+    { value: 'reporting', label: 'Отчетность', color: 'bg-purple-100 text-purple-800' },
+    { value: 'completed', label: 'Завершен', color: 'bg-green-100 text-green-800' },
+    { value: 'cancelled', label: 'Отменен', color: 'bg-red-100 text-red-800' },
+    { value: 'on_hold', label: 'Приостановлен', color: 'bg-orange-100 text-orange-800' }
+  ];
 
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
@@ -101,6 +115,14 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
     return sortDirection === 'asc' ? '↑' : '↓';
   };
 
+  const handleStatusChange = async (projectId: string, newStatus: Project['status']) => {
+    try {
+      await updateProject(projectId, { status: newStatus });
+      setEditingStatus(null);
+    } catch (error) {
+      console.error('Ошибка изменения статуса:', error);
+    }
+  };
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="overflow-x-auto">
@@ -193,9 +215,31 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
                   </td>
                   
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(project.status)}`}>
-                      {getStatusText(project.status)}
-                    </span>
+                    <div className="relative">
+                      {editingStatus === project.id ? (
+                        <select
+                          value={project.status}
+                          onChange={(e) => handleStatusChange(project.id, e.target.value as Project['status'])}
+                          onBlur={() => setEditingStatus(null)}
+                          className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          autoFocus
+                        >
+                          {statusOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <button
+                          onClick={() => setEditingStatus(project.id)}
+                          className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold rounded-full hover:opacity-80 transition-opacity ${getStatusColor(project.status)}`}
+                        >
+                          <span>{getStatusText(project.status)}</span>
+                          <Edit3 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                   
                   <td className="px-6 py-4 whitespace-nowrap">

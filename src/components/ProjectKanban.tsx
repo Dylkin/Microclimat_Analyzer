@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Project } from '../types/Project';
+import { useProjects } from '../contexts/ProjectContext';
 import { ProjectCard } from './ProjectCard';
 import { Plus, MoreHorizontal } from 'lucide-react';
 
@@ -15,6 +16,7 @@ interface KanbanColumn {
 }
 
 export const ProjectKanban: React.FC<ProjectKanbanProps> = ({ projects }) => {
+  const { updateProject } = useProjects();
   const [draggedProject, setDraggedProject] = useState<Project | null>(null);
 
   const columns: KanbanColumn[] = [
@@ -67,9 +69,8 @@ export const ProjectKanban: React.FC<ProjectKanbanProps> = ({ projects }) => {
   const handleDrop = (e: React.DragEvent, targetStatus: Project['status'][]) => {
     e.preventDefault();
     
-    if (draggedProject && targetStatus.length === 1) {
-      // В реальном приложении здесь был бы вызов API для обновления статуса
-      console.log(`Moving project ${draggedProject.id} to status ${targetStatus[0]}`);
+    if (draggedProject && targetStatus.length === 1 && draggedProject.status !== targetStatus[0]) {
+      updateProject(draggedProject.id, { status: targetStatus[0] });
     }
     
     setDraggedProject(null);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Project } from '../types/Project';
+import { useProjects } from '../contexts/ProjectContext';
 import { 
   Calendar, 
   User, 
@@ -9,7 +10,8 @@ import {
   MoreHorizontal,
   MapPin,
   Thermometer,
-  FileText
+  FileText,
+  Edit3
 } from 'lucide-react';
 
 interface ProjectCardProps {
@@ -18,6 +20,19 @@ interface ProjectCardProps {
 }
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
+  const { updateProject } = useProjects();
+  const [showStatusMenu, setShowStatusMenu] = React.useState(false);
+
+  const statusOptions = [
+    { value: 'draft', label: 'Черновик', color: 'bg-gray-100 text-gray-800' },
+    { value: 'preparation', label: 'Подготовка', color: 'bg-blue-100 text-blue-800' },
+    { value: 'testing', label: 'Испытания', color: 'bg-yellow-100 text-yellow-800' },
+    { value: 'reporting', label: 'Отчетность', color: 'bg-purple-100 text-purple-800' },
+    { value: 'completed', label: 'Завершен', color: 'bg-green-100 text-green-800' },
+    { value: 'cancelled', label: 'Отменен', color: 'bg-red-100 text-red-800' },
+    { value: 'on_hold', label: 'Приостановлен', color: 'bg-orange-100 text-orange-800' }
+  ];
+
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-800';
@@ -67,11 +82,25 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
 
   const isOverdue = project.endDate && new Date(project.endDate) < new Date() && project.status !== 'completed';
 
+  const handleStatusChange = async (newStatus: Project['status']) => {
+    try {
+      await updateProject(project.id, { status: newStatus });
+      setShowStatusMenu(false);
+    } catch (error) {
+      console.error('Ошибка изменения статуса:', error);
+    }
+  };
+
+  const handleStatusClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowStatusMenu(!showStatusMenu);
+  };
   return (
-    <div 
-      className="bg-white rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
-      onClick={onClick}
-    >
+    <div className="relative">
+      <div 
+        className="bg-white rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
+        onClick={onClick}
+      >
       <div className="p-6">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
@@ -124,9 +153,15 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
 
         {/* Status and Priority */}
         <div className="flex items-center justify-between mb-4">
-          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(project.status)}`}>
-            {getStatusText(project.status)}
-          </span>
+          <div className="relative">
+            <button
+              onClick={handleStatusClick}
+              className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold rounded-full hover:opacity-80 transition-opacity ${getStatusColor(project.status)}`}
+            >
+              <span>{getStatusText(project.status)}</span>
+              <Edit3 className="w-3 h-3" />
+            </button>
+          </div>
           <div className="flex items-center space-x-1">
             <AlertTriangle className={`w-4 h-4 ${getPriorityColor(project.priority)}`} />
             <span className={`text-xs font-medium ${getPriorityColor(project.priority)}`}>
@@ -196,6 +231,35 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
           </div>
         </div>
       </div>
+      </div>
+
+      {/* Status Menu */}
+      {showStatusMenu && (
+        <>
+          <div 
+            className="fixed inset-0 z-10" 
+            onClick={() => setShowStatusMenu(false)}
+          />
+          <div className="absolute top-20 left-4 z-20 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-48">
+            <div className="px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
+              Изменить статус
+            </div>
+            {statusOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => handleStatusChange(option.value as Project['status'])}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
+                  project.status === option.value ? 'bg-blue-50' : ''
+                }`}
+              >
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${option.color}`}>
+                  {option.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };
