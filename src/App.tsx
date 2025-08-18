@@ -4,8 +4,7 @@ import { ProjectProvider } from './contexts/ProjectContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
-import { References } from './components/References';
-import { References } from './components/References';
+import { UserManagement } from './components/UserManagement';
 import { ProjectManagement } from './components/ProjectManagement';
 import { Help } from './components/Help';
 import './index.css';
@@ -22,14 +21,14 @@ const AppContent: React.FC = () => {
       setCurrentPage('analyzer');
     } else if (user.role === 'manager' && !hasAccess('analyzer')) {
       setCurrentPage('projects');
-    } else if (!hasAccess(currentPage as 'analyzer' | 'references')) {
+    } else if (!hasAccess(currentPage as 'analyzer' | 'users')) {
       // Если текущая страница недоступна, переключаемся на доступную
       if (hasAccess('analyzer')) {
         setCurrentPage('analyzer');
       } else if (hasAccess('projects')) {
         setCurrentPage('projects');
-      } else if (hasAccess('references')) {
-        setCurrentPage('references');
+      } else if (hasAccess('users')) {
+        setCurrentPage('users');
       }
     }
   }, [user, hasAccess, currentPage]);
@@ -49,10 +48,8 @@ const AppContent: React.FC = () => {
         ) : <div>Доступ запрещен</div>;
       case 'projects':
         return hasAccess('projects') ? <ProjectManagement /> : <div>Доступ запрещен</div>;
-      case 'references':
-        return hasAccess('references') ? <References /> : <div>Доступ запрещен</div>;
-      case 'references':
-        return hasAccess('references') ? <References /> : <div>Доступ запрещен</div>;
+      case 'users':
+        return hasAccess('users') ? <UserManagement /> : <div>Доступ запрещен</div>;
       case 'help':
         return hasAccess('help') ? <Help /> : <div>Доступ запрещен</div>;
       default:
