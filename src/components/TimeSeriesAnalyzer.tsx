@@ -493,8 +493,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
 
     // Формируем текст выводов
-    const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU')}
-Завершение испытания: ${endTime.toLocaleString('ru-RU')}
+    const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}
+Завершение испытания: ${endTime.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}
 Длительность испытания: ${durationText}
 Зафиксированное минимальное значение: ${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
 Зафиксированное максимальное значение: ${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.
@@ -768,7 +780,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                       <span className="font-medium">{marker.label}</span>
                     )}
                     <span className="text-sm text-gray-500">
-                      {new Date(marker.timestamp).toLocaleString('ru-RU')}
+                      {new Date(marker.timestamp).toLocaleString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">

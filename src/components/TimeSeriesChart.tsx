@@ -168,7 +168,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
         });
       }
     }
-  }, [filteredData, xScale, margin.left, innerWidth, dataType, bisectDate, isSelecting]);
+  }, [filteredData, xScale, margin.left, innerWidth, dataType, bisectDate, isSelecting, data]);
 
   // Обработчик выхода мыши
   const handleMouseLeave = useCallback(() => {
@@ -491,7 +491,13 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             transform: tooltip.x > width - 200 ? 'translateX(-100%)' : 'none'
           }}
         >
-          <div className="font-semibold">{formatTime(new Date(tooltip.timestamp))}</div>
+          <div className="font-semibold">{new Date(tooltip.timestamp).toLocaleString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}</div>
           {tooltip.fileName && (
             <div className="text-xs text-gray-300">Файл: {tooltip.fileName.substring(0, 6)}</div>
           )}
