@@ -44,14 +44,20 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects }) 
   }, [projects]);
 
   // Статистика по типам проектов
-  const typeStats = React.useMemo(() => {
-    const stats = projects.reduce((acc, project) => {
-      acc[project.type] = (acc[project.type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+  const objectTypeStats = React.useMemo(() => {
+    const stats: Record<string, number> = {};
+    
+    projects.forEach(project => {
+      if (project.qualificationObjects) {
+        project.qualificationObjects.forEach(obj => {
+          const typeName = getObjectTypeText(obj.type);
+          stats[typeName] = (stats[typeName] || 0) + 1;
+        });
+      }
+    });
 
     return Object.entries(stats).map(([type, count]) => ({
-      name: getTypeText(type),
+      name: type,
       value: count
     }));
   }, [projects]);
@@ -137,6 +143,17 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects }) 
       mapping: 'Картирование',
       testing: 'Испытания',
       full_qualification: 'Полная квалификация'
+    };
+    return typeMap[type] || type;
+  }
+
+  function getObjectTypeText(type: string): string {
+    const typeMap: Record<string, string> = {
+      room: 'Помещение',
+      transport: 'Транспорт',
+      refrigerator: 'Холодильные камеры',
+      cooling_unit: 'Холодильные установки',
+      freezing_unit: 'Морозильные установки'
     };
     return typeMap[type] || type;
   }
@@ -234,10 +251,10 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects }) 
 
         {/* Project Types */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Типы проектов</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Типы объектов квалификации</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={typeStats}>
+              <BarChart data={objectTypeStats}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
