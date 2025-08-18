@@ -4,7 +4,7 @@ import { ProjectProvider } from './contexts/ProjectContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
-import { UserManagement } from './components/UserManagement';
+import { ReferenceBooks } from './components/ReferenceBooks';
 import { ProjectManagement } from './components/ProjectManagement';
 import { Help } from './components/Help';
 import './index.css';
@@ -28,7 +28,7 @@ const AppContent: React.FC = () => {
       } else if (hasAccess('projects')) {
         setCurrentPage('projects');
       } else if (hasAccess('users')) {
-        setCurrentPage('users');
+        setCurrentPage('references');
       }
     }
   }, [user, hasAccess, currentPage]);
@@ -48,8 +48,8 @@ const AppContent: React.FC = () => {
         ) : <div>Доступ запрещен</div>;
       case 'projects':
         return hasAccess('projects') ? <ProjectManagement /> : <div>Доступ запрещен</div>;
-      case 'users':
-        return hasAccess('users') ? <UserManagement /> : <div>Доступ запрещен</div>;
+      case 'references':
+        return hasAccess('users') ? <ReferenceBooks /> : <div>Доступ запрещен</div>;
       case 'help':
         return hasAccess('help') ? <Help /> : <div>Доступ запрещен</div>;
       default:
