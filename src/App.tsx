@@ -11,22 +11,23 @@ import './index.css';
 
 const AppContent: React.FC = () => {
   const { user, hasAccess } = useAuth();
-  const [currentPage, setCurrentPage] = useState('analyzer');
+  const [currentPage, setCurrentPage] = useState('projects');
   const [showVisualization, setShowVisualization] = useState(false);
 
   React.useEffect(() => {
     if (!user) return;
     
-    if (user.role === 'specialist' && !hasAccess('analyzer')) {
-      setCurrentPage('analyzer');
-    } else if (user.role === 'manager' && !hasAccess('analyzer')) {
+    // Для всех ролей стартовая страница - управление проектами
+    if (hasAccess('projects')) {
       setCurrentPage('projects');
-    } else if (!hasAccess(currentPage as 'analyzer' | 'users')) {
+    } else if (user.role === 'specialist' && hasAccess('analyzer')) {
+      setCurrentPage('analyzer');
+    } else if (!hasAccess(currentPage as 'analyzer' | 'projects' | 'users')) {
       // Если текущая страница недоступна, переключаемся на доступную
-      if (hasAccess('analyzer')) {
-        setCurrentPage('analyzer');
-      } else if (hasAccess('projects')) {
+      if (hasAccess('projects')) {
         setCurrentPage('projects');
+      } else if (hasAccess('analyzer')) {
+        setCurrentPage('analyzer');
       } else if (hasAccess('users')) {
         setCurrentPage('references');
       }
