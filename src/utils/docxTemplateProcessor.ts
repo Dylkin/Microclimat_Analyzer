@@ -608,6 +608,18 @@ export class DocxTemplateProcessor {
    * Создание XML структуры таблицы результатов анализа
    */
   private createResultsTableXml(results: any[], dataType: 'temperature' | 'humidity'): string {
+    // Находим глобальные минимальные и максимальные значения (исключая внешние датчики)
+    const nonExternalResults = results.filter(result => !result.isExternal);
+    const minTempValues = nonExternalResults
+      .map(result => parseFloat(result.minTemp))
+      .filter(val => !isNaN(val));
+    const maxTempValues = nonExternalResults
+      .map(result => parseFloat(result.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
+    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
+
     // Заголовок таблицы
     const headerRow = `
       <w:tr>
@@ -739,6 +751,18 @@ export class DocxTemplateProcessor {
       const complianceColor = result.meetsLimits === 'Да' ? 'C6EFCE' : 
                              result.meetsLimits === 'Нет' ? 'FFC7CE' : 'FFFFFF';
       
+      // Определяем цвета для минимальных и максимальных значений
+      const minTempValue = parseFloat(result.minTemp);
+      const maxTempValue = parseFloat(result.maxTemp);
+      
+      const minTempColor = (!result.isExternal && !isNaN(minTempValue) && 
+                          globalMinTemp !== null && minTempValue === globalMinTemp) ? 
+                          'ADD8E6' : 'FFFFFF'; // Светло-голубой для минимума
+      
+      const maxTempColor = (!result.isExternal && !isNaN(maxTempValue) && 
+                          globalMaxTemp !== null && maxTempValue === globalMaxTemp) ? 
+                          'FFB6C1' : 'FFFFFF'; // Светло-розовый для максимума
+
       return `
         <w:tr>
           <w:tc>
@@ -805,6 +829,7 @@ export class DocxTemplateProcessor {
                 <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
                 <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
               </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="${minTempColor}"/>
             </w:tcPr>
             <w:p>
               <w:pPr><w:jc w:val="center"/></w:pPr>
@@ -819,6 +844,7 @@ export class DocxTemplateProcessor {
                 <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
                 <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
               </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="${maxTempColor}"/>
             </w:tcPr>
             <w:p>
               <w:pPr><w:jc w:val="center"/></w:pPr>
