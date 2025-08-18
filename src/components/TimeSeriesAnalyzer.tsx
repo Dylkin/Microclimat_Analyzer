@@ -3,7 +3,7 @@ import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermomete
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
-import { ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
+import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
@@ -35,6 +35,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // UI state
   const [showSettings, setShowSettings] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
+  const [editingMarkerType, setEditingMarkerType] = useState<string | null>(null);
   const [conclusions, setConclusions] = useState('');
   const [reportStatus, setReportStatus] = useState<{
     isGenerating: boolean;
@@ -197,7 +198,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       id: Date.now().toString(),
       timestamp,
       label: `Маркер ${markers.length + 1}`,
-      color: '#8b5cf6'
+      color: '#8b5cf6',
+      type: 'test'
     };
     setMarkers(prev => [...prev, newMarker]);
   }, [markers.length]);
@@ -205,6 +207,23 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const handleUpdateMarker = (id: string, label: string) => {
     setMarkers(prev => prev.map(m => m.id === id ? { ...m, label } : m));
     setEditingMarker(null);
+  };
+
+  const handleUpdateMarkerType = (id: string, type: MarkerType) => {
+    const color = type === 'test' ? '#8b5cf6' : '#f59e0b';
+    setMarkers(prev => prev.map(m => m.id === id ? { ...m, type, color } : m));
+    setEditingMarkerType(null);
+  };
+
+  const getMarkerTypeLabel = (type: MarkerType): string => {
+    switch (type) {
+      case 'test':
+        return 'Испытание';
+      case 'door_opening':
+        return 'Открытие двери';
+      default:
+        return 'Неизвестно';
+    }
   };
 
   const handleDeleteMarker = (id: string) => {
@@ -755,50 +774,82 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             <div className="space-y-2">
               {markers.map((marker) => (
                 <div key={marker.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 flex-1">
                     <div
                       className="w-4 h-4 rounded-full"
                       style={{ backgroundColor: marker.color }}
                     ></div>
-                    {editingMarker === marker.id ? (
-                      <input
-                        type="text"
-                        value={marker.label}
-                        onChange={(e) => setMarkers(prev => 
-                          prev.map(m => m.id === marker.id ? { ...m, label: e.target.value } : m)
+                    
+                    <div className="flex flex-col space-y-1 flex-1">
+                      <div className="flex items-center space-x-3">
+                        {editingMarker === marker.id ? (
+                          <input
+                            type="text"
+                            value={marker.label}
+                            onChange={(e) => setMarkers(prev => 
+                              prev.map(m => m.id === marker.id ? { ...m, label: e.target.value } : m)
+                            )}
+                            onBlur={() => setEditingMarker(null)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                setEditingMarker(null);
+                              }
+                            }}
+                            className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            autoFocus
+                          />
+                        ) : (
+                          <span className="font-medium">{marker.label}</span>
                         )}
-                        onBlur={() => setEditingMarker(null)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            setEditingMarker(null);
-                          }
-                        }}
-                        className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        autoFocus
-                      />
-                    ) : (
-                      <span className="font-medium">{marker.label}</span>
-                    )}
-                    <span className="text-sm text-gray-500">
-                      {new Date(marker.timestamp).toLocaleString('ru-RU', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
+                        
+                        <span className="text-sm text-gray-500">
+                          {new Date(marker.timestamp).toLocaleString('ru-RU', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-500">Тип:</span>
+                        {editingMarkerType === marker.id ? (
+                          <select
+                            value={marker.type}
+                            onChange={(e) => handleUpdateMarkerType(marker.id, e.target.value as MarkerType)}
+                            onBlur={() => setEditingMarkerType(null)}
+                            className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            autoFocus
+                          >
+                            <option value="test">Испытание</option>
+                            <option value="door_opening">Открытие двери</option>
+                          </select>
+                        ) : (
+                          <span 
+                            className="text-xs px-2 py-1 bg-white border border-gray-200 rounded cursor-pointer hover:bg-gray-50"
+                            onClick={() => setEditingMarkerType(marker.id)}
+                          >
+                            {getMarkerTypeLabel(marker.type)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => setEditingMarker(marker.id)}
                       className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                      title="Редактировать название"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteMarker(marker.id)}
                       className="text-red-600 hover:text-red-800 transition-colors"
+                      title="Удалить маркер"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -810,6 +861,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
               <p className="text-sm">Маркеры не добавлены</p>
               <p className="text-xs mt-1">Сделайте двойной клик по графику для добавления маркера</p>
+              <div className="text-xs mt-2 space-y-1">
+                <p><strong>Типы маркеров:</strong></p>
+                <div className="flex justify-center space-x-4">
+                  <div className="flex items-center space-x-1">
+                    <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                    <span>Испытание</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <span>Открытие двери</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

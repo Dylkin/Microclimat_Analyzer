@@ -27,11 +27,14 @@ export interface ChartLimits {
   };
 }
 
+export type MarkerType = 'test' | 'door_opening';
+
 export interface VerticalMarker {
   id: string;
   timestamp: number;
   label?: string;
   color?: string;
+  type: MarkerType;
 }
 
 export interface ZoomState {
