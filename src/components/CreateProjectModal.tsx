@@ -1,11 +1,22 @@
 import React, { useState } from 'react';
 import { useProjects } from '../contexts/ProjectContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Project, ProjectType } from '../types/Project';
-import { X, MapPin, Thermometer, FileText, Calendar, User, DollarSign } from 'lucide-react';
+import { Project, ProjectType, QualificationObject, QualificationObjectType } from '../types/Project';
+import { X, MapPin, Calendar, User, DollarSign, Plus, Trash2, Building, Truck, Snowflake } from 'lucide-react';
 
 interface CreateProjectModalProps {
   onClose: () => void;
+}
+
+interface Client {
+  id: string;
+  name: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  inn: string;
+  kpp?: string;
 }
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose }) => {
@@ -13,27 +24,37 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
   const { createProject, templates } = useProjects();
   
   const [formData, setFormData] = useState({
-    title: '',
     description: '',
-    type: 'mapping' as ProjectType,
-    clientName: '',
+    clientId: '',
+    clientName: '', 
     estimatedDuration: 14,
     budget: '',
     priority: 'medium' as Project['priority'],
     tags: '',
-    roomArea: '',
-    loggerCount: '',
-    testingDuration: '',
-    specialRequirements: ''
+  });
+
+  const [qualificationObjects, setQualificationObjects] = useState<Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [newClient, setNewClient] = useState({
+    name: '',
+    contactPerson: '',
+    email: '',
+    phone: '',
+    address: '',
+    inn: '',
+    kpp: ''
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const projectTypes = [
-    { value: 'mapping', label: 'Картирование', icon: MapPin, description: 'Картирование температурных условий' },
-    { value: 'testing', label: 'Испытания', icon: Thermometer, description: 'Испытания климатического оборудования' },
-    { value: 'full_qualification', label: 'Полная квалификация', icon: FileText, description: 'Комплексная квалификация помещений' }
+  const qualificationObjectTypes = [
+    { value: 'room', label: 'Помещение', icon: Building },
+    { value: 'transport', label: 'Транспорт', icon: Truck },
+    { value: 'refrigerator', label: 'Холодильные камеры', icon: Snowflake },
+    { value: 'cooling_unit', label: 'Холодильные установки', icon: Snowflake },
+    { value: 'freezing_unit', label: 'Морозильные установки', icon: Snowflake }
   ];
 
   const priorities = [
@@ -43,19 +64,19 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
     { value: 'urgent', label: 'Срочный', color: 'text-red-600' }
   ];
 
+  // Загружаем клиентов при монтировании компонента
+  React.useEffect(() => {
+    const savedClients = localStorage.getItem('clients');
+    if (savedClients) {
+      setClients(JSON.parse(savedClients));
+    }
+  }, []);
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.title.trim()) {
-      newErrors.title = 'Название проекта обязательно';
-    }
-
-    if (!formData.description.trim()) {
-      newErrors.description = 'Описание проекта обязательно';
-    }
-
-    if (!formData.clientName.trim()) {
-      newErrors.clientName = 'Имя заказчика обязательно';
+    if (!formData.clientId && !formData.clientName.trim()) {
+      newErrors.client = 'Выберите заказчика или добавьте нового';
     }
 
     if (formData.estimatedDuration < 1) {
@@ -66,8 +87,51 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
       newErrors.budget = 'Бюджет должен быть числом';
     }
 
+    if (qualificationObjects.length === 0) {
+      newErrors.objects = 'Добавьте хотя бы один объект квалификации';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleAddClient = () => {
+    if (!newClient.name || !newClient.email || !newClient.inn) {
+      setErrors({ newClient: 'Заполните обязательные поля для нового заказчика' });
+      return;
+    }
+
+    const client: Client = {
+      id: Date.now().toString(),
+      ...newClient,
+      createdAt: new Date()
+    };
+
+    const updatedClients = [...clients, client];
+    setClients(updatedClients);
+    localStorage.setItem('clients', JSON.stringify(updatedClients));
+
+    setFormData(prev => ({ ...prev, clientId: client.id, clientName: client.name }));
+    setShowNewClientForm(false);
+    setNewClient({ name: '', contactPerson: '', email: '', phone: '', address: '', inn: '', kpp: '' });
+  };
+
+  const handleAddQualificationObject = () => {
+    const newObject: Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'> = {
+      type: 'room',
+      name: '',
+      description: '',
+      technicalParameters: {}
+    };
+    setQualificationObjects(prev => [...prev, newObject]);
+  };
+
+  const handleUpdateQualificationObject = (index: number, updates: Partial<Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>>) => {
+    setQualificationObjects(prev => prev.map((obj, i) => i === index ? { ...obj, ...updates } : obj));
+  };
+
+  const handleRemoveQualificationObject = (index: number) => {
+    setQualificationObjects(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,13 +144,15 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
     setIsSubmitting(true);
 
     try {
+      // Находим выбранного клиента
+      const selectedClient = clients.find(c => c.id === formData.clientId);
+      
       const projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        type: formData.type,
+        description: formData.description.trim() || undefined,
+        type: 'mapping',
         status: 'draft',
-        clientId: Date.now().toString(), // В реальном приложении - ID из системы
-        clientName: formData.clientName.trim(),
+        clientId: formData.clientId || Date.now().toString(),
+        clientName: selectedClient?.name || formData.clientName.trim(),
         managerId: user?.id || '',
         managerName: user?.fullName || '',
         estimatedDuration: formData.estimatedDuration,
@@ -95,13 +161,12 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
         progress: 0,
         priority: formData.priority,
         tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-        metadata: {
-          roomArea: formData.roomArea ? Number(formData.roomArea) : undefined,
-          loggerCount: formData.loggerCount ? Number(formData.loggerCount) : undefined,
-          testingDuration: formData.testingDuration ? Number(formData.testingDuration) : undefined,
-          specialRequirements: formData.specialRequirements ? 
-            formData.specialRequirements.split(',').map(req => req.trim()).filter(Boolean) : []
-        }
+        qualificationObjects: qualificationObjects.map(obj => ({
+          ...obj,
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }))
       };
 
       await createProject(projectData);
@@ -115,13 +180,18 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
   };
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'clientId') {
+      const selectedClient = clients.find(c => c.id === value);
+      setFormData(prev => ({ ...prev, clientId: value, clientName: selectedClient?.name || '' }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
-  const selectedTemplate = templates.find(t => t.type === formData.type);
+  const selectedTemplate = templates.find(t => t.type === 'mapping');
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -143,93 +213,154 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
               <h3 className="text-lg font-medium text-gray-900 mb-4">Основная информация</h3>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Название проекта *
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => handleInputChange('title', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                  errors.title ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Введите название проекта"
-              />
-              {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
-            </div>
-
-            <div>
+            <div className="lg:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Заказчик *
               </label>
-              <input
-                type="text"
-                value={formData.clientName}
-                onChange={(e) => handleInputChange('clientName', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                  errors.clientName ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Название организации или ФИО"
-              />
-              {errors.clientName && <p className="mt-1 text-sm text-red-600">{errors.clientName}</p>}
+              <div className="flex space-x-2">
+                <select
+                  value={formData.clientId}
+                  onChange={(e) => handleInputChange('clientId', e.target.value)}
+                  className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                    errors.client ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Выберите заказчика</option>
+                  {clients.map(client => (
+                    <option key={client.id} value={client.id}>{client.name}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowNewClientForm(true)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              {errors.client && <p className="mt-1 text-sm text-red-600">{errors.client}</p>}
             </div>
 
             <div className="lg:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Описание проекта *
+                Описание проекта
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 rows={3}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                  errors.description ? 'border-red-300' : 'border-gray-300'
-                }`}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Опишите цели и задачи проекта"
               />
-              {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
             </div>
           </div>
 
-          {/* Project Type */}
+          {/* New Client Form */}
+          {showNewClientForm && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="text-md font-medium text-gray-900 mb-3">Добавить нового заказчика</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Название *</label>
+                  <input
+                    type="text"
+                    value={newClient.name}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <input
+                    type="email"
+                    value={newClient.email}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ИНН *</label>
+                  <input
+                    type="text"
+                    value={newClient.inn}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, inn: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Контактное лицо</label>
+                  <input
+                    type="text"
+                    value={newClient.contactPerson}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, contactPerson: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowNewClientForm(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddClient}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Добавить
+                </button>
+              </div>
+              {errors.newClient && <p className="mt-2 text-sm text-red-600">{errors.newClient}</p>}
+            </div>
+          )}
+
+          {/* Qualification Objects */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Тип проекта</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {projectTypes.map((type) => {
-                const Icon = type.icon;
-                return (
-                  <div
-                    key={type.value}
-                    className={`relative rounded-lg border-2 cursor-pointer transition-colors ${
-                      formData.type === type.value
-                        ? 'border-indigo-500 bg-indigo-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => handleInputChange('type', type.value)}
-                  >
-                    <div className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <Icon className={`w-6 h-6 ${
-                          formData.type === type.value ? 'text-indigo-600' : 'text-gray-400'
-                        }`} />
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-900">{type.label}</h4>
-                          <p className="text-xs text-gray-500">{type.description}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <input
-                      type="radio"
-                      name="type"
-                      value={type.value}
-                      checked={formData.type === type.value}
-                      onChange={() => handleInputChange('type', type.value)}
-                      className="absolute top-4 right-4"
-                    />
-                  </div>
-                );
-              })}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Объекты квалификации</h3>
+              <button
+                type="button"
+                onClick={handleAddQualificationObject}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Добавить объект</span>
+              </button>
+            </div>
+            
+            {qualificationObjects.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                <Building className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>Добавьте объекты квалификации</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {qualificationObjects.map((obj, index) => (
+                  <QualificationObjectForm
+                    key={index}
+                    object={obj}
+                    index={index}
+                    objectTypes={qualificationObjectTypes}
+                    onUpdate={handleUpdateQualificationObject}
+                    onRemove={handleRemoveQualificationObject}
+                  />
+                ))}
+              </div>
+            )}
+            {errors.objects && <p className="mt-2 text-sm text-red-600">{errors.objects}</p>}
+          </div>
+
+          {/* Project Type Info */}
+          <div className="bg-blue-50 rounded-lg p-4">
+            <div className="flex items-center space-x-3">
+              <MapPin className="w-6 h-6 text-blue-600" />
+              <div>
+                <h4 className="text-sm font-medium text-blue-900">Тип проекта: Картирование (Исследование микроклимата)</h4>
+                <p className="text-xs text-blue-700">Картирование температурных и влажностных условий в объектах квалификации</p>
+              </div>
             </div>
           </div>
 
@@ -303,69 +434,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
             </div>
           </div>
 
-          {/* Technical Parameters */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="lg:col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Технические параметры</h3>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Площадь помещения (м²)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={formData.roomArea}
-                onChange={(e) => handleInputChange('roomArea', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Общая площадь"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Количество логгеров
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.loggerCount}
-                onChange={(e) => handleInputChange('loggerCount', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Планируемое количество"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Длительность испытаний (часы)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.testingDuration}
-                onChange={(e) => handleInputChange('testingDuration', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Время непрерывного мониторинга"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Особые требования
-              </label>
-              <input
-                type="text"
-                value={formData.specialRequirements}
-                onChange={(e) => handleInputChange('specialRequirements', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Через запятую: стерильность, взрывобезопасность"
-              />
-            </div>
-          </div>
-
           {/* Template Preview */}
           {selectedTemplate && (
             <div className="bg-gray-50 rounded-lg p-4">
@@ -422,6 +490,149 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+// Компонент для редактирования объекта квалификации
+interface QualificationObjectFormProps {
+  object: Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>;
+  index: number;
+  objectTypes: Array<{ value: QualificationObjectType; label: string; icon: any }>;
+  onUpdate: (index: number, updates: Partial<Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>>) => void;
+  onRemove: (index: number) => void;
+}
+
+const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
+  object,
+  index,
+  objectTypes,
+  onUpdate,
+  onRemove
+}) => {
+  const selectedType = objectTypes.find(t => t.value === object.type);
+  const Icon = selectedType?.icon || Building;
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <Icon className="w-5 h-5 text-indigo-600" />
+          <h4 className="text-md font-medium text-gray-900">
+            Объект квалификации #{index + 1}
+          </h4>
+        </div>
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          className="text-red-600 hover:text-red-800 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Тип объекта</label>
+          <select
+            value={object.type}
+            onChange={(e) => onUpdate(index, { type: e.target.value as QualificationObjectType })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            {objectTypes.map(type => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Название</label>
+          <input
+            type="text"
+            value={object.name}
+            onChange={(e) => onUpdate(index, { name: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Название объекта"
+          />
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
+          <textarea
+            value={object.description || ''}
+            onChange={(e) => onUpdate(index, { description: e.target.value })}
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Описание объекта"
+          />
+        </div>
+
+        {/* Технические параметры */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Площадь (м²)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={object.technicalParameters.area || ''}
+            onChange={(e) => onUpdate(index, {
+              technicalParameters: {
+                ...object.technicalParameters,
+                area: e.target.value ? Number(e.target.value) : undefined
+              }
+            })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Количество логгеров</label>
+          <input
+            type="number"
+            min="0"
+            value={object.technicalParameters.loggerCount || ''}
+            onChange={(e) => onUpdate(index, {
+              technicalParameters: {
+                ...object.technicalParameters,
+                loggerCount: e.target.value ? Number(e.target.value) : undefined
+              }
+            })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Длительность испытаний (часы)</label>
+          <input
+            type="number"
+            min="0"
+            value={object.technicalParameters.testingDuration || ''}
+            onChange={(e) => onUpdate(index, {
+              technicalParameters: {
+                ...object.technicalParameters,
+                testingDuration: e.target.value ? Number(e.target.value) : undefined
+              }
+            })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Местоположение</label>
+          <input
+            type="text"
+            value={object.technicalParameters.location || ''}
+            onChange={(e) => onUpdate(index, {
+              technicalParameters: {
+                ...object.technicalParameters,
+                location: e.target.value
+              }
+            })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Местоположение объекта"
+          />
+        </div>
       </div>
     </div>
   );

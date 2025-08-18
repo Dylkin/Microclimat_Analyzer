@@ -14,18 +14,46 @@ export type TaskType =
   | 'report_approval' 
   | 'report_delivery';
 
-export type ProjectType = 'mapping' | 'testing' | 'full_qualification';
+export type ProjectType = 'mapping';
+
+export type QualificationObjectType = 'room' | 'transport' | 'refrigerator' | 'cooling_unit' | 'freezing_unit';
+
+export interface QualificationObject {
+  id: string;
+  type: QualificationObjectType;
+  name: string;
+  description?: string;
+  technicalParameters: {
+    area?: number; // площадь в м²
+    volume?: number; // объем в м³
+    loggerCount?: number; // количество логгеров
+    testingDuration?: number; // длительность испытаний в часах
+    temperatureRange?: {
+      min: number;
+      max: number;
+    };
+    humidityRange?: {
+      min: number;
+      max: number;
+    };
+    specialRequirements?: string[];
+    location?: string; // местоположение объекта
+    capacity?: number; // вместимость (для транспорта, камер)
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface Project {
   id: string;
-  title: string;
-  description: string;
+  description?: string;
   type: ProjectType;
   status: ProjectStatus;
   clientId: string;
   clientName: string;
   managerId: string;
   managerName: string;
+  qualificationObjects: QualificationObject[];
   createdAt: Date;
   updatedAt: Date;
   startDate?: Date;
@@ -36,12 +64,6 @@ export interface Project {
   progress: number; // 0-100
   priority: 'low' | 'medium' | 'high' | 'urgent';
   tags: string[];
-  metadata: {
-    roomArea?: number;
-    loggerCount?: number;
-    testingDuration?: number;
-    specialRequirements?: string[];
-  };
 }
 
 export interface Task {

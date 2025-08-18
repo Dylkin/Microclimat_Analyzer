@@ -81,10 +81,10 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-semibold text-gray-900 truncate">
-                {project.title}
+                Картирование для {project.clientName}
               </h3>
               <p className="text-sm text-gray-500 truncate">
-                {project.clientName}
+                {project.qualificationObjects?.length || 0} объект(ов) квалификации
               </p>
             </div>
           </div>
@@ -94,9 +94,33 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
         </div>
 
         {/* Description */}
-        <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-          {project.description}
-        </p>
+        {project.description && (
+          <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+            {project.description}
+          </p>
+        )}
+
+        {/* Qualification Objects */}
+        {project.qualificationObjects && project.qualificationObjects.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 mb-2">Объекты квалификации:</p>
+            <div className="flex flex-wrap gap-1">
+              {project.qualificationObjects.slice(0, 3).map((obj, index) => (
+                <span 
+                  key={index}
+                  className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded"
+                >
+                  {obj.name || `${obj.type} #${index + 1}`}
+                </span>
+              ))}
+              {project.qualificationObjects.length > 3 && (
+                <span className="inline-flex px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
+                  +{project.qualificationObjects.length - 3}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Status and Priority */}
         <div className="flex items-center justify-between mb-4">
