@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, BarChart3, Users, Menu, X, HelpCircle } from 'lucide-react';
+import { LogOut, BarChart3, Users, Menu, X, HelpCircle, FolderOpen } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,6 +18,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       key: 'analyzer',
       icon: BarChart3,
       access: 'analyzer' as const
+    },
+    {
+      name: 'Управление проектами',
+      key: 'projects',
+      icon: FolderOpen,
+      access: 'projects' as const
     },
     {
       name: 'Справочник пользователей',

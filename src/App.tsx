@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ProjectProvider } from './contexts/ProjectContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
 import { UserManagement } from './components/UserManagement';
+import { ProjectManagement } from './components/ProjectManagement';
 import { Help } from './components/Help';
 import './index.css';
 
@@ -18,11 +20,13 @@ const AppContent: React.FC = () => {
     if (user.role === 'specialist' && !hasAccess('analyzer')) {
       setCurrentPage('analyzer');
     } else if (user.role === 'manager' && !hasAccess('analyzer')) {
-      setCurrentPage('users');
+      setCurrentPage('projects');
     } else if (!hasAccess(currentPage as 'analyzer' | 'users')) {
       // Если текущая страница недоступна, переключаемся на доступную
       if (hasAccess('analyzer')) {
         setCurrentPage('analyzer');
+      } else if (hasAccess('projects')) {
+        setCurrentPage('projects');
       } else if (hasAccess('users')) {
         setCurrentPage('users');
       }
@@ -42,6 +46,8 @@ const AppContent: React.FC = () => {
             onShowVisualization={setShowVisualization}
           />
         ) : <div>Доступ запрещен</div>;
+      case 'projects':
+        return hasAccess('projects') ? <ProjectManagement /> : <div>Доступ запрещен</div>;
       case 'users':
         return hasAccess('users') ? <UserManagement /> : <div>Доступ запрещен</div>;
       case 'help':
@@ -64,7 +70,9 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ProjectProvider>
+        <AppContent />
+      </ProjectProvider>
     </AuthProvider>
   );
 }
