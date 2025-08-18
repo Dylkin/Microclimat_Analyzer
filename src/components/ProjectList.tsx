@@ -124,13 +124,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
       setEditingStatus(null);
     } catch (error) {
       console.error('Ошибка изменения статуса:', error);
+    }
+  };
 
   const handleEditProject = (project: Project) => {
     setEditingProject(project);
   };
 
-    }
-  };
   return (
     <>
       <div className="bg-white rounded-lg shadow overflow-hidden">
