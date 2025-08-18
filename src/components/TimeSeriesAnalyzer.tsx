@@ -72,7 +72,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       );
     }
 
-    return files.map((file) => {
+    // Сортируем файлы по порядку (order) для соответствия таблице загрузки файлов
+    const sortedFiles = [...files].sort((a, b) => a.order - b.order);
+    
+    return sortedFiles.map((file) => {
       // Find data points for this file
       const filePoints = filteredPoints.filter(point => point.fileId === file.name);
       
