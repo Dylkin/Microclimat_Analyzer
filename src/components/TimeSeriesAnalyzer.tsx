@@ -436,6 +436,23 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
     duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // в минутах
 
+    // Форматируем длительность
+    let durationText: string;
+    if (duration >= 60) {
+      const hours = Math.floor(duration / 60);
+      const minutes = duration % 60;
+      if (minutes === 0) {
+        durationText = `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'}`;
+      } else {
+        const hoursText = hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов';
+        const minutesText = minutes === 1 ? 'минута' : minutes < 5 ? 'минуты' : 'минут';
+        durationText = `${hours} ${hoursText} ${minutes} ${minutesText}`;
+      }
+    } else {
+      const minutesText = duration === 1 ? 'минута' : duration < 5 ? 'минуты' : 'минут';
+      durationText = `${duration} ${minutesText}`;
+    }
+
     // Находим минимальное и максимальное значения (исключая внешние датчики)
     const nonExternalResults = analysisResults.filter(result => !result.isExternal);
     const validResults = nonExternalResults.filter(result => 
@@ -478,7 +495,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     // Формируем текст выводов
     const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU')}
 Завершение испытания: ${endTime.toLocaleString('ru-RU')}
-Длительность испытания: ${duration} минут
+Длительность испытания: ${durationText}
 Зафиксированное минимальное значение: ${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
 Зафиксированное максимальное значение: ${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.
 Результаты испытания ${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
