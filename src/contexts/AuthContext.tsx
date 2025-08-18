@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [users, setUsers] = useState<User[]>([defaultUser]);
 
   // Проверка доступа к страницам
-  const hasAccess = (page: 'analyzer' | 'projects' | 'users' | 'help'): boolean => {
+  const hasAccess = (page: 'analyzer' | 'projects' | 'users' | 'references' | 'help'): boolean => {
     if (!user) return false;
 
     switch (user.role) {
@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return page === 'analyzer' || page === 'help'; // К анализатору и справке
       case 'manager':
       case 'director':
-        return page === 'projects' || page === 'users' || page === 'help'; // К проектам, пользователям и справке
+        return page === 'projects' || page === 'users' || page === 'references' || page === 'help'; // К проектам, справочникам и справке
       default:
         return false;
     }
