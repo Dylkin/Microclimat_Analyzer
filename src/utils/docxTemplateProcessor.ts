@@ -202,6 +202,14 @@ export class DocxTemplateProcessor {
 
       // Заменяем плейсхолдер на XML изображения
       const updatedDocumentXml = this.replaceChartPlaceholder(documentXml, relationshipId);
+      
+      // Проверяем, что плейсхолдер был заменен
+      if (updatedDocumentXml.includes('{chart}')) {
+        console.warn('Плейсхолдер {chart} не был полностью заменен');
+      } else {
+        console.log('Плейсхолдер {chart} успешно заменен на XML изображения');
+      }
+      
       zip.file('word/document.xml', updatedDocumentXml);
 
       // Обрабатываем другие плейсхолдеры
@@ -395,6 +403,11 @@ export class DocxTemplateProcessor {
       relsXml = zip.files[relsPath].asText();
     } else {
       // Создаем базовый файл связей
+      // Создаем папку _rels если её нет
+      if (!zip.files['word/_rels/']) {
+        zip.folder('word/_rels');
+      }
+      
       relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 </Relationships>`;
@@ -407,56 +420,69 @@ export class DocxTemplateProcessor {
     relsXml = relsXml.replace('</Relationships>', `  ${imageRelationship}\n</Relationships>`);
     
     zip.file(relsPath, relsXml);
-    console.log('Обновлен файл связей:', relsPath);
+    console.log('Обновлен файл связей:', relsPath, 'с ID:', relationshipId);
   }
 
   /**
    * Замена плейсхолдера {chart} на XML изображения
    */
   private replaceChartPlaceholder(documentXml: string, relationshipId: string): string {
-    // XML структура для вставки изображения
+    // Более простая и надежная XML структура для вставки изображения
     const imageXml = `<w:p>
-      <w:r>
-        <w:drawing>
-          <wp:inline distT="0" distB="0" distL="0" distR="0">
-            <wp:extent cx="5715000" cy="7620000"/>
-            <wp:effectExtent l="0" t="0" r="0" b="0"/>
-            <wp:docPr id="1" name="Chart"/>
-            <wp:cNvGraphicFramePr>
-              <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
-            </wp:cNvGraphicFramePr>
-            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                  <pic:nvPicPr>
-                    <pic:cNvPr id="1" name="Chart"/>
-                    <pic:cNvPicPr/>
-                  </pic:nvPicPr>
-                  <pic:blipFill>
-                    <a:blip r:embed="${relationshipId}"/>
-                    <a:stretch>
-                      <a:fillRect/>
-                    </a:stretch>
-                  </pic:blipFill>
-                  <pic:spPr>
-                    <a:xfrm>
-                      <a:off x="0" y="0"/>
-                      <a:ext cx="5715000" cy="7620000"/>
-                    </a:xfrm>
-                    <a:prstGeom prst="rect">
-                      <a:avLst/>
-                    </a:prstGeom>
-                  </pic:spPr>
-                </pic:pic>
-              </a:graphicData>
-            </a:graphic>
-          </wp:inline>
-        </w:drawing>
-      </w:r>
-    </w:p>`;
+  <w:pPr>
+    <w:jc w:val="center"/>
+  </w:pPr>
+  <w:r>
+    <w:drawing>
+      <wp:inline distT="0" distB="0" distL="0" distR="0" 
+                 xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+        <wp:extent cx="5715000" cy="7620000"/>
+        <wp:effectExtent l="0" t="0" r="0" b="0"/>
+        <wp:docPr id="1" name="Chart" descr="Chart Image"/>
+        <wp:cNvGraphicFramePr>
+          <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+        </wp:cNvGraphicFramePr>
+        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+            <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+              <pic:nvPicPr>
+                <pic:cNvPr id="0" name="Chart"/>
+                <pic:cNvPicPr/>
+              </pic:nvPicPr>
+              <pic:blipFill>
+                <a:blip r:embed="${relationshipId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+                <a:stretch>
+                  <a:fillRect/>
+                </a:stretch>
+              </pic:blipFill>
+              <pic:spPr>
+                <a:xfrm>
+                  <a:off x="0" y="0"/>
+                  <a:ext cx="5715000" cy="7620000"/>
+                </a:xfrm>
+                <a:prstGeom prst="rect">
+                  <a:avLst/>
+                </a:prstGeom>
+              </pic:spPr>
+            </pic:pic>
+          </a:graphicData>
+        </a:graphic>
+      </wp:inline>
+    </w:drawing>
+  </w:r>
+</w:p>`;
 
+    // Более надежная замена плейсхолдера с учетом возможных разрывов в XML
+    let result = documentXml;
+    
+    // Сначала нормализуем возможные разбитые плейсхолдеры
+    result = this.normalizePlaceholders(result);
+    
     // Заменяем плейсхолдер на XML изображения
-    return documentXml.replace(/{chart}/g, imageXml);
+    result = result.replace(/{chart}/g, imageXml);
+    
+    console.log('Плейсхолдер {chart} заменен на XML изображения');
+    return result;
   }
 
   /**
@@ -573,18 +599,21 @@ export class DocxTemplateProcessor {
     let result = xml;
     
     placeholders.forEach(placeholder => {
-      // Регулярное выражение для поиска разбитых плейсхолдеров
-      // Ищем {, затем любые XML теги, затем части плейсхолдера, затем }
-      const regex = new RegExp(
+      // Более простой подход - ищем разбитые плейсхолдеры
+      const simpleRegex = new RegExp(`\\{[^}]*${placeholder}[^}]*\\}`, 'gi');
+      result = result.replace(simpleRegex, `{${placeholder}}`);
+      
+      // Также обрабатываем случаи с XML тегами внутри плейсхолдера
+      const complexRegex = new RegExp(
         `\\{(?:<[^>]*>)*${placeholder.split('').map(char => 
           `${char}(?:<[^>]*>)*`
         ).join('')}(?:<[^>]*>)*\\}`,
         'gi'
       );
-      
-      result = result.replace(regex, `{${placeholder}}`);
+      result = result.replace(complexRegex, `{${placeholder}}`);
     });
     
+    console.log('Нормализация плейсхолдеров завершена');
     return result;
   }
 
