@@ -12,7 +12,6 @@ import {
   BarChart3,
   Filter,
   Search,
-  Grid,
   List
 } from 'lucide-react';
 import { ProjectCard } from './ProjectCard';
@@ -21,7 +20,7 @@ import { ProjectKanban } from './ProjectKanban';
 import { ProjectList } from './ProjectList';
 import { ProjectDashboard } from './ProjectDashboard';
 
-type ViewMode = 'dashboard' | 'grid' | 'list' | 'kanban';
+type ViewMode = 'dashboard' | 'list' | 'kanban';
 
 export const ProjectManagement: React.FC = () => {
   const { user, hasAccess } = useAuth();
@@ -57,10 +56,9 @@ export const ProjectManagement: React.FC = () => {
   const getViewModeIcon = (mode: ViewMode) => {
     switch (mode) {
       case 'dashboard': return BarChart3;
-      case 'grid': return Grid;
       case 'list': return List;
       case 'kanban': return FolderOpen;
-      default: return Grid;
+      default: return List;
     }
   };
 
@@ -68,14 +66,6 @@ export const ProjectManagement: React.FC = () => {
     switch (viewMode) {
       case 'dashboard':
         return <ProjectDashboard projects={filteredProjects} />;
-      case 'grid':
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProjects.map(project => (
-              <ProjectCard key={project.id} project={project} />
-            ))}
-          </div>
-        );
       case 'list':
         return <ProjectList projects={filteredProjects} />;
       case 'kanban':
@@ -219,7 +209,7 @@ export const ProjectManagement: React.FC = () => {
 
             {/* View Mode Selector */}
             <div className="flex items-center bg-gray-100 rounded-lg p-1">
-              {(['dashboard', 'grid', 'list', 'kanban'] as ViewMode[]).map((mode) => {
+              {(['dashboard', 'list', 'kanban'] as ViewMode[]).map((mode) => {
                 const Icon = getViewModeIcon(mode);
                 return (
                   <button
