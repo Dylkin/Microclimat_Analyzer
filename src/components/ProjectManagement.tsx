@@ -85,15 +85,6 @@ export const ProjectManagement: React.FC = () => {
     }
   };
 
-  if (!hasAccess('analyzer')) {
-    return (
-      <div className="text-center py-8">
-        <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Доступ ограничен</h3>
-        <p className="text-gray-600">У вас нет прав для просмотра проектов</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -104,7 +95,7 @@ export const ProjectManagement: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Управление проектами</h1>
         </div>
         
-        {(user?.role === 'administrator' || user?.role === 'manager') && (
+        {user && (
           <button
             onClick={() => setShowCreateModal(true)}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
@@ -262,7 +253,7 @@ export const ProjectManagement: React.FC = () => {
                 : 'Создайте первый проект для начала работы'
               }
             </p>
-            {(user?.role === 'administrator' || user?.role === 'manager') && (
+            {user && (
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"

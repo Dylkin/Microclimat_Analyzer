@@ -47,7 +47,7 @@ const AppContent: React.FC = () => {
           />
         ) : <div>Доступ запрещен</div>;
       case 'projects':
-        return hasAccess('projects') ? <ProjectManagement /> : <div>Доступ запрещен</div>;
+        return <ProjectManagement />;
       case 'references':
         return hasAccess('users') ? <ReferenceBooks /> : <div>Доступ запрещен</div>;
       case 'help':
