@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Project } from '../types/Project';
 import { useProjects } from '../contexts/ProjectContext';
+import { EditProjectModal } from './EditProjectModal';
 import { 
   Calendar, 
   User, 
@@ -12,7 +13,8 @@ import {
   CheckCircle,
   Clock,
   DollarSign,
-  Edit3
+  Edit3,
+  Edit
 } from 'lucide-react';
 
 interface ProjectListProps {
@@ -24,6 +26,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
   const [sortField, setSortField] = useState<keyof Project>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   const statusOptions = [
     { value: 'draft', label: 'Черновик', color: 'bg-gray-100 text-gray-800' },
@@ -121,10 +124,16 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
       setEditingStatus(null);
     } catch (error) {
       console.error('Ошибка изменения статуса:', error);
+
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project);
+  };
+
     }
   };
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <>
+      <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -301,7 +310,16 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
                   
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button className="text-gray-400 hover:text-gray-600">
-                      <MoreHorizontal className="w-5 h-5" />
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleEditProject(project)}
+                          className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                          title="Редактировать проект"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <MoreHorizontal className="w-5 h-5" />
+                      </div>
                     </button>
                   </td>
                 </tr>
@@ -319,5 +337,14 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
         </div>
       )}
     </div>
+
+      {/* Edit Modal */}
+      {editingProject && (
+        <EditProjectModal
+          project={editingProject}
+          onClose={() => setEditingProject(null)}
+        />
+      )}
+    </>
   );
 };

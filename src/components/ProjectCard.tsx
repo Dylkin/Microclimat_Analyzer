@@ -1,6 +1,7 @@
 import React from 'react';
 import { Project } from '../types/Project';
 import { useProjects } from '../contexts/ProjectContext';
+import { EditProjectModal } from './EditProjectModal';
 import { 
   Calendar, 
   User, 
@@ -11,7 +12,8 @@ import {
   MapPin,
   Thermometer,
   FileText,
-  Edit3
+  Edit3,
+  Edit
 } from 'lucide-react';
 
 interface ProjectCardProps {
@@ -22,6 +24,7 @@ interface ProjectCardProps {
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
   const { updateProject } = useProjects();
   const [showStatusMenu, setShowStatusMenu] = React.useState(false);
+  const [showEditModal, setShowEditModal] = React.useState(false);
 
   const statusOptions = [
     { value: 'draft', label: 'Черновик', color: 'bg-gray-100 text-gray-800' },
@@ -95,8 +98,15 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
     e.stopPropagation();
     setShowStatusMenu(!showStatusMenu);
   };
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowEditModal(true);
+  };
+
   return (
-    <div className="relative">
+    <>
+      <div className="relative">
       <div 
         className="bg-white rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
         onClick={onClick}
@@ -118,7 +128,16 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
             </div>
           </div>
           <button className="text-gray-400 hover:text-gray-600">
-            <MoreHorizontal className="w-5 h-5" />
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={handleEditClick}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                title="Редактировать проект"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+              <MoreHorizontal className="w-5 h-5" />
+            </div>
           </button>
         </div>
 
@@ -261,5 +280,14 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
         </>
       )}
     </div>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <EditProjectModal
+          project={project}
+          onClose={() => setShowEditModal(false)}
+        />
+      )}
+    </>
   );
 };

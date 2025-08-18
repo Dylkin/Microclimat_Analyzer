@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Project } from '../types/Project';
 import { useProjects } from '../contexts/ProjectContext';
 import { ProjectCard } from './ProjectCard';
-import { Plus, MoreHorizontal } from 'lucide-react';
+import { EditProjectModal } from './EditProjectModal';
+import { Plus, MoreHorizontal, Edit } from 'lucide-react';
 
 interface ProjectKanbanProps {
   projects: Project[];
@@ -18,6 +19,7 @@ interface KanbanColumn {
 export const ProjectKanban: React.FC<ProjectKanbanProps> = ({ projects }) => {
   const { updateProject } = useProjects();
   const [draggedProject, setDraggedProject] = useState<Project | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   const columns: KanbanColumn[] = [
     {
@@ -80,8 +82,13 @@ export const ProjectKanban: React.FC<ProjectKanbanProps> = ({ projects }) => {
     setDraggedProject(null);
   };
 
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project);
+  };
+
   return (
-    <div className="flex space-x-6 overflow-x-auto pb-6">
+    <>
+      <div className="flex space-x-6 overflow-x-auto pb-6">
       {columns.map((column) => {
         const columnProjects = getProjectsByColumn(column.status);
         
@@ -102,7 +109,16 @@ export const ProjectKanban: React.FC<ProjectKanbanProps> = ({ projects }) => {
                   </span>
                 </div>
                 <button className="text-gray-500 hover:text-gray-700">
-                  <MoreHorizontal className="w-4 h-4" />
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => handleEditProject(columnProjects[0])}
+                      className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                      title="Редактировать проект"
+                    >
+                      <Edit className="w-3 h-3" />
+                    </button>
+                    <MoreHorizontal className="w-4 h-4" />
+                  </div>
                 </button>
               </div>
             </div>
@@ -142,5 +158,14 @@ export const ProjectKanban: React.FC<ProjectKanbanProps> = ({ projects }) => {
         );
       })}
     </div>
+
+      {/* Edit Modal */}
+      {editingProject && (
+        <EditProjectModal
+          project={editingProject}
+          onClose={() => setEditingProject(null)}
+        />
+      )}
+    </>
   );
 };
