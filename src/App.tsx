@@ -5,6 +5,7 @@ import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
 import { References } from './components/References';
+import { References } from './components/References';
 import { ProjectManagement } from './components/ProjectManagement';
 import { Help } from './components/Help';
 import './index.css';
@@ -48,6 +49,8 @@ const AppContent: React.FC = () => {
         ) : <div>Доступ запрещен</div>;
       case 'projects':
         return hasAccess('projects') ? <ProjectManagement /> : <div>Доступ запрещен</div>;
+      case 'references':
+        return hasAccess('references') ? <References /> : <div>Доступ запрещен</div>;
       case 'references':
         return hasAccess('references') ? <References /> : <div>Доступ запрещен</div>;
       case 'help':
