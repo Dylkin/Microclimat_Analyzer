@@ -423,11 +423,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Helper functions
-  const getTaskTitle = (type: string): string => {
+  const getTaskTitle = (type: string, clientName?: string): string => {
     const titles: Record<string, string> = {
-      contract_preparation: 'Подготовка договора',
-      quote_creation: 'Создание коммерческого предложения',
-      contract_signing: 'Подписание договора',
+      contract_preparation: `Подготовка договора${clientName ? ` с ${clientName}` : ''}`,
+      quote_creation: `Создание КП${clientName ? ` для ${clientName}` : ''}`,
+      contract_signing: `Подписание договора${clientName ? ` с ${clientName}` : ''}`,
       payment_control: 'Контроль оплаты',
       logger_placement: 'Расстановка логгеров',
       video_recording: 'Видеофиксация',

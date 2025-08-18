@@ -182,9 +182,16 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
                         <TypeIcon className="w-5 h-5 text-indigo-600" />
                       </div>
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">{project.title}</div>
-                        <div className="text-sm text-gray-500 truncate max-w-xs">
-                          {project.description}
+                        <div className="text-sm font-medium text-gray-900">
+                          Картирование для {project.clientName}
+                        </div>
+                        {project.description && (
+                          <div className="text-sm text-gray-500 truncate max-w-xs">
+                            {project.description}
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-400">
+                          {project.qualificationObjects?.length || 0} объект(ов)
                         </div>
                       </div>
                     </div>
