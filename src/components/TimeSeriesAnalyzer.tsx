@@ -133,7 +133,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       // Check if meets limits
       let meetsLimits = 'Да';
-      if (limits.temperature && temperatures.length > 0) {
+      // Для внешних датчиков не проверяем соответствие лимитам
+      if (file.zoneNumber === 999) {
+        meetsLimits = '-';
+      } else if (limits.temperature && temperatures.length > 0) {
         const min = Math.min(...temperatures);
         const max = Math.max(...temperatures);
         
