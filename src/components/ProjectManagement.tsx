@@ -24,7 +24,7 @@ type ViewMode = 'dashboard' | 'list' | 'kanban';
 
 export const ProjectManagement: React.FC = () => {
   const { user, hasAccess } = useAuth();
-  const { projects, getProjectsByUser, getOverdueTasks, getUnreadNotificationsCount } = useProjects();
+  const { projects } = useProjects();
   
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -43,15 +43,6 @@ export const ProjectManagement: React.FC = () => {
     
     return matchesSearch && matchesStatus && matchesPriority;
   });
-
-  // Статистика
-  const stats = {
-    total: projects.length,
-    active: projects.filter(p => ['preparation', 'testing', 'reporting'].includes(p.status)).length,
-    completed: projects.filter(p => p.status === 'completed').length,
-    overdue: getOverdueTasks().length,
-    notifications: getUnreadNotificationsCount()
-  };
 
   const getViewModeIcon = (mode: ViewMode) => {
     switch (mode) {
@@ -94,69 +85,6 @@ export const ProjectManagement: React.FC = () => {
             <span>Создать проект</span>
           </button>
         )}
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <FolderOpen className="w-8 h-8 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Всего проектов</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.total}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Clock className="w-8 h-8 text-yellow-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Активные</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.active}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Завершенные</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.completed}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <AlertTriangle className="w-8 h-8 text-red-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Просроченные</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.overdue}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Users className="w-8 h-8 text-purple-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Уведомления</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.notifications}</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Controls */}
