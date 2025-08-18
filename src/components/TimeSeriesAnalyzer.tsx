@@ -568,7 +568,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       {/* Settings Panel */}
       <div className="bg-white rounded-lg shadow p-6 space-y-6">
-        <h3 className="text-lg font-semibold text-gray-900">Настройки анализа</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Информация об объекте</h3>
         
         {/* Data Type Selection */}
         <div>
@@ -645,7 +645,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
         )}
 
-        {/* Contract Information */}
+        {/* Contract Information - moved test type to markers section */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Информация о договоре</label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -689,23 +689,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               />
             </div>
           </div>
-          
-          {/* Test Type Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Тип испытания</label>
-            <select
-              value={contractFields.testType}
-              onChange={(e) => handleContractFieldChange('testType', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="">Выберите тип испытания</option>
-              <option value="empty_volume">Испытание на соответствие критериям в пустом объеме</option>
-              <option value="loaded_volume">Испытание на соответствие критериям в загруженном объеме</option>
-              <option value="temperature_recovery">Испытание по восстановлению температуры после открытия двери</option>
-              <option value="power_off">Испытание на отключение электропитания</option>
-              <option value="power_on">Испытание на включение электропитания</option>
-            </select>
-          </div>
         </div>
       </div>
 
@@ -732,61 +715,87 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         />
       </div>
 
-      {/* Markers */}
-      {markers.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Маркеры</h3>
-          <div className="space-y-2">
-            {markers.map((marker) => (
-              <div key={marker.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div
-                    className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: marker.color }}
-                  ></div>
-                  {editingMarker === marker.id ? (
-                    <input
-                      type="text"
-                      value={marker.label}
-                      onChange={(e) => setMarkers(prev => 
-                        prev.map(m => m.id === marker.id ? { ...m, label: e.target.value } : m)
-                      )}
-                      onBlur={() => setEditingMarker(null)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          setEditingMarker(null);
-                        }
-                      }}
-                      className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      autoFocus
-                    />
-                  ) : (
-                    <span className="font-medium">{marker.label}</span>
-                  )}
-                  <span className="text-sm text-gray-500">
-                    {new Date(marker.timestamp).toLocaleString('ru-RU')}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setEditingMarker(marker.id)}
-                    className="text-indigo-600 hover:text-indigo-800 transition-colors"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteMarker(marker.id)}
-                    className="text-red-600 hover:text-red-800 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Test Information and Markers - always visible */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Испытания</h3>
+        
+        {/* Test Type Selection */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Тип испытания</label>
+          <select
+            value={contractFields.testType}
+            onChange={(e) => handleContractFieldChange('testType', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option value="">Выберите тип испытания</option>
+            <option value="empty_volume">Испытание на соответствие критериям в пустом объеме</option>
+            <option value="loaded_volume">Испытание на соответствие критериям в загруженном объеме</option>
+            <option value="temperature_recovery">Испытание по восстановлению температуры после открытия двери</option>
+            <option value="power_off">Испытание на отключение электропитания</option>
+            <option value="power_on">Испытание на включение электропитания</option>
+          </select>
         </div>
-      )}
 
+        {/* Markers section */}
+        <div>
+          <h4 className="text-md font-medium text-gray-900 mb-3">Маркеры времени</h4>
+          {markers.length > 0 ? (
+            <div className="space-y-2">
+              {markers.map((marker) => (
+                <div key={marker.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className="w-4 h-4 rounded-full"
+                      style={{ backgroundColor: marker.color }}
+                    ></div>
+                    {editingMarker === marker.id ? (
+                      <input
+                        type="text"
+                        value={marker.label}
+                        onChange={(e) => setMarkers(prev => 
+                          prev.map(m => m.id === marker.id ? { ...m, label: e.target.value } : m)
+                        )}
+                        onBlur={() => setEditingMarker(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            setEditingMarker(null);
+                          }
+                        }}
+                        className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="font-medium">{marker.label}</span>
+                    )}
+                    <span className="text-sm text-gray-500">
+                      {new Date(marker.timestamp).toLocaleString('ru-RU')}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setEditingMarker(marker.id)}
+                      className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteMarker(marker.id)}
+                      className="text-red-600 hover:text-red-800 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+              <p className="text-sm">Маркеры не добавлены</p>
+              <p className="text-xs mt-1">Сделайте двойной клик по графику для добавления маркера</p>
+            </div>
+          )}
+        </div>
+      </div>
       {/* Analysis Results Table */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
