@@ -185,7 +185,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (template) {
       const initialTasks = template.stages[0].tasks.map(taskType => ({
         projectId: newProject.id,
-        title: getTaskTitle(taskType),
+        title: getTaskTitle(taskType, newProject.clientName),
         description: getTaskDescription(taskType),
         type: taskType,
         status: 'pending' as const,
@@ -207,7 +207,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       userId: user?.id || '',
       userName: user?.fullName || '',
       action: 'project_created',
-      description: `Создан проект "${newProject.title}"`
+      description: `Создан проект "Картирование для ${newProject.clientName}"`
     });
 
     return newProject;

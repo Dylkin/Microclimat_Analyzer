@@ -109,19 +109,10 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
             <tr>
               <th 
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('title')}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Проект</span>
-                  <span className="text-gray-400">{getSortIcon('title')}</span>
-                </div>
-              </th>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('clientName')}
               >
                 <div className="flex items-center space-x-1">
-                  <span>Заказчик</span>
+                  <span>Проект</span>
                   <span className="text-gray-400">{getSortIcon('clientName')}</span>
                 </div>
               </th>
@@ -185,7 +176,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
                         <div className="text-sm font-medium text-gray-900">
                           Картирование для {project.clientName}
                         </div>
-                        {project.description && (
+                        {project.description && project.description.trim() && (
                           <div className="text-sm text-gray-500 truncate max-w-xs">
                             {project.description}
                           </div>
@@ -194,13 +185,6 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
                           {project.qualificationObjects?.length || 0} объект(ов)
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <User className="w-4 h-4 text-gray-400 mr-2" />
-                      <div className="text-sm text-gray-900">{project.clientName}</div>
                     </div>
                   </td>
                   

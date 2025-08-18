@@ -35,8 +35,8 @@ export const ProjectManagement: React.FC = () => {
 
   // Фильтрация проектов
   const filteredProjects = projects.filter(project => {
-    const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = project.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (project.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          project.clientName.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter;

@@ -358,7 +358,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects }) 
                   <tr key={project.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{project.title}</div>
+                        <div className="text-sm font-medium text-gray-900">Картирование для {project.clientName}</div>
                         <div className="text-sm text-gray-500">{getTypeText(project.type)}</div>
                       </div>
                     </td>
