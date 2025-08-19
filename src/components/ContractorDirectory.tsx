@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
 import { contractorService } from '../utils/contractorService';
 import { ContractorMap } from './ContractorMap';
 
 export const ContractorDirectory: React.FC = () => {
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [filteredContractors, setFilteredContractors] = useState<Contractor[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [operationLoading, setOperationLoading] = useState(false);
@@ -41,6 +43,7 @@ export const ContractorDirectory: React.FC = () => {
     try {
       const data = await contractorService.getAllContractors();
       setContractors(data);
+      setFilteredContractors(data);
       console.log('Контрагенты загружены:', data.length);
     } catch (error) {
       console.error('Ошибка загрузки контрагентов:', error);
@@ -54,6 +57,38 @@ export const ContractorDirectory: React.FC = () => {
     loadContractors();
   }, []);
 
+  // Поиск по контрагентам
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredContractors(contractors);
+      return;
+    }
+
+    const filtered = contractors.filter(contractor => {
+      const searchLower = searchTerm.toLowerCase();
+      
+      // Поиск по наименованию
+      if (contractor.name.toLowerCase().includes(searchLower)) {
+        return true;
+      }
+      
+      // Поиск по адресу
+      if (contractor.address && contractor.address.toLowerCase().includes(searchLower)) {
+        return true;
+      }
+      
+      // Поиск по контактам
+      return contractor.contacts.some(contact => {
+        return (
+          contact.employeeName.toLowerCase().includes(searchLower) ||
+          (contact.phone && contact.phone.toLowerCase().includes(searchLower)) ||
+          (contact.comment && contact.comment.toLowerCase().includes(searchLower))
+        );
+      });
+    });
+
+    setFilteredContractors(filtered);
+  }, [searchTerm, contractors]);
   // Добавление контрагента
   const handleAddContractor = async () => {
     if (!newContractor.name.trim()) {
@@ -225,6 +260,24 @@ export const ContractorDirectory: React.FC = () => {
         </button>
       </div>
 
+      {/* Search */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Поиск по наименованию, адресу, сотрудникам, телефонам..."
+          />
+        </div>
+        {searchTerm && (
+          <div className="mt-2 text-sm text-gray-600">
+            Найдено: {filteredContractors.length} из {contractors.length} контрагентов
+          </div>
+        )}
+      </div>
       {/* Add Contractor Form */}
       {showAddForm && (
         <div className="bg-white rounded-lg shadow p-6">
@@ -379,7 +432,7 @@ export const ContractorDirectory: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {contractors.map((contractor) => (
+              {filteredContractors.map((contractor) => (
                 <tr key={contractor.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingContractor === contractor.id ? (
@@ -510,42 +563,22 @@ export const ContractorDirectory: React.FC = () => {
           </table>
         </div>
 
-        {contractors.length === 0 && !loading && (
+        {filteredContractors.length === 0 && !loading && (
           <div className="text-center py-8 text-gray-500">
             <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>Контрагенты не найдены</p>
-            <p className="text-sm">Нажмите кнопку "Добавить контрагента" для создания первой записи</p>
+            {searchTerm ? (
+              <>
+                <p>По запросу "{searchTerm}" ничего не найдено</p>
+                <p className="text-sm">Попробуйте изменить поисковый запрос</p>
+              </>
+            ) : (
+              <>
+                <p>Контрагенты не найдены</p>
+                <p className="text-sm">Нажмите кнопку "Добавить контрагента" для создания первой записи</p>
+              </>
+            )}
           </div>
         )}
-      </div>
-
-      {/* Statistics */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Статистика</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-indigo-600">{contractors.length}</div>
-            <div className="text-sm text-gray-500">Всего контрагентов</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {contractors.filter(c => c.latitude && c.longitude).length}
-            </div>
-            <div className="text-sm text-gray-500">С координатами</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">
-              {contractors.reduce((sum, c) => sum + c.contacts.length, 0)}
-            </div>
-            <div className="text-sm text-gray-500">Всего контактов</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">
-              {contractors.filter(c => c.contacts.length > 0).length}
-            </div>
-            <div className="text-sm text-gray-500">С контактами</div>
-          </div>
-        </div>
       </div>
     </div>
   );
