@@ -546,8 +546,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     const uniqueQualificationIds = [...new Set(filesWithQualification.map(f => f.qualificationObjectId))];
     
     if (uniqueQualificationIds.length === 1) {
-      // Здесь нужно получить название объекта квалификации
-      // Пока возвращаем ID, в будущем можно добавить загрузку данных объекта
+      // Получаем название объекта квалификации из данных файла
+      const fileWithObject = filesWithQualification[0];
+      if (fileWithObject.parsedData?.qualificationObjectName) {
+        return fileWithObject.parsedData.qualificationObjectName;
+      }
+      
+      // Если название не сохранено в parsedData, возвращаем ID
       return `Объект квалификации (ID: ${uniqueQualificationIds[0]?.substring(0, 8)}...)`;
     } else {
       return `Несколько объектов (${uniqueQualificationIds.length})`;

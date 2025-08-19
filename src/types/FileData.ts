@@ -39,4 +39,6 @@ export interface UploadedFile {
   order: number;
   contractorId?: string;
   qualificationObjectId?: string;
+  qualificationObjectName?: string;
+  contractorName?: string;
 }

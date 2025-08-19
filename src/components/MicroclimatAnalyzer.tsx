@@ -133,7 +133,9 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         parsingStatus: 'processing' as const,
         order: uploadedFiles.length + index,
         contractorId: selectedContractor || undefined,
-        qualificationObjectId: selectedQualificationObject || undefined
+        qualificationObjectId: selectedQualificationObject || undefined,
+        qualificationObjectName: selectedQualificationObject ? getQualificationObjectName(selectedQualificationObject) : undefined,
+        contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
       };
     }).filter(Boolean) as UploadedFile[];
 
