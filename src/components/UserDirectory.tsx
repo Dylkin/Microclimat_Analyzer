@@ -4,12 +4,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { User, UserRole } from '../types/User';
 
 export const UserDirectory: React.FC = () => {
-  const { users, addUser, updateUser, deleteUser, resetPassword, user: currentUser } = useAuth();
+  const { users, addUser, updateUser, deleteUser, resetPassword, user: currentUser, loading, error } = useAuth();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [showPasswords, setShowPasswords] = useState<{ [key: string]: boolean }>({});
   const [resetPasswordUser, setResetPasswordUser] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [operationLoading, setOperationLoading] = useState(false);
 
   const [newUser, setNewUser] = useState({
     fullName: '',
@@ -31,7 +32,7 @@ export const UserDirectory: React.FC = () => {
     director: 'Менеджер'
   };
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!newUser.fullName || !newUser.email || !newUser.password) {
       alert('Заполните все поля');
       return;
@@ -43,7 +44,17 @@ export const UserDirectory: React.FC = () => {
       return;
     }
 
-    addUser(newUser);
+    setOperationLoading(true);
+    try {
+      await addUser(newUser);
+      alert('Пользователь успешно добавлен');
+    } catch (error) {
+      alert(`Ошибка добавления пользователя: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      setOperationLoading(false);
+      return;
+    }
+    setOperationLoading(false);
+
     setNewUser({
       fullName: '',
       email: '',
@@ -62,7 +73,7 @@ export const UserDirectory: React.FC = () => {
     setEditingUser(user.id);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editUser.fullName || !editUser.email) {
       alert('Заполните все поля');
       return;
@@ -74,11 +85,20 @@ export const UserDirectory: React.FC = () => {
       return;
     }
 
-    updateUser(editingUser!, editUser);
+    setOperationLoading(true);
+    try {
+      await updateUser(editingUser!, editUser);
+      alert('Пользователь успешно обновлен');
+    } catch (error) {
+      alert(`Ошибка обновления пользователя: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      setOperationLoading(false);
+      return;
+    }
     setEditingUser(null);
+    setOperationLoading(false);
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     const user = users.find(u => u.id === userId);
     if (user?.isDefault) {
       alert('Нельзя удалить пользователя по умолчанию');
@@ -91,23 +111,37 @@ export const UserDirectory: React.FC = () => {
     }
 
     if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-      deleteUser(userId);
+      setOperationLoading(true);
+      try {
+        await deleteUser(userId);
+        alert('Пользователь успешно удален');
+      } catch (error) {
+        alert(`Ошибка удаления пользователя: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      }
+      setOperationLoading(false);
     }
   };
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     if (!newPassword || newPassword.length < 6) {
       alert('Пароль должен содержать минимум 6 символов');
       return;
     }
 
-    if (resetPassword(resetPasswordUser!, newPassword)) {
-      alert('Пароль успешно изменен');
-      setResetPasswordUser(null);
-      setNewPassword('');
-    } else {
-      alert('Ошибка изменения пароля');
+    setOperationLoading(true);
+    try {
+      const success = await resetPassword(resetPasswordUser!, newPassword);
+      if (success) {
+        alert('Пароль успешно изменен');
+        setResetPasswordUser(null);
+        setNewPassword('');
+      } else {
+        alert('Ошибка изменения пароля');
+      }
+    } catch (error) {
+      alert(`Ошибка изменения пароля: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
+    setOperationLoading(false);
   };
 
   const togglePasswordVisibility = (userId: string) => {
@@ -128,6 +162,33 @@ export const UserDirectory: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Индикатор загрузки */}
+      {loading && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            <span className="text-blue-700">Загрузка пользователей из базы данных...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Ошибка подключения */}
+      {error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start space-x-2">
+            <div className="text-yellow-600">⚠️</div>
+            <div>
+              <h3 className="text-sm font-medium text-yellow-800">
+                Проблема с подключением к базе данных
+              </h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                {error}. Используются локальные данные.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
@@ -231,9 +292,10 @@ export const UserDirectory: React.FC = () => {
             </button>
             <button
               onClick={handleAddUser}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              disabled={operationLoading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              Добавить
+              {operationLoading ? 'Добавление...' : 'Добавить'}
             </button>
           </div>
         </div>
@@ -348,6 +410,7 @@ export const UserDirectory: React.FC = () => {
                       <div className="flex justify-end space-x-2">
                         <button
                           onClick={handleSaveEdit}
+                        disabled={operationLoading}
                           className="text-green-600 hover:text-green-900"
                           title="Сохранить"
                         >
@@ -365,6 +428,7 @@ export const UserDirectory: React.FC = () => {
                       <div className="flex justify-end space-x-2">
                         <button
                           onClick={() => handleEditUser(user)}
+                        disabled={operationLoading}
                           className="text-indigo-600 hover:text-indigo-900"
                           title="Редактировать"
                         >
@@ -373,6 +437,7 @@ export const UserDirectory: React.FC = () => {
                         {!user.isDefault && user.id !== currentUser?.id && (
                           <button
                             onClick={() => handleDeleteUser(user.id)}
+                          disabled={operationLoading}
                             className="text-red-600 hover:text-red-900"
                             title="Удалить"
                           >
@@ -420,9 +485,10 @@ export const UserDirectory: React.FC = () => {
               </button>
               <button
                 onClick={handleResetPassword}
+                disabled={operationLoading}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
-                Сбросить пароль
+                {operationLoading ? 'Сброс...' : 'Сбросить пароль'}
               </button>
             </div>
           </div>
