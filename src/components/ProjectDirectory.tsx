@@ -108,11 +108,25 @@ export const ProjectDirectory: React.FC = () => {
 
   // Добавление проекта
   const handleAddProject = async () => {
-    console.log('Создание проекта с данными:', newProject);
-    console.log('Выбранный контрагент ID:', newProject.contractorId);
+    console.log('=== ОТЛАДКА СОЗДАНИЯ ПРОЕКТА ===');
+    console.log('Данные нового проекта:', newProject);
+    console.log('ID контрагента:', newProject.contractorId);
+    console.log('Тип ID контрагента:', typeof newProject.contractorId);
     
-    console.log('Создание проекта с данными:', newProject);
-    console.log('Выбранный контрагент ID:', newProject.contractorId);
+    // Находим выбранного контрагента в списке
+    const selectedContractor = contractors.find(c => c.id === newProject.contractorId);
+    console.log('Найденный контрагент:', selectedContractor);
+    
+    if (selectedContractor) {
+      console.log('ID найденного контрагента:', selectedContractor.id);
+      console.log('Тип ID найденного контрагента:', typeof selectedContractor.id);
+    }
+    
+    // Проверяем все контрагенты на корректность UUID
+    console.log('Все контрагенты:');
+    contractors.forEach((contractor, index) => {
+      console.log(`${index + 1}. ID: "${contractor.id}" (тип: ${typeof contractor.id}), Название: "${contractor.name}"`);
+    });
     
     if (!newProject.contractorId) {
       alert('Выберите контрагента');
@@ -121,6 +135,14 @@ export const ProjectDirectory: React.FC = () => {
 
     if (newProject.qualificationObjectIds.length === 0) {
       alert('Выберите хотя бы один объект квалификации');
+      return;
+    }
+
+    // Проверяем, что contractorId является валидным UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(newProject.contractorId)) {
+      console.error('Некорректный UUID контрагента:', newProject.contractorId);
+      alert('Ошибка: некорректный ID контрагента. Обновите страницу и попробуйте снова.');
       return;
     }
 
