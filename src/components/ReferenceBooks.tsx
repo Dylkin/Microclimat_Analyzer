@@ -174,13 +174,13 @@ export const ReferenceBooks: React.FC = () => {
   // Обработчики для заказчиков
   const handleAddClient = async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
+      setError(''); // Очищаем предыдущие ошибки
       const newClient = await clientService.createClient(clientData);
       setClients(prev => [...prev, newClient]);
       setShowAddForm(false);
-      setError('');
     } catch (error) {
       console.error('Error adding client:', error);
-      setError('Ошибка добавления клиента. Проверьте права доступа.');
+      setError('Ошибка добавления клиента');
     }
   };
 

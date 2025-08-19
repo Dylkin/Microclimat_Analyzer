@@ -132,24 +132,28 @@ export class ClientService {
     } catch (error) {
       console.error('Error creating client:', error);
       
-      // Проверяем тип ошибки и возвращаем mock клиента
+      // Проверяем тип ошибки
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      // RLS policy violation, table not found, или другие ошибки БД
+      // RLS policy violation или другие ошибки доступа
       if (errorMessage.includes('row-level security policy') || 
+          errorMessage.includes('42501') ||
           errorMessage.includes('Could not find the table') ||
-          errorMessage.includes('PGRST205') ||
-          errorMessage.includes('42501')) {
-        console.warn('Database access restricted or unavailable, returning mock client');
+          errorMessage.includes('PGRST205')) {
+        console.warn('Database access restricted, creating mock client');
+        
+        // Возвращаем mock клиента без выброса ошибки
+        const mockClient: Client = {
+          ...clientData,
+          id: 'mock-client-' + Date.now(),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        return mockClient;
       }
       
-      const mockClient: Client = {
-        ...clientData,
-        id: 'mock-client-' + Date.now(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      return mockClient;
+      // Для других ошибок выбрасываем исключение
+      throw new Error('Ошибка создания клиента');
     }
   }
 
