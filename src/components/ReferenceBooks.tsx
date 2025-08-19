@@ -25,8 +25,6 @@ interface Client {
   email: string;
   phone: string;
   address: string;
-  inn: string;
-  kpp?: string;
   createdAt: Date;
 }
 
@@ -561,8 +559,6 @@ const ClientForm: React.FC<{
     email: '',
     phone: '',
     address: '',
-    inn: '',
-    kpp: ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
