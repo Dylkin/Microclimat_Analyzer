@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { UserManagement } from './UserManagement';
 import { ContractorManagement } from './ContractorManagement';
+import { ContractorManagement } from './ContractorManagement';
 import { Users, Settings, Building2 } from 'lucide-react';
 
 type ReferenceBookType = 'users' | 'contractors' | 'settings';
@@ -19,6 +20,12 @@ const referenceBooks: ReferenceBook[] = [
     name: 'Пользователи',
     icon: Users,
     description: 'Управление пользователями системы'
+  },
+  {
+    id: 'contractors',
+    name: 'Контрагенты',
+    icon: Building2,
+    description: 'Управление контрагентами и их контактными лицами'
   },
   {
     id: 'contractors',
@@ -95,6 +102,8 @@ export const ReferenceBooks: React.FC = () => {
     switch (activeBook) {
       case 'users':
         return <UserManagement />;
+      case 'contractors':
+        return <ContractorManagement />;
       case 'contractors':
         return <ContractorManagement />;
       case 'settings':

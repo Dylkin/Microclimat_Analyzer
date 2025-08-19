@@ -198,7 +198,7 @@ export const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ projec
             <MapPin className="w-6 h-6 text-indigo-600" />
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                Картирование для {project.clientName}
+                Картирование для {project.contractorName}
               </h2>
               <p className="text-sm text-gray-600">
                 {project.qualificationObjects?.length || 0} объект(ов) квалификации

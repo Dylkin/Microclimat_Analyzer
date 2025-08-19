@@ -9,8 +9,8 @@ const mockProjects: Project[] = [
     description: 'Картирование температурных условий в складском помещении',
     type: 'mapping',
     status: 'in_progress',
-    clientId: 'client-1',
-    clientName: 'ООО "Фармацевтическая компания"',
+    contractorId: 'client-1',
+    contractorName: 'ООО "Фармацевтическая компания"',
     managerId: 'manager-1',
     managerName: 'Иванов И.И.',
     estimatedDuration: 14,
@@ -30,8 +30,8 @@ const mockProjects: Project[] = [
     description: 'Испытания холодильной камеры',
     type: 'testing',
     status: 'contract',
-    clientId: 'client-2',
-    clientName: 'ООО "Медицинский центр"',
+    contractorId: 'client-2',
+    contractorName: 'ООО "Медицинский центр"',
     managerId: 'manager-1',
     managerName: 'Петров П.П.',
     estimatedDuration: 21,
@@ -68,8 +68,8 @@ export class ProjectService {
       description: projectRow.description || undefined,
       type: projectRow.type,
       status: projectRow.status,
-      clientId: projectRow.client_id || '',
-      clientName: projectRow.client_name,
+      contractorId: projectRow.client_id || '',
+      contractorName: projectRow.client_name,
       managerId: projectRow.manager_id || '',
       managerName: projectRow.manager_name,
       estimatedDuration: projectRow.estimated_duration,
@@ -131,8 +131,8 @@ export class ProjectService {
       description: project.description || null,
       type: project.type,
       status: project.status,
-      client_id: project.clientId || null,
-      client_name: project.clientName,
+      client_id: project.contractorId || null,
+      client_name: project.contractorName,
       manager_id: project.managerId || null,
       manager_name: project.managerName,
       estimated_duration: project.estimatedDuration,
@@ -288,12 +288,12 @@ export class ProjectService {
   }
 
   // Поиск проекта по клиенту и типу (для проверки дублирования)
-  async findProjectByClientAndType(clientName: string, type: Project['type']): Promise<Project | null> {
+  async findProjectByContractorAndType(contractorName: string, type: Project['type']): Promise<Project | null> {
     try {
       const { data, error } = await supabase
         .from('projects')
         .select('*')
-        .eq('client_name', clientName)
+        .eq('client_name', contractorName)
         .eq('type', type)
         .single();
 

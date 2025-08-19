@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Project, QualificationObject, QualificationObjectType } from '../types/Project';
 import { createQualificationStages } from '../utils/qualificationStages';
 import { ArrowLeft, Save, Plus, Trash2, Building, Truck, Snowflake } from 'lucide-react';
-import { clientService, Client } from '../services/clientService';
+import { contractorService } from '../services/contractorService';
+import { Contractor } from '../types/Contractor';
 
 interface EditProjectFormProps {
   project: Project;
@@ -18,8 +19,8 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
   
   const [formData, setFormData] = useState({
     description: project.description || '',
-    clientId: project.clientId,
-    clientName: project.clientName,
+    contractorId: project.contractorId,
+    contractorName: project.contractorName,
     estimatedDuration: project.estimatedDuration,
     budget: project.budget?.toString() || '',
     priority: project.priority,
@@ -33,14 +34,12 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
   
   const [clients, setClients] = useState<Client[]>([]);
   const [showNewClientForm, setShowNewClientForm] = useState(false);
-  const [newClient, setNewClient] = useState({
+  const [newContractor, setNewContractor] = useState({
     name: '',
     contactPerson: '',
     email: '',
     phone: '',
-    address: '',
-    inn: '',
-    kpp: ''
+    address: ''
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,23 +71,34 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
 
   // Загружаем клиентов при монтировании компонента
   useEffect(() => {
-    loadClients();
+    loadContractors();
   }, []);
 
-  const loadClients = async () => {
+  const loadContractors = async () => {
     try {
-      const clientsData = await clientService.getAllClients();
+      const contractorsData = await contractorService.getAllContractors();
+      // Преобразуем контрагентов в формат клиентов для совместимости
+      const clientsData = contractorsData.map(contractor => ({
+        id: contractor.id,
+        name: contractor.name,
+        contactPerson: contractor.contactPersons[0]?.name || '',
+        email: '',
+        phone: contractor.contactPersons[0]?.phone || '',
+        address: contractor.address,
+        createdAt: contractor.createdAt,
+        updatedAt: contractor.updatedAt
+      }));
       setClients(clientsData);
     } catch (error) {
-      console.error('Error loading clients:', error);
+      console.error('Error loading contractors:', error);
     }
   };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.clientId && !formData.clientName.trim()) {
-      newErrors.client = 'Выберите заказчика или добавьте нового';
+    if (!formData.contractorId && !formData.contractorName.trim()) {
+      newErrors.contractor = 'Выберите контрагента или добавьте нового';
     }
 
     if (formData.estimatedDuration < 1) {
@@ -107,31 +117,41 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAddClient = async () => {
-    if (!newClient.name || !newClient.email || !newClient.inn) {
-      setErrors({ newClient: 'Заполните обязательные поля для нового заказчика' });
+  const handleAddContractor = async () => {
+    if (!newContractor.name || !newContractor.contactPerson) {
+      setErrors({ newContractor: 'Заполните обязательные поля для нового контрагента' });
       return;
     }
 
     try {
-      const client = await clientService.createClient({
-        name: newClient.name,
-        contactPerson: newClient.contactPerson,
-        email: newClient.email,
-        phone: newClient.phone,
-        address: newClient.address,
-        inn: newClient.inn,
-        kpp: newClient.kpp
+      const contractor = await contractorService.createContractor({
+        name: newContractor.name,
+        address: newContractor.address,
+        contactPersons: [{
+          id: Date.now().toString(),
+          name: newContractor.contactPerson,
+          phone: newContractor.phone,
+          comment: ''
+        }]
       });
 
-      setClients(prev => [...prev, client]);
-      setFormData(prev => ({ ...prev, clientId: client.id, clientName: client.name }));
+      setClients(prev => [...prev, { 
+        id: contractor.id, 
+        name: contractor.name, 
+        contactPerson: contractor.contactPersons[0]?.name || '',
+        email: '',
+        phone: contractor.contactPersons[0]?.phone || '',
+        address: contractor.address,
+        createdAt: contractor.createdAt,
+        updatedAt: contractor.updatedAt
+      }]);
+      setFormData(prev => ({ ...prev, contractorId: contractor.id, contractorName: contractor.name }));
       setShowNewClientForm(false);
-      setNewClient({ name: '', contactPerson: '', email: '', phone: '', address: '', inn: '', kpp: '' });
+      setNewContractor({ name: '', contactPerson: '', email: '', phone: '', address: '' });
       setErrors({});
     } catch (error) {
-      console.error('Error adding client:', error);
-      setErrors({ newClient: 'Ошибка добавления клиента' });
+      console.error('Error adding contractor:', error);
+      setErrors({ newContractor: 'Ошибка добавления контрагента' });
     }
   };
 
@@ -174,12 +194,12 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
 
     try {
       // Находим выбранного клиента
-      const selectedClient = clients.find(c => c.id === formData.clientId);
+      const selectedContractor = clients.find(c => c.id === formData.contractorId);
       
       const updatedProject: Partial<Project> = {
         description: formData.description.trim() || undefined,
-        clientId: formData.clientId || project.clientId,
-        clientName: selectedClient?.name || formData.clientName.trim(),
+        contractorId: formData.contractorId || project.contractorId,
+        contractorName: selectedContractor?.name || formData.contractorName.trim(),
         estimatedDuration: formData.estimatedDuration,
         budget: formData.budget ? Number(formData.budget) : undefined,
         priority: formData.priority,
@@ -200,9 +220,9 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
   };
 
   const handleInputChange = (field: string, value: any) => {
-    if (field === 'clientId') {
-      const selectedClient = clients.find(c => c.id === value);
-      setFormData(prev => ({ ...prev, clientId: value, clientName: selectedClient?.name || '' }));
+    if (field === 'contractorId') {
+      const selectedContractor = clients.find(c => c.id === value);
+      setFormData(prev => ({ ...prev, contractorId: value, contractorName: selectedContractor?.name || '' }));
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
@@ -222,7 +242,7 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
           <ArrowLeft className="w-6 h-6" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900">
-          Редактировать проект: Картирование для {project.clientName}
+          Редактировать проект: Картирование для {project.contractorName}
         </h1>
       </div>
 
@@ -234,17 +254,17 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="lg:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Заказчик *
+                Контрагент *
               </label>
               <div className="flex space-x-2">
                 <select
-                  value={formData.clientId}
-                  onChange={(e) => handleInputChange('clientId', e.target.value)}
+                  value={formData.contractorId}
+                  onChange={(e) => handleInputChange('contractorId', e.target.value)}
                   className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                    errors.client ? 'border-red-300' : 'border-gray-300'
+                    errors.contractor ? 'border-red-300' : 'border-gray-300'
                   }`}
                 >
-                  <option value="">Выберите заказчика</option>
+                  <option value="">Выберите контрагента</option>
                   {clients.map(client => (
                     <option key={client.id} value={client.id}>{client.name}</option>
                   ))}
@@ -257,7 +277,7 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
-              {errors.client && <p className="mt-1 text-sm text-red-600">{errors.client}</p>}
+              {errors.contractor && <p className="mt-1 text-sm text-red-600">{errors.contractor}</p>}
             </div>
 
             <div className="lg:col-span-2">
@@ -294,23 +314,14 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
           {/* New Client Form */}
           {showNewClientForm && (
             <div className="mt-6 bg-gray-50 rounded-lg p-4">
-              <h4 className="text-md font-medium text-gray-900 mb-3">Добавить нового заказчика</h4>
+              <h4 className="text-md font-medium text-gray-900 mb-3">Добавить нового контрагента</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Название *</label>
                   <input
                     type="text"
-                    value={newClient.name}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={newClient.email}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, email: e.target.value }))}
+                    value={newContractor.name}
+                    onChange={(e) => setNewContractor(prev => ({ ...prev, name: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
@@ -318,8 +329,8 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
                   <label className="block text-sm font-medium text-gray-700 mb-1">Контактное лицо *</label>
                   <input
                     type="text"
-                    value={newClient.contactPerson}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, contactPerson: e.target.value }))}
+                    value={newContractor.contactPerson}
+                    onChange={(e) => setNewContractor(prev => ({ ...prev, contactPerson: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
                   />
@@ -328,17 +339,17 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
                   <label className="block text-sm font-medium text-gray-700 mb-1">Телефон</label>
                   <input
                     type="tel"
-                    value={newClient.phone}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
+                    value={newContractor.phone}
+                    onChange={(e) => setNewContractor(prev => ({ ...prev, phone: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Адрес</label>
-                  <textarea
-                    value={newClient.address}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, address: e.target.value }))}
-                    rows={2}
+                  <input
+                    type="text"
+                    value={newContractor.address}
+                    onChange={(e) => setNewContractor(prev => ({ ...prev, address: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
@@ -353,13 +364,13 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
                 </button>
                 <button
                   type="button"
-                  onClick={handleAddClient}
+                  onClick={handleAddContractor}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                 >
                   Добавить
                 </button>
               </div>
-              {errors.newClient && <p className="mt-2 text-sm text-red-600">{errors.newClient}</p>}
+              {errors.newContractor && <p className="mt-2 text-sm text-red-600">{errors.newContractor}</p>}
             </div>
           )}
         </div>

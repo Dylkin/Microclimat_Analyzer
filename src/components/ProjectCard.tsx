@@ -122,7 +122,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-semibold text-gray-900 truncate">
-                Картирование для {project.clientName}
+                Картирование для {project.contractorName}
               </h3>
               <p className="text-sm text-gray-500 truncate">
                 {project.qualificationObjects?.length || 0} объект(ов) квалификации

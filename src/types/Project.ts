@@ -100,8 +100,8 @@ export interface Project {
   description?: string;
   type: ProjectType;
   status: ProjectStatus;
-  clientId: string;
-  clientName: string;
+  contractorId: string;
+  contractorName: string;
   managerId: string;
   managerName: string;
   qualificationObjects: QualificationObject[];
