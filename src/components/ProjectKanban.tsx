@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Project } from '../types/Project';
 import { useProjects } from '../contexts/ProjectContext';
 import { ProjectCard } from './ProjectCard';
-import { EditProjectModal } from './EditProjectModal';
+import { EditProjectForm } from './EditProjectForm';
 import { Plus, MoreHorizontal, Edit } from 'lucide-react';
 
 interface ProjectKanbanProps {
@@ -156,9 +156,9 @@ export const ProjectKanban: React.FC<ProjectKanbanProps> = ({ projects }) => {
       })}
     </div>
 
-      {/* Edit Modal */}
+      {/* Edit Form */}
       {editingProject && (
-        <EditProjectModal
+        <EditProjectForm
           project={editingProject}
           onClose={() => setEditingProject(null)}
         />

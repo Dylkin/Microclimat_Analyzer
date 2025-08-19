@@ -1,7 +1,7 @@
 import React from 'react';
 import { Project } from '../types/Project';
 import { useProjects } from '../contexts/ProjectContext';
-import { EditProjectModal } from './EditProjectModal';
+import { EditProjectForm } from './EditProjectForm';
 import { ProjectDetailsModal } from './ProjectDetailsModal';
 import { 
   Calendar, 
@@ -26,7 +26,7 @@ interface ProjectCardProps {
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
   const { updateProject } = useProjects();
   const [showStatusMenu, setShowStatusMenu] = React.useState(false);
-  const [showEditModal, setShowEditModal] = React.useState(false);
+  const [showEditForm, setShowEditForm] = React.useState(false);
   const [showDetailsModal, setShowDetailsModal] = React.useState(false);
 
   const statusOptions = [
@@ -98,7 +98,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowEditModal(true);
+    setShowEditForm(true);
   };
 
   const handleDetailsClick = (e: React.MouseEvent) => {
@@ -290,11 +290,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
       )}
     </div>
 
-      {/* Edit Modal */}
-      {showEditModal && (
-        <EditProjectModal
+      {/* Edit Form */}
+      {showEditForm && (
+        <EditProjectForm
           project={project}
-          onClose={() => setShowEditModal(false)}
+          onClose={() => setShowEditForm(false)}
         />
       )}
 

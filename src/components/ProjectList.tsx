@@ -7,3 +7,5 @@ const handleEditProject = (project: Project) => {
 };
 
 const handleDetailsProject = (project: Project) => {
+  // TODO: Implement details functionality
+};
