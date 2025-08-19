@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { UserManagement } from './UserManagement';
 import { ContractorManagement } from './ContractorManagement';
-import { ContractorManagement } from './ContractorManagement';
 import { Users, Settings, Building2 } from 'lucide-react';
 
 type ReferenceBookType = 'users' | 'contractors' | 'settings';
