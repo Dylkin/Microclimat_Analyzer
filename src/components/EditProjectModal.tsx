@@ -56,10 +56,11 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, onC
 
   const qualificationObjectTypes = [
     { value: 'room', label: 'Помещение', icon: Building },
-    { value: 'transport', label: 'Транспорт', icon: Truck },
-    { value: 'refrigerator', label: 'Холодильные камеры', icon: Snowflake },
-    { value: 'cooling_unit', label: 'Холодильные установки', icon: Snowflake },
-    { value: 'freezing_unit', label: 'Морозильные установки', icon: Snowflake }
+    { value: 'automobile', label: 'Автомобиль', icon: Truck },
+    { value: 'refrigerator_chamber', label: 'Холодильная камера', icon: Snowflake },
+    { value: 'refrigerator', label: 'Холодильник', icon: Snowflake },
+    { value: 'freezer', label: 'Морозильник', icon: Snowflake },
+    { value: 'thermocontainer', label: 'Термоконтейнер', icon: Snowflake }
   ];
 
   const priorities = [
@@ -639,6 +640,97 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
             placeholder="Местоположение объекта"
           />
         </div>
+
+        {/* Название климатической установки - для всех типов */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Название климатической установки</label>
+          <input
+            type="text"
+            value={object.technicalParameters.climateSystemName || ''}
+            onChange={(e) => onUpdate(object.id, {
+              technicalParameters: {
+                ...object.technicalParameters,
+                climateSystemName: e.target.value
+              }
+            })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Название климатической установки"
+          />
+        </div>
+
+        {/* Инвентарный номер - для помещений и холодильных камер */}
+        {(object.type === 'room' || object.type === 'refrigerator_chamber') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Инвентарный номер</label>
+            <input
+              type="text"
+              value={object.technicalParameters.inventoryNumber || ''}
+              onChange={(e) => onUpdate(object.id, {
+                technicalParameters: {
+                  ...object.technicalParameters,
+                  inventoryNumber: e.target.value
+                }
+              })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Инвентарный номер"
+            />
+          </div>
+        )}
+
+        {/* Серийный номер - для холодильников, морозильников, термоконтейнеров */}
+        {(object.type === 'refrigerator' || object.type === 'freezer' || object.type === 'thermocontainer') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Серийный номер</label>
+            <input
+              type="text"
+              value={object.technicalParameters.serialNumber || ''}
+              onChange={(e) => onUpdate(object.id, {
+                technicalParameters: {
+                  ...object.technicalParameters,
+                  serialNumber: e.target.value
+                }
+              })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Серийный номер"
+            />
+          </div>
+        )}
+
+        {/* VIN и регистрационный номер - для автомобилей */}
+        {object.type === 'automobile' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">VIN номер</label>
+              <input
+                type="text"
+                value={object.technicalParameters.vin || ''}
+                onChange={(e) => onUpdate(object.id, {
+                  technicalParameters: {
+                    ...object.technicalParameters,
+                    vin: e.target.value
+                  }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="VIN номер"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Регистрационный номер</label>
+              <input
+                type="text"
+                value={object.technicalParameters.registrationNumber || ''}
+                onChange={(e) => onUpdate(object.id, {
+                  technicalParameters: {
+                    ...object.technicalParameters,
+                    registrationNumber: e.target.value
+                  }
+                })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Регистрационный номер"
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -150,10 +150,11 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects }) 
   function getObjectTypeText(type: string): string {
     const typeMap: Record<string, string> = {
       room: 'Помещение',
-      transport: 'Транспорт',
-      refrigerator: 'Холодильные камеры',
-      cooling_unit: 'Холодильные установки',
-      freezing_unit: 'Морозильные установки'
+      automobile: 'Автомобиль',
+      refrigerator_chamber: 'Холодильная камера',
+      refrigerator: 'Холодильник',
+      freezer: 'Морозильник',
+      thermocontainer: 'Термоконтейнер'
     };
     return typeMap[type] || type;
   }

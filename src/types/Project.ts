@@ -16,7 +16,7 @@ export type TaskType =
 
 export type ProjectType = 'mapping';
 
-export type QualificationObjectType = 'room' | 'transport' | 'refrigerator' | 'cooling_unit' | 'freezing_unit';
+export type QualificationObjectType = 'room' | 'automobile' | 'refrigerator_chamber' | 'refrigerator' | 'freezer' | 'thermocontainer';
 
 export interface QualificationObject {
   id: string;
@@ -39,6 +39,18 @@ export interface QualificationObject {
     specialRequirements?: string[];
     location?: string; // местоположение объекта
     capacity?: number; // вместимость (для транспорта, камер)
+    // Общие поля
+    climateSystemName?: string; // Название климатической установки
+    
+    // Для помещений, холодильных камер
+    inventoryNumber?: string; // Инвентарный номер
+    
+    // Для холодильников, морозильников, термоконтейнеров
+    serialNumber?: string; // Серийный номер
+    
+    // Для автомобилей
+    vin?: string; // VIN номер
+    registrationNumber?: string; // Регистрационный номер
   };
   createdAt: Date;
   updatedAt: Date;
