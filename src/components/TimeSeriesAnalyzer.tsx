@@ -27,7 +27,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [contractFields, setContractFields] = useState({
     contractNumber: '',
     contractDate: '',
-    researchObject: '',
     climateInstallation: '',
     testType: ''
   });
@@ -355,7 +354,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         dataType,
         analysisResults,
         conclusions,
-        researchObject: contractFields.researchObject || '',
+        researchObject: getQualificationObjectDisplayName() || '',
         conditioningSystem: contractFields.climateInstallation || '',
        testType: convertedTestType || '',
         limits: limits,
@@ -534,6 +533,27 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setConclusions(conclusionText);
   };
 
+  // Функция для получения названия объекта квалификации
+  const getQualificationObjectDisplayName = (): string => {
+    // Находим файлы с привязанным объектом квалификации
+    const filesWithQualification = files.filter(f => f.qualificationObjectId);
+    
+    if (filesWithQualification.length === 0) {
+      return 'Не указан';
+    }
+    
+    // Если все файлы привязаны к одному объекту, показываем его название
+    const uniqueQualificationIds = [...new Set(filesWithQualification.map(f => f.qualificationObjectId))];
+    
+    if (uniqueQualificationIds.length === 1) {
+      // Здесь нужно получить название объекта квалификации
+      // Пока возвращаем ID, в будущем можно добавить загрузку данных объекта
+      return `Объект квалификации (ID: ${uniqueQualificationIds[0]?.substring(0, 8)}...)`;
+    } else {
+      return `Несколько объектов (${uniqueQualificationIds.length})`;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -700,16 +720,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Объект исследования</label>
-              <input
-                type="text"
-                value={contractFields.researchObject}
-                onChange={(e) => handleContractFieldChange('researchObject', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите объект исследования"
-              />
-            </div>
-            <div>
               <label className="block text-xs text-gray-500 mb-1">Климатическая установка</label>
               <input
                 type="text"
@@ -718,6 +728,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Введите тип климатической установки"
               />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Объект квалификации</label>
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+                {getQualificationObjectDisplayName()}
+              </div>
             </div>
           </div>
         </div>
