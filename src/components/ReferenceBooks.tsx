@@ -1,282 +1,211 @@
-import { supabase } from '../lib/supabase';
-import { Database } from '../lib/database.types';
+import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { UserManagement } from './UserManagement';
+import { Users, Settings } from 'lucide-react';
 
-// Mock data for fallback when database is not available
-const mockClients = [
+type ReferenceBookType = 'users' | 'settings';
+
+interface ReferenceBook {
+  id: ReferenceBookType;
+  name: string;
+  icon: React.ComponentType<any>;
+  description: string;
+}
+
+const referenceBooks: ReferenceBook[] = [
   {
-    id: 'client-1',
-    name: 'ООО "Фармацевтическая компания"',
-    contactPerson: 'Иванов Иван Иванович',
-    email: 'ivanov@pharma.ru',
-    phone: '+7 (495) 123-45-67',
-    address: 'г. Москва, ул. Примерная, д. 1',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01')
+    id: 'users',
+    name: 'Пользователи',
+    icon: Users,
+    description: 'Управление пользователями системы'
   },
   {
-    id: 'client-2',
-    name: 'ООО "Медицинский центр"',
-    contactPerson: 'Петров Петр Петрович',
-    email: 'petrov@medcenter.ru',
-    phone: '+7 (495) 987-65-43',
-    address: 'г. Санкт-Петербург, пр. Медицинский, д. 10',
-    createdAt: new Date('2024-01-05'),
-    updatedAt: new Date('2024-01-05')
+    id: 'settings',
+    name: 'Настройки системы',
+    icon: Settings,
+    description: 'Общие настройки приложения'
   }
 ];
 
-type ClientRow = Database['public']['Tables']['clients']['Row'];
-type ClientInsert = Database['public']['Tables']['clients']['Insert'];
-type ClientUpdate = Database['public']['Tables']['clients']['Update'];
-
-export interface Client {
-  id: string;
+// Системные настройки
+interface SystemSetting {
+  key: string;
   name: string;
-  contactPerson: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  value: string;
+  category: string;
+  description: string;
+  type: 'text' | 'number' | 'boolean' | 'select';
+  options?: string[];
 }
 
-export class ClientService {
-  // Преобразование данных из базы в типы приложения
-  private mapClientFromDB(clientRow: ClientRow): Client {
-    return {
-      id: clientRow.id,
-      name: clientRow.name,
-      contactPerson: clientRow.contact_person,
-      email: clientRow.email || undefined,
-      phone: clientRow.phone || undefined,
-      address: clientRow.address || undefined,
-      createdAt: new Date(clientRow.created_at),
-      updatedAt: new Date(clientRow.updated_at)
-    };
+const defaultSettings: SystemSetting[] = [
+  {
+    key: 'company_name',
+    name: 'Название компании',
+    value: 'ООО "Квалификация"',
+    category: 'general',
+    description: 'Название компании для отчетов',
+    type: 'text'
+  },
+  {
+    key: 'default_project_duration',
+    name: 'Длительность проекта по умолчанию (дни)',
+    value: '14',
+    category: 'projects',
+    description: 'Стандартная длительность нового проекта',
+    type: 'number'
+  },
+  {
+    key: 'auto_assign_manager',
+    name: 'Автоматическое назначение менеджера',
+    value: 'true',
+    category: 'projects',
+    description: 'Автоматически назначать текущего пользователя менеджером проекта',
+    type: 'boolean'
+  },
+  {
+    key: 'notification_email',
+    name: 'Email для уведомлений',
+    value: 'admin@company.com',
+    category: 'notifications',
+    description: 'Email для системных уведомлений',
+    type: 'text'
   }
+];
 
-  // Преобразование данных приложения в формат базы
-  private mapClientToDB(client: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>): ClientInsert {
-    return {
-      name: client.name,
-      contact_person: client.contactPerson,
-      email: client.email || null,
-      phone: client.phone || null,
-      address: client.address || null
-    };
-  }
+export const ReferenceBooks: React.FC = () => {
+  const { user } = useAuth();
+  const [activeBook, setActiveBook] = useState<ReferenceBookType>('users');
+  const [settings, setSettings] = useState<SystemSetting[]>(defaultSettings);
 
-  // Получение всех клиентов
-  async getAllClients(): Promise<Client[]> {
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .order('name');
+  const handleSettingChange = (key: string, value: string) => {
+    setSettings(prev => prev.map(setting => 
+      setting.key === key ? { ...setting, value } : setting
+    ));
+  };
 
-      if (error) {
-        // Проверяем на RLS ошибку
-        if (this.isRLSError(error)) {
-          console.warn('Database access restricted for clients, using mock data');
-          return mockClients;
-        }
-        
-        // Проверяем на отсутствие таблицы
-        if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
-          console.warn('Database not available, using mock clients data');
-          return mockClients;
-        }
-        
-        throw error;
-      }
-
-      return (data || []).map(this.mapClientFromDB);
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-      
-      console.warn('Database error, falling back to mock clients data');
-      return mockClients;
+  const renderBookContent = () => {
+    switch (activeBook) {
+      case 'users':
+        return <UserManagement />;
+      case 'settings':
+        return renderSettingsBook();
+      default:
+        return <UserManagement />;
     }
-  }
+  };
 
-  // Получение клиента по ID
-  async getClientById(id: string): Promise<Client | null> {
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', id)
-        .single();
+  const renderSettingsBook = () => {
+    const categories = [...new Set(settings.map(s => s.category))];
 
-      if (error) {
-        if (error.code === 'PGRST116') return null; // Не найден
-        throw error;
-      }
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900">Настройки системы</h2>
+        </div>
 
-      return this.mapClientFromDB(data);
-    } catch (error) {
-      console.error('Error fetching client:', error);
-      throw new Error('Ошибка загрузки клиента');
-    }
-  }
+        {categories.map(category => (
+          <div key={category} className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4 capitalize">
+              {category === 'general' && 'Общие'}
+              {category === 'projects' && 'Проекты'}
+              {category === 'notifications' && 'Уведомления'}
+              {category === 'measurements' && 'Измерения'}
+            </h3>
+            
+            <div className="space-y-4">
+              {settings.filter(s => s.category === category).map(setting => (
+                <div key={setting.key} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {setting.name}
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">{setting.description}</p>
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    {setting.type === 'boolean' ? (
+                      <select
+                        value={setting.value}
+                        onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        disabled={user?.role !== 'administrator'}
+                      >
+                        <option value="true">Включено</option>
+                        <option value="false">Отключено</option>
+                      </select>
+                    ) : setting.type === 'select' ? (
+                      <select
+                        value={setting.value}
+                        onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        disabled={user?.role !== 'administrator'}
+                      >
+                        {setting.options?.map(option => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type={setting.type === 'number' ? 'number' : 'text'}
+                        value={setting.value}
+                        onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        disabled={user?.role !== 'administrator'}
+                      />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
 
-  // Создание клиента
-  async createClient(clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>): Promise<Client> {
-    try {
-      // Проверяем доступность базы данных
-      const { error: healthError } = await supabase
-        .from('clients')
-        .select('count')
-        .limit(1);
+        {user?.role !== 'administrator' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-sm text-yellow-800">
+              Только администраторы могут изменять настройки системы
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
 
-      if (healthError && (healthError.code === 'PGRST205' || healthError.message?.includes('Could not find the table'))) {
-        console.warn('Database not available, creating mock client');
-        const mockClient: Client = {
-          ...clientData,
-          id: 'mock-client-' + Date.now(),
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-        return mockClient;
-      }
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Справочники</h1>
+      </div>
 
-      const { data, error } = await supabase
-        .from('clients')
-        .insert(this.mapClientToDB(clientData))
-        .select()
-        .single();
+      {/* Navigation */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="border-b border-gray-200">
+          <nav className="flex space-x-8 px-6">
+            {referenceBooks.map((book) => {
+              const Icon = book.icon;
+              return (
+                <button
+                  key={book.id}
+                  onClick={() => setActiveBook(book.id)}
+                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeBook === book.id
+                      ? 'border-indigo-500 text-indigo-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{book.name}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
-      if (error) {
-        // Проверяем на RLS policy violation
-        if (this.isRLSError(error)) {
-          console.warn('Database access restricted, creating mock client');
-          
-          // Возвращаем mock клиента без выброса ошибки
-          const mockClient: Client = {
-            ...clientData,
-            id: 'mock-client-' + Date.now(),
-            createdAt: new Date(),
-            updatedAt: new Date()
-          };
-          return mockClient;
-        }
-        
-        throw error;
-      }
-
-      return this.mapClientFromDB(data);
-    } catch (error) {
-      console.error('Error creating client:', error);
-      
-      // Дополнительная проверка на RLS в блоке catch
-      if (this.isRLSError(error)) {
-        console.warn('Database access restricted, creating mock client');
-        
-        // Возвращаем mock клиента без выброса ошибки
-        const mockClient: Client = {
-          ...clientData,
-          id: 'mock-client-' + Date.now(),
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-        return mockClient;
-      }
-      
-      // Для других ошибок также возвращаем mock клиента
-      console.warn('Database error, creating mock client');
-      const mockClient: Client = {
-        ...clientData,
-        id: 'mock-client-' + Date.now(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      return mockClient;
-    }
-  }
-
-  // Обновление клиента
-  async updateClient(id: string, updates: Partial<Client>): Promise<void> {
-    try {
-      const clientUpdates: ClientUpdate = {};
-      
-      if (updates.name !== undefined) clientUpdates.name = updates.name;
-      if (updates.contactPerson !== undefined) clientUpdates.contact_person = updates.contactPerson;
-      if (updates.email !== undefined) clientUpdates.email = updates.email || null;
-      if (updates.phone !== undefined) clientUpdates.phone = updates.phone || null;
-      if (updates.address !== undefined) clientUpdates.address = updates.address || null;
-
-      const { error } = await supabase
-        .from('clients')
-        .update(clientUpdates)
-        .eq('id', id);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error updating client:', error);
-      
-      if (this.isRLSError(error)) {
-        console.warn('Insufficient permissions to update client, operation ignored');
-        return; // Игнорируем ошибку RLS для обновления
-      }
-      
-      throw new Error('Ошибка обновления клиента');
-    }
-  }
-
-  // Удаление клиента
-  async deleteClient(id: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error deleting client:', error);
-      
-      if (this.isRLSError(error)) {
-        console.warn('Insufficient permissions to delete client, operation ignored');
-        return; // Игнорируем ошибку RLS для удаления
-      }
-      
-      throw new Error('Ошибка удаления клиента');
-    }
-  }
-
-  // Проверка на RLS ошибку
-  private isRLSError(error: any): boolean {
-    if (!error) return false;
-
-    // Проверяем прямые свойства ошибки
-    if (error.code === '42501') return true;
-    if (error.message && error.message.includes('row-level security policy')) return true;
-
-    // Проверяем вложенные свойства (для Supabase ошибок)
-    if (error.details && typeof error.details === 'object') {
-      if (error.details.code === '42501') return true;
-      if (error.details.message && error.details.message.includes('row-level security policy')) return true;
-    }
-
-    // Проверяем строковое представление ошибки
-    const errorString = String(error);
-    if (errorString.includes('42501') || errorString.includes('row-level security policy')) {
-      return true;
-    }
-
-    // Проверяем JSON body (для HTTP ошибок)
-    try {
-      if (error.body && typeof error.body === 'string') {
-        const parsedBody = JSON.parse(error.body);
-        if (parsedBody.code === '42501') return true;
-        if (parsedBody.message && parsedBody.message.includes('row-level security policy')) return true;
-      }
-    } catch (e) {
-      // Игнорируем ошибки парсинга JSON
-    }
-
-    return false;
-  }
-}
-
-export const clientService = new ClientService();
+        <div className="p-6">
+          {renderBookContent()}
+        </div>
+      </div>
+    </div>
+  );
+};

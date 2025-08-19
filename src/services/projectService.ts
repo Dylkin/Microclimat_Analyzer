@@ -186,7 +186,7 @@ export class ProjectService {
   async getAllProjects(): Promise<Project[]> {
     try {
       // Проверяем доступность Supabase
-      const { data: healthCheck, error: healthError } = await supabase
+      const { error: healthError } = await supabase
         .from('projects')
         .select('count')
         .limit(1);

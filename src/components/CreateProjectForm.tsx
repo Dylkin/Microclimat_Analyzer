@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useProjects } from '../contexts/ProjectContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Project, ProjectType, QualificationObject, QualificationObjectType } from '../types/Project';
+import { Project, QualificationObject, QualificationObjectType } from '../types/Project';
 import { createQualificationStages } from '../utils/qualificationStages';
-import { ArrowLeft, MapPin, Calendar, User, DollarSign, Plus, Trash2, Building, Truck, Snowflake, Save } from 'lucide-react';
+import { ArrowLeft, Calendar, User, DollarSign, Plus, Trash2, Building, Truck, Snowflake, Save } from 'lucide-react';
 import { clientService, Client } from '../services/clientService';
 
 interface CreateProjectFormProps {
