@@ -26,20 +26,17 @@ export const ProjectDirectory: React.FC = () => {
   
   // Form state
   const [newProject, setNewProject] = useState<CreateProjectData>({
-    name: '',
     description: '',
     contractorId: '',
     qualificationObjectIds: []
   });
 
   const [editProject, setEditProject] = useState<{
-    name: string;
     description: string;
     contractNumber: string;
     status: ProjectStatus;
     qualificationObjectIds: string[];
   }>({
-    name: '',
     description: '',
     contractNumber: '',
     status: 'contract_negotiation',
@@ -111,11 +108,6 @@ export const ProjectDirectory: React.FC = () => {
 
   // Добавление проекта
   const handleAddProject = async () => {
-    if (!newProject.name.trim()) {
-      alert('Введите название проекта');
-      return;
-    }
-
     if (!newProject.contractorId) {
       alert('Выберите контрагента');
       return;
@@ -128,12 +120,27 @@ export const ProjectDirectory: React.FC = () => {
 
     setOperationLoading(true);
     try {
-      const addedProject = await projectService.addProject(newProject, user?.id);
+      // Генерируем название проекта на основе выбранных объектов
+      const selectedObjects = getQualificationObjectsForContractor(newProject.contractorId)
+        .filter(obj => newProject.qualificationObjectIds.includes(obj.id));
+      
+      const contractorName = contractors.find(c => c.id === newProject.contractorId)?.name || 'Неизвестный контрагент';
+      const objectNames = selectedObjects.map(obj => 
+        obj.name || obj.vin || obj.serialNumber || 'Без названия'
+      ).join(', ');
+      
+      const projectName = `${contractorName} - ${objectNames}`;
+      
+      const projectData = {
+        ...newProject,
+        name: projectName
+      };
+      
+      const addedProject = await projectService.addProject(projectData, user?.id);
       setProjects(prev => [addedProject, ...prev]);
       
       // Сбрасываем форму
       setNewProject({
-        name: '',
         description: '',
         contractorId: '',
         qualificationObjectIds: []
@@ -151,7 +158,6 @@ export const ProjectDirectory: React.FC = () => {
   // Редактирование проекта
   const handleEditProject = (project: Project) => {
     setEditProject({
-      name: project.name,
       description: project.description || '',
       contractNumber: project.contractNumber || '',
       status: project.status,
@@ -161,15 +167,9 @@ export const ProjectDirectory: React.FC = () => {
   };
 
   const handleSaveEdit = async () => {
-    if (!editProject.name.trim()) {
-      alert('Введите название проекта');
-      return;
-    }
-
     setOperationLoading(true);
     try {
       const updatedProject = await projectService.updateProject(editingProject!, {
-        name: editProject.name,
         description: editProject.description,
         contractNumber: editProject.contractNumber,
         status: editProject.status,
@@ -268,41 +268,26 @@ export const ProjectDirectory: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Название проекта *
-                </label>
-                <input
-                  type="text"
-                  value={newProject.name}
-                  onChange={(e) => setNewProject(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Введите название проекта"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Контрагент *
-                </label>
-                <select
-                  value={newProject.contractorId}
-                  onChange={(e) => setNewProject(prev => ({ 
-                    ...prev, 
-                    contractorId: e.target.value,
-                    qualificationObjectIds: [] // Сбрасываем выбранные объекты
-                  }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="">Выберите контрагента</option>
-                  {contractors.map((contractor) => (
-                    <option key={contractor.id} value={contractor.id}>
-                      {contractor.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Контрагент *
+              </label>
+              <select
+                value={newProject.contractorId}
+                onChange={(e) => setNewProject(prev => ({ 
+                  ...prev, 
+                  contractorId: e.target.value,
+                  qualificationObjectIds: [] // Сбрасываем выбранные объекты
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="">Выберите контрагента</option>
+                {contractors.map((contractor) => (
+                  <option key={contractor.id} value={contractor.id}>
+                    {contractor.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -319,16 +304,16 @@ export const ProjectDirectory: React.FC = () => {
             </div>
 
             {/* Объекты квалификации */}
-            {newProject.contractorId && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Объекты квалификации *
-                </label>
-                <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Объекты квалификации *
+              </label>
+              {newProject.contractorId ? (
+                <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3">
                   {getQualificationObjectsForContractor(newProject.contractorId).map((obj) => {
                     const objectName = obj.name || obj.vin || obj.serialNumber || 'Без названия';
                     return (
-                      <label key={obj.id} className="flex items-center space-x-2">
+                      <label key={obj.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded">
                         <input
                           type="checkbox"
                           checked={newProject.qualificationObjectIds.includes(obj.id)}
@@ -347,18 +332,38 @@ export const ProjectDirectory: React.FC = () => {
                           }}
                           className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
-                        <span className="text-sm">
-                          {objectName} ({QualificationObjectTypeLabels[obj.type]})
-                        </span>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">{objectName}</div>
+                          <div className="text-xs text-gray-500">
+                            {QualificationObjectTypeLabels[obj.type]}
+                            {obj.address && ` • ${obj.address}`}
+                            {obj.vin && ` • VIN: ${obj.vin}`}
+                            {obj.serialNumber && ` • S/N: ${obj.serialNumber}`}
+                          </div>
+                        </div>
                       </label>
                     );
                   })}
                   {getQualificationObjectsForContractor(newProject.contractorId).length === 0 && (
-                    <p className="text-sm text-gray-500">У выбранного контрагента нет объектов квалификации</p>
+                    <div className="text-center py-4 text-gray-500">
+                      <p className="text-sm">У выбранного контрагента нет объектов квалификации</p>
+                      <p className="text-xs mt-1">Сначала добавьте объекты в справочнике контрагентов</p>
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <p className="text-sm text-gray-500 text-center">
+                    Сначала выберите контрагента для отображения объектов квалификации
+                  </p>
+                </div>
+              )}
+              {newProject.contractorId && newProject.qualificationObjectIds.length > 0 && (
+                <div className="mt-2 text-sm text-green-600">
+                  Выбрано объектов: {newProject.qualificationObjectIds.length}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3 mt-6">
@@ -416,21 +421,13 @@ export const ProjectDirectory: React.FC = () => {
                   <tr key={project.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       {editingProject === project.id ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={editProject.name}
-                            onChange={(e) => setEditProject(prev => ({ ...prev, name: e.target.value }))}
-                            className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          />
-                          <textarea
-                            value={editProject.description}
-                            onChange={(e) => setEditProject(prev => ({ ...prev, description: e.target.value }))}
-                            className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            rows={2}
-                            placeholder="Описание"
-                          />
-                        </div>
+                        <textarea
+                          value={editProject.description}
+                          onChange={(e) => setEditProject(prev => ({ ...prev, description: e.target.value }))}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          rows={2}
+                          placeholder="Описание"
+                        />
                       ) : (
                         <div>
                           <div className="text-sm font-medium text-gray-900">{project.name}</div>

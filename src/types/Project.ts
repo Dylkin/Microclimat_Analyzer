@@ -45,7 +45,7 @@ export interface ProjectStageAssignment {
 }
 
 export interface CreateProjectData {
-  name: string;
+  name?: string;
   description?: string;
   contractorId: string;
   qualificationObjectIds: string[];
@@ -57,7 +57,6 @@ export interface CreateProjectData {
 }
 
 export interface UpdateProjectData {
-  name?: string;
   description?: string;
   contractNumber?: string;
   status?: ProjectStatus;
