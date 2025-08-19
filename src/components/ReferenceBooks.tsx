@@ -281,6 +281,9 @@ export const ReferenceBooks: React.FC = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Контакты
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                ИНН/КПП
+              </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Действия
               </th>
@@ -581,9 +584,17 @@ const ClientForm: React.FC<{
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Контактное лицо *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Контактное лицо *</label>
           <input
             type="text"
             value={formData.contactPerson}
@@ -594,22 +605,7 @@ const ClientForm: React.FC<{
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Email *
-          </label>
-          <input
-            type="email"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            required
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Телефон
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Телефон</label>
           <input
             type="tel"
             value={formData.phone}
@@ -618,35 +614,8 @@ const ClientForm: React.FC<{
           />
         </div>
         
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            ИНН *
-          </label>
-          <input
-            type="text"
-            value={formData.inn}
-            onChange={(e) => setFormData({ ...formData, inn: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            required
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            КПП
-          </label>
-          <input
-            type="text"
-            value={formData.kpp}
-            onChange={(e) => setFormData({ ...formData, kpp: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
-        
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Адрес
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Адрес</label>
           <textarea
             value={formData.address}
             onChange={(e) => setFormData({ ...formData, address: e.target.value })}

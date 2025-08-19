@@ -270,7 +270,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                   <input
                     type="email"
                     value={newClient.email}
@@ -279,20 +279,30 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ИНН *</label>
-                  <input
-                    type="text"
-                    value={newClient.inn}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, inn: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Контактное лицо</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Контактное лицо *</label>
                   <input
                     type="text"
                     value={newClient.contactPerson}
                     onChange={(e) => setNewClient(prev => ({ ...prev, contactPerson: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Телефон</label>
+                  <input
+                    type="tel"
+                    value={newClient.phone}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Адрес</label>
+                  <textarea
+                    value={newClient.address}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, address: e.target.value }))}
+                    rows={2}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
