@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthUser } from '../types/User';
+import { supabase } from '../utils/supabaseClient';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -34,7 +35,69 @@ const defaultUser: User = {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [users, setUsers] = useState<User[]>([defaultUser]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Проверяем сессию Supabase при загрузке
+  useEffect(() => {
+    checkSupabaseSession();
+    
+    // Подписываемся на изменения аутентификации
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          // Пользователь вошел в систему
+          const userData = await getUserFromSupabase(session.user.id);
+          if (userData) {
+            setUser(userData);
+          }
+        } else {
+          // Пользователь вышел из системы
+          setUser(null);
+        }
+        setIsLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const checkSupabaseSession = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const userData = await getUserFromSupabase(session.user.id);
+        if (userData) {
+          setUser(userData);
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка проверки сессии:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getUserFromSupabase = async (userId: string): Promise<AuthUser | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        fullName: data.full_name,
+        email: data.email,
+        role: data.role
+      };
+    } catch (error) {
+      console.error('Ошибка получения пользователя:', error);
+      return null;
+    }
+  };
   // Проверка доступа к страницам
   const hasAccess = (page: 'analyzer' | 'users' | 'help'): boolean => {
     if (!user) return false;
@@ -53,30 +116,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Авторизация
-  const login = (email: string, password: string): boolean => {
-    const foundUser = users.find(u => u.email === email && u.password === password);
-    if (foundUser) {
-      setUser({
-        id: foundUser.id,
-        fullName: foundUser.fullName,
-        email: foundUser.email,
-        role: foundUser.role
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
-      localStorage.setItem('currentUser', JSON.stringify({
-        id: foundUser.id,
-        fullName: foundUser.fullName,
-        email: foundUser.email,
-        role: foundUser.role
-      }));
-      return true;
+
+      if (error) throw error;
+
+      if (data.user) {
+        const userData = await getUserFromSupabase(data.user.id);
+        if (userData) {
+          setUser(userData);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Ошибка входа:', error);
+      return false;
     }
-    return false;
   };
 
   // Выход
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('currentUser');
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Ошибка выхода:', error);
+    }
   };
 
   // Добавление пользователя
@@ -102,12 +172,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Восстановление сессии при загрузке
-  useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-  }, []);
 
   const value = {
     user,
@@ -117,8 +181,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addUser,
     updateUser,
     deleteUser,
-    hasAccess
+    hasAccess,
+    isLoading
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>

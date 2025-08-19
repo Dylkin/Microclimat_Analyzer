@@ -8,11 +8,12 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('');
   const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (login(email, password)) {
+    const success = await login(email, password);
+    if (success) {
       // Успешная авторизация
     } else {
       setError('Неверный логин или пароль');

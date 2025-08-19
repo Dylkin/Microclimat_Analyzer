@@ -7,6 +7,7 @@ import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType } from '..
 import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
+import { supabaseDatabaseService } from '../utils/supabaseDatabase';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -53,6 +54,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     templateValidation: null
   });
   
+  // Состояние для сохранения/загрузки сессии анализа
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
   // Chart dimensions
   const chartWidth = 1200;
   const chartHeight = 400;
@@ -60,6 +65,55 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   // Ref для элемента графика
   const chartRef = useRef<HTMLDivElement>(null);
+
+  // Автосохранение настроек при изменении
+  useEffect(() => {
+    if (currentSessionId) {
+      saveCurrentState();
+    }
+  }, [limits, markers, zoomState, dataType, contractFields, conclusions]);
+
+  // Создание новой сессии анализа при первом запуске
+  useEffect(() => {
+    if (files.length > 0 && !currentSessionId) {
+      createNewSession();
+    }
+  }, [files]);
+
+  const createNewSession = async () => {
+    try {
+      const sessionId = await supabaseDatabaseService.saveAnalysisSession({
+        name: `Анализ ${new Date().toLocaleString('ru-RU')}`,
+        description: `Анализ ${files.length} файлов`,
+        fileIds: files.map(f => f.id),
+        dataType,
+        contractFields,
+        conclusions
+      });
+      setCurrentSessionId(sessionId);
+    } catch (error) {
+      console.error('Ошибка создания сессии анализа:', error);
+    }
+  };
+
+  const saveCurrentState = async () => {
+    if (!currentSessionId || isSaving) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // Сохраняем настройки графика
+      await supabaseDatabaseService.saveChartSettings(currentSessionId, dataType, limits, zoomState);
+      
+      // Сохраняем маркеры
+      await supabaseDatabaseService.saveVerticalMarkers(currentSessionId, markers);
+      
+    } catch (error) {
+      console.error('Ошибка сохранения состояния:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Generate analysis results table data
   const analysisResults = useMemo(() => {
@@ -594,6 +648,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           )}
           <BarChart className="w-8 h-8 text-indigo-600" />
           <h1 className="text-2xl font-bold text-gray-900">Анализатор временных рядов</h1>
+          {isSaving && (
+            <div className="flex items-center space-x-2 text-sm text-gray-500">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+              <span>Сохранение...</span>
+            </div>
+          )}
         </div>
       </div>
 

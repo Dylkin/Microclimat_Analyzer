@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesPoint, ProcessedTimeSeriesData } from '../types/TimeSeriesData';
-import { databaseService } from '../utils/database';
+import { supabaseDatabaseService } from '../utils/supabaseDatabase';
 
 interface UseTimeSeriesDataProps {
   files: UploadedFile[];
@@ -15,7 +15,7 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
 
   const processFileData = useCallback(async (file: UploadedFile): Promise<TimeSeriesPoint[]> => {
     try {
-      const measurements = await databaseService.getMeasurements(file.id);
+      const measurements = await supabaseDatabaseService.getMeasurements(file.id);
       if (!measurements || measurements.length === 0) {
         console.warn(`No measurements found for file: ${file.name}`);
         return [];
