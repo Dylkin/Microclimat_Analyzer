@@ -4,21 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { Project, ProjectType, QualificationObject, QualificationObjectType } from '../types/Project';
 import { createQualificationStages } from '../utils/qualificationStages';
 import { ArrowLeft, MapPin, Calendar, User, DollarSign, Plus, Trash2, Building, Truck, Snowflake, Save } from 'lucide-react';
+import { clientService, Client } from '../services/clientService';
 
 interface CreateProjectFormProps {
   onCancel: () => void;
   onSuccess: () => void;
-}
-
-interface Client {
-  id: string;
-  name: string;
-  contactPerson: string;
-  email: string;
-  phone: string;
-  address: string;
-  inn: string;
-  kpp?: string;
 }
 
 export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, onSuccess }) => {
@@ -69,11 +59,17 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
 
   // Загружаем клиентов при монтировании компонента
   React.useEffect(() => {
-    const savedClients = localStorage.getItem('clients');
-    if (savedClients) {
-      setClients(JSON.parse(savedClients));
-    }
+    loadClients();
   }, []);
+
+  const loadClients = async () => {
+    try {
+      const clientsData = await clientService.getAllClients();
+      setClients(clientsData);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+    }
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -98,25 +94,32 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAddClient = () => {
+  const handleAddClient = async () => {
     if (!newClient.name || !newClient.email || !newClient.inn) {
       setErrors({ newClient: 'Заполните обязательные поля для нового заказчика' });
       return;
     }
 
-    const client: Client = {
-      id: Date.now().toString(),
-      ...newClient,
-      createdAt: new Date()
-    };
+    try {
+      const client = await clientService.createClient({
+        name: newClient.name,
+        contactPerson: newClient.contactPerson,
+        email: newClient.email,
+        phone: newClient.phone,
+        address: newClient.address,
+        inn: newClient.inn,
+        kpp: newClient.kpp
+      });
 
-    const updatedClients = [...clients, client];
-    setClients(updatedClients);
-    localStorage.setItem('clients', JSON.stringify(updatedClients));
-
-    setFormData(prev => ({ ...prev, clientId: client.id, clientName: client.name }));
-    setShowNewClientForm(false);
-    setNewClient({ name: '', contactPerson: '', email: '', phone: '', address: '', inn: '', kpp: '' });
+      setClients(prev => [...prev, client]);
+      setFormData(prev => ({ ...prev, clientId: client.id, clientName: client.name }));
+      setShowNewClientForm(false);
+      setNewClient({ name: '', contactPerson: '', email: '', phone: '', address: '', inn: '', kpp: '' });
+      setErrors({});
+    } catch (error) {
+      console.error('Error adding client:', error);
+      setErrors({ newClient: 'Ошибка добавления клиента' });
+    }
   };
 
   const handleAddQualificationObject = () => {
@@ -305,6 +308,25 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
                     type="tel"
                     value={newClient.phone}
                     onChange={(e) => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ИНН *</label>
+                  <input
+                    type="text"
+                    value={newClient.inn}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, inn: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">КПП</label>
+                  <input
+                    type="text"
+                    value={newClient.kpp}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, kpp: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
