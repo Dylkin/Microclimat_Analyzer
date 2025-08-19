@@ -133,11 +133,24 @@ export class ClientService {
       console.error('Error creating client:', error);
       
       // Проверяем тип ошибки
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      let errorCode = '';
+      let errorMessage = '';
+      
+      if (error && typeof error === 'object' && 'code' in error) {
+        errorCode = String(error.code);
+      }
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      } else {
+        errorMessage = String(error);
+      }
       
       // RLS policy violation или другие ошибки доступа
-      if (errorMessage.includes('row-level security policy') || 
-          errorMessage.includes('42501') ||
+      if (errorCode === '42501' ||
+          errorMessage.includes('row-level security policy') || 
           errorMessage.includes('Could not find the table') ||
           errorMessage.includes('PGRST205')) {
         console.warn('Database access restricted, creating mock client');
