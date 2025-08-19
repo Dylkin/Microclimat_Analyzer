@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, Award, ArrowLeft } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
 import { contractorService } from '../utils/contractorService';
 import { ContractorMap } from './ContractorMap';
-import { QualificationObjectsList } from './QualificationObjectsList';
 
 export const ContractorDirectory: React.FC = () => {
   const [contractors, setContractors] = useState<Contractor[]>([]);
@@ -18,7 +17,6 @@ export const ContractorDirectory: React.FC = () => {
   const [editingContractor, setEditingContractor] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
-  const [showQualificationObjects, setShowQualificationObjects] = useState(false);
 
   // Form state
   const [newContractor, setNewContractor] = useState<CreateContractorData>({
@@ -210,12 +208,6 @@ export const ContractorDirectory: React.FC = () => {
     }
   };
 
-  // Показать объекты квалификации
-  const showContractorQualificationObjects = (contractor: Contractor) => {
-    setSelectedContractor(contractor);
-    setShowQualificationObjects(true);
-  };
-
   if (showMap && selectedContractor) {
     return (
       <ContractorMap
@@ -225,31 +217,6 @@ export const ContractorDirectory: React.FC = () => {
           setSelectedContractor(null);
         }}
       />
-    );
-  }
-
-  if (showQualificationObjects && selectedContractor) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => {
-              setShowQualificationObjects(false);
-              setSelectedContractor(null);
-            }}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <Award className="w-8 h-8 text-indigo-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Объекты квалификации</h1>
-        </div>
-        
-        <QualificationObjectsList
-          contractorId={selectedContractor.id}
-          contractorName={selectedContractor.name}
-        />
-      </div>
     );
   }
 
@@ -518,14 +485,6 @@ export const ContractorDirectory: React.FC = () => {
                           </div>
                         ) : (
                           <span className="text-gray-400 text-sm">Не указан</span>
-                            <button
-                              onClick={() => showContractorQualificationObjects(contractor)}
-                              disabled={operationLoading}
-                              className="text-purple-600 hover:text-purple-900"
-                              title="Объекты квалификации"
-                            >
-                              <Award className="w-4 h-4" />
-                            </button>
                         )}
                       </div>
                     )}

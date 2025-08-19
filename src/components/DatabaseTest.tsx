@@ -26,7 +26,6 @@ export const DatabaseTest: React.FC = () => {
     'users',
     'contractors',
     'contractor_contacts',
-    'qualification_objects',
     'uploaded_files',
     'device_metadata',
     'measurement_records',
