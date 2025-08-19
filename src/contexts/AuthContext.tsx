@@ -39,19 +39,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Проверяем сессию Supabase при загрузке
   useEffect(() => {
+    console.log('Проверяем сессию Supabase при загрузке приложения');
     checkSupabaseSession();
     
     // Подписываемся на изменения аутентификации
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Изменение состояния аутентификации:', event, session?.user?.email);
         if (session?.user) {
           // Пользователь вошел в систему
+          console.log('Пользователь вошел в систему, загружаем данные пользователя');
           const userData = await getUserFromSupabase(session.user.id);
           if (userData) {
+            console.log('Данные пользователя загружены:', userData.fullName, userData.role);
             setUser(userData);
           }
         } else {
           // Пользователь вышел из системы
+          console.log('Пользователь вышел из системы');
           setUser(null);
         }
         setIsLoading(false);
@@ -63,12 +68,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkSupabaseSession = async () => {
     try {
+      console.log('Проверяем существующую сессию Supabase');
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        console.log('Найдена существующая сессия для пользователя:', session.user.email);
         const userData = await getUserFromSupabase(session.user.id);
         if (userData) {
+          console.log('Данные пользователя восстановлены из сессии:', userData.fullName);
           setUser(userData);
         }
+      } else {
+        console.log('Активная сессия не найдена');
       }
     } catch (error) {
       console.error('Ошибка проверки сессии:', error);
@@ -79,14 +89,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getUserFromSupabase = async (userId: string): Promise<AuthUser | null> => {
     try {
+      console.log('Загружаем данные пользователя из Supabase:', userId);
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Ошибка загрузки данных пользователя:', error);
+        throw error;
+      }
 
+      console.log('Данные пользователя успешно загружены:', data.full_name);
       return {
         id: data.id,
         fullName: data.full_name,
@@ -118,16 +133,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Авторизация
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      console.log('Попытка входа в систему для пользователя:', email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Ошибка входа в систему:', error);
+        throw error;
+      }
 
       if (data.user) {
+        console.log('Успешный вход в систему, загружаем данные пользователя');
         const userData = await getUserFromSupabase(data.user.id);
         if (userData) {
+          console.log('Пользователь успешно авторизован:', userData.fullName);
           setUser(userData);
           return true;
         }
@@ -142,8 +163,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Выход
   const logout = async () => {
     try {
+      console.log('Выход из системы');
       await supabase.auth.signOut();
       setUser(null);
+      console.log('Пользователь успешно вышел из системы');
     } catch (error) {
       console.error('Ошибка выхода:', error);
     }
@@ -190,7 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Загрузка...</p>
+          <p className="text-gray-600">Проверка авторизации...</p>
         </div>
       </div>
     );

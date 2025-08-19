@@ -15,6 +15,7 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
 
   const processFileData = useCallback(async (file: UploadedFile): Promise<TimeSeriesPoint[]> => {
     try {
+      console.log(`Загружаем измерения для файла: ${file.name} (ID: ${file.id})`);
       const measurements = await supabaseDatabaseService.getMeasurements(file.id);
       if (!measurements || measurements.length === 0) {
         console.warn(`No measurements found for file: ${file.name}`);
@@ -31,6 +32,7 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
         zoneNumber: file.zoneNumber
       }));
 
+      console.log(`Загружено ${points.length} точек данных для файла: ${file.name}`);
       return points;
     } catch (error) {
       console.error(`Error processing file ${file.name}:`, error);

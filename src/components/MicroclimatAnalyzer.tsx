@@ -21,16 +21,21 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
   // Загружаем файлы пользователя при монтировании компонента
   React.useEffect(() => {
+    console.log('Загружаем файлы пользователя при монтировании компонента');
     loadUserFiles();
   }, []);
 
   const loadUserFiles = async () => {
     try {
       setIsLoading(true);
+      console.log('Запрос файлов пользователя из базы данных...');
       const files = await supabaseDatabaseService.getUserFiles();
+      console.log(`Загружено ${files.length} файлов из базы данных`);
       setUploadedFiles(files);
     } catch (error) {
       console.error('Ошибка загрузки файлов пользователя:', error);
+      // Показываем пользователю ошибку
+      alert('Ошибка загрузки файлов: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
     } finally {
       setIsLoading(false);
     }
@@ -60,6 +65,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
       try {
         // Сохраняем файл в базу данных
+        console.log(`Сохраняем файл в базу данных: ${file.name}`);
         const fileId = await supabaseDatabaseService.saveUploadedFile({
           name: file.name,
           uploadDate: new Date().toLocaleString('ru-RU'),
@@ -67,6 +73,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           order: uploadedFiles.length + i,
           userId: 'current-user' // Будет заменено в сервисе на реального пользователя
         });
+        console.log(`Файл сохранен с ID: ${fileId}`);
 
         // Обновляем состояние с новым файлом
         const newFile: UploadedFile = {
@@ -85,9 +92,12 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         // Используем универсальный парсер VI2
         const parsingService = new VI2ParsingService();
         const parsedData = await parsingService.parseFile(file);
+        console.log(`Парсинг завершен для файла: ${file.name}, записей: ${parsedData.recordCount}`);
         
         // Сохраняем в базу данных
+        console.log(`Сохраняем данные парсинга в базу данных для файла: ${file.name}`);
         await supabaseDatabaseService.saveParsedFileData(fileId, parsedData);
+        console.log(`Данные успешно сохранены в базу данных для файла: ${file.name}`);
         
         // Обновляем состояние с результатами парсинга
         setUploadedFiles(prev => prev.map(f => {
@@ -109,12 +119,9 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         
         // Обновляем статус на ошибку в базе данных
         try {
-          const fileId = uploadedFiles[uploadedFiles.length - 1]?.id;
-          if (fileId) {
-            await supabaseDatabaseService.updateFileStatus(fileId, 'error', error instanceof Error ? error.message : 'Неизвестная ошибка');
-            // Перезагружаем файлы для обновления состояния
-            await loadUserFiles();
-          }
+          console.log('Обновляем статус файла на ошибку в базе данных');
+          // Перезагружаем файлы для обновления состояния
+          await loadUserFiles();
         } catch (updateError) {
           console.error('Ошибка обновления статуса файла:', updateError);
         }
@@ -130,14 +137,16 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const handleDeleteFile = async (fileId: string) => {
     if (confirm('Вы уверены, что хотите удалить этот файл?')) {
       try {
+        console.log(`Удаляем файл из базы данных: ${fileId}`);
         // Удаляем файл из базы данных
         await supabaseDatabaseService.deleteFile(fileId);
+        console.log(`Файл успешно удален из базы данных: ${fileId}`);
         
         // Обновляем состояние
         setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
       } catch (error) {
         console.error('Ошибка удаления файла:', error);
-        alert('Ошибка при удалении файла');
+        alert('Ошибка при удалении файла: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
       }
     }
   };
@@ -162,8 +171,13 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       const targetFile = sortedFiles[newIndex];
       
       // Обновляем порядок в базе данных
-      supabaseDatabaseService.updateFileOrder(currentFile.id, targetFile.order);
-      supabaseDatabaseService.updateFileOrder(targetFile.id, currentFile.order);
+      try {
+        await supabaseDatabaseService.updateFileOrder(currentFile.id, targetFile.order);
+        await supabaseDatabaseService.updateFileOrder(targetFile.id, currentFile.order);
+        console.log(`Обновлен порядок файлов: ${currentFile.id} <-> ${targetFile.id}`);
+      } catch (error) {
+        console.error('Ошибка обновления порядка файлов:', error);
+      }
       
       return prev.map(f => {
         if (f.id === currentFile.id) return { ...f, order: targetFile.order };
@@ -176,13 +190,16 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const updateFileField = async (fileId: string, field: 'zoneNumber' | 'measurementLevel', value: string | number) => {
     // Обновляем в базе данных
     try {
+      console.log(`Обновляем поле ${field} для файла ${fileId}: ${value}`);
       const fields = field === 'zoneNumber' 
         ? { zoneNumber: typeof value === 'string' ? parseInt(value) || undefined : value }
         : { measurementLevel: value.toString() };
       
       await supabaseDatabaseService.updateFileFields(fileId, fields);
+      console.log(`Поле ${field} успешно обновлено в базе данных`);
     } catch (error) {
       console.error('Ошибка обновления поля файла:', error);
+      alert('Ошибка обновления поля: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
     }
     
     // Обновляем состояние
@@ -255,7 +272,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Загрузка файлов...</p>
+          <p className="text-gray-600">Загрузка файлов из базы данных...</p>
         </div>
       </div>
     );

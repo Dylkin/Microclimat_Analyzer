@@ -12,10 +12,12 @@ export const Login: React.FC = () => {
     e.preventDefault();
     setError('');
 
+    console.log('Попытка входа в систему с email:', email);
     const success = await login(email, password);
     if (success) {
-      // Успешная авторизация
+      console.log('Успешная авторизация');
     } else {
+      console.log('Неудачная попытка авторизации');
       setError('Неверный логин или пароль');
     }
   };
