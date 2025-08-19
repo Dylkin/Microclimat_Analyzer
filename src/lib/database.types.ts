@@ -43,8 +43,6 @@ export interface Database {
           email: string | null
           phone: string | null
           address: string | null
-          inn: string | null
-          kpp: string | null
           created_at: string
           updated_at: string
         }
@@ -55,8 +53,6 @@ export interface Database {
           email?: string | null
           phone?: string | null
           address?: string | null
-          inn?: string | null
-          kpp?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -67,8 +63,6 @@ export interface Database {
           email?: string | null
           phone?: string | null
           address?: string | null
-          inn?: string | null
-          kpp?: string | null
           created_at?: string
           updated_at?: string
         }

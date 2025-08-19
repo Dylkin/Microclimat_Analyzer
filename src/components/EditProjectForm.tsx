@@ -108,7 +108,7 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
   };
 
   const handleAddClient = async () => {
-    if (!newClient.name || !newClient.email || !newClient.inn) {
+    if (!newClient.name || !newClient.email) {
       setErrors({ newClient: 'Заполните обязательные поля для нового заказчика' });
       return;
     }

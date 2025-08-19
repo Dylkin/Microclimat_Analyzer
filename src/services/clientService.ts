@@ -181,8 +181,6 @@ export class ClientService {
       if (updates.email !== undefined) clientUpdates.email = updates.email || null;
       if (updates.phone !== undefined) clientUpdates.phone = updates.phone || null;
       if (updates.address !== undefined) clientUpdates.address = updates.address || null;
-      if (updates.inn !== undefined) clientUpdates.inn = updates.inn || null;
-      if (updates.kpp !== undefined) clientUpdates.kpp = updates.kpp || null;
 
       const { error } = await supabase
         .from('clients')
