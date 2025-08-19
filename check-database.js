@@ -1,11 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
-import { config } from 'dotenv';
-
-// Загружаем переменные окружения
-config();
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+console.log('🚀 Запуск проверки базы данных...');
+console.log('📋 Переменные окружения:');
+console.log('VITE_SUPABASE_URL:', supabaseUrl ? 'установлена' : 'НЕ НАЙДЕНА');
+console.log('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'установлена' : 'НЕ НАЙДЕНА');
+console.log('');
 
 console.log('🔍 Проверка подключения к базе данных Supabase...\n');
 
@@ -14,11 +16,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Проверьте наличие VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY в .env файле');
   process.exit(1);
 }
-
-console.log('📋 Конфигурация:');
-console.log(`URL: ${supabaseUrl}`);
-console.log(`Anon Key: ${supabaseAnonKey.substring(0, 20)}...`);
-console.log('');
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -42,33 +39,35 @@ const tablesToCheck = [
 
 async function checkTableAccess(tableName) {
   try {
-    console.log(`🔍 Проверяем таблицу: ${tableName}`);
+    console.log(`🔍 Проверяем таблицу: ${tableName}...`);
     
     const { data, error, count } = await supabase
       .from(tableName)
       .select('*', { count: 'exact', head: true });
     
     if (error) {
-      console.log(`❌ ${tableName}: ${error.message}`);
+      console.log(`❌ ${tableName}: ОШИБКА - ${error.message}`);
       return { table: tableName, accessible: false, error: error.message };
     } else {
-      console.log(`✅ ${tableName}: доступна (записей: ${count || 0})`);
+      console.log(`✅ ${tableName}: ДОСТУПНА (записей: ${count || 0})`);
       return { table: tableName, accessible: true, count: count || 0 };
     }
   } catch (err) {
-    console.log(`❌ ${tableName}: ${err.message}`);
+    console.log(`❌ ${tableName}: ИСКЛЮЧЕНИЕ - ${err.message}`);
     return { table: tableName, accessible: false, error: err.message };
   }
 }
 
 async function checkDatabaseConnection() {
   try {
+    console.log('⏳ Начинаем проверку...\n');
+    
     // Проверяем базовое подключение
     console.log('🔗 Проверяем базовое подключение...');
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError && authError.message !== 'Invalid JWT: JWTExpired') {
-      console.log(`⚠️  Аутентификация: ${authError.message}`);
+      console.log(`⚠️ Аутентификация: ${authError.message}`);
     } else {
       console.log('✅ Базовое подключение установлено');
     }
@@ -77,9 +76,12 @@ async function checkDatabaseConnection() {
     
     // Проверяем каждую таблицу
     const results = [];
+    let processedCount = 0;
     for (const table of tablesToCheck) {
       const result = await checkTableAccess(table);
       results.push(result);
+      processedCount++;
+      console.log(`📊 Обработано: ${processedCount}/${tablesToCheck.length}`);
     }
     
     console.log('\n📈 Сводка результатов:');
@@ -134,9 +136,20 @@ async function checkDatabaseConnection() {
     
   } catch (error) {
     console.error('❌ Критическая ошибка:', error.message);
+    console.error('Стек ошибки:', error.stack);
     process.exit(1);
   }
 }
 
+console.log('🎯 Начинаем проверку базы данных...');
+
 // Запускаем проверку
-checkDatabaseConnection();
+checkDatabaseConnection()
+  .then(() => {
+    console.log('\n✅ Проверка завершена успешно!');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('\n❌ Проверка завершена с ошибкой:', error);
+    process.exit(1);
+  });
