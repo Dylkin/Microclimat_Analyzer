@@ -5,6 +5,7 @@ import { Layout } from './components/Layout';
 import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
 import { Help } from './components/Help';
 import { DatabaseTest } from './components/DatabaseTest';
+import { UserDirectory } from './components/UserDirectory';
 import './index.css';
 
 const AppContent: React.FC = () => {
@@ -31,6 +32,8 @@ const AppContent: React.FC = () => {
         ) : <div>Доступ запрещен</div>;
       case 'help':
         return hasAccess('help') ? <Help /> : <div>Доступ запрещен</div>;
+      case 'users':
+        return hasAccess('users') ? <UserDirectory /> : <div>Доступ запрещен</div>;
       case 'database':
         return hasAccess('database') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
       default:
