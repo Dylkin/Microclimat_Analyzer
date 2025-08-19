@@ -138,14 +138,6 @@ export const ReferenceBooks: React.FC = () => {
       const defaultSettings: SystemSettings[] = [
         {
           id: '1',
-          key: 'default_measurement_interval',
-          value: '15',
-          description: 'Интервал измерений по умолчанию (минуты)',
-          type: 'number',
-          category: 'measurements'
-        },
-        {
-          id: '2',
           key: 'max_file_size',
           value: '100',
           description: 'Максимальный размер загружаемого файла (МБ)',
@@ -153,7 +145,7 @@ export const ReferenceBooks: React.FC = () => {
           category: 'files'
         },
         {
-          id: '3',
+          id: '2',
           key: 'company_name',
           value: 'ООО "Микроклимат"',
           description: 'Название организации',
