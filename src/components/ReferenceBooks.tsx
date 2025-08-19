@@ -263,13 +263,15 @@ export const ReferenceBooks: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">Справочник заказчиков</h2>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Добавить заказчика</span>
-        </button>
+        {user?.role === 'administrator' && (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Добавить заказчика</span>
+          </button>
+        )}
       </div>
 
       {showAddForm && (

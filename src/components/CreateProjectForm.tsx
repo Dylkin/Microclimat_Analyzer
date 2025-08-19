@@ -247,7 +247,12 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
                 <button
                   type="button"
                   onClick={() => setShowNewClientForm(true)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  disabled={user?.role !== 'administrator'}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    user?.role === 'administrator' 
+                      ? 'bg-green-600 text-white hover:bg-green-700' 
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -360,7 +365,12 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
                 <button
                   type="button"
                   onClick={handleAddClient}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  disabled={user?.role !== 'administrator'}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    user?.role === 'administrator'
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
                   Добавить
                 </button>
