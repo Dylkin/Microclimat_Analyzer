@@ -108,14 +108,6 @@ export class ContractorService {
         console.warn('Найдены контрагенты с некорректными ID:', invalidContractors);
       }
 
-      // Проверяем валидность UUID для всех контрагентов
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const invalidContractors = contractorsData?.filter(c => !uuidRegex.test(c.id)) || [];
-      
-      if (invalidContractors.length > 0) {
-        console.warn('Найдены контрагенты с некорректными ID:', invalidContractors);
-      }
-
       // Получаем все контакты
       const { data: contactsData, error: contactsError } = await this.supabase
         .from('contractor_contacts')

@@ -131,13 +131,6 @@ export const ProjectDirectory: React.FC = () => {
       return;
     }
 
-    // Проверяем, что contractorId является валидным UUID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(newProject.contractorId)) {
-      alert('Ошибка: некорректный ID контрагента. Обновите страницу и попробуйте снова.');
-      return;
-    }
-
     setOperationLoading(true);
     try {
       // Генерируем название проекта на основе выбранных объектов
