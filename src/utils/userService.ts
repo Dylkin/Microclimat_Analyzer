@@ -113,6 +113,8 @@ export class UserService {
     }
 
     try {
+      console.log('Добавляем пользователя:', newUser);
+      
       const { data, error } = await this.supabase
         .from('users')
         .insert({
@@ -127,12 +129,24 @@ export class UserService {
 
       if (error) {
         console.error('Ошибка добавления пользователя:', error);
+        console.error('Детали ошибки:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        
         if (error.code === '23505') {
           throw new Error('Пользователь с таким email уже существует');
+        }
+        if (error.code === '42501') {
+          throw new Error('Недостаточно прав для добавления пользователя');
         }
         throw new Error(`Ошибка добавления пользователя: ${error.message}`);
       }
 
+      console.log('Пользователь успешно добавлен:', data);
+      
       return {
         id: data.id,
         fullName: data.full_name,

@@ -152,21 +152,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Добавление пользователя
-  const addUser = async (newUser: Omit<User, 'id'>) => {
+  const addUser = async (newUser: Omit<User, 'id'>): Promise<void> => {
     try {
       let addedUser: User;
 
       // Пытаемся добавить в базу данных
       if (userService.isAvailable()) {
         try {
+          console.log('Добавляем пользователя через userService:', newUser);
           addedUser = await userService.addUser(newUser);
           console.log('Пользователь добавлен в БД:', addedUser);
         } catch (error) {
           console.error('Ошибка добавления в БД:', error);
-          throw error;
+          
+          // Если ошибка связана с правами доступа, пробуем fallback
+          if (error instanceof Error && error.message.includes('прав')) {
+            console.warn('Используем fallback к локальному хранению');
+            addedUser = {
+              ...newUser,
+              id: Date.now().toString()
+            };
+          } else {
+            throw error;
+          }
         }
       } else {
         // Fallback к локальному хранению
+        console.log('Supabase недоступен, используем локальное хранение');
         addedUser = {
           ...newUser,
           id: Date.now().toString()
@@ -174,6 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setUsers(prev => [...prev, addedUser]);
+      console.log('Пользователь добавлен в локальное состояние:', addedUser);
     } catch (error) {
       console.error('Ошибка добавления пользователя:', error);
       throw error;

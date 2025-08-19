@@ -46,22 +46,27 @@ export const UserDirectory: React.FC = () => {
 
     setOperationLoading(true);
     try {
+      console.log('Начинаем добавление пользователя:', newUser);
       await addUser(newUser);
+      console.log('Пользователь успешно добавлен');
+      
+      // Сбрасываем форму только после успешного добавления
+      setNewUser({
+        fullName: '',
+        email: '',
+        password: '',
+        role: 'specialist'
+      });
+      setShowAddForm(false);
       alert('Пользователь успешно добавлен');
     } catch (error) {
-      alert(`Ошибка добавления пользователя: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      console.error('Ошибка в handleAddUser:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      alert(`Ошибка добавления пользователя: ${errorMessage}`);
       setOperationLoading(false);
       return;
     }
     setOperationLoading(false);
-
-    setNewUser({
-      fullName: '',
-      email: '',
-      password: '',
-      role: 'specialist'
-    });
-    setShowAddForm(false);
   };
 
   const handleEditUser = (user: User) => {
