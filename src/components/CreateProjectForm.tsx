@@ -19,10 +19,6 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
     description: '',
     clientId: '',
     clientName: '', 
-    estimatedDuration: 14,
-    budget: '',
-    priority: 'medium' as Project['priority'],
-    tags: '',
   });
 
   const [qualificationObjects, setQualificationObjects] = useState<Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>[]>([]);
@@ -50,13 +46,6 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
     { value: 'thermocontainer', label: 'Термоконтейнер', icon: Snowflake }
   ];
 
-  const priorities = [
-    { value: 'low', label: 'Низкий', color: 'text-green-600' },
-    { value: 'medium', label: 'Средний', color: 'text-yellow-600' },
-    { value: 'high', label: 'Высокий', color: 'text-orange-600' },
-    { value: 'urgent', label: 'Срочный', color: 'text-red-600' }
-  ];
-
   // Загружаем клиентов при монтировании компонента
   React.useEffect(() => {
     loadClients();
@@ -78,17 +67,16 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
       newErrors.client = 'Выберите заказчика или добавьте нового';
     }
 
-    if (formData.estimatedDuration < 1) {
-      newErrors.estimatedDuration = 'Длительность должна быть больше 0';
-    }
-
-    if (formData.budget && isNaN(Number(formData.budget))) {
-      newErrors.budget = 'Бюджет должен быть числом';
-    }
-
     if (qualificationObjects.length === 0) {
       newErrors.objects = 'Добавьте хотя бы один объект квалификации';
     }
+
+    // Проверка на дублирование проектов
+    const selectedClient = clients.find(c => c.id === formData.clientId);
+    const clientName = selectedClient?.name || formData.clientName.trim();
+    
+    // Проверяем дублирование проектов (будет работать после подключения к БД)
+    // Пока оставляем заготовку для будущей реализации
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -148,6 +136,22 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Проверка на дублирование проектов перед созданием
+    const selectedClient = clients.find(c => c.id === formData.clientId);
+    const clientName = selectedClient?.name || formData.clientName.trim();
+    
+    try {
+      // Проверяем существование проекта с таким же типом и заказчиком
+      const existingProject = await projectService.findProjectByClientAndType(clientName, 'mapping');
+      if (existingProject) {
+        setErrors({ duplicate: `Проект картирования для заказчика "${clientName}" уже существует` });
+        return;
+      }
+    } catch (error) {
+      // Если проверка не удалась (например, БД недоступна), продолжаем создание
+      console.warn('Could not check for duplicate projects:', error);
+    }
+    
     if (!validateForm()) {
       return;
     }
@@ -166,12 +170,12 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
         clientName: selectedClient?.name || formData.clientName.trim(),
         managerId: user?.id || '',
         managerName: user?.fullName || '',
-        estimatedDuration: formData.estimatedDuration,
-        budget: formData.budget ? Number(formData.budget) : undefined,
+        estimatedDuration: 14, // Значение по умолчанию
+        budget: undefined,
         currentStage: 'preparation',
         progress: 0,
-        priority: formData.priority,
-        tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
+        priority: 'medium',
+        tags: [],
         qualificationObjects: qualificationObjects.map(obj => ({
           ...obj,
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -205,8 +209,6 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
-
-  const selectedTemplate = templates.find(t => t.type === 'mapping');
 
   return (
     <div className="space-y-6">
@@ -267,6 +269,34 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
                 placeholder="Опишите цели и задачи проекта"
               />
             </div>
+          </div>
+
+          {/* Actions moved here */}
+          <div className="flex items-center justify-end space-x-4 pt-6 mt-6 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Создание...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Создать проект</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* New Client Form */}
@@ -398,144 +428,19 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
         </div>
 
         {/* Project Type Info */}
-        <div className="bg-blue-50 rounded-lg p-4">
-          <div className="flex items-center space-x-3">
-            <MapPin className="w-6 h-6 text-blue-600" />
-            <div>
-              <h4 className="text-sm font-medium text-blue-900">Тип проекта: Картирование (Исследование микроклимата)</h4>
-              <p className="text-xs text-blue-700">Картирование температурных и влажностных условий в объектах квалификации</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Project Parameters */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Параметры проекта</h3>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Длительность (дни) *
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={formData.estimatedDuration}
-                onChange={(e) => handleInputChange('estimatedDuration', Number(e.target.value))}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                  errors.estimatedDuration ? 'border-red-300' : 'border-gray-300'
-                }`}
-              />
-              {errors.estimatedDuration && <p className="mt-1 text-sm text-red-600">{errors.estimatedDuration}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Бюджет (руб.)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.budget}
-                onChange={(e) => handleInputChange('budget', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                  errors.budget ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Ориентировочный бюджет"
-              />
-              {errors.budget && <p className="mt-1 text-sm text-red-600">{errors.budget}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Приоритет
-              </label>
-              <select
-                value={formData.priority}
-                onChange={(e) => handleInputChange('priority', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                {priorities.map((priority) => (
-                  <option key={priority.value} value={priority.value}>
-                    {priority.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Теги (через запятую)
-              </label>
-              <input
-                type="text"
-                value={formData.tags}
-                onChange={(e) => handleInputChange('tags', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="фармацевтика, склад, холодильник"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Template Preview */}
-        {selectedTemplate && (
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-900 mb-2">
-              Этапы проекта (по шаблону "{selectedTemplate.name}")
-            </h4>
-            <div className="space-y-2">
-              {selectedTemplate.stages.map((stage, index) => (
-                <div key={stage.id} className="flex items-center space-x-3">
-                  <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-medium">
-                    {index + 1}
-                  </span>
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-gray-900">{stage.name}</span>
-                    <span className="text-xs text-gray-500 ml-2">
-                      (~{stage.estimatedDuration} дней)
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Error Message */}
         {errors.submit && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-sm text-red-600">{errors.submit}</p>
           </div>
         )}
-
-        {/* Actions */}
-        <div className="flex items-center justify-end space-x-4 pt-6">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            Отмена
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
-          >
-            {isSubmitting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Создание...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>Создать проект</span>
-              </>
-            )}
-          </button>
-        </div>
+        
+        {/* Duplicate Error Message */}
+        {errors.duplicate && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-600">{errors.duplicate}</p>
+          </div>
+        )}
       </form>
     </div>
   );

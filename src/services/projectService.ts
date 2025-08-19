@@ -287,6 +287,28 @@ export class ProjectService {
     }
   }
 
+  // Поиск проекта по клиенту и типу (для проверки дублирования)
+  async findProjectByClientAndType(clientName: string, type: Project['type']): Promise<Project | null> {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('client_name', clientName)
+        .eq('type', type)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Не найден
+        throw error;
+      }
+
+      return this.mapProjectFromDB(data);
+    } catch (error) {
+      console.error('Error finding project by client and type:', error);
+      return null;
+    }
+  }
+
   // Создание проекта
   async createProject(projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
     try {
