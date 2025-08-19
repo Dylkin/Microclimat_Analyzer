@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useProjects } from '../contexts/ProjectContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Project, ProjectType, QualificationObject, QualificationObjectType } from '../types/Project';
+import { createQualificationStages } from '../utils/qualificationStages';
 import { X, MapPin, Calendar, User, DollarSign, Plus, Trash2, Building, Truck, Snowflake } from 'lucide-react';
 
 interface CreateProjectModalProps {
@@ -118,10 +119,14 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
   };
 
   const handleAddQualificationObject = () => {
+    const objectId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     const newObject: Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'> = {
       type: 'room',
       name: '',
       description: '',
+      stages: createQualificationStages(objectId),
+      overallStatus: 'not_started',
+      overallProgress: 0,
       technicalParameters: {}
     };
     setQualificationObjects(prev => [...prev, newObject]);
@@ -165,6 +170,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
         qualificationObjects: qualificationObjects.map(obj => ({
           ...obj,
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          stages: obj.stages.map(stage => ({
+            ...stage,
+            id: `${obj.id || Date.now()}_stage_${stage.type}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`
+          })),
           createdAt: new Date(),
           updatedAt: new Date()
         }))

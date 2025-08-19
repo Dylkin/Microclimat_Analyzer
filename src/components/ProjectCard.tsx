@@ -2,6 +2,7 @@ import React from 'react';
 import { Project } from '../types/Project';
 import { useProjects } from '../contexts/ProjectContext';
 import { EditProjectModal } from './EditProjectModal';
+import { ProjectDetailsModal } from './ProjectDetailsModal';
 import { 
   Calendar, 
   User, 
@@ -13,7 +14,8 @@ import {
   Thermometer,
   FileText,
   Edit3,
-  Edit
+  Edit,
+  Eye
 } from 'lucide-react';
 
 interface ProjectCardProps {
@@ -25,6 +27,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
   const { updateProject } = useProjects();
   const [showStatusMenu, setShowStatusMenu] = React.useState(false);
   const [showEditModal, setShowEditModal] = React.useState(false);
+  const [showDetailsModal, setShowDetailsModal] = React.useState(false);
 
   const statusOptions = [
     { value: 'draft', label: 'Черновик', color: 'bg-gray-100 text-gray-800' },
@@ -98,6 +101,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
     setShowEditModal(true);
   };
 
+  const handleDetailsClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDetailsModal(true);
+  };
+
   return (
     <>
       <div className="relative">
@@ -123,6 +131,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
           </div>
           <button className="text-gray-400 hover:text-gray-600">
             <div className="flex items-center space-x-1">
+              <button
+                onClick={handleDetailsClick}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                title="Просмотр этапов"
+              >
+                <Eye className="w-4 h-4" />
+              </button>
               <button
                 onClick={handleEditClick}
                 className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -280,6 +295,14 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
         <EditProjectModal
           project={project}
           onClose={() => setShowEditModal(false)}
+        />
+      )}
+
+      {/* Details Modal */}
+      {showDetailsModal && (
+        <ProjectDetailsModal
+          project={project}
+          onClose={() => setShowDetailsModal(false)}
         />
       )}
     </>

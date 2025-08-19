@@ -18,11 +18,50 @@ export type ProjectType = 'mapping';
 
 export type QualificationObjectType = 'room' | 'automobile' | 'refrigerator_chamber' | 'refrigerator' | 'freezer' | 'thermocontainer';
 
+export type QualificationStageType = 
+  | 'documentation_collection'
+  | 'protocol_preparation' 
+  | 'equipment_setup'
+  | 'testing_execution'
+  | 'data_extraction'
+  | 'report_preparation'
+  | 'report_approval'
+  | 'documentation_finalization'
+  | 'closed'
+  | 'paused';
+
+export type QualificationStageStatus = 'pending' | 'in_progress' | 'completed' | 'paused';
+
+export interface QualificationStage {
+  id: string;
+  type: QualificationStageType;
+  name: string;
+  description: string;
+  status: QualificationStageStatus;
+  assigneeId?: string;
+  assigneeName?: string;
+  estimatedDuration: number; // в днях
+  actualDuration?: number; // в днях
+  startDate?: Date;
+  endDate?: Date;
+  plannedStartDate?: Date;
+  plannedEndDate?: Date;
+  order: number;
+  isRequired: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  notes?: string;
+}
+
 export interface QualificationObject {
   id: string;
   type: QualificationObjectType;
   name: string;
   description?: string;
+  stages: QualificationStage[];
+  currentStageId?: string;
+  overallStatus: 'not_started' | 'in_progress' | 'completed' | 'paused';
+  overallProgress: number; // 0-100
   technicalParameters: {
     area?: number; // площадь в м²
     volume?: number; // объем в м³

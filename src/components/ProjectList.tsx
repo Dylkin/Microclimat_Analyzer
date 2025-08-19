@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Project } from '../types/Project';
 import { useProjects } from '../contexts/ProjectContext';
 import { EditProjectModal } from './EditProjectModal';
+import { ProjectDetailsModal } from './ProjectDetailsModal';
 import { 
   Calendar, 
   User, 
@@ -14,7 +15,8 @@ import {
   Clock,
   DollarSign,
   Edit3,
-  Edit
+  Edit,
+  Eye
 } from 'lucide-react';
 
 interface ProjectListProps {
@@ -27,6 +29,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [detailsProject, setDetailsProject] = useState<Project | null>(null);
 
   const statusOptions = [
     { value: 'draft', label: 'Черновик', color: 'bg-gray-100 text-gray-800' },
@@ -123,6 +126,10 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
 
   const handleEditProject = (project: Project) => {
     setEditingProject(project);
+  };
+
+  const handleDetailsProject = (project: Project) => {
+    setDetailsProject(project);
   };
 
   return (
@@ -306,6 +313,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
                     <button className="text-gray-400 hover:text-gray-600">
                       <div className="flex items-center space-x-2">
                         <button
+                          onClick={() => handleDetailsProject(project)}
+                          className="text-blue-600 hover:text-blue-900 transition-colors"
+                          title="Просмотр этапов"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleEditProject(project)}
                           className="text-indigo-600 hover:text-indigo-900 transition-colors"
                           title="Редактировать проект"
@@ -337,6 +351,14 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
         <EditProjectModal
           project={editingProject}
           onClose={() => setEditingProject(null)}
+        />
+      )}
+
+      {/* Details Modal */}
+      {detailsProject && (
+        <ProjectDetailsModal
+          project={detailsProject}
+          onClose={() => setDetailsProject(null)}
         />
       )}
     </>

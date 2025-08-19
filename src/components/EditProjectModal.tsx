@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useProjects } from '../contexts/ProjectContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Project, QualificationObject, QualificationObjectType } from '../types/Project';
+import { createQualificationStages } from '../utils/qualificationStages';
 import { X, Save, Plus, Trash2, Building, Truck, Snowflake } from 'lucide-react';
 
 interface EditProjectModalProps {
@@ -131,11 +132,15 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, onC
   };
 
   const handleAddQualificationObject = () => {
+    const objectId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     const newObject: QualificationObject = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: objectId,
       type: 'room',
       name: '',
       description: '',
+      stages: createQualificationStages(objectId),
+      overallStatus: 'not_started',
+      overallProgress: 0,
       technicalParameters: {},
       createdAt: new Date(),
       updatedAt: new Date()
