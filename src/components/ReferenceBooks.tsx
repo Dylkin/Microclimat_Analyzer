@@ -563,6 +563,8 @@ const ClientForm: React.FC<{
     email: '',
     phone: '',
     address: ''
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
