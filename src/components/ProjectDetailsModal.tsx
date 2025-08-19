@@ -151,12 +151,14 @@ export const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ projec
   };
 
   const handleAddNewObject = () => {
+    const objectId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const startDate = new Date(); // Начинаем от текущей даты
     const newObject: QualificationObject = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: objectId,
       type: 'room',
       name: '',
       description: '',
-      stages: [],
+      stages: createQualificationStages(objectId, startDate),
       overallStatus: 'not_started',
       overallProgress: 0,
       technicalParameters: {},

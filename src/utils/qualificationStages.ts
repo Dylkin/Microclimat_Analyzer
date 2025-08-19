@@ -96,11 +96,12 @@ export const QUALIFICATION_STAGE_TEMPLATES: StageTemplate[] = [
 /**
  * Создание этапов для объекта квалификации на основе шаблонов
  */
-export function createQualificationStages(objectId: string): QualificationStage[] {
+export function createQualificationStages(objectId: string, startDate?: Date): QualificationStage[] {
   const now = new Date();
+  const baseStartDate = startDate || now;
   
   return QUALIFICATION_STAGE_TEMPLATES
-    .filter(template => template.isRequired) // Только обязательные этапы по умолчанию
+    .filter(template => template.type !== 'paused') // Все этапы кроме "Пауза"
     .map((template, index) => {
       const stage: QualificationStage = {
         id: `${objectId}_stage_${template.type}_${Date.now()}_${index}`,
@@ -115,17 +116,18 @@ export function createQualificationStages(objectId: string): QualificationStage[
         updatedAt: now
       };
 
-      // Рассчитываем плановые даты
+      // Рассчитываем плановые даты начиная от базовой даты
       if (index === 0) {
-        stage.plannedStartDate = now;
-        stage.plannedEndDate = new Date(now.getTime() + template.estimatedDuration * 24 * 60 * 60 * 1000);
+        stage.plannedStartDate = new Date(baseStartDate);
+        stage.plannedEndDate = new Date(baseStartDate.getTime() + template.estimatedDuration * 24 * 60 * 60 * 1000);
       } else {
-        // Каждый следующий этап начинается после завершения предыдущего
-        const prevStage = QUALIFICATION_STAGE_TEMPLATES[index - 1];
-        const prevDuration = QUALIFICATION_STAGE_TEMPLATES.slice(0, index).reduce((sum, s) => sum + s.estimatedDuration, 0);
+        // Каждый следующий этап начинается после завершения предыдущего (исключая "Пауза")
+        const relevantTemplates = QUALIFICATION_STAGE_TEMPLATES.filter(t => t.type !== 'paused');
+        const currentTemplateIndex = relevantTemplates.findIndex(t => t.type === template.type);
+        const prevDuration = relevantTemplates.slice(0, currentTemplateIndex).reduce((sum, s) => sum + s.estimatedDuration, 0);
         
-        stage.plannedStartDate = new Date(now.getTime() + prevDuration * 24 * 60 * 60 * 1000);
-        stage.plannedEndDate = new Date(now.getTime() + (prevDuration + template.estimatedDuration) * 24 * 60 * 60 * 1000);
+        stage.plannedStartDate = new Date(baseStartDate.getTime() + prevDuration * 24 * 60 * 60 * 1000);
+        stage.plannedEndDate = new Date(baseStartDate.getTime() + (prevDuration + template.estimatedDuration) * 24 * 60 * 60 * 1000);
       }
 
       return stage;

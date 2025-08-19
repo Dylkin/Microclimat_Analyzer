@@ -134,12 +134,13 @@ export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCan
 
   const handleAddQualificationObject = () => {
     const objectId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const startDate = new Date(); // Начинаем от текущей даты
     const newObject: QualificationObject = {
       id: objectId,
       type: 'room',
       name: '',
       description: '',
-      stages: createQualificationStages(objectId),
+      stages: createQualificationStages(objectId, startDate),
       overallStatus: 'not_started',
       overallProgress: 0,
       technicalParameters: {},

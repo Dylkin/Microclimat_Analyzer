@@ -206,6 +206,15 @@ export const QualificationObjectStages: React.FC<QualificationObjectStagesProps>
     const template = QUALIFICATION_STAGE_TEMPLATES.find(t => t.type === stageType);
     if (!template) return;
 
+    // Находим последний этап для расчета даты начала нового этапа
+    const existingStages = object.stages.filter(s => s.isRequired).sort((a, b) => a.order - b.order);
+    const lastStage = existingStages[existingStages.length - 1];
+    
+    let plannedStartDate = new Date();
+    if (lastStage && lastStage.plannedEndDate) {
+      plannedStartDate = new Date(lastStage.plannedEndDate);
+    }
+
     const newStage: QualificationStage = {
       id: `${object.id}_stage_${stageType}_${Date.now()}`,
       type: stageType,
@@ -215,6 +224,8 @@ export const QualificationObjectStages: React.FC<QualificationObjectStagesProps>
       estimatedDuration: template.estimatedDuration,
       order: Math.max(...object.stages.map(s => s.order), 0) + 1,
       isRequired: template.isRequired,
+      plannedStartDate,
+      plannedEndDate: new Date(plannedStartDate.getTime() + template.estimatedDuration * 24 * 60 * 60 * 1000),
       createdAt: new Date(),
       updatedAt: new Date()
     };
