@@ -356,7 +356,7 @@ export const QualificationObjectStages: React.FC<QualificationObjectStagesProps>
   };
 
   // Сортируем этапы по порядку
-  const sortedStages = [...object.stages].sort((a, b) => a.order - b.order);
+  const sortedStages = [...(object.stages || [])].sort((a, b) => a.order - b.order);
 
   return (
     <div className="space-y-4">
