@@ -83,7 +83,11 @@ export const ProjectKanban: React.FC<ProjectKanbanProps> = ({ projects }) => {
   };
 
   const handleEditProject = (project: Project) => {
-    setEditingProject(project);
+    if (props.onEditProject) {
+      props.onEditProject(project);
+    } else {
+      setEditingProject(project);
+    }
   };
 
   return (

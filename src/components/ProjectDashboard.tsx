@@ -26,6 +26,7 @@ import {
 
 interface ProjectDashboardProps {
   projects: Project[];
+  onEditProject?: (project: Project) => void;
 }
 
 export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects }) => {

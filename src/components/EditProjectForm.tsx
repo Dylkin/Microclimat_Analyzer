@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProjects } from '../contexts/ProjectContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Project, ProjectType, QualificationObject, QualificationObjectType } from '../types/Project';
+import { Project, QualificationObject, QualificationObjectType } from '../types/Project';
 import { createQualificationStages } from '../utils/qualificationStages';
-import { X, MapPin, Calendar, User, DollarSign, Plus, Trash2, Building, Truck, Snowflake } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Building, Truck, Snowflake } from 'lucide-react';
 
-interface CreateProjectModalProps {
-  onClose: () => void;
+interface EditProjectFormProps {
+  project: Project;
+  onCancel: () => void;
+  onSuccess: () => void;
 }
 
 interface Client {
@@ -20,21 +22,25 @@ interface Client {
   kpp?: string;
 }
 
-export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose }) => {
+export const EditProjectForm: React.FC<EditProjectFormProps> = ({ project, onCancel, onSuccess }) => {
   const { user } = useAuth();
-  const { createProject, templates } = useProjects();
+  const { updateProject } = useProjects();
   
   const [formData, setFormData] = useState({
-    description: '',
-    clientId: '',
-    clientName: '', 
-    estimatedDuration: 14,
-    budget: '',
-    priority: 'medium' as Project['priority'],
-    tags: '',
+    description: project.description || '',
+    clientId: project.clientId,
+    clientName: project.clientName,
+    estimatedDuration: project.estimatedDuration,
+    budget: project.budget?.toString() || '',
+    priority: project.priority,
+    tags: project.tags.join(', '),
+    status: project.status
   });
 
-  const [qualificationObjects, setQualificationObjects] = useState<Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>[]>([]);
+  const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>(
+    project.qualificationObjects || []
+  );
+  
   const [clients, setClients] = useState<Client[]>([]);
   const [showNewClientForm, setShowNewClientForm] = useState(false);
   const [newClient, setNewClient] = useState({
@@ -66,8 +72,16 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
     { value: 'urgent', label: 'Срочный', color: 'text-red-600' }
   ];
 
+  const statusOptions = [
+    { value: 'draft', label: 'Черновик' },
+    { value: 'contract', label: 'Договор' },
+    { value: 'in_progress', label: 'В работе' },
+    { value: 'paused', label: 'Пауза' },
+    { value: 'closed', label: 'Закрыт' }
+  ];
+
   // Загружаем клиентов при монтировании компонента
-  React.useEffect(() => {
+  useEffect(() => {
     const savedClients = localStorage.getItem('clients');
     if (savedClients) {
       setClients(JSON.parse(savedClients));
@@ -120,24 +134,29 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
 
   const handleAddQualificationObject = () => {
     const objectId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-    const newObject: Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'> = {
+    const newObject: QualificationObject = {
+      id: objectId,
       type: 'room',
       name: '',
       description: '',
       stages: createQualificationStages(objectId),
       overallStatus: 'not_started',
       overallProgress: 0,
-      technicalParameters: {}
+      technicalParameters: {},
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     setQualificationObjects(prev => [...prev, newObject]);
   };
 
-  const handleUpdateQualificationObject = (index: number, updates: Partial<Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>>) => {
-    setQualificationObjects(prev => prev.map((obj, i) => i === index ? { ...obj, ...updates } : obj));
+  const handleUpdateQualificationObject = (id: string, updates: Partial<QualificationObject>) => {
+    setQualificationObjects(prev => prev.map(obj => 
+      obj.id === id ? { ...obj, ...updates, updatedAt: new Date() } : obj
+    ));
   };
 
-  const handleRemoveQualificationObject = (index: number) => {
-    setQualificationObjects(prev => prev.filter((_, i) => i !== index));
+  const handleRemoveQualificationObject = (id: string) => {
+    setQualificationObjects(prev => prev.filter(obj => obj.id !== id));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -153,37 +172,24 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
       // Находим выбранного клиента
       const selectedClient = clients.find(c => c.id === formData.clientId);
       
-      const projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> = {
+      const updatedProject: Partial<Project> = {
         description: formData.description.trim() || undefined,
-        type: 'mapping',
-        status: 'draft',
-        clientId: formData.clientId || Date.now().toString(),
+        clientId: formData.clientId || project.clientId,
         clientName: selectedClient?.name || formData.clientName.trim(),
-        managerId: user?.id || '',
-        managerName: user?.fullName || '',
         estimatedDuration: formData.estimatedDuration,
         budget: formData.budget ? Number(formData.budget) : undefined,
-        currentStage: 'preparation',
-        progress: 0,
         priority: formData.priority,
+        status: formData.status,
         tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-        qualificationObjects: qualificationObjects.map(obj => ({
-          ...obj,
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          stages: obj.stages.map(stage => ({
-            ...stage,
-            id: `${obj.id || Date.now()}_stage_${stage.type}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`
-          })),
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }))
+        qualificationObjects: qualificationObjects,
+        updatedAt: new Date()
       };
 
-      await createProject(projectData);
-      onClose();
+      await updateProject(project.id, updatedProject);
+      onSuccess();
     } catch (error) {
-      console.error('Ошибка создания проекта:', error);
-      setErrors({ submit: 'Ошибка при создании проекта' });
+      console.error('Ошибка обновления проекта:', error);
+      setErrors({ submit: 'Ошибка при обновлении проекта' });
     } finally {
       setIsSubmitting(false);
     }
@@ -201,28 +207,27 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
     }
   };
 
-  const selectedTemplate = templates.find(t => t.type === 'mapping');
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Создать новый проект</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center space-x-3">
+        <button
+          onClick={onCancel}
+          className="text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Редактировать проект: Картирование для {project.clientName}
+        </h1>
+      </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Basic Information */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Basic Information */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Основная информация</h3>
+          
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="lg:col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Основная информация</h3>
-            </div>
-
             <div className="lg:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Заказчик *
@@ -263,11 +268,28 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
                 placeholder="Опишите цели и задачи проекта"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Статус проекта
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => handleInputChange('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                {statusOptions.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* New Client Form */}
           {showNewClientForm && (
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="mt-6 bg-gray-50 rounded-lg p-4">
               <h4 className="text-md font-medium text-gray-900 mb-3">Добавить нового заказчика</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -336,60 +358,48 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
               {errors.newClient && <p className="mt-2 text-sm text-red-600">{errors.newClient}</p>}
             </div>
           )}
+        </div>
 
-          {/* Qualification Objects */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Объекты квалификации</h3>
-              <button
-                type="button"
-                onClick={handleAddQualificationObject}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Добавить объект</span>
-              </button>
-            </div>
-            
-            {qualificationObjects.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-                <Building className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>Добавьте объекты квалификации</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {qualificationObjects.map((obj, index) => (
-                  <QualificationObjectForm
-                    key={index}
-                    object={obj}
-                    index={index}
-                    objectTypes={qualificationObjectTypes}
-                    onUpdate={handleUpdateQualificationObject}
-                    onRemove={handleRemoveQualificationObject}
-                  />
-                ))}
-              </div>
-            )}
-            {errors.objects && <p className="mt-2 text-sm text-red-600">{errors.objects}</p>}
+        {/* Qualification Objects */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900">Объекты квалификации</h3>
+            <button
+              type="button"
+              onClick={handleAddQualificationObject}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Добавить объект</span>
+            </button>
           </div>
-
-          {/* Project Type Info */}
-          <div className="bg-blue-50 rounded-lg p-4">
-            <div className="flex items-center space-x-3">
-              <MapPin className="w-6 h-6 text-blue-600" />
-              <div>
-                <h4 className="text-sm font-medium text-blue-900">Тип проекта: Картирование (Исследование микроклимата)</h4>
-                <p className="text-xs text-blue-700">Картирование температурных и влажностных условий в объектах квалификации</p>
-              </div>
+          
+          {qualificationObjects.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+              <Building className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p>Добавьте объекты квалификации</p>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              {qualificationObjects.map((obj) => (
+                <QualificationObjectForm
+                  key={obj.id}
+                  object={obj}
+                  objectTypes={qualificationObjectTypes}
+                  onUpdate={handleUpdateQualificationObject}
+                  onRemove={handleRemoveQualificationObject}
+                />
+              ))}
+            </div>
+          )}
+          {errors.objects && <p className="mt-2 text-sm text-red-600">{errors.objects}</p>}
+        </div>
 
-          {/* Project Parameters */}
+        {/* Project Parameters */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Параметры проекта</h3>
+          
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="lg:col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Параметры проекта</h3>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Длительность (дни) *
@@ -453,80 +463,57 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose 
               />
             </div>
           </div>
+        </div>
 
-          {/* Template Preview */}
-          {selectedTemplate && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-2">
-                Этапы проекта (по шаблону "{selectedTemplate.name}")
-              </h4>
-              <div className="space-y-2">
-                {selectedTemplate.stages.map((stage, index) => (
-                  <div key={stage.id} className="flex items-center space-x-3">
-                    <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-medium">
-                      {index + 1}
-                    </span>
-                    <div className="flex-1">
-                      <span className="text-sm font-medium text-gray-900">{stage.name}</span>
-                      <span className="text-xs text-gray-500 ml-2">
-                        (~{stage.estimatedDuration} дней)
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {errors.submit && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-600">{errors.submit}</p>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Создание...</span>
-                </>
-              ) : (
-                <span>Создать проект</span>
-              )}
-            </button>
+        {/* Error Message */}
+        {errors.submit && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-600">{errors.submit}</p>
           </div>
-        </form>
-      </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center justify-end space-x-4 pt-6">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Отмена
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Сохранение...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>Сохранить изменения</span>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
 
 // Компонент для редактирования объекта квалификации
 interface QualificationObjectFormProps {
-  object: Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>;
-  index: number;
+  object: QualificationObject;
   objectTypes: Array<{ value: QualificationObjectType; label: string; icon: any }>;
-  onUpdate: (index: number, updates: Partial<Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>>) => void;
-  onRemove: (index: number) => void;
+  onUpdate: (id: string, updates: Partial<QualificationObject>) => void;
+  onRemove: (id: string) => void;
 }
 
 const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
   object,
-  index,
   objectTypes,
   onUpdate,
   onRemove
@@ -540,12 +527,12 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
         <div className="flex items-center space-x-3">
           <Icon className="w-5 h-5 text-indigo-600" />
           <h4 className="text-md font-medium text-gray-900">
-            Объект квалификации #{index + 1}
+            {object.name || `Объект квалификации #${object.id.slice(-4)}`}
           </h4>
         </div>
         <button
           type="button"
-          onClick={() => onRemove(index)}
+          onClick={() => onRemove(object.id)}
           className="text-red-600 hover:text-red-800 transition-colors"
         >
           <Trash2 className="w-4 h-4" />
@@ -557,7 +544,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
           <label className="block text-sm font-medium text-gray-700 mb-1">Тип объекта</label>
           <select
             value={object.type}
-            onChange={(e) => onUpdate(index, { type: e.target.value as QualificationObjectType })}
+            onChange={(e) => onUpdate(object.id, { type: e.target.value as QualificationObjectType })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           >
             {objectTypes.map(type => (
@@ -571,7 +558,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
           <input
             type="text"
             value={object.name}
-            onChange={(e) => onUpdate(index, { name: e.target.value })}
+            onChange={(e) => onUpdate(object.id, { name: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             placeholder="Название объекта"
           />
@@ -581,7 +568,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
           <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
           <textarea
             value={object.description || ''}
-            onChange={(e) => onUpdate(index, { description: e.target.value })}
+            onChange={(e) => onUpdate(object.id, { description: e.target.value })}
             rows={2}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             placeholder="Описание объекта"
@@ -596,7 +583,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
             min="0"
             step="0.1"
             value={object.technicalParameters.area || ''}
-            onChange={(e) => onUpdate(index, {
+            onChange={(e) => onUpdate(object.id, {
               technicalParameters: {
                 ...object.technicalParameters,
                 area: e.target.value ? Number(e.target.value) : undefined
@@ -612,7 +599,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
             type="number"
             min="0"
             value={object.technicalParameters.loggerCount || ''}
-            onChange={(e) => onUpdate(index, {
+            onChange={(e) => onUpdate(object.id, {
               technicalParameters: {
                 ...object.technicalParameters,
                 loggerCount: e.target.value ? Number(e.target.value) : undefined
@@ -628,7 +615,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
             type="number"
             min="0"
             value={object.technicalParameters.testingDuration || ''}
-            onChange={(e) => onUpdate(index, {
+            onChange={(e) => onUpdate(object.id, {
               technicalParameters: {
                 ...object.technicalParameters,
                 testingDuration: e.target.value ? Number(e.target.value) : undefined
@@ -643,7 +630,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
           <input
             type="text"
             value={object.technicalParameters.location || ''}
-            onChange={(e) => onUpdate(index, {
+            onChange={(e) => onUpdate(object.id, {
               technicalParameters: {
                 ...object.technicalParameters,
                 location: e.target.value
@@ -660,7 +647,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
           <input
             type="text"
             value={object.technicalParameters.climateSystemName || ''}
-            onChange={(e) => onUpdate(index, {
+            onChange={(e) => onUpdate(object.id, {
               technicalParameters: {
                 ...object.technicalParameters,
                 climateSystemName: e.target.value
@@ -678,7 +665,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
             <input
               type="text"
               value={object.technicalParameters.inventoryNumber || ''}
-              onChange={(e) => onUpdate(index, {
+              onChange={(e) => onUpdate(object.id, {
                 technicalParameters: {
                   ...object.technicalParameters,
                   inventoryNumber: e.target.value
@@ -697,7 +684,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
             <input
               type="text"
               value={object.technicalParameters.serialNumber || ''}
-              onChange={(e) => onUpdate(index, {
+              onChange={(e) => onUpdate(object.id, {
                 technicalParameters: {
                   ...object.technicalParameters,
                   serialNumber: e.target.value
@@ -717,7 +704,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
               <input
                 type="text"
                 value={object.technicalParameters.vin || ''}
-                onChange={(e) => onUpdate(index, {
+                onChange={(e) => onUpdate(object.id, {
                   technicalParameters: {
                     ...object.technicalParameters,
                     vin: e.target.value
@@ -732,7 +719,7 @@ const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
               <input
                 type="text"
                 value={object.technicalParameters.registrationNumber || ''}
-                onChange={(e) => onUpdate(index, {
+                onChange={(e) => onUpdate(object.id, {
                   technicalParameters: {
                     ...object.technicalParameters,
                     registrationNumber: e.target.value
