@@ -1,6 +1,10 @@
 import React from 'react';
 import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
+import { Contractor } from '../types/Contractor';
+import { QualificationObject } from '../types/QualificationObject';
+import { contractorService } from '../utils/contractorService';
+import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { databaseService } from '../utils/database';
 import { VI2ParsingService } from '../utils/vi2Parser';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
@@ -15,6 +19,14 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   onShowVisualization 
 }) => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
+  const [contractors, setContractors] = React.useState<Contractor[]>([]);
+  const [qualificationObjects, setQualificationObjects] = React.useState<QualificationObject[]>([]);
+  const [selectedContractor, setSelectedContractor] = React.useState<string>('');
+  const [selectedQualificationObject, setSelectedQualificationObject] = React.useState<string>('');
+  const [contractorSearch, setContractorSearch] = React.useState('');
+  const [qualificationSearch, setQualificationSearch] = React.useState('');
+  const [showContractorDropdown, setShowContractorDropdown] = React.useState(false);
+  const [showQualificationDropdown, setShowQualificationDropdown] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [editingField, setEditingField] = React.useState<{ fileId: string; field: 'zoneNumber' | 'measurementLevel' } | null>(null);
 
@@ -24,6 +36,81 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     { label: 'Скорость ветра', value: '3.2 м/с', icon: Wind, color: 'text-green-600', bg: 'bg-green-100' },
     { label: 'Освещенность', value: '850 лк', icon: Sun, color: 'text-yellow-600', bg: 'bg-yellow-100' }
   ];
+
+  // Загрузка контрагентов при инициализации
+  React.useEffect(() => {
+    const loadContractors = async () => {
+      if (!contractorService.isAvailable()) return;
+      
+      try {
+        const data = await contractorService.getAllContractors();
+        setContractors(data);
+      } catch (error) {
+        console.error('Ошибка загрузки контрагентов:', error);
+      }
+    };
+
+    loadContractors();
+  }, []);
+
+  // Загрузка объектов квалификации при выборе контрагента
+  React.useEffect(() => {
+    const loadQualificationObjects = async () => {
+      if (!selectedContractor || !qualificationObjectService.isAvailable()) {
+        setQualificationObjects([]);
+        setSelectedQualificationObject('');
+        return;
+      }
+      
+      try {
+        const data = await qualificationObjectService.getQualificationObjects(selectedContractor);
+        setQualificationObjects(data);
+        setSelectedQualificationObject(''); // Сбрасываем выбор объекта при смене контрагента
+      } catch (error) {
+        console.error('Ошибка загрузки объектов квалификации:', error);
+        setQualificationObjects([]);
+      }
+    };
+
+    loadQualificationObjects();
+  }, [selectedContractor]);
+
+  // Фильтрация контрагентов по поиску
+  const filteredContractors = React.useMemo(() => {
+    if (!contractorSearch.trim()) return contractors;
+    
+    return contractors.filter(contractor =>
+      contractor.name.toLowerCase().includes(contractorSearch.toLowerCase()) ||
+      (contractor.address && contractor.address.toLowerCase().includes(contractorSearch.toLowerCase()))
+    );
+  }, [contractors, contractorSearch]);
+
+  // Фильтрация объектов квалификации по поиску
+  const filteredQualificationObjects = React.useMemo(() => {
+    if (!qualificationSearch.trim()) return qualificationObjects;
+    
+    return qualificationObjects.filter(obj =>
+      (obj.name && obj.name.toLowerCase().includes(qualificationSearch.toLowerCase())) ||
+      (obj.address && obj.address.toLowerCase().includes(qualificationSearch.toLowerCase())) ||
+      (obj.vin && obj.vin.toLowerCase().includes(qualificationSearch.toLowerCase())) ||
+      (obj.serialNumber && obj.serialNumber.toLowerCase().includes(qualificationSearch.toLowerCase())) ||
+      (obj.inventoryNumber && obj.inventoryNumber.toLowerCase().includes(qualificationSearch.toLowerCase()))
+    );
+  }, [qualificationObjects, qualificationSearch]);
+
+  // Получение названия контрагента по ID
+  const getContractorName = (contractorId: string) => {
+    const contractor = contractors.find(c => c.id === contractorId);
+    return contractor ? contractor.name : 'Выберите контрагента';
+  };
+
+  // Получение названия объекта квалификации по ID
+  const getQualificationObjectName = (objectId: string) => {
+    const obj = qualificationObjects.find(o => o.id === objectId);
+    if (!obj) return 'Выберите объект квалификации';
+    
+    return obj.name || obj.vin || obj.serialNumber || `${obj.type} (без названия)`;
+  };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -44,7 +131,9 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         name: file.name,
         uploadDate: new Date().toLocaleString('ru-RU'),
         parsingStatus: 'processing' as const,
-        order: uploadedFiles.length + index
+        order: uploadedFiles.length + index,
+        contractorId: selectedContractor || undefined,
+        qualificationObjectId: selectedQualificationObject || undefined
       };
     }).filter(Boolean) as UploadedFile[];
 
@@ -244,6 +333,124 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Селекторы контрагента и объекта квалификации */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Селектор контрагента */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Контрагент
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={selectedContractor ? getContractorName(selectedContractor) : contractorSearch}
+                onChange={(e) => {
+                  setContractorSearch(e.target.value);
+                  if (!selectedContractor) {
+                    setShowContractorDropdown(true);
+                  }
+                }}
+                onFocus={() => {
+                  setShowContractorDropdown(true);
+                  if (selectedContractor) {
+                    setContractorSearch('');
+                    setSelectedContractor('');
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Поиск контрагента..."
+              />
+              
+              {showContractorDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredContractors.length > 0 ? (
+                    filteredContractors.map((contractor) => (
+                      <div
+                        key={contractor.id}
+                        onClick={() => {
+                          setSelectedContractor(contractor.id);
+                          setContractorSearch('');
+                          setShowContractorDropdown(false);
+                        }}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">{contractor.name}</div>
+                        {contractor.address && (
+                          <div className="text-sm text-gray-500">{contractor.address}</div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-gray-500 text-sm">
+                      Контрагенты не найдены
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Селектор объекта квалификации */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Объект квалификации
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={selectedQualificationObject ? getQualificationObjectName(selectedQualificationObject) : qualificationSearch}
+                onChange={(e) => {
+                  setQualificationSearch(e.target.value);
+                  if (!selectedQualificationObject) {
+                    setShowQualificationDropdown(true);
+                  }
+                }}
+                onFocus={() => {
+                  if (selectedContractor) {
+                    setShowQualificationDropdown(true);
+                    if (selectedQualificationObject) {
+                      setQualificationSearch('');
+                      setSelectedQualificationObject('');
+                    }
+                  }
+                }}
+                disabled={!selectedContractor}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder={selectedContractor ? "Поиск объекта квалификации..." : "Сначала выберите контрагента"}
+              />
+              
+              {showQualificationDropdown && selectedContractor && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredQualificationObjects.length > 0 ? (
+                    filteredQualificationObjects.map((obj) => (
+                      <div
+                        key={obj.id}
+                        onClick={() => {
+                          setSelectedQualificationObject(obj.id);
+                          setQualificationSearch('');
+                          setShowQualificationDropdown(false);
+                        }}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">
+                          {obj.name || obj.vin || obj.serialNumber || 'Без названия'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {obj.type} {obj.address && `• ${obj.address}`}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-gray-500 text-sm">
+                      Объекты квалификации не найдены
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
         
         <input
           ref={fileInputRef}
@@ -313,6 +520,16 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                         {file.parsedData && (
                           <div className="text-xs text-gray-500 mt-1">
                             {file.parsedData.deviceMetadata.deviceModel} (S/N: {file.parsedData.deviceMetadata.serialNumber})
+                          </div>
+                        )}
+                        {file.contractorId && (
+                          <div className="text-xs text-blue-600 mt-1">
+                            📋 {getContractorName(file.contractorId)}
+                          </div>
+                        )}
+                        {file.qualificationObjectId && (
+                          <div className="text-xs text-green-600 mt-1">
+                            🏢 {getQualificationObjectName(file.qualificationObjectId)}
                           </div>
                         )}
                       </div>
