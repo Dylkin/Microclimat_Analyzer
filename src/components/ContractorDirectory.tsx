@@ -517,8 +517,7 @@ export const ContractorDirectory: React.FC = () => {
                             )}
                           </div>
                         ) : (
-                          <>
-                            <span className="text-gray-400 text-sm">Не указан</span>
+                          <span className="text-gray-400 text-sm">Не указан</span>
                             <button
                               onClick={() => showContractorQualificationObjects(contractor)}
                               disabled={operationLoading}
@@ -527,7 +526,6 @@ export const ContractorDirectory: React.FC = () => {
                             >
                               <Award className="w-4 h-4" />
                             </button>
-                          </>
                         )}
                       </div>
                     )}
