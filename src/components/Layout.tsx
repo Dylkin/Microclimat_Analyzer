@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, BarChart3, Menu, X, HelpCircle } from 'lucide-react';
+import { LogOut, BarChart3, Menu, X, HelpCircle, Database } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -24,6 +24,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       key: 'help',
       icon: HelpCircle,
       access: 'help' as const
+    },
+    {
+      name: 'Проверка БД',
+      key: 'database',
+      icon: Database,
+      access: 'analyzer' as const
     }
   ];
 
