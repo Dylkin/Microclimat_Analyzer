@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { UploadedFile } from '../types/FileData';
-import { TimeSeriesPoint, ProcessedTimeSeriesData, DataType } from '../types/TimeSeriesData';
+import { TimeSeriesPoint, ProcessedTimeSeriesData } from '../types/TimeSeriesData';
 import { supabaseDatabaseService } from '../utils/supabaseDatabase';
 
 interface UseTimeSeriesDataProps {
@@ -14,7 +14,6 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
   const [error, setError] = useState<string | null>(null);
 
   const processFileData = useCallback(async (file: UploadedFile): Promise<TimeSeriesPoint[]> => {
-    console.log(`Обработка файла: ${file.name} (ID: ${file.id})`);
     try {
       const measurements = await supabaseDatabaseService.getMeasurements(file.id);
       if (!measurements || measurements.length === 0) {
@@ -22,7 +21,7 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
         return [];
       }
 
-      // Преобразуем измерения в точки временных рядов
+      // Преобразуем все данные без сэмплирования для отображения всех точек
       const points: TimeSeriesPoint[] = measurements.map((measurement, index) => ({
         timestamp: measurement.timestamp.getTime(),
         temperature: measurement.temperature,
@@ -31,8 +30,6 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
         originalIndex: index,
         zoneNumber: file.zoneNumber
       }));
-
-      console.log(`Файл ${file.name}: загружено ${points.length} точек данных`);
 
       return points;
     } catch (error) {
@@ -54,7 +51,7 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
     try {
       const allPoints: TimeSeriesPoint[] = [];
       const completedFiles = files.filter(f => f.parsingStatus === 'completed');
-      
+
       console.log(`Loading data from ${completedFiles.length} files...`);
 
       // Параллельная загрузка файлов батчами по 20 для оптимизации
@@ -74,11 +71,6 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
       if (allPoints.length === 0) {
         throw new Error('No data points loaded from files');
       }
-      
-      // Проверяем качество данных
-      const validPoints = allPoints.filter(p => p.temperature !== undefined || p.humidity !== undefined);
-      console.log(`Валидных точек данных: ${validPoints.length} из ${allPoints.length}`);
-      
 
       // Сортируем по времени
       allPoints.sort((a, b) => a.timestamp - b.timestamp);
@@ -105,7 +97,6 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
         hasHumidity
       };
 
-      console.log('Данные успешно обработаны:', processedData);
       console.log('Time range:', new Date(processedData.timeRange[0]), 'to', new Date(processedData.timeRange[1]));
       console.log('Temperature range:', processedData.temperatureRange);
       console.log('Humidity range:', processedData.humidityRange);
@@ -115,7 +106,6 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
       setData(processedData);
     } catch (error) {
       console.error('Error loading time series data:', error);
-      
       setError(error instanceof Error ? error.message : 'Unknown error occurred');
     } finally {
       setLoading(false);
