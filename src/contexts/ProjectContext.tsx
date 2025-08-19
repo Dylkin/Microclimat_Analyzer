@@ -404,7 +404,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return tasks.filter(t => 
       t.dueDate && 
       new Date(t.dueDate) < now && 
-      t.status !== 'completed' && 
+      t.status !== 'completed' &&
       t.status !== 'cancelled'
     );
   };

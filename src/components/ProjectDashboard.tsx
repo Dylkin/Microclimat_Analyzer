@@ -80,7 +80,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects }) 
       months.push({
         month: date.toLocaleDateString('ru-RU', { month: 'short' }),
         created: monthProjects.length,
-        completed: monthProjects.filter(p => p.status === 'completed').length
+        completed: monthProjects.filter(p => p.status === 'closed').length
       });
     }
     
@@ -89,12 +89,12 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects }) 
 
   // Общая статистика
   const totalStats = React.useMemo(() => {
-    const active = projects.filter(p => ['preparation', 'testing', 'reporting'].includes(p.status)).length;
-    const completed = projects.filter(p => p.status === 'completed').length;
+    const active = projects.filter(p => ['contract', 'in_progress'].includes(p.status)).length;
+    const completed = projects.filter(p => p.status === 'closed').length;
     const overdue = projects.filter(p => 
       p.endDate && 
       new Date(p.endDate) < new Date() && 
-      p.status !== 'completed'
+      p.status !== 'closed'
     ).length;
     
     const totalBudget = projects.reduce((sum, p) => sum + (p.budget || 0), 0);
@@ -115,12 +115,10 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects }) 
   function getStatusText(status: string): string {
     const statusMap: Record<string, string> = {
       draft: 'Черновик',
-      preparation: 'Подготовка',
-      testing: 'Испытания',
-      reporting: 'Отчетность',
-      completed: 'Завершен',
-      cancelled: 'Отменен',
-      on_hold: 'Приостановлен'
+      contract: 'Договор',
+      in_progress: 'В работе',
+      paused: 'Пауза',
+      closed: 'Закрыт'
     };
     return statusMap[status] || status;
   }
@@ -128,12 +126,10 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projects }) 
   function getStatusColor(status: string): string {
     const colorMap: Record<string, string> = {
       draft: '#6B7280',
-      preparation: '#3B82F6',
-      testing: '#F59E0B',
-      reporting: '#8B5CF6',
-      completed: '#10B981',
-      cancelled: '#EF4444',
-      on_hold: '#F97316'
+      contract: '#3B82F6',
+      in_progress: '#F59E0B',
+      paused: '#F97316',
+      closed: '#10B981'
     };
     return colorMap[status] || '#6B7280';
   }

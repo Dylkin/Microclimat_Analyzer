@@ -72,12 +72,10 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({ project, onC
 
   const statusOptions = [
     { value: 'draft', label: 'Черновик' },
-    { value: 'preparation', label: 'Подготовка' },
-    { value: 'testing', label: 'Испытания' },
-    { value: 'reporting', label: 'Отчетность' },
-    { value: 'completed', label: 'Завершен' },
-    { value: 'cancelled', label: 'Отменен' },
-    { value: 'on_hold', label: 'Приостановлен' }
+    { value: 'contract', label: 'Договор' },
+    { value: 'in_progress', label: 'В работе' },
+    { value: 'paused', label: 'Пауза' },
+    { value: 'closed', label: 'Закрыт' }
   ];
 
   // Загружаем клиентов при монтировании компонента

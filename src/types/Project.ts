@@ -1,4 +1,4 @@
-export type ProjectStatus = 'draft' | 'preparation' | 'testing' | 'reporting' | 'completed' | 'cancelled' | 'on_hold';
+export type ProjectStatus = 'draft' | 'contract' | 'in_progress' | 'paused' | 'closed';
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'overdue';
 

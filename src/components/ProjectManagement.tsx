@@ -115,11 +115,10 @@ export const ProjectManagement: React.FC = () => {
               >
                 <option value="all">Все статусы</option>
                 <option value="draft">Черновик</option>
-                <option value="preparation">Подготовка</option>
-                <option value="testing">Испытания</option>
-                <option value="reporting">Отчетность</option>
-                <option value="completed">Завершен</option>
-                <option value="cancelled">Отменен</option>
+                <option value="contract">Договор</option>
+                <option value="in_progress">В работе</option>
+                <option value="paused">Пауза</option>
+                <option value="closed">Закрыт</option>
               </select>
             </div>
 

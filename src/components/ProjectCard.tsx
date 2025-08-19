@@ -28,23 +28,19 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
 
   const statusOptions = [
     { value: 'draft', label: 'Черновик', color: 'bg-gray-100 text-gray-800' },
-    { value: 'preparation', label: 'Подготовка', color: 'bg-blue-100 text-blue-800' },
-    { value: 'testing', label: 'Испытания', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 'reporting', label: 'Отчетность', color: 'bg-purple-100 text-purple-800' },
-    { value: 'completed', label: 'Завершен', color: 'bg-green-100 text-green-800' },
-    { value: 'cancelled', label: 'Отменен', color: 'bg-red-100 text-red-800' },
-    { value: 'on_hold', label: 'Приостановлен', color: 'bg-orange-100 text-orange-800' }
+    { value: 'contract', label: 'Договор', color: 'bg-blue-100 text-blue-800' },
+    { value: 'in_progress', label: 'В работе', color: 'bg-yellow-100 text-yellow-800' },
+    { value: 'paused', label: 'Пауза', color: 'bg-orange-100 text-orange-800' },
+    { value: 'closed', label: 'Закрыт', color: 'bg-green-100 text-green-800' }
   ];
 
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-800';
-      case 'preparation': return 'bg-blue-100 text-blue-800';
-      case 'testing': return 'bg-yellow-100 text-yellow-800';
-      case 'reporting': return 'bg-purple-100 text-purple-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'on_hold': return 'bg-orange-100 text-orange-800';
+      case 'contract': return 'bg-blue-100 text-blue-800';
+      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
+      case 'paused': return 'bg-orange-100 text-orange-800';
+      case 'closed': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -52,12 +48,10 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
   const getStatusText = (status: Project['status']) => {
     switch (status) {
       case 'draft': return 'Черновик';
-      case 'preparation': return 'Подготовка';
-      case 'testing': return 'Испытания';
-      case 'reporting': return 'Отчетность';
-      case 'completed': return 'Завершен';
-      case 'cancelled': return 'Отменен';
-      case 'on_hold': return 'Приостановлен';
+      case 'contract': return 'Договор';
+      case 'in_progress': return 'В работе';
+      case 'paused': return 'Пауза';
+      case 'closed': return 'Закрыт';
       default: return status;
     }
   };
@@ -83,7 +77,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
 
   const TypeIcon = getTypeIcon(project.type);
 
-  const isOverdue = project.endDate && new Date(project.endDate) < new Date() && project.status !== 'completed';
+  const isOverdue = project.endDate && new Date(project.endDate) < new Date() && project.status !== 'closed';
 
   const handleStatusChange = async (newStatus: Project['status']) => {
     try {

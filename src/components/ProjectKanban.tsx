@@ -29,27 +29,27 @@ export const ProjectKanban: React.FC<ProjectKanbanProps> = ({ projects }) => {
       color: 'bg-gray-100'
     },
     {
-      id: 'preparation',
-      title: 'Подготовка',
-      status: ['preparation'],
+      id: 'contract',
+      title: 'Договор',
+      status: ['contract'],
       color: 'bg-blue-100'
     },
     {
-      id: 'testing',
-      title: 'Испытания',
-      status: ['testing'],
+      id: 'in_progress',
+      title: 'В работе',
+      status: ['in_progress'],
       color: 'bg-yellow-100'
     },
     {
-      id: 'reporting',
-      title: 'Отчетность',
-      status: ['reporting'],
-      color: 'bg-purple-100'
+      id: 'paused',
+      title: 'Пауза',
+      status: ['paused'],
+      color: 'bg-orange-100'
     },
     {
-      id: 'completed',
-      title: 'Завершенные',
-      status: ['completed', 'cancelled', 'on_hold'],
+      id: 'closed',
+      title: 'Закрытые',
+      status: ['closed'],
       color: 'bg-green-100'
     }
   ];
