@@ -7,6 +7,7 @@ import { Help } from './components/Help';
 import { DatabaseTest } from './components/DatabaseTest';
 import { UserDirectory } from './components/UserDirectory';
 import { ContractorDirectory } from './components/ContractorDirectory';
+import { ProjectDirectory } from './components/ProjectDirectory';
 import './index.css';
 
 const AppContent: React.FC = () => {
@@ -37,6 +38,8 @@ const AppContent: React.FC = () => {
         return hasAccess('users') ? <UserDirectory /> : <div>Доступ запрещен</div>;
       case 'contractors':
         return hasAccess('analyzer') ? <ContractorDirectory /> : <div>Доступ запрещен</div>;
+      case 'projects':
+        return hasAccess('analyzer') ? <ProjectDirectory /> : <div>Доступ запрещен</div>;
       case 'database':
         return hasAccess('database') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
       default:
