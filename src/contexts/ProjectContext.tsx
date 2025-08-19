@@ -59,8 +59,8 @@ const defaultTemplates: ProjectTemplate[] = [
     type: 'mapping',
     stages: [
       {
-        id: 'preparation',
-        name: 'Подготовительный этап',
+        id: 'contract',
+        name: 'Договорный этап',
         description: 'Подготовка документов и планирование',
         order: 1,
         requiredRoles: ['manager', 'administrator'],
@@ -69,8 +69,8 @@ const defaultTemplates: ProjectTemplate[] = [
         isCompleted: false
       },
       {
-        id: 'testing',
-        name: 'Проведение испытаний',
+        id: 'in_progress',
+        name: 'Выполнение работ',
         description: 'Размещение логгеров и сбор данных',
         order: 2,
         requiredRoles: ['specialist', 'administrator'],
@@ -79,8 +79,8 @@ const defaultTemplates: ProjectTemplate[] = [
         isCompleted: false
       },
       {
-        id: 'reporting',
-        name: 'Отчетность',
+        id: 'closed',
+        name: 'Завершение',
         description: 'Подготовка и согласование отчета',
         order: 3,
         requiredRoles: ['specialist', 'manager', 'administrator'],
@@ -98,8 +98,8 @@ const defaultTemplates: ProjectTemplate[] = [
     type: 'testing',
     stages: [
       {
-        id: 'preparation',
-        name: 'Подготовительный этап',
+        id: 'contract',
+        name: 'Договорный этап',
         description: 'Подготовка к испытаниям',
         order: 1,
         requiredRoles: ['manager', 'administrator'],
@@ -108,8 +108,8 @@ const defaultTemplates: ProjectTemplate[] = [
         isCompleted: false
       },
       {
-        id: 'testing',
-        name: 'Испытания',
+        id: 'in_progress',
+        name: 'Выполнение испытаний',
         description: 'Проведение испытаний',
         order: 2,
         requiredRoles: ['specialist', 'administrator'],
@@ -118,8 +118,8 @@ const defaultTemplates: ProjectTemplate[] = [
         isCompleted: false
       },
       {
-        id: 'reporting',
-        name: 'Отчетность',
+        id: 'closed',
+        name: 'Завершение',
         description: 'Формирование отчета',
         order: 3,
         requiredRoles: ['specialist', 'manager'],
@@ -173,7 +173,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       createdAt: new Date(),
       updatedAt: new Date(),
       progress: 0,
-      currentStage: 'contract'
+      currentStage: 'preparation'
     };
 
     const updatedProjects = [...projects, newProject];
@@ -192,7 +192,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         priority: 'medium' as const,
         dependencies: [],
         estimatedHours: getTaskEstimatedHours(taskType),
-        stage: 'contract',
+        stage: 'preparation',
         comments: [],
         attachments: []
       }));
