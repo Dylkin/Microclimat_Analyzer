@@ -16,9 +16,7 @@ const AppContent: React.FC = () => {
 
   React.useEffect(() => {
     if (!user) return;
-    
-  }
-  )
+  }, [user]);
 
   if (!user) {
     return <Login />;

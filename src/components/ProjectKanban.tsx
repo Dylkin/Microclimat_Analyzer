@@ -110,13 +110,6 @@ export const ProjectKanban: React.FC<ProjectKanbanProps> = ({ projects }) => {
                 </div>
                 <button className="text-gray-500 hover:text-gray-700">
                   <div className="flex items-center space-x-1">
-                    <button
-                      onClick={() => handleEditProject(columnProjects[0])}
-                      className="text-indigo-600 hover:text-indigo-900 transition-colors"
-                      title="Редактировать проект"
-                    >
-                      <Edit className="w-3 h-3" />
-                    </button>
                     <MoreHorizontal className="w-4 h-4" />
                   </div>
                 </button>
