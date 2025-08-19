@@ -99,20 +99,20 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, onEditProjec
     
     switch (sortBy) {
       case 'name':
-        aValue = a.name.toLowerCase();
-        bValue = b.name.toLowerCase();
+        aValue = a.clientName?.toLowerCase() || '';
+        bValue = b.clientName?.toLowerCase() || '';
         break;
       case 'startDate':
-        aValue = new Date(a.startDate);
-        bValue = new Date(b.startDate);
+        aValue = a.startDate ? new Date(a.startDate) : new Date('9999-12-31');
+        bValue = b.startDate ? new Date(b.startDate) : new Date('9999-12-31');
         break;
       case 'endDate':
         aValue = a.endDate ? new Date(a.endDate) : new Date('9999-12-31');
         bValue = b.endDate ? new Date(b.endDate) : new Date('9999-12-31');
         break;
       case 'status':
-        aValue = a.status;
-        bValue = b.status;
+        aValue = a.status || '';
+        bValue = b.status || '';
         break;
       default:
         return 0;
