@@ -409,18 +409,7 @@ export const ReferenceBooks: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={() => setEditingItem(item)}
-                      className="text-indigo-600 hover:text-indigo-900"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteEquipment(item.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <span className="text-gray-400 text-xs">Функционал в разработке</span>
                   </div>
                 </td>
               </tr>
@@ -463,12 +452,7 @@ export const ReferenceBooks: React.FC = () => {
               <div>Файл: {template.fileName}</div>
             </div>
             <div className="flex justify-end space-x-2">
-              <button className="text-indigo-600 hover:text-indigo-900">
-                <Edit2 className="w-4 h-4" />
-              </button>
-              <button className="text-red-600 hover:text-red-900">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <span className="text-gray-400 text-xs">Функционал в разработке</span>
             </div>
           </div>
         ))}
@@ -497,9 +481,7 @@ export const ReferenceBooks: React.FC = () => {
                   <div className="text-sm text-gray-900 font-mono">
                     {setting.value}
                   </div>
-                  <button className="text-indigo-600 hover:text-indigo-900">
-                    <Edit2 className="w-4 h-4" />
-                  </button>
+                  <span className="text-gray-400 text-xs">Функционал в разработке</span>
                 </div>
               </div>
             </div>

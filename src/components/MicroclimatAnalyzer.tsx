@@ -3,7 +3,7 @@ import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, Che
 import { UploadedFile } from '../types/FileData';
 import { databaseService } from '../utils/database';
 import { VI2ParsingService } from '../utils/vi2Parser';
-import { DataVisualization } from './DataVisualization';
+import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 
 interface MicroclimatAnalyzerProps {
   showVisualization?: boolean;
@@ -175,7 +175,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   // Если показываем визуализацию, рендерим компонент визуализации
   if (showVisualization) {
     return (
-      <DataVisualization 
+      <TimeSeriesAnalyzer 
         files={uploadedFiles.filter(f => f.parsingStatus === 'completed')}
         onBack={() => onShowVisualization?.(false)}
       />
