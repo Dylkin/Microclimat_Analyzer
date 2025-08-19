@@ -284,6 +284,27 @@ export class SupabaseDatabaseService {
   }
 
   /**
+   * Обновление сессии анализа
+   */
+  async updateAnalysisSession(sessionId: string, updates: {
+    name?: string;
+    description?: string;
+    contractFields?: Record<string, any>;
+    conclusions?: string;
+  }): Promise<void> {
+    const { error } = await supabase
+      .from('analysis_sessions')
+      .update({
+        ...updates,
+        contract_fields: updates.contractFields,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', sessionId);
+
+    if (error) throw new Error(`Ошибка обновления сессии анализа: ${error.message}`);
+  }
+
+  /**
    * Сохранение настроек графика
    */
   async saveChartSettings(sessionId: string, dataType: 'temperature' | 'humidity', limits: ChartLimits, zoomState?: ZoomState): Promise<void> {
@@ -293,7 +314,8 @@ export class SupabaseDatabaseService {
         session_id: sessionId,
         data_type: dataType,
         limits: limits,
-        zoom_state: zoomState
+        zoom_state: zoomState,
+        updated_at: new Date().toISOString()
       });
 
     if (error) throw new Error(`Ошибка сохранения настроек графика: ${error.message}`);
