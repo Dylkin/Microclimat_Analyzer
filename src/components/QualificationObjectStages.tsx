@@ -19,13 +19,17 @@ import {
   Download,
   BarChart,
   FileCheck,
-  Archive
+  Archive,
+  RotateCcw,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { 
   getStageStatusText, 
   getStageStatusColor, 
   calculateObjectProgress,
-  calculateObjectStatus 
+  calculateObjectStatus,
+  QUALIFICATION_STAGE_TEMPLATES
 } from '../utils/qualificationStages';
 
 interface QualificationObjectStagesProps {
@@ -42,6 +46,9 @@ export const QualificationObjectStages: React.FC<QualificationObjectStagesProps>
   const { user } = useAuth();
   const [editingStage, setEditingStage] = useState<string | null>(null);
   const [editingDuration, setEditingDuration] = useState<{ stageId: string; duration: number } | null>(null);
+  const [editingNotes, setEditingNotes] = useState<string | null>(null);
+  const [showAddStageModal, setShowAddStageModal] = useState(false);
+  const [tempNotes, setTempNotes] = useState<string>('');
 
   const getStageIcon = (type: QualificationStage['type']) => {
     switch (type) {
@@ -153,6 +160,95 @@ export const QualificationObjectStages: React.FC<QualificationObjectStagesProps>
     handleStageStatusChange(stageId, 'paused');
   };
 
+  const handleResetStage = (stageId: string) => {
+    const updatedStages = object.stages.map(stage => {
+      if (stage.id === stageId) {
+        return {
+          ...stage,
+          status: 'pending' as QualificationStageStatus,
+          startDate: undefined,
+          endDate: undefined,
+          actualDuration: undefined,
+          updatedAt: new Date()
+        };
+      }
+      return stage;
+    });
+
+    const overallProgress = calculateObjectProgress(updatedStages);
+    const overallStatus = calculateObjectStatus(updatedStages);
+
+    onUpdateObject({
+      stages: updatedStages,
+      overallProgress,
+      overallStatus,
+      updatedAt: new Date()
+    });
+  };
+
+  const handleDeleteStage = (stageId: string) => {
+    if (confirm('Вы уверены, что хотите удалить этот этап?')) {
+      const updatedStages = object.stages.filter(stage => stage.id !== stageId);
+      
+      const overallProgress = calculateObjectProgress(updatedStages);
+      const overallStatus = calculateObjectStatus(updatedStages);
+
+      onUpdateObject({
+        stages: updatedStages,
+        overallProgress,
+        overallStatus,
+        updatedAt: new Date()
+      });
+    }
+  };
+
+  const handleAddStage = (stageType: QualificationStage['type']) => {
+    const template = QUALIFICATION_STAGE_TEMPLATES.find(t => t.type === stageType);
+    if (!template) return;
+
+    const newStage: QualificationStage = {
+      id: `${object.id}_stage_${stageType}_${Date.now()}`,
+      type: stageType,
+      name: template.name,
+      description: template.description,
+      status: 'pending',
+      estimatedDuration: template.estimatedDuration,
+      order: Math.max(...object.stages.map(s => s.order), 0) + 1,
+      isRequired: template.isRequired,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const updatedStages = [...object.stages, newStage];
+    
+    onUpdateObject({
+      stages: updatedStages,
+      updatedAt: new Date()
+    });
+    
+    setShowAddStageModal(false);
+  };
+
+  const handleUpdateStageNotes = (stageId: string, notes: string) => {
+    const updatedStages = object.stages.map(stage =>
+      stage.id === stageId 
+        ? { ...stage, notes, updatedAt: new Date() }
+        : stage
+    );
+
+    onUpdateObject({
+      stages: updatedStages,
+      updatedAt: new Date()
+    });
+    
+    setEditingNotes(null);
+    setTempNotes('');
+  };
+
+  const handleStartEditingNotes = (stage: QualificationStage) => {
+    setEditingNotes(stage.id);
+    setTempNotes(stage.notes || '');
+  };
   const canStartStage = (stage: QualificationStage): boolean => {
     if (stage.status !== 'pending') return false;
     
@@ -217,6 +313,34 @@ export const QualificationObjectStages: React.FC<QualificationObjectStagesProps>
       );
     }
 
+    // Кнопка сброса этапа (доступна для завершенных этапов)
+    if (stage.status === 'completed') {
+      actions.push(
+        <button
+          key="reset"
+          onClick={() => handleResetStage(stage.id)}
+          className="text-gray-600 hover:text-gray-800 transition-colors"
+          title="Сбросить этап"
+        >
+          <RotateCcw className="w-4 h-4" />
+        </button>
+      );
+    }
+
+    // Кнопка удаления (только для необязательных этапов)
+    if (!stage.isRequired) {
+      actions.push(
+        <button
+          key="delete"
+          onClick={() => handleDeleteStage(stage.id)}
+          className="text-red-600 hover:text-red-800 transition-colors"
+          title="Удалить этап"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      );
+    }
+
     return actions;
   };
 
@@ -230,7 +354,14 @@ export const QualificationObjectStages: React.FC<QualificationObjectStagesProps>
         <h4 className="text-lg font-medium text-gray-900">
           Этапы выполнения: {object.name || `${object.type} #${object.id.slice(-4)}`}
         </h4>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setShowAddStageModal(true)}
+            className="bg-indigo-600 text-white px-3 py-1 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-1 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Добавить этап</span>
+          </button>
           <div className="text-sm text-gray-600">
             Прогресс: {object.overallProgress || 0}%
           </div>
@@ -382,6 +513,48 @@ export const QualificationObjectStages: React.FC<QualificationObjectStagesProps>
                   <strong>Заметки:</strong> {stage.notes}
                 </div>
               )}
+
+              {/* Редактирование заметок */}
+              <div className="mt-3">
+                {editingNotes === stage.id ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={tempNotes}
+                      onChange={(e) => setTempNotes(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      rows={3}
+                      placeholder="Добавьте заметки к этапу..."
+                    />
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleUpdateStageNotes(stage.id, tempNotes)}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 transition-colors flex items-center space-x-1"
+                      >
+                        <Save className="w-3 h-3" />
+                        <span>Сохранить</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingNotes(null);
+                          setTempNotes('');
+                        }}
+                        className="bg-gray-600 text-white px-3 py-1 rounded text-xs hover:bg-gray-700 transition-colors flex items-center space-x-1"
+                      >
+                        <X className="w-3 h-3" />
+                        <span>Отмена</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleStartEditingNotes(stage)}
+                    className="text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center space-x-1"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    <span>{stage.notes ? 'Редактировать заметки' : 'Добавить заметки'}</span>
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
@@ -421,6 +594,69 @@ export const QualificationObjectStages: React.FC<QualificationObjectStagesProps>
           </div>
         </div>
       </div>
+
+      {/* Модальное окно добавления этапа */}
+      {showAddStageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Добавить этап</h3>
+              <button
+                onClick={() => setShowAddStageModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Выберите тип этапа для добавления:
+              </p>
+              
+              <div className="space-y-2">
+                {QUALIFICATION_STAGE_TEMPLATES.map((template) => {
+                  const StageIcon = getStageIcon(template.type);
+                  const alreadyExists = object.stages.some(s => s.type === template.type);
+                  
+                  return (
+                    <button
+                      key={template.type}
+                      onClick={() => handleAddStage(template.type)}
+                      disabled={alreadyExists}
+                      className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors text-left ${
+                        alreadyExists 
+                          ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                          : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'
+                      }`}
+                    >
+                      <StageIcon className={`w-5 h-5 ${alreadyExists ? 'text-gray-400' : 'text-indigo-600'}`} />
+                      <div className="flex-1">
+                        <div className="font-medium">{template.name}</div>
+                        <div className="text-sm text-gray-500">
+                          {template.description} ({template.estimatedDuration} дн.)
+                        </div>
+                        {alreadyExists && (
+                          <div className="text-xs text-gray-400 mt-1">Этап уже существует</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowAddStageModal(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

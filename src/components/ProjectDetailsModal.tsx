@@ -16,7 +16,11 @@ import {
   ChevronDown,
   ChevronRight,
   BarChart3,
-  AlertTriangle
+  AlertTriangle,
+  Edit2,
+  Save,
+  Trash2,
+  Plus
 } from 'lucide-react';
 
 interface ProjectDetailsModalProps {
@@ -28,6 +32,8 @@ export const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ projec
   const { updateProject } = useProjects();
   const { users } = useAuth();
   const [expandedObjects, setExpandedObjects] = useState<Set<string>>(new Set());
+  const [editingObject, setEditingObject] = useState<string | null>(null);
+  const [editingObjectData, setEditingObjectData] = useState<Partial<QualificationObject>>({});
 
   // Получаем пользователей для назначения на этапы
   const projectUsers = users.map(user => ({
@@ -107,6 +113,59 @@ export const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ projec
       obj.id === objectId ? { ...obj, ...updates, updatedAt: new Date() } : obj
     ) || [];
 
+    updateProject(project.id, {
+      qualificationObjects: updatedObjects,
+      updatedAt: new Date()
+    });
+  };
+
+  const handleEditObject = (obj: QualificationObject) => {
+    setEditingObject(obj.id);
+    setEditingObjectData({
+      name: obj.name,
+      description: obj.description,
+      technicalParameters: { ...obj.technicalParameters }
+    });
+  };
+
+  const handleSaveObjectEdit = (objectId: string) => {
+    handleUpdateQualificationObject(objectId, editingObjectData);
+    setEditingObject(null);
+    setEditingObjectData({});
+  };
+
+  const handleCancelObjectEdit = () => {
+    setEditingObject(null);
+    setEditingObjectData({});
+  };
+
+  const handleDeleteObject = (objectId: string) => {
+    if (confirm('Вы уверены, что хотите удалить этот объект квалификации? Все связанные этапы также будут удалены.')) {
+      const updatedObjects = project.qualificationObjects?.filter(obj => obj.id !== objectId) || [];
+      
+      updateProject(project.id, {
+        qualificationObjects: updatedObjects,
+        updatedAt: new Date()
+      });
+    }
+  };
+
+  const handleAddNewObject = () => {
+    const newObject: QualificationObject = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      type: 'room',
+      name: '',
+      description: '',
+      stages: [],
+      overallStatus: 'not_started',
+      overallProgress: 0,
+      technicalParameters: {},
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const updatedObjects = [...(project.qualificationObjects || []), newObject];
+    
     updateProject(project.id, {
       qualificationObjects: updatedObjects,
       updatedAt: new Date()
@@ -208,7 +267,16 @@ export const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ projec
 
           {/* Объекты квалификации и их этапы */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Объекты квалификации</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Объекты квалификации</h3>
+              <button
+                onClick={handleAddNewObject}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Добавить объект</span>
+              </button>
+            </div>
             
             {project.qualificationObjects && project.qualificationObjects.length > 0 ? (
               <div className="space-y-4">
@@ -221,19 +289,69 @@ export const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ projec
                       {/* Заголовок объекта */}
                       <div 
                         className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                        onClick={() => toggleObjectExpansion(obj.id)}
                       >
-                        <div className="flex items-center space-x-3">
+                        <div 
+                          className="flex items-center space-x-3 flex-1"
+                          onClick={() => toggleObjectExpansion(obj.id)}
+                        >
                           <ObjectIcon className="w-5 h-5 text-indigo-600" />
                           <div>
-                            <h4 className="font-medium text-gray-900">
-                              {obj.name || `${getObjectTypeText(obj.type)} #${obj.id.slice(-4)}`}
-                            </h4>
+                            {editingObject === obj.id ? (
+                              <input
+                                type="text"
+                                value={editingObjectData.name || ''}
+                                onChange={(e) => setEditingObjectData(prev => ({ ...prev, name: e.target.value }))}
+                                className="font-medium text-gray-900 bg-white border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder={`${getObjectTypeText(obj.type)} #${obj.id.slice(-4)}`}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            ) : (
+                              <h4 className="font-medium text-gray-900">
+                                {obj.name || `${getObjectTypeText(obj.type)} #${obj.id.slice(-4)}`}
+                              </h4>
+                            )}
                             <p className="text-sm text-gray-600">{getObjectTypeText(obj.type)}</p>
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-4" onClick={(e) => e.stopPropagation()}>
+                          {/* Кнопки управления объектом */}
+                          {editingObject === obj.id ? (
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleSaveObjectEdit(obj.id)}
+                                className="text-green-600 hover:text-green-800 transition-colors"
+                                title="Сохранить изменения"
+                              >
+                                <Save className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={handleCancelObjectEdit}
+                                className="text-gray-600 hover:text-gray-800 transition-colors"
+                                title="Отменить изменения"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleEditObject(obj)}
+                                className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                title="Редактировать объект"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteObject(obj.id)}
+                                className="text-red-600 hover:text-red-800 transition-colors"
+                                title="Удалить объект"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                          
                           {/* Прогресс объекта */}
                           <div className="flex items-center space-x-2">
                             <div className="w-16 bg-gray-200 rounded-full h-2">
@@ -259,11 +377,13 @@ export const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ projec
                              obj.overallStatus}
                           </span>
                           
-                          {isExpanded ? (
+                          <button onClick={() => toggleObjectExpansion(obj.id)}>
+                            {isExpanded ? (
                             <ChevronDown className="w-5 h-5 text-gray-400" />
                           ) : (
                             <ChevronRight className="w-5 h-5 text-gray-400" />
                           )}
+                          </button>
                         </div>
                       </div>
 
