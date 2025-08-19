@@ -173,7 +173,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       createdAt: new Date(),
       updatedAt: new Date(),
       progress: 0,
-      currentStage: 'preparation'
+      currentStage: 'contract'
     };
 
     const updatedProjects = [...projects, newProject];
@@ -192,7 +192,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         priority: 'medium' as const,
         dependencies: [],
         estimatedHours: getTaskEstimatedHours(taskType),
-        stage: 'preparation',
+        stage: 'contract',
         comments: [],
         attachments: []
       }));
