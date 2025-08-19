@@ -180,7 +180,7 @@ export const ReferenceBooks: React.FC = () => {
       setError('');
     } catch (error) {
       console.error('Error adding client:', error);
-      setError('Ошибка добавления клиента');
+      setError('Ошибка добавления клиента. Проверьте права доступа.');
     }
   };
 
@@ -192,7 +192,7 @@ export const ReferenceBooks: React.FC = () => {
       setError('');
     } catch (error) {
       console.error('Error updating client:', error);
-      setError('Ошибка обновления клиента');
+      setError('Ошибка обновления клиента. Проверьте права доступа.');
     }
   };
 
@@ -204,7 +204,7 @@ export const ReferenceBooks: React.FC = () => {
         setError('');
       } catch (error) {
         console.error('Error deleting client:', error);
-        setError('Ошибка удаления клиента');
+        setError('Ошибка удаления клиента. Проверьте права доступа.');
       }
     }
   };

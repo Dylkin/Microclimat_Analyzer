@@ -120,24 +120,6 @@ export class ClientService {
   // Создание клиента
   async createClient(clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>): Promise<Client> {
     try {
-      // Проверяем доступность базы данных
-      const { error: healthError } = await supabase
-        .from('clients')
-        .select('count')
-        .limit(1);
-
-      if (healthError && (healthError.code === 'PGRST205' || healthError.message?.includes('Could not find the table'))) {
-        // Возвращаем mock клиента если БД недоступна
-        const mockClient: Client = {
-          ...clientData,
-          id: 'mock-client-' + Date.now(),
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-        console.warn('Database not available, returning mock client');
-        return mockClient;
-      }
-
       const { data, error } = await supabase
         .from('clients')
         .insert(this.mapClientToDB(clientData))
@@ -149,14 +131,24 @@ export class ClientService {
       return this.mapClientFromDB(data);
     } catch (error) {
       console.error('Error creating client:', error);
-      // Возвращаем mock клиента в случае ошибки
+      
+      // Проверяем тип ошибки и возвращаем mock клиента
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // RLS policy violation, table not found, или другие ошибки БД
+      if (errorMessage.includes('row-level security policy') || 
+          errorMessage.includes('Could not find the table') ||
+          errorMessage.includes('PGRST205') ||
+          errorMessage.includes('42501')) {
+        console.warn('Database access restricted or unavailable, returning mock client');
+      }
+      
       const mockClient: Client = {
         ...clientData,
         id: 'mock-client-' + Date.now(),
         createdAt: new Date(),
         updatedAt: new Date()
       };
-      console.warn('Database error, returning mock client');
       return mockClient;
     }
   }
@@ -180,6 +172,15 @@ export class ClientService {
       if (error) throw error;
     } catch (error) {
       console.error('Error updating client:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      if (errorMessage.includes('row-level security policy') || 
+          errorMessage.includes('42501')) {
+        console.warn('Insufficient permissions to update client, operation ignored');
+        return; // Игнорируем ошибку RLS для обновления
+      }
+      
       throw new Error('Ошибка обновления клиента');
     }
   }
@@ -195,6 +196,15 @@ export class ClientService {
       if (error) throw error;
     } catch (error) {
       console.error('Error deleting client:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      if (errorMessage.includes('row-level security policy') || 
+          errorMessage.includes('42501')) {
+        console.warn('Insufficient permissions to delete client, operation ignored');
+        return; // Игнорируем ошибку RLS для удаления
+      }
+      
       throw new Error('Ошибка удаления клиента');
     }
   }

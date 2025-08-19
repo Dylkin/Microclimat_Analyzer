@@ -104,7 +104,7 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
       setErrors({});
     } catch (error) {
       console.error('Error adding client:', error);
-      setErrors({ newClient: 'Ошибка добавления клиента' });
+      setErrors({ newClient: 'Ошибка добавления клиента. Проверьте права доступа.' });
     }
   };
 
