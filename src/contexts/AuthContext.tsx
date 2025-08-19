@@ -9,6 +9,8 @@ interface AuthContextType {
   addUser: (user: Omit<User, 'id'>) => void;
   updateUser: (id: string, user: Partial<User>) => void;
   deleteUser: (id: string) => void;
+  changePassword: (userId: string, oldPassword: string, newPassword: string) => boolean;
+  resetPassword: (userId: string, newPassword: string) => boolean;
   hasAccess: (page: 'analyzer' | 'projects' | 'users' | 'help') => boolean;
 }
 
@@ -101,6 +103,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(prev => prev.filter(u => u.id !== id));
   };
 
+  // Смена пароля (для обычных пользователей)
+  const changePassword = (userId: string, oldPassword: string, newPassword: string): boolean => {
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return false;
+    
+    // Проверяем старый пароль
+    if (targetUser.password !== oldPassword) return false;
+    
+    // Обновляем пароль
+    setUsers(prev => prev.map(u => 
+      u.id === userId ? { ...u, password: newPassword } : u
+    ));
+    
+    return true;
+  };
+
+  // Сброс пароля (только для администраторов)
+  const resetPassword = (userId: string, newPassword: string): boolean => {
+    if (user?.role !== 'administrator') return false;
+    
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return false;
+    
+    // Обновляем пароль без проверки старого
+    setUsers(prev => prev.map(u => 
+      u.id === userId ? { ...u, password: newPassword } : u
+    ));
+    
+    return true;
+  };
   // Восстановление сессии при загрузке
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser');
@@ -117,6 +149,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addUser,
     updateUser,
     deleteUser,
+    changePassword,
+    resetPassword,
     hasAccess
   };
 

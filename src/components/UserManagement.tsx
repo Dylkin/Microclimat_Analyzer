@@ -11,13 +11,21 @@ import {
   AlertCircle,
   Shield,
   UserCheck,
-  Settings
+  Settings,
+  Key
 } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
-  const { users, addUser, updateUser, deleteUser } = useAuth();
+  const { user: currentUser, users, addUser, updateUser, deleteUser, changePassword, resetPassword } = useAuth();
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState<User | null>(null);
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordError, setPasswordError] = useState('');
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -91,6 +99,59 @@ export const UserManagement: React.FC = () => {
     }
   };
 
+  const handleOpenPasswordModal = (user: User) => {
+    setShowPasswordModal(user);
+    setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    setPasswordError('');
+  };
+
+  const handleClosePasswordModal = () => {
+    setShowPasswordModal(null);
+    setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    setPasswordError('');
+  };
+
+  const handlePasswordChange = () => {
+    setPasswordError('');
+    
+    if (!passwordForm.newPassword || passwordForm.newPassword.length < 6) {
+      setPasswordError('Новый пароль должен содержать минимум 6 символов');
+      return;
+    }
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('Пароли не совпадают');
+      return;
+    }
+    
+    if (!showPasswordModal) return;
+    
+    let success = false;
+    
+    // Если администратор меняет пароль другому пользователю
+    if (currentUser?.role === 'administrator' && showPasswordModal.id !== currentUser.id) {
+      success = resetPassword(showPasswordModal.id, passwordForm.newPassword);
+      if (!success) {
+        setPasswordError('Ошибка сброса пароля');
+        return;
+      }
+    } else {
+      // Пользователь меняет свой пароль
+      if (!passwordForm.oldPassword) {
+        setPasswordError('Введите текущий пароль');
+        return;
+      }
+      
+      success = changePassword(showPasswordModal.id, passwordForm.oldPassword, passwordForm.newPassword);
+      if (!success) {
+        setPasswordError('Неверный текущий пароль');
+        return;
+      }
+    }
+    
+    handleClosePasswordModal();
+    setError('');
+  };
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -279,13 +340,22 @@ export const UserManagement: React.FC = () => {
                         <button
                           onClick={() => setEditingUser(user)}
                           className="text-indigo-600 hover:text-indigo-900"
+                          title="Редактировать пользователя"
                         >
                           <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenPasswordModal(user)}
+                          className="text-purple-600 hover:text-purple-900"
+                          title="Сменить пароль"
+                        >
+                          <Key className="w-4 h-4" />
                         </button>
                         {!user.isDefault && (
                           <button
                             onClick={() => handleDeleteUser(user.id)}
                             className="text-red-600 hover:text-red-900"
+                            title="Удалить пользователя"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -299,6 +369,110 @@ export const UserManagement: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {currentUser?.role === 'administrator' && showPasswordModal.id !== currentUser.id
+                  ? `Сброс пароля для ${showPasswordModal.fullName}`
+                  : 'Смена пароля'
+                }
+              </h3>
+              <button
+                onClick={handleClosePasswordModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {passwordError && (
+                <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="text-sm">{passwordError}</span>
+                </div>
+              )}
+
+              {/* Текущий пароль (только если пользователь меняет свой пароль или не администратор) */}
+              {!(currentUser?.role === 'administrator' && showPasswordModal.id !== currentUser.id) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Текущий пароль
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordForm.oldPassword}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, oldPassword: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Введите текущий пароль"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Новый пароль
+                </label>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Введите новый пароль (минимум 6 символов)"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Подтверждение пароля
+                </label>
+                <input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Повторите новый пароль"
+                />
+              </div>
+
+              {/* Информация для администратора */}
+              {currentUser?.role === 'administrator' && showPasswordModal.id !== currentUser.id && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Режим администратора:</strong> Вы сбрасываете пароль для пользователя {showPasswordModal.fullName}. 
+                    Ввод текущего пароля не требуется.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+              <button
+                onClick={handleClosePasswordModal}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handlePasswordChange}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+              >
+                <Key className="w-4 h-4" />
+                <span>
+                  {currentUser?.role === 'administrator' && showPasswordModal.id !== currentUser.id
+                    ? 'Сбросить пароль'
+                    : 'Сменить пароль'
+                  }
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
