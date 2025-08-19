@@ -342,12 +342,12 @@ export const ContractorDirectory: React.FC = () => {
       </div>
       {/* Add Contractor Form */}
       {showAddForm && (
-        {renderContractorForm(false)}
+        renderContractorForm(false)
       )}
 
       {/* Edit Contractor Form */}
       {showEditForm && editingContractorData && (
-        {renderContractorForm(true)}
+        renderContractorForm(true)
       )}
 
       {/* Contractors Table */}
