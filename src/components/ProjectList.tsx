@@ -188,7 +188,6 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects }) => {
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedProjects.map((project) => {
               const TypeIcon = getTypeIcon(project.type);
-              const isOverdue = project.endDate && new Date(project.endDate) < new Date() && project.status !== 'completed';
               const isOverdue = project.endDate && new Date(project.endDate) < new Date() && project.status !== 'closed';
               
               return (
