@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
+import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { contractorService } from '../utils/contractorService';
+import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { ContractorMap } from './ContractorMap';
+import { QualificationObjectForm } from './QualificationObjectForm';
+import { QualificationObjectsTable } from './QualificationObjectsTable';
 
 export const ContractorDirectory: React.FC = () => {
   const [contractors, setContractors] = useState<Contractor[]>([]);
@@ -19,6 +23,12 @@ export const ContractorDirectory: React.FC = () => {
   const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingContractorData, setEditingContractorData] = useState<Contractor | null>(null);
+  
+  // Qualification objects state
+  const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
+  const [showQualificationObjects, setShowQualificationObjects] = useState(false);
+  const [showAddQualificationForm, setShowAddQualificationForm] = useState(false);
+  const [selectedContractorForObjects, setSelectedContractorForObjects] = useState<Contractor | null>(null);
 
   // Form state
   const [newContractor, setNewContractor] = useState<CreateContractorData>({
@@ -96,6 +106,26 @@ export const ContractorDirectory: React.FC = () => {
 
     setFilteredContractors(filtered);
   }, [searchTerm, contractors]);
+
+  // Загрузка объектов квалификации для контрагента
+  const loadQualificationObjects = async (contractorId: string) => {
+    if (!qualificationObjectService.isAvailable()) {
+      setError('Supabase не настроен для работы с объектами квалификации');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const objects = await qualificationObjectService.getQualificationObjects(contractorId);
+      setQualificationObjects(objects);
+    } catch (error) {
+      console.error('Ошибка загрузки объектов квалификации:', error);
+      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Добавление контрагента
   const handleAddContractor = async () => {
     if (!newContractor.name.trim()) {
@@ -213,6 +243,46 @@ export const ContractorDirectory: React.FC = () => {
     }
   };
 
+  // Показать объекты квалификации контрагента
+  const handleShowQualificationObjects = (contractor: Contractor) => {
+    setSelectedContractorForObjects(contractor);
+    setShowQualificationObjects(true);
+    loadQualificationObjects(contractor.id);
+  };
+
+  // Добавление объекта квалификации
+  const handleAddQualificationObject = async (objectData: CreateQualificationObjectData) => {
+    setOperationLoading(true);
+    try {
+      const addedObject = await qualificationObjectService.addQualificationObject(objectData);
+      setQualificationObjects(prev => [...prev, addedObject]);
+      setShowAddQualificationForm(false);
+      alert('Объект квалификации успешно добавлен');
+    } catch (error) {
+      console.error('Ошибка добавления объекта квалификации:', error);
+      alert(`Ошибка добавления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // Удаление объекта квалификации
+  const handleDeleteQualificationObject = async (objectId: string) => {
+    if (confirm('Вы уверены, что хотите удалить этот объект квалификации?')) {
+      setOperationLoading(true);
+      try {
+        await qualificationObjectService.deleteQualificationObject(objectId);
+        setQualificationObjects(prev => prev.filter(obj => obj.id !== objectId));
+        alert('Объект квалификации успешно удален');
+      } catch (error) {
+        console.error('Ошибка удаления объекта квалификации:', error);
+        alert(`Ошибка удаления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      } finally {
+        setOperationLoading(false);
+      }
+    }
+  };
+
   // Управление контактами в форме добавления
   const addNewContact = (isEdit = false) => {
     if (isEdit) {
@@ -279,6 +349,58 @@ export const ContractorDirectory: React.FC = () => {
           setSelectedContractor(null);
         }}
       />
+    );
+  }
+
+  // Если показываем объекты квалификации
+  if (showQualificationObjects && selectedContractorForObjects) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => {
+              setShowQualificationObjects(false);
+              setSelectedContractorForObjects(null);
+              setQualificationObjects([]);
+            }}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <Building2 className="w-8 h-8 text-indigo-600" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Объекты квалификации</h1>
+            <p className="text-gray-600">{selectedContractorForObjects.name}</p>
+          </div>
+        </div>
+
+        {/* Add Qualification Object Form */}
+        {showAddQualificationForm && (
+          <QualificationObjectForm
+            contractorId={selectedContractorForObjects.id}
+            onAdd={handleAddQualificationObject}
+            onCancel={() => setShowAddQualificationForm(false)}
+            loading={operationLoading}
+          />
+        )}
+
+        {/* Qualification Objects Table */}
+        <QualificationObjectsTable
+          objects={qualificationObjects}
+          onAdd={() => setShowAddQualificationForm(true)}
+          onEdit={(obj) => {
+            // TODO: Implement edit functionality
+            console.log('Edit object:', obj);
+          }}
+          onDelete={handleDeleteQualificationObject}
+          onShowOnMap={(obj) => {
+            // TODO: Implement map functionality for objects
+            console.log('Show on map:', obj);
+          }}
+          loading={loading}
+        />
+      </div>
     );
   }
 
@@ -365,6 +487,9 @@ export const ContractorDirectory: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Контакты
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Объекты
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
                 </th>
@@ -436,6 +561,14 @@ export const ContractorDirectory: React.FC = () => {
                     ) : (
                       <span className="text-gray-400 text-sm">Нет контактов</span>
                     )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <button
+                      onClick={() => handleShowQualificationObjects(contractor)}
+                      className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+                    >
+                      Объекты квалификации
+                    </button>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
