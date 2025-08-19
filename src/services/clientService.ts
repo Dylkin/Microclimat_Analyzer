@@ -132,27 +132,8 @@ export class ClientService {
     } catch (error) {
       console.error('Error creating client:', error);
       
-      // Проверяем тип ошибки
-      let errorCode = '';
-      let errorMessage = '';
-      
-      if (error && typeof error === 'object' && 'code' in error) {
-        errorCode = String(error.code);
-      }
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage = String(error.message);
-      } else {
-        errorMessage = String(error);
-      }
-      
-      // RLS policy violation или другие ошибки доступа
-      if (errorCode === '42501' ||
-          errorMessage.includes('row-level security policy') || 
-          errorMessage.includes('Could not find the table') ||
-          errorMessage.includes('PGRST205')) {
+      // Проверяем на RLS policy violation
+      if (this.isRLSError(error)) {
         console.warn('Database access restricted, creating mock client');
         
         // Возвращаем mock клиента без выброса ошибки
@@ -190,10 +171,7 @@ export class ClientService {
     } catch (error) {
       console.error('Error updating client:', error);
       
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      if (errorMessage.includes('row-level security policy') || 
-          errorMessage.includes('42501')) {
+      if (this.isRLSError(error)) {
         console.warn('Insufficient permissions to update client, operation ignored');
         return; // Игнорируем ошибку RLS для обновления
       }
@@ -214,16 +192,47 @@ export class ClientService {
     } catch (error) {
       console.error('Error deleting client:', error);
       
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      if (errorMessage.includes('row-level security policy') || 
-          errorMessage.includes('42501')) {
+      if (this.isRLSError(error)) {
         console.warn('Insufficient permissions to delete client, operation ignored');
         return; // Игнорируем ошибку RLS для удаления
       }
       
       throw new Error('Ошибка удаления клиента');
     }
+  }
+
+  // Проверка на RLS ошибку
+  private isRLSError(error: any): boolean {
+    if (!error) return false;
+
+    // Проверяем прямые свойства ошибки
+    if (error.code === '42501') return true;
+    if (error.message && error.message.includes('row-level security policy')) return true;
+
+    // Проверяем вложенные свойства (для Supabase ошибок)
+    if (error.details && typeof error.details === 'object') {
+      if (error.details.code === '42501') return true;
+      if (error.details.message && error.details.message.includes('row-level security policy')) return true;
+    }
+
+    // Проверяем строковое представление ошибки
+    const errorString = String(error);
+    if (errorString.includes('42501') || errorString.includes('row-level security policy')) {
+      return true;
+    }
+
+    // Проверяем JSON body (для HTTP ошибок)
+    try {
+      if (error.body && typeof error.body === 'string') {
+        const parsedBody = JSON.parse(error.body);
+        if (parsedBody.code === '42501') return true;
+        if (parsedBody.message && parsedBody.message.includes('row-level security policy')) return true;
+      }
+    } catch (e) {
+      // Игнорируем ошибки парсинга JSON
+    }
+
+    return false;
   }
 }
 
