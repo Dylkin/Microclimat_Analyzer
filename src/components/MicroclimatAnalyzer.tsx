@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart } from 'lucide-react';
+import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart, Database } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { supabaseDatabaseService } from '../utils/supabaseDatabase';
 import { VI2ParsingService } from '../utils/vi2Parser';
@@ -18,6 +18,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [editingField, setEditingField] = React.useState<{ fileId: string; field: 'zoneNumber' | 'measurementLevel' } | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   // Загружаем файлы пользователя при монтировании компонента
   React.useEffect(() => {
@@ -26,6 +27,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
   const loadUserFiles = async () => {
     try {
+      console.log('Загружаем файлы пользователя из базы данных...');
       setIsLoading(true);
       const files = await supabaseDatabaseService.getUserFiles();
       setUploadedFiles(files);
@@ -35,6 +37,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       setIsLoading(false);
     }
   };
+  
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
     { label: 'Влажность', value: '65%', icon: Droplets, color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -44,6 +47,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
+    setIsSaving(true);
     if (!files) return;
 
     const fileArray = Array.from(files);
@@ -60,6 +64,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
       try {
         // Сохраняем файл в базу данных
+        console.log(`Сохраняем файл в базу данных: ${file.name}`);
         const fileId = await supabaseDatabaseService.saveUploadedFile({
           name: file.name,
           uploadDate: new Date().toLocaleString('ru-RU'),
@@ -68,7 +73,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           userId: 'current-user' // Будет заменено в сервисе на реального пользователя
         });
 
-        // Обновляем состояние с новым файлом
         const newFile: UploadedFile = {
           id: fileId,
           name: file.name,
@@ -79,6 +83,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         
         setUploadedFiles(prev => [...prev, newFile]);
 
+        console.log(`Начинаем парсинг файла: ${file.name}`);
         // Реальный парсинг файла
         console.log(`Парсинг файла: ${file.name}`);
         
@@ -86,9 +91,11 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         const parsingService = new VI2ParsingService();
         const parsedData = await parsingService.parseFile(file);
         
+        console.log(`Сохраняем результаты парсинга в базу данных для файла: ${file.name}`);
         // Сохраняем в базу данных
         await supabaseDatabaseService.saveParsedFileData(fileId, parsedData);
         
+        console.log(`Файл ${file.name} успешно обработан`);
         // Обновляем состояние с результатами парсинга
         setUploadedFiles(prev => prev.map(f => {
           if (f.id === fileId) {
@@ -109,6 +116,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         
         // Обновляем статус на ошибку в базе данных
         try {
+          console.error(`Ошибка обработки файла ${file.name}:`, error);
           const fileId = uploadedFiles[uploadedFiles.length - 1]?.id;
           if (fileId) {
             await supabaseDatabaseService.updateFileStatus(fileId, 'error', error instanceof Error ? error.message : 'Неизвестная ошибка');
@@ -121,6 +129,8 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       }
     }
 
+    setIsSaving(false);
+    
     // Очищаем input для возможности загрузки того же файла повторно
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -130,6 +140,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const handleDeleteFile = async (fileId: string) => {
     if (confirm('Вы уверены, что хотите удалить этот файл?')) {
       try {
+        console.log(`Удаляем файл из базы данных: ${fileId}`);
         // Удаляем файл из базы данных
         await supabaseDatabaseService.deleteFile(fileId);
         
@@ -176,6 +187,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const updateFileField = async (fileId: string, field: 'zoneNumber' | 'measurementLevel', value: string | number) => {
     // Обновляем в базе данных
     try {
+      console.log(`Обновляем поле ${field} для файла ${fileId}:`, value);
       const fields = field === 'zoneNumber' 
         ? { zoneNumber: typeof value === 'string' ? parseInt(value) || undefined : value }
         : { measurementLevel: value.toString() };
@@ -288,6 +300,15 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
               <Upload className="w-4 h-4" />
               <span>Загрузить файлы в формате Vi2</span>
             </button>
+            {isSaving && (
+              <div className="flex items-center space-x-2 text-blue-600">
+                <Database className="w-4 h-4 animate-pulse" />
+                <span className="text-sm">Сохранение...</span>
+              </div>
+            )}
+            {!isSaving && uploadedFiles.length > 0 && (
+              <span className="text-xs text-green-600">✓ Данные сохранены</span>
+            )}
           </div>
         </div>
         

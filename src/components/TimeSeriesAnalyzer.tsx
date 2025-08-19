@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowLeft, Download, FileText, Upload, Settings, Zap, BarChart, Save, Plus, Trash2, Edit2, X } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Upload, Settings, Zap, BarChart, Save, Plus, Trash2, Edit2, X, Database } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -8,6 +8,7 @@ import { DocxReportGenerator } from '../utils/docxGenerator';
 import { DocxImageGenerator } from '../utils/docxImageGenerator';
 import { DocxTemplateProcessor } from '../utils/docxTemplateProcessor';
 import { supabaseDatabaseService } from '../utils/supabaseDatabase';
+
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -31,6 +32,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [showContractFields, setShowContractFields] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   
   const chartRef = useRef<HTMLDivElement>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
@@ -47,12 +49,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     { id: 'conclusions', label: 'Выводы', value: '', type: 'textarea' }
   ]);
 
+  // Автосохранение сессии анализа с индикатором
   // Автосохранение сессии анализа
   useEffect(() => {
     const saveSession = async () => {
       if (!data || files.length === 0) return;
 
       try {
+        setIsSaving(true);
+
         const sessionData = {
           name: `Анализ ${dataType === 'temperature' ? 'температуры' : 'влажности'} - ${new Date().toLocaleDateString('ru-RU')}`,
           description: `Анализ данных из ${files.length} файлов`,
@@ -81,7 +86,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           await supabaseDatabaseService.saveVerticalMarkers(currentSessionId, markers);
         }
       } catch (error) {
-        console.error('Ошибка автосохранения сессии:', error);
+        console.error('Ошибка сохранения сессии:', error);
+      } finally {
+        setIsSaving(false);
       }
     };
 
@@ -89,7 +96,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     return () => clearTimeout(timeoutId);
   }, [data, files, dataType, limits, zoomState, markers, contractFields, currentSessionId]);
 
-  // Загрузка сохраненных настроек при смене типа данных
+  // Загрузка сохраненных настроек
   useEffect(() => {
     const loadSettings = async () => {
       if (!currentSessionId) return;
@@ -104,7 +111,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         const savedMarkers = await supabaseDatabaseService.getVerticalMarkers(currentSessionId);
         setMarkers(savedMarkers);
       } catch (error) {
-        console.error('Ошибка загрузки настроек:', error);
+        console.warn('Настройки не найдены, используем значения по умолчанию');
       }
     };
 
@@ -472,6 +479,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             <Settings className="w-4 h-4" />
             <span>Настройки</span>
           </button>
+          {isSaving && (
+            <div className="flex items-center space-x-2 text-blue-600">
+              <Database className="w-4 h-4 animate-pulse" />
+              <span className="text-sm">Сохранение...</span>
+            </div>
+          )}
+          {currentSessionId && !isSaving && (
+            <span className="text-xs text-green-600">✓ Сохранено</span>
+          )}
         </div>
       </div>
 
