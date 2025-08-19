@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check-db": "node check-database.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0",

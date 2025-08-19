@@ -1,17 +1,18 @@
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+// Проверяем наличие переменных окружения
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'NOT_SET';
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'NOT_SET';
 
 console.log('🚀 Запуск проверки базы данных...');
 console.log('📋 Переменные окружения:');
-console.log('VITE_SUPABASE_URL:', supabaseUrl ? 'установлена' : 'НЕ НАЙДЕНА');
-console.log('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'установлена' : 'НЕ НАЙДЕНА');
+console.log('VITE_SUPABASE_URL:', supabaseUrl !== 'NOT_SET' ? 'установлена' : 'НЕ НАЙДЕНА');
+console.log('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey !== 'NOT_SET' ? 'установлена' : 'НЕ НАЙДЕНА');
 console.log('');
 
 console.log('🔍 Проверка подключения к базе данных Supabase...\n');
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (supabaseUrl === 'NOT_SET' || supabaseAnonKey === 'NOT_SET') {
   console.error('❌ Ошибка: Переменные окружения не найдены');
   console.error('Проверьте наличие VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY в .env файле');
   process.exit(1);
