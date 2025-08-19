@@ -113,7 +113,7 @@ export class UserService {
     }
 
     try {
-      console.log('Добавляем пользователя:', newUser);
+      console.log('Добавляем пользователя:', user);
       
       const { data, error } = await this.supabase
         .from('users')
@@ -141,6 +141,9 @@ export class UserService {
         }
         if (error.code === '42501') {
           throw new Error('Недостаточно прав для добавления пользователя');
+        }
+        if (error.code === 'PGRST301') {
+          throw new Error('Недостаточно прав для добавления пользователя. Убедитесь, что вы авторизованы как администратор.');
         }
         throw new Error(`Ошибка добавления пользователя: ${error.message}`);
       }
