@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ProjectProvider } from './contexts/ProjectContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
-import { ReferenceBooks } from './components/ReferenceBooks';
-import { ProjectManagement } from './components/ProjectManagement';
 import { Help } from './components/Help';
 import './index.css';
 
 const AppContent: React.FC = () => {
   const { user, hasAccess } = useAuth();
-  const [currentPage, setCurrentPage] = useState('projects');
+  const [currentPage, setCurrentPage] = useState('analyzer');
   const [showVisualization, setShowVisualization] = useState(false);
 
   React.useEffect(() => {
@@ -31,10 +28,6 @@ const AppContent: React.FC = () => {
             onShowVisualization={setShowVisualization}
           />
         ) : <div>Доступ запрещен</div>;
-      case 'projects':
-        return <ProjectManagement />;
-      case 'references':
-        return hasAccess('users') ? <ReferenceBooks /> : <div>Доступ запрещен</div>;
       case 'help':
         return hasAccess('help') ? <Help /> : <div>Доступ запрещен</div>;
       default:
@@ -55,9 +48,7 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <ProjectProvider>
         <AppContent />
-      </ProjectProvider>
     </AuthProvider>
   );
 }

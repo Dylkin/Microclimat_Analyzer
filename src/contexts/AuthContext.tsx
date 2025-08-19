@@ -11,7 +11,7 @@ interface AuthContextType {
   deleteUser: (id: string) => void;
   changePassword: (userId: string, oldPassword: string, newPassword: string) => boolean;
   resetPassword: (userId: string, newPassword: string) => boolean;
-  hasAccess: (page: 'analyzer' | 'projects' | 'users' | 'help') => boolean;
+  hasAccess: (page: 'analyzer' | 'help') => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,17 +38,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [users, setUsers] = useState<User[]>([defaultUser]);
 
   // Проверка доступа к страницам
-  const hasAccess = (page: 'analyzer' | 'projects' | 'users' | 'help'): boolean => {
+  const hasAccess = (page: 'analyzer' | 'help'): boolean => {
     if (!user) return false;
 
     switch (user.role) {
       case 'administrator':
-        return true; // Полный доступ ко всем страницам
+        return true; // Полный доступ
       case 'specialist':
-        return page === 'analyzer' || page === 'help'; // К анализатору и справке
+        return page === 'analyzer' || page === 'help';
       case 'manager':
       case 'director':
-        return page === 'projects' || page === 'users' || page === 'help' || page === 'analyzer'; // К проектам, пользователям, справке и анализатору
+        return page === 'analyzer' || page === 'help';
       default:
         return false;
     }
