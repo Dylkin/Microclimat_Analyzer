@@ -35,7 +35,31 @@ const defaultUser: User = {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [users, setUsers] = useState<User[]>([defaultUser]);
+  const [users, setUsers] = useState<User[]>(() => {
+    // Загружаем пользователей из localStorage при инициализации
+    const savedUsers = localStorage.getItem('users');
+    if (savedUsers) {
+      try {
+        const parsedUsers = JSON.parse(savedUsers);
+        // Проверяем, есть ли пользователь по умолчанию
+        const hasDefaultUser = parsedUsers.some((u: User) => u.isDefault);
+        if (!hasDefaultUser) {
+          // Если нет пользователя по умолчанию, добавляем его
+          return [defaultUser, ...parsedUsers];
+        }
+        return parsedUsers;
+      } catch (error) {
+        console.error('Ошибка загрузки пользователей из localStorage:', error);
+        return [defaultUser];
+      }
+    }
+    return [defaultUser];
+  });
+
+  // Сохраняем пользователей в localStorage при каждом изменении
+  useEffect(() => {
+    localStorage.setItem('users', JSON.stringify(users));
+  }, [users]);
 
   // Проверка доступа к страницам
   const hasAccess = (page: 'analyzer' | 'help' | 'database' | 'users'): boolean => {
