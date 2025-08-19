@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 // Проверяем наличие переменных окружения
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'NOT_SET';
