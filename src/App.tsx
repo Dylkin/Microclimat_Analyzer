@@ -17,22 +17,6 @@ const AppContent: React.FC = () => {
   React.useEffect(() => {
     if (!user) return;
     
-    // Для всех ролей стартовая страница - управление проектами
-    if (hasAccess('projects')) {
-      setCurrentPage('projects');
-    } else if (user.role === 'specialist' && hasAccess('analyzer')) {
-      setCurrentPage('analyzer');
-    } else if (!hasAccess(currentPage as 'analyzer' | 'projects' | 'users')) {
-      // Если текущая страница недоступна, переключаемся на доступную
-      if (hasAccess('projects')) {
-        setCurrentPage('projects');
-      } else if (hasAccess('analyzer')) {
-        setCurrentPage('analyzer');
-      } else if (hasAccess('users')) {
-        setCurrentPage('references');
-      }
-    }
-  }, [user, hasAccess, currentPage]);
 
   if (!user) {
     return <Login />;
