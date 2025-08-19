@@ -29,9 +29,7 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
     contactPerson: '',
     email: '',
     phone: '',
-    address: '',
-    inn: '',
-    kpp: ''
+    address: ''
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,7 +81,7 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
   };
 
   const handleAddClient = async () => {
-    if (!newClient.name || !newClient.email || !newClient.inn) {
+    if (!newClient.name || !newClient.contactPerson) {
       setErrors({ newClient: 'Заполните обязательные поля для нового заказчика' });
       return;
     }
@@ -102,7 +100,7 @@ export const CreateProjectForm: React.FC<CreateProjectFormProps> = ({ onCancel, 
       setClients(prev => [...prev, client]);
       setFormData(prev => ({ ...prev, clientId: client.id, clientName: client.name }));
       setShowNewClientForm(false);
-      setNewClient({ name: '', contactPerson: '', email: '', phone: '', address: '', inn: '', kpp: '' });
+      setNewClient({ name: '', contactPerson: '', email: '', phone: '', address: '' });
       setErrors({});
     } catch (error) {
       console.error('Error adding client:', error);

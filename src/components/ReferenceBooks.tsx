@@ -292,9 +292,6 @@ export const ReferenceBooks: React.FC = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Контакты
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ИНН/КПП
-              </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Действия
               </th>
@@ -313,10 +310,6 @@ export const ReferenceBooks: React.FC = () => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">{client.email}</div>
                   <div className="text-sm text-gray-500">{client.phone}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{client.inn || '-'}</div>
-                  {client.kpp && <div className="text-sm text-gray-500">{client.kpp}</div>}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex justify-end space-x-2">
@@ -569,11 +562,7 @@ const ClientForm: React.FC<{
     contactPerson: '',
     email: '',
     phone: '',
-    address: '',
-    inn: '',
-    kpp: ''
-  });
-
+    address: ''
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);

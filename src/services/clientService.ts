@@ -10,8 +10,6 @@ const mockClients = [
     email: 'ivanov@pharma.ru',
     phone: '+7 (495) 123-45-67',
     address: 'г. Москва, ул. Примерная, д. 1',
-    inn: '1234567890',
-    kpp: '123456789',
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01')
   },
@@ -22,8 +20,6 @@ const mockClients = [
     email: 'petrov@medcenter.ru',
     phone: '+7 (495) 987-65-43',
     address: 'г. Санкт-Петербург, пр. Медицинский, д. 10',
-    inn: '0987654321',
-    kpp: '098765432',
     createdAt: new Date('2024-01-05'),
     updatedAt: new Date('2024-01-05')
   }
@@ -40,8 +36,6 @@ export interface Client {
   email?: string;
   phone?: string;
   address?: string;
-  inn?: string;
-  kpp?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,8 +50,6 @@ export class ClientService {
       email: clientRow.email || undefined,
       phone: clientRow.phone || undefined,
       address: clientRow.address || undefined,
-      inn: clientRow.inn || undefined,
-      kpp: clientRow.kpp || undefined,
       createdAt: new Date(clientRow.created_at),
       updatedAt: new Date(clientRow.updated_at)
     };
@@ -70,9 +62,7 @@ export class ClientService {
       contact_person: client.contactPerson,
       email: client.email || null,
       phone: client.phone || null,
-      address: client.address || null,
-      inn: client.inn || null,
-      kpp: client.kpp || null
+      address: client.address || null
     };
   }
 
