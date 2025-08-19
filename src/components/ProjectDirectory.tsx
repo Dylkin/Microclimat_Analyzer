@@ -111,6 +111,9 @@ export const ProjectDirectory: React.FC = () => {
     console.log('Создание проекта с данными:', newProject);
     console.log('Выбранный контрагент ID:', newProject.contractorId);
     
+    console.log('Создание проекта с данными:', newProject);
+    console.log('Выбранный контрагент ID:', newProject.contractorId);
+    
     if (!newProject.contractorId) {
       alert('Выберите контрагента');
       return;
@@ -118,6 +121,13 @@ export const ProjectDirectory: React.FC = () => {
 
     if (newProject.qualificationObjectIds.length === 0) {
       alert('Выберите хотя бы один объект квалификации');
+      return;
+    }
+
+    // Проверяем, что contractorId является валидным UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(newProject.contractorId)) {
+      alert('Ошибка: некорректный ID контрагента. Обновите страницу и попробуйте снова.');
       return;
     }
 
