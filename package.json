@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0",
+    "@types/leaflet": "^1.9.20",
     "d3-array": "^3.2.4",
     "d3-scale": "^4.0.2",
     "d3-scale-chromatic": "^3.1.0",
@@ -21,6 +22,7 @@
     "docxtemplater-image-module": "^3.1.0",
     "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.532.0",
     "pizzip": "^3.2.0",
     "react": "^18.3.1",

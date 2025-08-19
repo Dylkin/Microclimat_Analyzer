@@ -6,6 +6,7 @@ import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
 import { Help } from './components/Help';
 import { DatabaseTest } from './components/DatabaseTest';
 import { UserDirectory } from './components/UserDirectory';
+import { ContractorDirectory } from './components/ContractorDirectory';
 import './index.css';
 
 const AppContent: React.FC = () => {
@@ -34,6 +35,8 @@ const AppContent: React.FC = () => {
         return hasAccess('help') ? <Help /> : <div>Доступ запрещен</div>;
       case 'users':
         return hasAccess('users') ? <UserDirectory /> : <div>Доступ запрещен</div>;
+      case 'contractors':
+        return hasAccess('analyzer') ? <ContractorDirectory /> : <div>Доступ запрещен</div>;
       case 'database':
         return hasAccess('database') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
       default:
