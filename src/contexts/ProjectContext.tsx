@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Project, Task, ProjectActivity, ProjectDocument, Notification, ProjectTemplate } from '../types/Project';
 import { useAuth } from './AuthContext';
+import { projectService } from '../services/projectService';
+import { clientService } from '../services/clientService';
 
 interface ProjectContextType {
   projects: Project[];
@@ -140,104 +142,87 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [templates] = useState<ProjectTemplate[]>(defaultTemplates);
+  const [loading, setLoading] = useState(false);
 
   // Загрузка данных при инициализации
   useEffect(() => {
-    loadData();
-  }, []);
+    if (user) {
+      loadData();
+    }
+  }, [user]);
 
   const loadData = () => {
-    // Загрузка из localStorage (в реальном приложении - из API)
-    const savedProjects = localStorage.getItem('projects');
-    const savedTasks = localStorage.getItem('tasks');
-    const savedActivities = localStorage.getItem('activities');
-    const savedDocuments = localStorage.getItem('documents');
-    const savedNotifications = localStorage.getItem('notifications');
-
-    if (savedProjects) setProjects(JSON.parse(savedProjects));
-    if (savedTasks) setTasks(JSON.parse(savedTasks));
-    if (savedActivities) setActivities(JSON.parse(savedActivities));
-    if (savedDocuments) setDocuments(JSON.parse(savedDocuments));
-    if (savedNotifications) setNotifications(JSON.parse(savedNotifications));
+    loadProjects();
   };
 
-  const saveData = (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
+  const loadProjects = async () => {
+    try {
+      setLoading(true);
+      const projectsData = await projectService.getAllProjects();
+      setProjects(projectsData);
+    } catch (error) {
+      console.error('Error loading projects:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Project methods
   const createProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> => {
-    const newProject: Project = {
-      ...projectData,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      progress: 0,
-      currentStage: 'preparation'
-    };
-
-    const updatedProjects = [...projects, newProject];
-    setProjects(updatedProjects);
-    saveData('projects', updatedProjects);
-
-    // Создаем начальные задачи на основе шаблона
-    const template = templates.find(t => t.type === projectData.type);
-    if (template) {
-      const initialTasks = template.stages[0].tasks.map(taskType => ({
+    try {
+      const newProject = await projectService.createProject(projectData);
+      setProjects(prev => [...prev, newProject]);
+      
+      // Добавляем активность
+      await projectService.addProjectActivity({
         projectId: newProject.id,
-        title: getTaskTitle(taskType, newProject.clientName),
-        description: getTaskDescription(taskType),
-        type: taskType,
-        status: 'pending' as const,
-        priority: 'medium' as const,
-        dependencies: [],
-        estimatedHours: getTaskEstimatedHours(taskType),
-        stage: 'preparation',
-        comments: [],
-        attachments: []
-      }));
-
-      for (const taskData of initialTasks) {
-        await createTask(taskData);
-      }
+        userId: user?.id || '',
+        userName: user?.fullName || '',
+        action: 'project_created',
+        description: `Создан проект "Картирование для ${newProject.clientName}"`
+      });
+      
+      return newProject;
+    } catch (error) {
+      console.error('Error creating project:', error);
+      throw error;
     }
-
-    await addActivity({
-      projectId: newProject.id,
-      userId: user?.id || '',
-      userName: user?.fullName || '',
-      action: 'project_created',
-      description: `Создан проект "Картирование для ${newProject.clientName}"`
-    });
-
-    return newProject;
   };
 
   const updateProject = async (id: string, updates: Partial<Project>): Promise<void> => {
-    const updatedProjects = projects.map(p => 
-      p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p
-    );
-    setProjects(updatedProjects);
-    saveData('projects', updatedProjects);
-
-    await addActivity({
-      projectId: id,
-      userId: user?.id || '',
-      userName: user?.fullName || '',
-      action: 'project_updated',
-      description: `Обновлен проект`
-    });
+    try {
+      await projectService.updateProject(id, updates);
+      
+      // Обновляем локальное состояние
+      setProjects(prev => prev.map(p => 
+        p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p
+      ));
+      
+      // Добавляем активность
+      await projectService.addProjectActivity({
+        projectId: id,
+        userId: user?.id || '',
+        userName: user?.fullName || '',
+        action: 'project_updated',
+        description: `Обновлен проект`
+      });
+    } catch (error) {
+      console.error('Error updating project:', error);
+      throw error;
+    }
   };
 
   const deleteProject = async (id: string): Promise<void> => {
-    const updatedProjects = projects.filter(p => p.id !== id);
-    setProjects(updatedProjects);
-    saveData('projects', updatedProjects);
-
-    // Удаляем связанные задачи
-    const updatedTasks = tasks.filter(t => t.projectId !== id);
-    setTasks(updatedTasks);
-    saveData('tasks', updatedTasks);
+    try {
+      await projectService.deleteProject(id);
+      setProjects(prev => prev.filter(p => p.id !== id));
+      
+      // Удаляем связанные задачи из локального состояния
+      setTasks(prev => prev.filter(t => t.projectId !== id));
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      throw error;
+    }
   };
 
   const getProject = (id: string): Project | undefined => {
@@ -366,15 +351,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Activity methods
   const addActivity = async (activity: Omit<ProjectActivity, 'id' | 'timestamp'>): Promise<void> => {
-    const newActivity: ProjectActivity = {
-      ...activity,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      timestamp: new Date()
-    };
-
-    const updatedActivities = [...activities, newActivity];
-    setActivities(updatedActivities);
-    saveData('activities', updatedActivities);
+    try {
+      await projectService.addProjectActivity({
+        projectId: activity.projectId,
+        userId: activity.userId,
+        userName: activity.userName,
+        action: activity.action,
+        description: activity.description,
+        metadata: activity.metadata
+      });
+      
+      // Обновляем локальное состояние
+      const newActivity: ProjectActivity = {
+        ...activity,
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        timestamp: new Date()
+      };
+      setActivities(prev => [...prev, newActivity]);
+    } catch (error) {
+      console.error('Error adding activity:', error);
+      throw error;
+    }
   };
 
   // Notification methods

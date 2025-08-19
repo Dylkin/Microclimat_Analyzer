@@ -15,18 +15,9 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { UserManagement } from './UserManagement';
+import { clientService, Client } from '../services/clientService';
 
 type ReferenceBookType = 'users' | 'clients' | 'equipment' | 'templates' | 'settings';
-
-interface Client {
-  id: string;
-  name: string;
-  contactPerson: string;
-  email: string;
-  phone: string;
-  address: string;
-  createdAt: Date;
-}
 
 interface Equipment {
   id: string;
@@ -119,17 +110,35 @@ export const ReferenceBooks: React.FC = () => {
 
   // Инициализация данных
   React.useEffect(() => {
-    loadReferenceData();
+    if (activeBook === 'clients') {
+      loadClients();
+    } else {
+      loadReferenceData();
+    }
   }, []);
 
+  React.useEffect(() => {
+    if (activeBook === 'clients') {
+      loadClients();
+    }
+  }, [activeBook]);
+
+  const loadClients = async () => {
+    try {
+      const clientsData = await clientService.getAllClients();
+      setClients(clientsData);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+      setError('Ошибка загрузки клиентов');
+    }
+  };
+
   const loadReferenceData = () => {
-    // Загрузка данных из localStorage или API
-    const savedClients = localStorage.getItem('clients');
+    // Загрузка данных из localStorage для других справочников
     const savedEquipment = localStorage.getItem('equipment');
     const savedTemplates = localStorage.getItem('templates');
     const savedSettings = localStorage.getItem('settings');
 
-    if (savedClients) setClients(JSON.parse(savedClients));
     if (savedEquipment) setEquipment(JSON.parse(savedEquipment));
     if (savedTemplates) setTemplates(JSON.parse(savedTemplates));
     if (savedSettings) setSettings(JSON.parse(savedSettings));
@@ -163,30 +172,40 @@ export const ReferenceBooks: React.FC = () => {
   };
 
   // Обработчики для заказчиков
-  const handleAddClient = (clientData: Omit<Client, 'id' | 'createdAt'>) => {
-    const newClient: Client = {
-      ...clientData,
-      id: Date.now().toString(),
-      createdAt: new Date()
-    };
-    const updatedClients = [...clients, newClient];
-    setClients(updatedClients);
-    saveData('clients', updatedClients);
-    setShowAddForm(false);
+  const handleAddClient = async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const newClient = await clientService.createClient(clientData);
+      setClients(prev => [...prev, newClient]);
+      setShowAddForm(false);
+      setError('');
+    } catch (error) {
+      console.error('Error adding client:', error);
+      setError('Ошибка добавления клиента');
+    }
   };
 
-  const handleUpdateClient = (id: string, updates: Partial<Client>) => {
-    const updatedClients = clients.map(c => c.id === id ? { ...c, ...updates } : c);
-    setClients(updatedClients);
-    saveData('clients', updatedClients);
-    setEditingItem(null);
+  const handleUpdateClient = async (id: string, updates: Partial<Client>) => {
+    try {
+      await clientService.updateClient(id, updates);
+      setClients(prev => prev.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date() } : c));
+      setEditingItem(null);
+      setError('');
+    } catch (error) {
+      console.error('Error updating client:', error);
+      setError('Ошибка обновления клиента');
+    }
   };
 
-  const handleDeleteClient = (id: string) => {
+  const handleDeleteClient = async (id: string) => {
     if (confirm('Вы уверены, что хотите удалить этого заказчика?')) {
-      const updatedClients = clients.filter(c => c.id !== id);
-      setClients(updatedClients);
-      saveData('clients', updatedClients);
+      try {
+        await clientService.deleteClient(id);
+        setClients(prev => prev.filter(c => c.id !== id));
+        setError('');
+      } catch (error) {
+        console.error('Error deleting client:', error);
+        setError('Ошибка удаления клиента');
+      }
     }
   };
 
@@ -296,7 +315,7 @@ export const ReferenceBooks: React.FC = () => {
                   <div className="text-sm text-gray-500">{client.phone}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{client.inn}</div>
+                  <div className="text-sm text-gray-900">{client.inn || '-'}</div>
                   {client.kpp && <div className="text-sm text-gray-500">{client.kpp}</div>}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -542,7 +561,7 @@ export const ReferenceBooks: React.FC = () => {
 
 // Компонент формы для добавления заказчика
 const ClientForm: React.FC<{
-  onSubmit: (data: Omit<Client, 'id' | 'createdAt'>) => void;
+  onSubmit: (data: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onCancel: () => void;
 }> = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -551,6 +570,8 @@ const ClientForm: React.FC<{
     email: '',
     phone: '',
     address: '',
+    inn: '',
+    kpp: ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -602,6 +623,26 @@ const ClientForm: React.FC<{
             type="tel"
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">ИНН</label>
+          <input
+            type="text"
+            value={formData.inn}
+            onChange={(e) => setFormData({ ...formData, inn: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">КПП</label>
+          <input
+            type="text"
+            value={formData.kpp}
+            onChange={(e) => setFormData({ ...formData, kpp: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
