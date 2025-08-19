@@ -23,14 +23,6 @@ export const DatabaseTest: React.FC = () => {
 
   // Список таблиц для проверки
   const tablesToCheck = [
-    'users',
-    'clients', 
-    'projects',
-    'qualification_objects',
-    'qualification_stages',
-    'project_activities',
-    'project_documents',
-    'notifications',
     'uploaded_files',
     'device_metadata',
     'measurement_records',
