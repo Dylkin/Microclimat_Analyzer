@@ -32,10 +32,7 @@ export const DatabaseTest: React.FC = () => {
     'measurement_records',
     'analysis_sessions',
     'chart_settings',
-    'vertical_markers',
-    'projects',
-    'project_qualification_objects',
-    'project_stage_assignments'
+    'vertical_markers'
   ];
 
   useEffect(() => {
