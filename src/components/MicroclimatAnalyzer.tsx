@@ -1,9 +1,13 @@
 import React from 'react';
 import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
-import { supabaseDatabaseService } from '../utils/supabaseDatabase';
+import { Contractor } from '../types/Contractor';
+import { QualificationObject } from '../types/QualificationObject';
+import { contractorService } from '../utils/contractorService';
+import { qualificationObjectService } from '../utils/qualificationObjectService';
+import { databaseService } from '../utils/database';
 import { VI2ParsingService } from '../utils/vi2Parser';
-import { DataVisualization } from './DataVisualization';
+import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 
 interface MicroclimatAnalyzerProps {
   showVisualization?: boolean;
@@ -15,31 +19,17 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   onShowVisualization 
 }) => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
+  const [contractors, setContractors] = React.useState<Contractor[]>([]);
+  const [qualificationObjects, setQualificationObjects] = React.useState<QualificationObject[]>([]);
+  const [selectedContractor, setSelectedContractor] = React.useState<string>('');
+  const [selectedQualificationObject, setSelectedQualificationObject] = React.useState<string>('');
+  const [contractorSearch, setContractorSearch] = React.useState('');
+  const [qualificationSearch, setQualificationSearch] = React.useState('');
+  const [showContractorDropdown, setShowContractorDropdown] = React.useState(false);
+  const [showQualificationDropdown, setShowQualificationDropdown] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [editingField, setEditingField] = React.useState<{ fileId: string; field: 'zoneNumber' | 'measurementLevel' } | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
 
-  // Загружаем файлы пользователя при монтировании компонента
-  React.useEffect(() => {
-    console.log('Загружаем файлы пользователя при монтировании компонента');
-    loadUserFiles();
-  }, []);
-
-  const loadUserFiles = async () => {
-    try {
-      setIsLoading(true);
-      console.log('Запрос файлов пользователя из базы данных...');
-      const files = await supabaseDatabaseService.getUserFiles();
-      console.log(`Загружено ${files.length} файлов из базы данных`);
-      setUploadedFiles(files);
-    } catch (error) {
-      console.error('Ошибка загрузки файлов пользователя:', error);
-      // Показываем пользователю ошибку
-      alert('Ошибка загрузки файлов: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
     { label: 'Влажность', value: '65%', icon: Droplets, color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -47,61 +37,134 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     { label: 'Освещенность', value: '850 лк', icon: Sun, color: 'text-yellow-600', bg: 'bg-yellow-100' }
   ];
 
+  // Загрузка контрагентов при инициализации
+  React.useEffect(() => {
+    const loadContractors = async () => {
+      if (!contractorService.isAvailable()) return;
+      
+      try {
+        const data = await contractorService.getAllContractors();
+        setContractors(data);
+      } catch (error) {
+        console.error('Ошибка загрузки контрагентов:', error);
+      }
+    };
+
+    loadContractors();
+  }, []);
+
+  // Загрузка объектов квалификации при выборе контрагента
+  React.useEffect(() => {
+    const loadQualificationObjects = async () => {
+      if (!selectedContractor || !qualificationObjectService.isAvailable()) {
+        setQualificationObjects([]);
+        setSelectedQualificationObject('');
+        return;
+      }
+      
+      try {
+        const data = await qualificationObjectService.getQualificationObjects(selectedContractor);
+        setQualificationObjects(data);
+        setSelectedQualificationObject(''); // Сбрасываем выбор объекта при смене контрагента
+      } catch (error) {
+        console.error('Ошибка загрузки объектов квалификации:', error);
+        setQualificationObjects([]);
+      }
+    };
+
+    loadQualificationObjects();
+  }, [selectedContractor]);
+
+  // Фильтрация контрагентов по поиску
+  const filteredContractors = React.useMemo(() => {
+    if (!contractorSearch.trim()) return contractors;
+    
+    return contractors.filter(contractor =>
+      contractor.name.toLowerCase().includes(contractorSearch.toLowerCase()) ||
+      (contractor.address && contractor.address.toLowerCase().includes(contractorSearch.toLowerCase()))
+    );
+  }, [contractors, contractorSearch]);
+
+  // Фильтрация объектов квалификации по поиску
+  const filteredQualificationObjects = React.useMemo(() => {
+    if (!qualificationSearch.trim()) return qualificationObjects;
+    
+    return qualificationObjects.filter(obj =>
+      (obj.name && obj.name.toLowerCase().includes(qualificationSearch.toLowerCase())) ||
+      (obj.address && obj.address.toLowerCase().includes(qualificationSearch.toLowerCase())) ||
+      (obj.vin && obj.vin.toLowerCase().includes(qualificationSearch.toLowerCase())) ||
+      (obj.serialNumber && obj.serialNumber.toLowerCase().includes(qualificationSearch.toLowerCase())) ||
+      (obj.inventoryNumber && obj.inventoryNumber.toLowerCase().includes(qualificationSearch.toLowerCase()))
+    );
+  }, [qualificationObjects, qualificationSearch]);
+
+  // Получение названия контрагента по ID
+  const getContractorName = (contractorId: string) => {
+    const contractor = contractors.find(c => c.id === contractorId);
+    return contractor ? contractor.name : 'Выберите контрагента';
+  };
+
+  // Получение названия объекта квалификации по ID
+  const getQualificationObjectName = (objectId: string) => {
+    const obj = qualificationObjects.find(o => o.id === objectId);
+    if (!obj) return 'Выберите объект квалификации';
+    
+    return obj.name || obj.vin || obj.serialNumber || `${obj.type} (без названия)`;
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
 
     const fileArray = Array.from(files);
     
-    // Обрабатываем каждый файл
-    for (let i = 0; i < fileArray.length; i++) {
-      const file = fileArray[i];
-      
+    // Создаем записи для файлов с начальным статусом
+    const newFiles: UploadedFile[] = fileArray.map((file, index) => {
       // Проверяем расширение файла
       if (!file.name.toLowerCase().endsWith('.vi2')) {
         alert(`Файл "${file.name}" имеет неподдерживаемый формат. Поддерживаются только файлы .vi2`);
-        continue;
+        return null;
       }
 
+      return {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        uploadDate: new Date().toLocaleString('ru-RU'),
+        parsingStatus: 'processing' as const,
+        order: uploadedFiles.length + index,
+        contractorId: selectedContractor || undefined,
+        qualificationObjectId: selectedQualificationObject || undefined,
+        qualificationObjectName: selectedQualificationObject ? getQualificationObjectName(selectedQualificationObject) : undefined,
+        contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
+      };
+    }).filter(Boolean) as UploadedFile[];
+
+    // Добавляем файлы в состояние
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+
+    // Парсим файлы
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
+      const fileRecord = newFiles[i];
+      
+      if (!fileRecord) continue;
+      
       try {
-        // Сохраняем файл в базу данных
-        console.log(`Сохраняем файл в базу данных: ${file.name}`);
-        const fileId = await supabaseDatabaseService.saveUploadedFile({
-          name: file.name,
-          uploadDate: new Date().toLocaleString('ru-RU'),
-          parsingStatus: 'processing',
-          order: uploadedFiles.length + i,
-          userId: 'current-user' // Будет заменено в сервисе на реального пользователя
-        });
-        console.log(`Файл сохранен с ID: ${fileId}`);
-
-        // Обновляем состояние с новым файлом
-        const newFile: UploadedFile = {
-          id: fileId,
-          name: file.name,
-          uploadDate: new Date().toLocaleString('ru-RU'),
-          parsingStatus: 'processing',
-          order: uploadedFiles.length + i
-        };
-        
-        setUploadedFiles(prev => [...prev, newFile]);
-
         // Реальный парсинг файла
         console.log(`Парсинг файла: ${file.name}`);
+        
+        // Читаем файл как ArrayBuffer
+        const arrayBuffer = await file.arrayBuffer();
         
         // Используем универсальный парсер VI2
         const parsingService = new VI2ParsingService();
         const parsedData = await parsingService.parseFile(file);
-        console.log(`Парсинг завершен для файла: ${file.name}, записей: ${parsedData.recordCount}`);
         
         // Сохраняем в базу данных
-        console.log(`Сохраняем данные парсинга в базу данных для файла: ${file.name}`);
-        await supabaseDatabaseService.saveParsedFileData(fileId, parsedData);
-        console.log(`Данные успешно сохранены в базу данных для файла: ${file.name}`);
+        await databaseService.saveParsedFileData(parsedData, fileRecord.id);
         
-        // Обновляем состояние с результатами парсинга
         setUploadedFiles(prev => prev.map(f => {
-          if (f.id === fileId) {
+          if (f.id === fileRecord.id) {
             const period = `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`;
             return {
               ...f,
@@ -117,14 +180,17 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       } catch (error) {
         console.error('Ошибка парсинга файла:', error);
         
-        // Обновляем статус на ошибку в базе данных
-        try {
-          console.log('Обновляем статус файла на ошибку в базе данных');
-          // Перезагружаем файлы для обновления состояния
-          await loadUserFiles();
-        } catch (updateError) {
-          console.error('Ошибка обновления статуса файла:', updateError);
-        }
+        // Обновляем статус на ошибку
+        setUploadedFiles(prev => prev.map(f => {
+          if (f.id === fileRecord.id) {
+            return {
+              ...f,
+              parsingStatus: 'error' as const,
+              errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка'
+            };
+          }
+          return f;
+        }));
       }
     }
 
@@ -137,17 +203,14 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const handleDeleteFile = async (fileId: string) => {
     if (confirm('Вы уверены, что хотите удалить этот файл?')) {
       try {
-        console.log(`Удаляем файл из базы данных: ${fileId}`);
-        // Удаляем файл из базы данных
-        await supabaseDatabaseService.deleteFile(fileId);
-        console.log(`Файл успешно удален из базы данных: ${fileId}`);
-        
-        // Обновляем состояние
-        setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+        // Удаляем данные из базы
+        await databaseService.deleteFileData(fileId);
       } catch (error) {
-        console.error('Ошибка удаления файла:', error);
-        alert('Ошибка при удалении файла: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
+        console.error('Ошибка удаления данных из базы:', error);
       }
+      
+      // Удаляем из состояния
+      setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
     }
   };
 
@@ -155,7 +218,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     fileInputRef.current?.click();
   };
 
-  const moveFile = async (fileId: string, direction: 'up' | 'down') => {
+  const moveFile = (fileId: string, direction: 'up' | 'down') => {
     setUploadedFiles(prev => {
       const sortedFiles = [...prev].sort((a, b) => a.order - b.order);
       const currentIndex = sortedFiles.findIndex(f => f.id === fileId);
@@ -170,15 +233,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       const currentFile = sortedFiles[currentIndex];
       const targetFile = sortedFiles[newIndex];
       
-      // Обновляем порядок в базе данных
-      try {
-        await supabaseDatabaseService.updateFileOrder(currentFile.id, targetFile.order);
-        await supabaseDatabaseService.updateFileOrder(targetFile.id, currentFile.order);
-        console.log(`Обновлен порядок файлов: ${currentFile.id} <-> ${targetFile.id}`);
-      } catch (error) {
-        console.error('Ошибка обновления порядка файлов:', error);
-      }
-      
       return prev.map(f => {
         if (f.id === currentFile.id) return { ...f, order: targetFile.order };
         if (f.id === targetFile.id) return { ...f, order: currentFile.order };
@@ -187,22 +241,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     });
   };
 
-  const updateFileField = async (fileId: string, field: 'zoneNumber' | 'measurementLevel', value: string | number) => {
-    // Обновляем в базе данных
-    try {
-      console.log(`Обновляем поле ${field} для файла ${fileId}: ${value}`);
-      const fields = field === 'zoneNumber' 
-        ? { zoneNumber: typeof value === 'string' ? parseInt(value) || undefined : value }
-        : { measurementLevel: value.toString() };
-      
-      await supabaseDatabaseService.updateFileFields(fileId, fields);
-      console.log(`Поле ${field} успешно обновлено в базе данных`);
-    } catch (error) {
-      console.error('Ошибка обновления поля файла:', error);
-      alert('Ошибка обновления поля: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
-    }
-    
-    // Обновляем состояние
+  const updateFileField = (fileId: string, field: 'zoneNumber' | 'measurementLevel', value: string | number) => {
     setUploadedFiles(prev => prev.map(f => {
       if (f.id === fileId) {
         return { ...f, [field]: value };
@@ -227,7 +266,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   // Если показываем визуализацию, рендерим компонент визуализации
   if (showVisualization) {
     return (
-      <DataVisualization 
+      <TimeSeriesAnalyzer 
         files={uploadedFiles.filter(f => f.parsingStatus === 'completed')}
         onBack={() => onShowVisualization?.(false)}
       />
@@ -267,17 +306,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   // Сортируем файлы по порядку для отображения
   const sortedFiles = [...uploadedFiles].sort((a, b) => a.order - b.order);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Загрузка файлов из базы данных...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
@@ -305,6 +333,124 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
               <Upload className="w-4 h-4" />
               <span>Загрузить файлы в формате Vi2</span>
             </button>
+          </div>
+        </div>
+
+        {/* Селекторы контрагента и объекта квалификации */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Селектор контрагента */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Контрагент
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={selectedContractor ? getContractorName(selectedContractor) : contractorSearch}
+                onChange={(e) => {
+                  setContractorSearch(e.target.value);
+                  if (!selectedContractor) {
+                    setShowContractorDropdown(true);
+                  }
+                }}
+                onFocus={() => {
+                  setShowContractorDropdown(true);
+                  if (selectedContractor) {
+                    setContractorSearch('');
+                    setSelectedContractor('');
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Поиск контрагента..."
+              />
+              
+              {showContractorDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredContractors.length > 0 ? (
+                    filteredContractors.map((contractor) => (
+                      <div
+                        key={contractor.id}
+                        onClick={() => {
+                          setSelectedContractor(contractor.id);
+                          setContractorSearch('');
+                          setShowContractorDropdown(false);
+                        }}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">{contractor.name}</div>
+                        {contractor.address && (
+                          <div className="text-sm text-gray-500">{contractor.address}</div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-gray-500 text-sm">
+                      Контрагенты не найдены
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Селектор объекта квалификации */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Объект квалификации
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={selectedQualificationObject ? getQualificationObjectName(selectedQualificationObject) : qualificationSearch}
+                onChange={(e) => {
+                  setQualificationSearch(e.target.value);
+                  if (!selectedQualificationObject) {
+                    setShowQualificationDropdown(true);
+                  }
+                }}
+                onFocus={() => {
+                  if (selectedContractor) {
+                    setShowQualificationDropdown(true);
+                    if (selectedQualificationObject) {
+                      setQualificationSearch('');
+                      setSelectedQualificationObject('');
+                    }
+                  }
+                }}
+                disabled={!selectedContractor}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder={selectedContractor ? "Поиск объекта квалификации..." : "Сначала выберите контрагента"}
+              />
+              
+              {showQualificationDropdown && selectedContractor && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredQualificationObjects.length > 0 ? (
+                    filteredQualificationObjects.map((obj) => (
+                      <div
+                        key={obj.id}
+                        onClick={() => {
+                          setSelectedQualificationObject(obj.id);
+                          setQualificationSearch('');
+                          setShowQualificationDropdown(false);
+                        }}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">
+                          {obj.name || obj.vin || obj.serialNumber || 'Без названия'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {obj.type} {obj.address && `• ${obj.address}`}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-gray-500 text-sm">
+                      Объекты квалификации не найдены
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         
@@ -376,6 +522,16 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                         {file.parsedData && (
                           <div className="text-xs text-gray-500 mt-1">
                             {file.parsedData.deviceMetadata.deviceModel} (S/N: {file.parsedData.deviceMetadata.serialNumber})
+                          </div>
+                        )}
+                        {file.contractorId && (
+                          <div className="text-xs text-blue-600 mt-1">
+                            📋 {getContractorName(file.contractorId)}
+                          </div>
+                        )}
+                        {file.qualificationObjectId && (
+                          <div className="text-xs text-green-600 mt-1">
+                            🏢 {getQualificationObjectName(file.qualificationObjectId)}
                           </div>
                         )}
                       </div>

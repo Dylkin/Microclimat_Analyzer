@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesPoint, ProcessedTimeSeriesData } from '../types/TimeSeriesData';
-import { supabaseDatabaseService } from '../utils/supabaseDatabase';
+import { databaseService } from '../utils/database';
 
 interface UseTimeSeriesDataProps {
   files: UploadedFile[];
@@ -15,8 +15,7 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
 
   const processFileData = useCallback(async (file: UploadedFile): Promise<TimeSeriesPoint[]> => {
     try {
-      console.log(`Загружаем измерения для файла: ${file.name} (ID: ${file.id})`);
-      const measurements = await supabaseDatabaseService.getMeasurements(file.id);
+      const measurements = await databaseService.getMeasurements(file.id);
       if (!measurements || measurements.length === 0) {
         console.warn(`No measurements found for file: ${file.name}`);
         return [];
@@ -32,7 +31,6 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
         zoneNumber: file.zoneNumber
       }));
 
-      console.log(`Загружено ${points.length} точек данных для файла: ${file.name}`);
       return points;
     } catch (error) {
       console.error(`Error processing file ${file.name}:`, error);

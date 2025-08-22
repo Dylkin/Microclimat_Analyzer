@@ -7,7 +7,6 @@ import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType } from '..
 import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
-import { supabaseDatabaseService } from '../utils/supabaseDatabase';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -28,7 +27,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [contractFields, setContractFields] = useState({
     contractNumber: '',
     contractDate: '',
-    researchObject: '',
     climateInstallation: '',
     testType: ''
   });
@@ -54,10 +52,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     templateValidation: null
   });
   
-  // Состояние для сохранения/загрузки сессии анализа
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  
   // Chart dimensions
   const chartWidth = 1200;
   const chartHeight = 400;
@@ -65,55 +59,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   // Ref для элемента графика
   const chartRef = useRef<HTMLDivElement>(null);
-
-  // Автосохранение настроек при изменении
-  useEffect(() => {
-    if (currentSessionId) {
-      saveCurrentState();
-    }
-  }, [limits, markers, zoomState, dataType, contractFields, conclusions]);
-
-  // Создание новой сессии анализа при первом запуске
-  useEffect(() => {
-    if (files.length > 0 && !currentSessionId) {
-      createNewSession();
-    }
-  }, [files]);
-
-  const createNewSession = async () => {
-    try {
-      const sessionId = await supabaseDatabaseService.saveAnalysisSession({
-        name: `Анализ ${new Date().toLocaleString('ru-RU')}`,
-        description: `Анализ ${files.length} файлов`,
-        fileIds: files.map(f => f.id),
-        dataType,
-        contractFields,
-        conclusions
-      });
-      setCurrentSessionId(sessionId);
-    } catch (error) {
-      console.error('Ошибка создания сессии анализа:', error);
-    }
-  };
-
-  const saveCurrentState = async () => {
-    if (!currentSessionId || isSaving) return;
-    
-    try {
-      setIsSaving(true);
-      
-      // Сохраняем настройки графика
-      await supabaseDatabaseService.saveChartSettings(currentSessionId, dataType, limits, zoomState);
-      
-      // Сохраняем маркеры
-      await supabaseDatabaseService.saveVerticalMarkers(currentSessionId, markers);
-      
-    } catch (error) {
-      console.error('Ошибка сохранения состояния:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   // Generate analysis results table data
   const analysisResults = useMemo(() => {
@@ -409,7 +354,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         dataType,
         analysisResults,
         conclusions,
-        researchObject: contractFields.researchObject || '',
+        researchObject: getQualificationObjectDisplayName() || '',
         conditioningSystem: contractFields.climateInstallation || '',
        testType: convertedTestType || '',
         limits: limits,
@@ -588,6 +533,32 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setConclusions(conclusionText);
   };
 
+  // Функция для получения названия объекта квалификации
+  const getQualificationObjectDisplayName = (): string => {
+    // Находим файлы с привязанным объектом квалификации
+    const filesWithQualification = files.filter(f => f.qualificationObjectId);
+    
+    if (filesWithQualification.length === 0) {
+      return 'Не указан';
+    }
+    
+    // Если все файлы привязаны к одному объекту, показываем его название
+    const uniqueQualificationIds = [...new Set(filesWithQualification.map(f => f.qualificationObjectId))];
+    
+    if (uniqueQualificationIds.length === 1) {
+      // Получаем название объекта квалификации из сохраненных данных файла
+      const fileWithObject = filesWithQualification[0];
+      if (fileWithObject.qualificationObjectName) {
+        return fileWithObject.qualificationObjectName;
+      }
+      
+      // Если название не сохранено, возвращаем ID
+      return `Объект квалификации (ID: ${uniqueQualificationIds[0]?.substring(0, 8)}...)`;
+    } else {
+      return `Несколько объектов (${uniqueQualificationIds.length})`;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -648,12 +619,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           )}
           <BarChart className="w-8 h-8 text-indigo-600" />
           <h1 className="text-2xl font-bold text-gray-900">Анализатор временных рядов</h1>
-          {isSaving && (
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
-              <span>Сохранение...</span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -760,16 +725,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Объект исследования</label>
-              <input
-                type="text"
-                value={contractFields.researchObject}
-                onChange={(e) => handleContractFieldChange('researchObject', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите объект исследования"
-              />
-            </div>
-            <div>
               <label className="block text-xs text-gray-500 mb-1">Климатическая установка</label>
               <input
                 type="text"
@@ -778,6 +733,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Введите тип климатической установки"
               />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Объект квалификации</label>
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+                {getQualificationObjectDisplayName()}
+              </div>
             </div>
           </div>
         </div>

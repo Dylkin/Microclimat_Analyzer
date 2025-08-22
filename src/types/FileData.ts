@@ -37,4 +37,8 @@ export interface UploadedFile {
   zoneNumber?: number;
   measurementLevel?: string;
   order: number;
+  contractorId?: string;
+  qualificationObjectId?: string;
+  qualificationObjectName?: string;
+  contractorName?: string;
 }

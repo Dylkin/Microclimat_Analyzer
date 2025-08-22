@@ -3,8 +3,11 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
-import { UserManagement } from './components/UserManagement';
 import { Help } from './components/Help';
+import { DatabaseTest } from './components/DatabaseTest';
+import { UserDirectory } from './components/UserDirectory';
+import { ContractorDirectory } from './components/ContractorDirectory';
+import { ProjectDirectory } from './components/ProjectDirectory';
 import './index.css';
 
 const AppContent: React.FC = () => {
@@ -14,20 +17,7 @@ const AppContent: React.FC = () => {
 
   React.useEffect(() => {
     if (!user) return;
-    
-    if (user.role === 'specialist' && !hasAccess('analyzer')) {
-      setCurrentPage('analyzer');
-    } else if (user.role === 'manager' && !hasAccess('analyzer')) {
-      setCurrentPage('users');
-    } else if (!hasAccess(currentPage as 'analyzer' | 'users')) {
-      // Если текущая страница недоступна, переключаемся на доступную
-      if (hasAccess('analyzer')) {
-        setCurrentPage('analyzer');
-      } else if (hasAccess('users')) {
-        setCurrentPage('users');
-      }
-    }
-  }, [user, hasAccess, currentPage]);
+  }, [user]);
 
   if (!user) {
     return <Login />;
@@ -42,10 +32,16 @@ const AppContent: React.FC = () => {
             onShowVisualization={setShowVisualization}
           />
         ) : <div>Доступ запрещен</div>;
-      case 'users':
-        return hasAccess('users') ? <UserManagement /> : <div>Доступ запрещен</div>;
       case 'help':
         return hasAccess('help') ? <Help /> : <div>Доступ запрещен</div>;
+      case 'users':
+        return hasAccess('users') ? <UserDirectory /> : <div>Доступ запрещен</div>;
+      case 'contractors':
+        return hasAccess('analyzer') ? <ContractorDirectory /> : <div>Доступ запрещен</div>;
+      case 'projects':
+        return hasAccess('analyzer') ? <ProjectDirectory /> : <div>Доступ запрещен</div>;
+      case 'database':
+        return hasAccess('database') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
       default:
         return <MicroclimatAnalyzer 
           showVisualization={showVisualization}
@@ -64,7 +60,7 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+        <AppContent />
     </AuthProvider>
   );
 }

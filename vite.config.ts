@@ -7,11 +7,6 @@ export default defineConfig({
     global: 'globalThis',
     'process.env': {},
   },
-  resolve: {
-    alias: {
-      buffer: 'buffer',
-    },
-  },
   optimizeDeps: {
     include: [
       'd3-array',
@@ -21,18 +16,11 @@ export default defineConfig({
       'd3-time-format',
       'd3-zoom',
       'pizzip',
-      'docxtemplater',
-      'buffer'
+      'docxtemplater'
     ],
   },
   server: {
-    port: 3000,
-    host: '0.0.0.0',
-    strictPort: false,
-    hmr: {
-      port: 3001,
-      host: true,
-      clientPort: 3001
-    }
+    port: 5173,
+    host: true
   },
 })

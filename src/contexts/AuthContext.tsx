@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthUser } from '../types/User';
-import { supabase } from '../utils/supabaseClient';
+import { userService } from '../utils/userService';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -10,7 +10,9 @@ interface AuthContextType {
   addUser: (user: Omit<User, 'id'>) => void;
   updateUser: (id: string, user: Partial<User>) => void;
   deleteUser: (id: string) => void;
-  hasAccess: (page: 'analyzer' | 'users' | 'help') => boolean;
+  changePassword: (userId: string, oldPassword: string, newPassword: string) => boolean;
+  resetPassword: (userId: string, newPassword: string) => boolean;
+  hasAccess: (page: 'analyzer' | 'help' | 'database' | 'users') => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,7 +26,7 @@ export const useAuth = () => {
 };
 
 const defaultUser: User = {
-  id: '1',
+  id: '00000000-0000-0000-0000-000000000001',
   fullName: 'Дылкин П.А.',
   email: 'pavel.dylkin@gmail.com',
   password: '00016346',
@@ -35,96 +37,70 @@ const defaultUser: User = {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [users, setUsers] = useState<User[]>([defaultUser]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Проверяем сессию Supabase при загрузке
-  useEffect(() => {
-    console.log('Проверяем сессию Supabase при загрузке приложения');
-    checkSupabaseSession();
-    
-    // Подписываемся на изменения аутентификации
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Изменение состояния аутентификации:', event, session?.user?.email);
-        if (session?.user) {
-          // Пользователь вошел в систему
-          console.log('Пользователь вошел в систему, загружаем данные пользователя');
-          const userData = await getUserFromSupabase(session.user.id);
-          if (userData) {
-            console.log('Данные пользователя загружены:', userData.fullName, userData.role);
-            setUser(userData);
+  // Загрузка пользователей из базы данных
+  const loadUsers = async () => {
+    if (!userService.isAvailable()) {
+      console.warn('Supabase не настроен, используем локальные данные');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const dbUsers = await userService.getAllUsers();
+      setUsers(dbUsers);
+      console.log('Пользователи загружены из базы данных:', dbUsers.length);
+    } catch (error) {
+      console.error('Ошибка загрузки пользователей из БД:', error);
+      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+      
+      // Fallback к localStorage
+      const savedUsers = localStorage.getItem('users');
+      if (savedUsers) {
+        try {
+          const parsedUsers = JSON.parse(savedUsers);
+          const hasDefaultUser = parsedUsers.some((u: User) => u.isDefault);
+          if (!hasDefaultUser) {
+            setUsers([defaultUser, ...parsedUsers]);
+          } else {
+            setUsers(parsedUsers);
           }
-        } else {
-          // Пользователь вышел из системы
-          console.log('Пользователь вышел из системы');
-          setUser(null);
+        } catch (parseError) {
+          console.error('Ошибка парсинга пользователей из localStorage:', parseError);
+          setUsers([defaultUser]);
         }
-        setIsLoading(false);
       }
-    );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return () => subscription.unsubscribe();
+  // Сохранение пользователей в localStorage как резервная копия
+  useEffect(() => {
+    localStorage.setItem('users', JSON.stringify(users));
+  }, [users]);
+
+  // Загрузка пользователей при инициализации
+  useEffect(() => {
+    loadUsers();
   }, []);
 
-  const checkSupabaseSession = async () => {
-    try {
-      console.log('Проверяем существующую сессию Supabase');
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        console.log('Найдена существующая сессия для пользователя:', session.user.email);
-        const userData = await getUserFromSupabase(session.user.id);
-        if (userData) {
-          console.log('Данные пользователя восстановлены из сессии:', userData.fullName);
-          setUser(userData);
-        }
-      } else {
-        console.log('Активная сессия не найдена');
-      }
-    } catch (error) {
-      console.error('Ошибка проверки сессии:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getUserFromSupabase = async (userId: string): Promise<AuthUser | null> => {
-    try {
-      console.log('Загружаем данные пользователя из Supabase:', userId);
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Ошибка загрузки данных пользователя:', error);
-        throw error;
-      }
-
-      console.log('Данные пользователя успешно загружены:', data.full_name);
-      return {
-        id: data.id,
-        fullName: data.full_name,
-        email: data.email,
-        role: data.role
-      };
-    } catch (error) {
-      console.error('Ошибка получения пользователя:', error);
-      return null;
-    }
-  };
   // Проверка доступа к страницам
-  const hasAccess = (page: 'analyzer' | 'users' | 'help'): boolean => {
+  const hasAccess = (page: 'analyzer' | 'help' | 'database' | 'users'): boolean => {
     if (!user) return false;
 
     switch (user.role) {
       case 'administrator':
-        return true; // Полный доступ ко всем страницам
+        return true; // Полный доступ
       case 'specialist':
-        return page === 'analyzer' || page === 'help'; // К анализатору и справке
+        return page === 'analyzer' || page === 'help' || page === 'database';
       case 'manager':
       case 'director':
-        return page === 'users' || page === 'help'; // К справочнику пользователей и справке
+        return page === 'analyzer' || page === 'help' || page === 'database';
       default:
         return false;
     }
@@ -133,91 +109,221 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Авторизация
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      console.log('Попытка входа в систему для пользователя:', email);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      let foundUser: User | null = null;
 
-      if (error) {
-        console.error('Ошибка входа в систему:', error);
-        throw error;
-      }
-
-      if (data.user) {
-        console.log('Успешный вход в систему, загружаем данные пользователя');
-        const userData = await getUserFromSupabase(data.user.id);
-        if (userData) {
-          console.log('Пользователь успешно авторизован:', userData.fullName);
-          setUser(userData);
-          return true;
+      // Сначала пытаемся найти в базе данных
+      if (userService.isAvailable()) {
+        try {
+          foundUser = await userService.getUserByCredentials(email, password);
+        } catch (error) {
+          console.error('Ошибка авторизации через БД:', error);
         }
       }
+
+      // Если не найден в БД, ищем в локальных данных
+      if (!foundUser) {
+        foundUser = users.find(u => u.email === email && u.password === password) || null;
+      }
+
+      if (foundUser) {
+        const authUser = {
+          id: foundUser.id,
+          fullName: foundUser.fullName,
+          email: foundUser.email,
+          role: foundUser.role
+        };
+        
+        setUser(authUser);
+        localStorage.setItem('currentUser', JSON.stringify(authUser));
+        return true;
+      }
+      
       return false;
     } catch (error) {
-      console.error('Ошибка входа:', error);
+      console.error('Ошибка авторизации:', error);
       return false;
     }
   };
 
   // Выход
-  const logout = async () => {
-    try {
-      console.log('Выход из системы');
-      await supabase.auth.signOut();
-      setUser(null);
-      console.log('Пользователь успешно вышел из системы');
-    } catch (error) {
-      console.error('Ошибка выхода:', error);
-    }
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('currentUser');
   };
 
   // Добавление пользователя
-  const addUser = (newUser: Omit<User, 'id'>) => {
-    const user: User = {
-      ...newUser,
-      id: Date.now().toString()
-    };
-    setUsers(prev => [...prev, user]);
+  const addUser = async (newUser: Omit<User, 'id'>): Promise<void> => {
+    try {
+      let addedUser: User;
+
+      // Пытаемся добавить в базу данных
+      if (userService.isAvailable()) {
+        try {
+          console.log('Добавляем пользователя через userService:', newUser);
+          addedUser = await userService.addUser(newUser);
+          console.log('Пользователь добавлен в БД:', addedUser);
+        } catch (error) {
+          console.error('Ошибка добавления в БД:', error);
+          
+          // Если ошибка связана с правами доступа, пробуем fallback
+          if (error instanceof Error && error.message.includes('прав')) {
+            console.warn('Используем fallback к локальному хранению');
+            addedUser = {
+              ...newUser,
+              id: Date.now().toString()
+            };
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        // Fallback к локальному хранению
+        console.log('Supabase недоступен, используем локальное хранение');
+        addedUser = {
+          ...newUser,
+          id: Date.now().toString()
+        };
+      }
+
+      setUsers(prev => [...prev, addedUser]);
+      console.log('Пользователь добавлен в локальное состояние:', addedUser);
+    } catch (error) {
+      console.error('Ошибка добавления пользователя:', error);
+      throw error;
+    }
   };
 
   // Обновление пользователя
-  const updateUser = (id: string, updatedUser: Partial<User>) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updatedUser } : u));
+  const updateUser = async (id: string, updatedUser: Partial<User>) => {
+    try {
+      // Пытаемся обновить в базе данных
+      if (userService.isAvailable()) {
+        try {
+          await userService.updateUser(id, updatedUser);
+          console.log('Пользователь обновлен в БД:', id);
+        } catch (error) {
+          console.error('Ошибка обновления в БД:', error);
+          throw error;
+        }
+      }
+
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updatedUser } : u));
+    } catch (error) {
+      console.error('Ошибка обновления пользователя:', error);
+      throw error;
+    }
   };
 
   // Удаление пользователя
-  const deleteUser = (id: string) => {
-    const userToDelete = users.find(u => u.id === id);
-    if (userToDelete?.isDefault) return; // Нельзя удалить пользователя по умолчанию
-    
-    setUsers(prev => prev.filter(u => u.id !== id));
+  const deleteUser = async (id: string) => {
+    try {
+      const userToDelete = users.find(u => u.id === id);
+      if (userToDelete?.isDefault) {
+        throw new Error('Нельзя удалить пользователя по умолчанию');
+      }
+
+      // Пытаемся удалить из базы данных
+      if (userService.isAvailable()) {
+        try {
+          await userService.deleteUser(id);
+          console.log('Пользователь удален из БД:', id);
+        } catch (error) {
+          console.error('Ошибка удаления из БД:', error);
+          throw error;
+        }
+      }
+
+      setUsers(prev => prev.filter(u => u.id !== id));
+    } catch (error) {
+      console.error('Ошибка удаления пользователя:', error);
+      throw error;
+    }
+  };
+
+  // Смена пароля (для обычных пользователей)
+  const changePassword = async (userId: string, oldPassword: string, newPassword: string): Promise<boolean> => {
+    try {
+      const targetUser = users.find(u => u.id === userId);
+      if (!targetUser) return false;
+      
+      // Проверяем старый пароль
+      if (targetUser.password !== oldPassword) return false;
+      
+      // Обновляем пароль в базе данных
+      if (userService.isAvailable()) {
+        try {
+          await userService.resetPassword(userId, newPassword);
+        } catch (error) {
+          console.error('Ошибка смены пароля в БД:', error);
+          throw error;
+        }
+      }
+      
+      // Обновляем локальное состояние
+      setUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, password: newPassword } : u
+      ));
+      
+      return true;
+    } catch (error) {
+      console.error('Ошибка смены пароля:', error);
+      return false;
+    }
+  };
+
+  // Сброс пароля (только для администраторов)
+  const resetPassword = async (userId: string, newPassword: string): Promise<boolean> => {
+    try {
+      if (user?.role !== 'administrator') return false;
+      
+      const targetUser = users.find(u => u.id === userId);
+      if (!targetUser) return false;
+      
+      // Обновляем пароль в базе данных
+      if (userService.isAvailable()) {
+        try {
+          await userService.resetPassword(userId, newPassword);
+        } catch (error) {
+          console.error('Ошибка сброса пароля в БД:', error);
+          throw error;
+        }
+      }
+      
+      // Обновляем локальное состояние
+      setUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, password: newPassword } : u
+      ));
+      
+      return true;
+    } catch (error) {
+      console.error('Ошибка сброса пароля:', error);
+      return false;
+    }
   };
 
   // Восстановление сессии при загрузке
+  useEffect(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+  }, []);
 
   const value = {
     user,
     users,
+    loading,
+    error,
     login,
     logout,
     addUser,
     updateUser,
     deleteUser,
+    changePassword,
+    resetPassword,
     hasAccess,
-    isLoading
+    reloadUsers: loadUsers
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Проверка авторизации...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <AuthContext.Provider value={value}>
