@@ -226,7 +226,8 @@ export class ProjectService {
       // Валидация UUID пользователя если указан
       if (userId && !this.isValidUUID(userId)) {
         console.error('Некорректный UUID пользователя:', userId);
-        throw new Error(`Некорректный ID пользователя: ${userId}. Ожидается UUID формат.`);
+        console.warn(`Некорректный ID пользователя: ${userId}. Используем null вместо некорректного ID.`);
+        userId = undefined; // Устанавливаем undefined для некорректного UUID
       }
 
       // Добавляем проект
