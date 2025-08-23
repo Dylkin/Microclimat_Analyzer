@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Wrench, Plus, Edit2, Trash2, Save, X, Search, AlertTriangle, Calendar, Package, Hash } from 'lucide-react';
-import { MeasurementEquipment, CreateMeasurementEquipmentData, UpdateMeasurementEquipmentData } from '../types/MeasurementEquipment';
+import { Wrench, Plus, Edit2, Trash2, Save, X, Search, AlertTriangle, Calendar, Package, Hash, Upload, FileText, Download, CheckCircle } from 'lucide-react';
+import { 
+  MeasurementEquipment, 
+  EquipmentVerification,
+  CreateMeasurementEquipmentData, 
+  UpdateMeasurementEquipmentData,
+  CreateEquipmentVerificationData,
+  EquipmentType
+} from '../types/MeasurementEquipment';
 import { measurementEquipmentService } from '../utils/measurementEquipmentService';
+
+const equipmentTypes: EquipmentType[] = ['-', 'Testo 174T', 'Testo 174H'];
 
 export const MeasurementEquipmentDirectory: React.FC = () => {
   const [equipment, setEquipment] = useState<MeasurementEquipment[]>([]);
@@ -21,13 +30,21 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
   
   // Form state
   const [newEquipment, setNewEquipment] = useState<CreateMeasurementEquipmentData>({
-    type: '',
+    type: '-',
     name: '',
-    serialNumber: '',
-    verificationDueDate: new Date()
+    serialNumber: ''
   });
 
   const [editEquipment, setEditEquipment] = useState<UpdateMeasurementEquipmentData>({});
+
+  // Verification state
+  const [selectedEquipmentForVerification, setSelectedEquipmentForVerification] = useState<string | null>(null);
+  const [showVerificationForm, setShowVerificationForm] = useState(false);
+  const [newVerification, setNewVerification] = useState<CreateEquipmentVerificationData>({
+    equipmentId: '',
+    verificationStartDate: new Date(),
+    verificationEndDate: new Date()
+  });
 
   // Загрузка оборудования
   const loadEquipment = async () => {
@@ -71,7 +88,10 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
         item.type.toLowerCase().includes(searchLower) ||
         item.name.toLowerCase().includes(searchLower) ||
         item.serialNumber.toLowerCase().includes(searchLower) ||
-        item.verificationDueDate.toLocaleDateString('ru-RU').includes(searchLower)
+        item.verifications.some(v => 
+          v.verificationStartDate.toLocaleDateString('ru-RU').includes(searchLower) ||
+          v.verificationEndDate.toLocaleDateString('ru-RU').includes(searchLower)
+        )
       );
     });
 
@@ -87,7 +107,7 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
 
   // Добавление оборудования
   const handleAddEquipment = async () => {
-    if (!newEquipment.type.trim() || !newEquipment.name.trim() || !newEquipment.serialNumber.trim()) {
+    if (newEquipment.type === '-' || !newEquipment.name.trim() || !newEquipment.serialNumber.trim()) {
       alert('Заполните все обязательные поля');
       return;
     }
@@ -99,10 +119,9 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
       
       // Сбрасываем форму
       setNewEquipment({
-        type: '',
+        type: '-',
         name: '',
-        serialNumber: '',
-        verificationDueDate: new Date()
+        serialNumber: ''
       });
       setShowAddForm(false);
       alert('Измерительное оборудование успешно добавлено');
@@ -119,14 +138,13 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
     setEditEquipment({
       type: item.type,
       name: item.name,
-      serialNumber: item.serialNumber,
-      verificationDueDate: item.verificationDueDate
+      serialNumber: item.serialNumber
     });
     setEditingEquipment(item.id);
   };
 
   const handleSaveEdit = async () => {
-    if (!editEquipment.type?.trim() || !editEquipment.name?.trim() || !editEquipment.serialNumber?.trim()) {
+    if (editEquipment.type === '-' || !editEquipment.name?.trim() || !editEquipment.serialNumber?.trim()) {
       alert('Заполните все обязательные поля');
       return;
     }
@@ -176,6 +194,92 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
     setEditEquipment({});
   };
 
+  // Добавление записи о поверке
+  const handleAddVerification = async () => {
+    if (!newVerification.verificationStartDate || !newVerification.verificationEndDate) {
+      alert('Заполните период поверки');
+      return;
+    }
+
+    if (newVerification.verificationEndDate <= newVerification.verificationStartDate) {
+      alert('Дата окончания должна быть позже даты начала');
+      return;
+    }
+
+    setOperationLoading(true);
+    try {
+      const addedVerification = await measurementEquipmentService.addVerification(newVerification);
+      
+      // Обновляем оборудование с новой записью о поверке
+      setEquipment(prev => prev.map(item => 
+        item.id === newVerification.equipmentId 
+          ? { ...item, verifications: [...item.verifications, addedVerification] }
+          : item
+      ));
+      
+      // Сбрасываем форму
+      setNewVerification({
+        equipmentId: '',
+        verificationStartDate: new Date(),
+        verificationEndDate: new Date()
+      });
+      setShowVerificationForm(false);
+      setSelectedEquipmentForVerification(null);
+      alert('Запись о поверке успешно добавлена');
+    } catch (error) {
+      console.error('Ошибка добавления записи о поверке:', error);
+      alert(`Ошибка добавления записи о поверке: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // Удаление записи о поверке
+  const handleDeleteVerification = async (verificationId: string, equipmentId: string) => {
+    if (confirm('Вы уверены, что хотите удалить эту запись о поверке?')) {
+      setOperationLoading(true);
+      try {
+        await measurementEquipmentService.deleteVerification(verificationId);
+        
+        // Обновляем оборудование, удаляя запись о поверке
+        setEquipment(prev => prev.map(item => 
+          item.id === equipmentId 
+            ? { ...item, verifications: item.verifications.filter(v => v.id !== verificationId) }
+            : item
+        ));
+        
+        alert('Запись о поверке успешно удалена');
+      } catch (error) {
+        console.error('Ошибка удаления записи о поверке:', error);
+        alert(`Ошибка удаления записи о поверке: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      } finally {
+        setOperationLoading(false);
+      }
+    }
+  };
+
+  // Показать форму добавления поверки
+  const handleShowVerificationForm = (equipmentId: string) => {
+    setSelectedEquipmentForVerification(equipmentId);
+    setNewVerification(prev => ({
+      ...prev,
+      equipmentId
+    }));
+    setShowVerificationForm(true);
+  };
+
+  // Получение актуальной поверки (последней по дате окончания)
+  const getCurrentVerification = (equipment: MeasurementEquipment): EquipmentVerification | null => {
+    if (equipment.verifications.length === 0) return null;
+    
+    // Сортируем по дате окончания и берем последнюю
+    const sortedVerifications = [...equipment.verifications].sort(
+      (a, b) => b.verificationEndDate.getTime() - a.verificationEndDate.getTime()
+    );
+    
+    return sortedVerifications[0];
+  };
+
   // Проверка истечения срока поверки
   const isVerificationExpired = (date: Date): boolean => {
     return date < new Date();
@@ -195,6 +299,21 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
       return 'bg-yellow-100 text-yellow-800';
     } else {
       return 'bg-green-100 text-green-800';
+    }
+  };
+
+  // Обработка загрузки файла поверки
+  const handleVerificationFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        alert('Можно загружать только файлы в формате PDF');
+        return;
+      }
+      setNewVerification(prev => ({
+        ...prev,
+        verificationFile: file
+      }));
     }
   };
 
@@ -275,13 +394,15 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Вид *
               </label>
-              <input
-                type="text"
+              <select
                 value={newEquipment.type}
-                onChange={(e) => setNewEquipment(prev => ({ ...prev, type: e.target.value }))}
+                onChange={(e) => setNewEquipment(prev => ({ ...prev, type: e.target.value as EquipmentType }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите вид оборудования"
-              />
+              >
+                {equipmentTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -309,21 +430,6 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
                 placeholder="Введите серийный номер"
               />
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Срок поверки до *
-              </label>
-              <input
-                type="date"
-                value={newEquipment.verificationDueDate.toISOString().split('T')[0]}
-                onChange={(e) => setNewEquipment(prev => ({ 
-                  ...prev, 
-                  verificationDueDate: new Date(e.target.value) 
-                }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
           </div>
 
           <div className="flex justify-end space-x-3 mt-6">
@@ -335,6 +441,110 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
             </button>
             <button
               onClick={handleAddEquipment}
+              disabled={operationLoading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {operationLoading ? 'Добавление...' : 'Добавить'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Verification Form */}
+      {showVerificationForm && selectedEquipmentForVerification && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Добавить запись о поверке</h2>
+            <button
+              onClick={() => {
+                setShowVerificationForm(false);
+                setSelectedEquipmentForVerification(null);
+                setNewVerification({
+                  equipmentId: '',
+                  verificationStartDate: new Date(),
+                  verificationEndDate: new Date()
+                });
+              }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Период поверки с *
+              </label>
+              <input
+                type="date"
+                value={newVerification.verificationStartDate.toISOString().split('T')[0]}
+                onChange={(e) => setNewVerification(prev => ({ 
+                  ...prev, 
+                  verificationStartDate: new Date(e.target.value) 
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Период поверки по *
+              </label>
+              <input
+                type="date"
+                value={newVerification.verificationEndDate.toISOString().split('T')[0]}
+                onChange={(e) => setNewVerification(prev => ({ 
+                  ...prev, 
+                  verificationEndDate: new Date(e.target.value) 
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Файл поверки (PDF)
+              </label>
+              <div className="flex items-center space-x-3">
+                <label className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                  <Upload className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-600">Выбрать файл</span>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleVerificationFileChange}
+                    className="hidden"
+                  />
+                </label>
+                {newVerification.verificationFile && (
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-4 h-4 text-green-600" />
+                    <span className="text-sm text-gray-600">{newVerification.verificationFile.name}</span>
+                    <button
+                      onClick={() => setNewVerification(prev => ({ ...prev, verificationFile: undefined }))}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={() => {
+                setShowVerificationForm(false);
+                setSelectedEquipmentForVerification(null);
+              }}
+              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Отмена
+            </button>
+            <button
+              onClick={handleAddVerification}
               disabled={operationLoading}
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
@@ -360,7 +570,7 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
                   Серийный №
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Срок поверки до
+                  Поверка
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
@@ -372,12 +582,15 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingEquipment === item.id ? (
-                      <input
-                        type="text"
+                      <select
                         value={editEquipment.type || ''}
-                        onChange={(e) => setEditEquipment(prev => ({ ...prev, type: e.target.value }))}
+                        onChange={(e) => setEditEquipment(prev => ({ ...prev, type: e.target.value as EquipmentType }))}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      />
+                      >
+                        {equipmentTypes.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
                     ) : (
                       <div className="flex items-center space-x-2">
                         <Package className="w-4 h-4 text-gray-400" />
@@ -414,21 +627,63 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingEquipment === item.id ? (
-                      <input
-                        type="date"
-                        value={editEquipment.verificationDueDate?.toISOString().split('T')[0] || ''}
-                        onChange={(e) => setEditEquipment(prev => ({ 
-                          ...prev, 
-                          verificationDueDate: new Date(e.target.value) 
-                        }))}
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      />
+                      <div className="text-sm text-gray-500">
+                        Редактирование поверки недоступно
+                      </div>
                     ) : (
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getVerificationStatusColor(item.verificationDueDate)}`}>
-                          {item.verificationDueDate.toLocaleDateString('ru-RU')}
-                        </span>
+                      <div className="space-y-2">
+                        {item.verifications.length > 0 ? (
+                          <>
+                            {item.verifications.slice(0, 2).map((verification) => (
+                              <div key={verification.id} className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <Calendar className="w-4 h-4 text-gray-400" />
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getVerificationStatusColor(verification.verificationEndDate)}`}>
+                                    {verification.verificationStartDate.toLocaleDateString('ru-RU')} - {verification.verificationEndDate.toLocaleDateString('ru-RU')}
+                                  </span>
+                                  {verification.verificationFileUrl && (
+                                    <a
+                                      href={verification.verificationFileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-800"
+                                      title="Открыть файл поверки"
+                                    >
+                                      <FileText className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteVerification(verification.id, item.id)}
+                                  className="text-red-600 hover:text-red-800 ml-2"
+                                  title="Удалить запись о поверке"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {item.verifications.length > 2 && (
+                              <div className="text-xs text-gray-500">
+                                +{item.verifications.length - 2} записей
+                              </div>
+                            )}
+                            <button
+                              onClick={() => handleShowVerificationForm(item.id)}
+                              className="text-green-600 hover:text-green-800 text-xs flex items-center space-x-1"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Добавить поверку</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleShowVerificationForm(item.id)}
+                            className="text-indigo-600 hover:text-indigo-800 text-sm flex items-center space-x-1"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Добавить поверку</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </td>
@@ -584,19 +839,28 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">
-              {equipment.filter(item => !isVerificationExpired(item.verificationDueDate) && !isVerificationExpiringSoon(item.verificationDueDate)).length}
+              {equipment.filter(item => {
+                const currentVerification = getCurrentVerification(item);
+                return currentVerification && !isVerificationExpired(currentVerification.verificationEndDate) && !isVerificationExpiringSoon(currentVerification.verificationEndDate);
+              }).length}
             </div>
             <div className="text-sm text-gray-500">Поверка актуальна</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-yellow-600">
-              {equipment.filter(item => isVerificationExpiringSoon(item.verificationDueDate)).length}
+              {equipment.filter(item => {
+                const currentVerification = getCurrentVerification(item);
+                return currentVerification && isVerificationExpiringSoon(currentVerification.verificationEndDate);
+              }).length}
             </div>
             <div className="text-sm text-gray-500">Истекает в течение 30 дней</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600">
-              {equipment.filter(item => isVerificationExpired(item.verificationDueDate)).length}
+              {equipment.filter(item => {
+                const currentVerification = getCurrentVerification(item);
+                return currentVerification && isVerificationExpired(currentVerification.verificationEndDate);
+              }).length}
             </div>
             <div className="text-sm text-gray-500">Просрочена поверка</div>
           </div>
