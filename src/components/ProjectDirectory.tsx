@@ -122,21 +122,14 @@ export const ProjectDirectory: React.FC = () => {
     console.log('ID контрагента:', newProject.contractorId);
     console.log('Тип ID контрагента:', typeof newProject.contractorId);
     
-    // Находим выбранного контрагента в списке
-    const selectedContractor = contractors.find(c => c.id === newProject.contractorId);
-    console.log('Найденный контрагент:', selectedContractor);
-    
-    if (selectedContractor) {
-      console.log('ID найденного контрагента:', selectedContractor.id);
-      console.log('Тип ID найденного контрагента:', typeof selectedContractor.id);
+    // Проверяем, что contractorId является строкой
+    if (typeof newProject.contractorId !== 'string') {
+      console.error('Contractor ID не является строкой:', newProject.contractorId);
+      alert('Ошибка: некорректный тип ID контрагента');
+      return;
     }
-    
-    // Проверяем все контрагенты на корректность UUID
-    console.log('Все контрагенты:');
-    contractors.forEach((contractor, index) => {
-      console.log(`${index + 1}. ID: "${contractor.id}" (тип: ${typeof contractor.id}), Название: "${contractor.name}"`);
-    });
-    
+
+    // Проверяем, что contractorId не пустой
     if (!newProject.contractorId || !newProject.contractorId.trim()) {
       alert('Выберите контрагента');
       return;
@@ -152,6 +145,27 @@ export const ProjectDirectory: React.FC = () => {
       return;
     }
 
+    // Находим выбранного контрагента в списке
+    const selectedContractor = contractors.find(c => c.id === trimmedContractorId);
+    console.log('Найденный контрагент:', selectedContractor);
+    
+    if (!selectedContractor) {
+      console.error('Контрагент не найден в списке:', trimmedContractorId);
+      alert('Ошибка: выбранный контрагент не найден. Обновите страницу и попробуйте снова.');
+      return;
+    }
+    
+    if (selectedContractor) {
+      console.log('ID найденного контрагента:', selectedContractor.id);
+      console.log('Тип ID найденного контрагента:', typeof selectedContractor.id);
+    }
+    
+    // Проверяем все контрагенты на корректность UUID
+    console.log('Все контрагенты:');
+    contractors.forEach((contractor, index) => {
+      console.log(`${index + 1}. ID: "${contractor.id}" (тип: ${typeof contractor.id}), Название: "${contractor.name}"`);
+    });
+    
     if (newProject.qualificationObjectIds.length === 0) {
       alert('Выберите хотя бы один объект квалификации');
       return;
