@@ -261,9 +261,12 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
   // Показать форму добавления поверки
   const handleShowVerificationForm = (equipmentId: string) => {
     setSelectedEquipmentForVerification(equipmentId);
+    const nextYear = new Date();
+    nextYear.setDate(nextYear.getDate() + 364);
     setNewVerification(prev => ({
       ...prev,
-      equipmentId
+      equipmentId,
+      verificationEndDate: nextYear
     }));
     setShowVerificationForm(true);
   };
@@ -471,6 +474,30 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
             </button>
           </div>
 
+          {/* Equipment Information */}
+          {(() => {
+            const selectedEquipment = equipment.find(eq => eq.id === selectedEquipmentForVerification);
+            return selectedEquipment ? (
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="text-sm font-medium text-blue-900 mb-2">Информация об оборудовании</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-blue-800">Вид:</span>
+                    <div className="text-blue-700">{selectedEquipment.type}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-blue-800">Наименование:</span>
+                    <div className="text-blue-700">{selectedEquipment.name}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-blue-800">Серийный номер:</span>
+                    <div className="text-blue-700 font-mono">{selectedEquipment.serialNumber}</div>
+                  </div>
+                </div>
+              </div>
+            ) : null;
+          })()}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -500,6 +527,9 @@ export const MeasurementEquipmentDirectory: React.FC = () => {
                 }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
+              <div className="mt-1 text-xs text-gray-500">
+                Автоматически установлена дата: текущая дата + 364 дня
+              </div>
             </div>
 
             <div className="md:col-span-2">
