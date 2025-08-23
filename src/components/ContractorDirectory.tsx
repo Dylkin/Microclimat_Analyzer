@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, Eye, ArrowLeft } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { contractorService } from '../utils/contractorService';
@@ -23,6 +23,7 @@ export const ContractorDirectory: React.FC = () => {
   const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingContractorData, setEditingContractorData] = useState<Contractor | null>(null);
+  const [showViewContractor, setShowViewContractor] = useState(false);
   
   // Qualification objects state
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
@@ -30,7 +31,6 @@ export const ContractorDirectory: React.FC = () => {
   const [showAddQualificationForm, setShowAddQualificationForm] = useState(false);
   const [selectedContractorForObjects, setSelectedContractorForObjects] = useState<Contractor | null>(null);
   const [viewingContractor, setViewingContractor] = useState<Contractor | null>(null);
-  const [showViewContractor, setShowViewContractor] = useState(false);
 
   // Form state
   const [newContractor, setNewContractor] = useState<CreateContractorData>({
