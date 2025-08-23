@@ -1,4 +1,8 @@
+import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+
+// Загружаем переменные окружения из .env файла
+dotenv.config();
 
 // Получаем конфигурацию Supabase из переменных окружения
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
