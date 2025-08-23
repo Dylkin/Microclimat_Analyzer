@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft, Eye } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { contractorService } from '../utils/contractorService';
@@ -347,7 +347,7 @@ export const ContractorDirectory: React.FC = () => {
     setViewingContractor(contractor);
     setShowViewContractor(true);
   };
-  
+
   if (showMap && selectedContractor) {
     return (
       <ContractorMap
@@ -598,7 +598,7 @@ export const ContractorDirectory: React.FC = () => {
           </div>
         )}
       </div>
-      
+
       {/* Add Contractor Form */}
       {showAddForm && (
         renderContractorForm(false)
@@ -709,6 +709,14 @@ export const ContractorDirectory: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => handleViewContractor(contractor)}
+                          disabled={operationLoading}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Просмотр"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => handleEditContractor(contractor)}
                           disabled={operationLoading}
