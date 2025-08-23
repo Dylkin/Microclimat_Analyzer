@@ -684,6 +684,14 @@ export const ContractorDirectory: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
                         <button
+                          onClick={() => handleViewContractor(contractor)}
+                          disabled={operationLoading}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Просмотр"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleEditContractor(contractor)}
                           disabled={operationLoading}
                           className="text-indigo-600 hover:text-indigo-900"

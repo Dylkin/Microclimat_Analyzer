@@ -901,6 +901,14 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button
+                        onClick={() => handleViewContractor(contractor)}
+                        disabled={operationLoading}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Просмотр"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleDeleteFile(file.id)}
                         className="text-red-600 hover:text-red-900 transition-colors"
                         title="Удалить файл"
