@@ -541,6 +541,9 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                     Контрагент
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Дата создания
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Статус
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -559,22 +562,10 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                   <tr key={project.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       {editingProject === project.id ? (
-                        <textarea
-                          value={editProject.description}
-                          onChange={(e) => setEditProject(prev => ({ ...prev, description: e.target.value }))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          rows={2}
-                          placeholder="Описание"
-                        />
+                        <div className="text-sm font-medium text-gray-900">{project.name}</div>
                       ) : (
                         <div>
                           <div className="text-sm font-medium text-gray-900">{project.name}</div>
-                          {project.description && (
-                            <div className="text-xs text-gray-500 mt-1">{project.description}</div>
-                          )}
-                          <div className="text-xs text-gray-400 mt-1">
-                            Создан: {project.createdAt.toLocaleDateString('ru-RU')}
-                          </div>
                         </div>
                       )}
                     </td>
@@ -582,6 +573,17 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                       <div className="flex items-center space-x-2">
                         <Building2 className="w-4 h-4 text-gray-400" />
                         <span className="text-sm text-gray-900">{project.contractorName}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {project.createdAt.toLocaleDateString('ru-RU')}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {project.createdAt.toLocaleTimeString('ru-RU', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
