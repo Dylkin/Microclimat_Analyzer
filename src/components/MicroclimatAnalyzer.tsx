@@ -56,6 +56,13 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   });
   const [projectFilesLoaded, setProjectFilesLoaded] = React.useState(false);
 
+  const mockData = [
+    { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
+    { label: 'Влажность', value: '65%', icon: Droplets, color: 'text-blue-600', bg: 'bg-blue-100' },
+    { label: 'Скорость ветра', value: '3.2 м/с', icon: Wind, color: 'text-green-600', bg: 'bg-green-100' },
+    { label: 'Освещенность', value: '850 лк', icon: Sun, color: 'text-yellow-600', bg: 'bg-yellow-100' }
+  ];
+
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
     const loadContractors = async () => {
