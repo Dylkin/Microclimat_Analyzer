@@ -3,9 +3,11 @@ import { ArrowLeft, Building2, FileText, Upload, Download, Trash2, CheckCircle, 
 import { Project } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
+import { ProjectDocument, DocumentTypeLabels } from '../types/ProjectDocument';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { projectService } from '../utils/projectService';
+import { projectDocumentService } from '../utils/projectDocumentService';
 
 interface ProtocolPreparationProps {
   project: Project;
@@ -21,6 +23,7 @@ interface ProtocolFile {
 export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ project, onBack }) => {
   const [contractor, setContractor] = useState<Contractor | null>(null);
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
+  const [projectDocuments, setProjectDocuments] = useState<ProjectDocument[]>([]);
   const [protocolFiles, setProtocolFiles] = useState<ProtocolFile[]>([]);
   const [completedObjects, setCompletedObjects] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -48,6 +51,12 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
           const projectObjects = allObjects.filter(obj => projectObjectIds.includes(obj.id));
           setQualificationObjects(projectObjects);
         }
+
+        // Загружаем документы проекта
+        if (projectDocumentService.isAvailable()) {
+          const documentsData = await projectDocumentService.getProjectDocuments(project.id);
+          setProjectDocuments(documentsData);
+        }
       } catch (error) {
         console.error('Ошибка загрузки данных:', error);
         setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
@@ -58,6 +67,34 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
 
     loadData();
   }, [project]);
+
+  // Получение документа по типу
+  const getDocumentByType = (documentType: 'commercial_offer' | 'contract'): ProjectDocument | null => {
+    return projectDocuments.find(doc => doc.documentType === documentType) || null;
+  };
+
+  // Скачивание документа проекта
+  const handleDownloadProjectDocument = async (document: ProjectDocument) => {
+    try {
+      setOperationLoading(true);
+      
+      const blob = await projectDocumentService.getDocumentContent(document.id);
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = document.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Ошибка скачивания документа:', error);
+      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
 
   // Получение иконки для типа объекта квалификации
   const getTypeIcon = (type: string) => {
@@ -288,15 +325,78 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
           </div>
         </div>
 
-        {/* Contract Link */}
+        {/* Project Documents */}
         <div className="mt-4 p-4 bg-white border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-blue-600" />
-              <span className="text-sm font-medium text-gray-900">Договор</span>
+          <h3 className="text-sm font-medium text-gray-900 mb-3">Документы проекта</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Commercial Offer */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-2">
+                {DocumentTypeLabels.commercial_offer}
+              </label>
+              {(() => {
+                const document = getDocumentByType('commercial_offer');
+                return document ? (
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="w-4 h-4 text-blue-600" />
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{document.fileName}</div>
+                        <div className="text-xs text-gray-500">
+                          {(document.fileSize / 1024 / 1024).toFixed(2)} MB
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDownloadProjectDocument(document)}
+                      disabled={operationLoading}
+                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                      title="Скачать"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg text-center">
+                    Не загружено
+                  </div>
+                );
+              })()}
             </div>
-            <div className="text-sm text-gray-500">
-              Файл договора должен быть загружен на этапе согласования
+
+            {/* Contract */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-2">
+                {DocumentTypeLabels.contract}
+              </label>
+              {(() => {
+                const document = getDocumentByType('contract');
+                return document ? (
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="w-4 h-4 text-green-600" />
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{document.fileName}</div>
+                        <div className="text-xs text-gray-500">
+                          {(document.fileSize / 1024 / 1024).toFixed(2)} MB
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDownloadProjectDocument(document)}
+                      disabled={operationLoading}
+                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                      title="Скачать"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg text-center">
+                    Не загружено
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

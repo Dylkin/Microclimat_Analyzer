@@ -3,9 +3,12 @@ import { ArrowLeft, Building2, Calendar, Save, Edit2, X, CheckCircle, AlertCircl
 import { Project } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels, UpdateQualificationObjectData } from '../types/QualificationObject';
+import { ProjectDocument, DocumentType, DocumentTypeLabels } from '../types/ProjectDocument';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { projectService } from '../utils/projectService';
+import { projectDocumentService } from '../utils/projectDocumentService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ContractNegotiationProps {
   project: Project;
@@ -13,8 +16,10 @@ interface ContractNegotiationProps {
 }
 
 export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBack }) => {
+  const { user } = useAuth();
   const [contractor, setContractor] = useState<Contractor | null>(null);
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
+  const [projectDocuments, setProjectDocuments] = useState<ProjectDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingObject, setEditingObject] = useState<string | null>(null);
@@ -29,13 +34,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
       return date.toISOString().split('T')[0];
     })()
   });
-  const [documents, setDocuments] = useState<{
-    commercialOffer: File | null;
-    contract: File | null;
-  }>({
-    commercialOffer: null,
-    contract: null
-  });
+  const [uploadingDocument, setUploadingDocument] = useState<DocumentType | null>(null);
 
   // Вычисляем примерную дату завершения (дата создания + 7 дней)
 
@@ -65,6 +64,12 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
       } finally {
         setLoading(false);
+      }
+
+      // Загружаем документы проекта
+      if (projectDocumentService.isAvailable()) {
+        const documentsData = await projectDocumentService.getProjectDocuments(project.id);
+        setProjectDocuments(documentsData);
       }
     };
 
@@ -146,7 +151,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
   };
 
   // Загрузка документов
-  const handleDocumentUpload = (documentType: 'commercialOffer' | 'contract', file: File) => {
+  const handleDocumentUpload = async (documentType: DocumentType, file: File) => {
     // Проверяем формат файла
     const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if (!allowedTypes.includes(file.type)) {
@@ -154,30 +159,86 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
       return;
     }
 
-    setDocuments(prev => ({
-      ...prev,
-      [documentType]: file
-    }));
+    // Проверяем размер файла (максимум 10 MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Размер файла не должен превышать 10 MB');
+      return;
+    }
+
+    setUploadingDocument(documentType);
+
+    try {
+      const documentData: CreateProjectDocumentData = {
+        projectId: project.id,
+        documentType,
+        file,
+        uploadedBy: user?.id
+      };
+
+      const savedDocument = await projectDocumentService.saveDocument(documentData);
+      
+      // Обновляем список документов
+      setProjectDocuments(prev => {
+        // Удаляем старый документ того же типа если есть
+        const filtered = prev.filter(doc => doc.documentType !== documentType);
+        return [...filtered, savedDocument];
+      });
+
+      alert(`${DocumentTypeLabels[documentType]} успешно сохранен`);
+    } catch (error) {
+      console.error('Ошибка сохранения документа:', error);
+      alert(`Ошибка сохранения документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setUploadingDocument(null);
+    }
   };
 
   // Удаление документа
-  const handleRemoveDocument = (documentType: 'commercialOffer' | 'contract') => {
-    setDocuments(prev => ({
-      ...prev,
-      [documentType]: null
-    }));
+  const handleRemoveDocument = async (documentId: string, documentType: DocumentType) => {
+    if (confirm(`Вы уверены, что хотите удалить ${DocumentTypeLabels[documentType].toLowerCase()}?`)) {
+      setOperationLoading(true);
+      try {
+        await projectDocumentService.deleteDocument(documentId);
+        
+        // Удаляем из локального состояния
+        setProjectDocuments(prev => prev.filter(doc => doc.id !== documentId));
+        
+        alert(`${DocumentTypeLabels[documentType]} успешно удален`);
+      } catch (error) {
+        console.error('Ошибка удаления документа:', error);
+        alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      } finally {
+        setOperationLoading(false);
+      }
+    }
   };
 
   // Скачивание документа
-  const handleDownloadDocument = (file: File) => {
-    const url = URL.createObjectURL(file);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = file.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const handleDownloadDocument = async (document: ProjectDocument) => {
+    try {
+      setOperationLoading(true);
+      
+      const blob = await projectDocumentService.getDocumentContent(document.id);
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = document.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Ошибка скачивания документа:', error);
+      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // Получение документа по типу
+  const getDocumentByType = (documentType: DocumentType): ProjectDocument | null => {
+    return projectDocuments.find(doc => doc.documentType === documentType) || null;
   };
 
   // Отмена редактирования
@@ -631,31 +692,39 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Commercial Offer */}
           <div>
-            <h3 className="text-md font-medium text-gray-800 mb-3">Коммерческое предложение</h3>
-            {documents.commercialOffer ? (
+            <h3 className="text-md font-medium text-gray-800 mb-3">{DocumentTypeLabels.commercial_offer}</h3>
+            {(() => {
+              const document = getDocumentByType('commercial_offer');
+              return document ? (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <FileText className="w-5 h-5 text-blue-600" />
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {documents.commercialOffer.name}
+                        {document.fileName}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {(documents.commercialOffer.size / 1024 / 1024).toFixed(2)} MB
+                        {(document.fileSize / 1024 / 1024).toFixed(2)} MB
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Загружен: {document.uploadedAt.toLocaleString('ru-RU')}
+                        {document.uploadedByName && ` • ${document.uploadedByName}`}
                       </div>
                     </div>
                   </div>
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => handleDownloadDocument(documents.commercialOffer!)}
+                      onClick={() => handleDownloadDocument(document)}
+                      disabled={operationLoading}
                       className="text-blue-600 hover:text-blue-800 transition-colors"
                       title="Скачать"
                     >
                       <Download className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleRemoveDocument('commercialOffer')}
+                      onClick={() => handleRemoveDocument(document.id, 'commercial_offer')}
+                      disabled={operationLoading}
                       className="text-red-600 hover:text-red-800 transition-colors"
                       title="Удалить"
                     >
@@ -664,15 +733,22 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
                   </div>
                 </div>
               </div>
-            ) : (
+              ) : (
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                {uploadingDocument === 'commercial_offer' ? (
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <span className="text-sm text-gray-600">Сохранение документа...</span>
+                  </div>
+                ) : (
+                  <>
                 <input
                   type="file"
                   accept=".pdf,.docx"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      handleDocumentUpload('commercialOffer', file);
+                      handleDocumentUpload('commercial_offer', file);
                     }
                   }}
                   className="hidden"
@@ -684,43 +760,54 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
                 >
                   <Upload className="w-8 h-8 text-gray-400" />
                   <span className="text-sm text-gray-600">
-                    Загрузить коммерческое предложение
+                      Загрузить {DocumentTypeLabels.commercial_offer.toLowerCase()}
                   </span>
                   <span className="text-xs text-gray-500">
                     PDF или DOCX, до 10 MB
                   </span>
                 </label>
+                  </>
+                )}
               </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Contract */}
           <div>
-            <h3 className="text-md font-medium text-gray-800 mb-3">Договор</h3>
-            {documents.contract ? (
+            <h3 className="text-md font-medium text-gray-800 mb-3">{DocumentTypeLabels.contract}</h3>
+            {(() => {
+              const document = getDocumentByType('contract');
+              return document ? (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <FileText className="w-5 h-5 text-green-600" />
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {documents.contract.name}
+                        {document.fileName}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {(documents.contract.size / 1024 / 1024).toFixed(2)} MB
+                        {(document.fileSize / 1024 / 1024).toFixed(2)} MB
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Загружен: {document.uploadedAt.toLocaleString('ru-RU')}
+                        {document.uploadedByName && ` • ${document.uploadedByName}`}
                       </div>
                     </div>
                   </div>
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => handleDownloadDocument(documents.contract!)}
+                      onClick={() => handleDownloadDocument(document)}
+                      disabled={operationLoading}
                       className="text-blue-600 hover:text-blue-800 transition-colors"
                       title="Скачать"
                     >
                       <Download className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleRemoveDocument('contract')}
+                      onClick={() => handleRemoveDocument(document.id, 'contract')}
+                      disabled={operationLoading}
                       className="text-red-600 hover:text-red-800 transition-colors"
                       title="Удалить"
                     >
@@ -729,8 +816,15 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
                   </div>
                 </div>
               </div>
-            ) : (
+              ) : (
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                {uploadingDocument === 'contract' ? (
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <span className="text-sm text-gray-600">Сохранение документа...</span>
+                  </div>
+                ) : (
+                  <>
                 <input
                   type="file"
                   accept=".pdf,.docx"
@@ -749,14 +843,17 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
                 >
                   <Upload className="w-8 h-8 text-gray-400" />
                   <span className="text-sm text-gray-600">
-                    Загрузить договор
+                      Загрузить {DocumentTypeLabels.contract.toLowerCase()}
                   </span>
                   <span className="text-xs text-gray-500">
                     PDF или DOCX, до 10 MB
                   </span>
                 </label>
+                  </>
+                )}
               </div>
-            )}
+              );
+            })()}
           </div>
         </div>
 
@@ -766,8 +863,9 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           <ul className="text-xs text-blue-800 space-y-1">
             <li>• Поддерживаемые форматы: PDF, DOCX</li>
             <li>• Максимальный размер файла: 10 MB</li>
-            <li>• Документы сохраняются локально в браузере</li>
-            <li>• Для постоянного хранения используйте внешние системы документооборота</li>
+            <li>• Документы сохраняются в базе данных проекта</li>
+            <li>• При загрузке нового документа старый автоматически заменяется</li>
+            <li>• Документы доступны для скачивания всем участникам проекта</li>
           </ul>
         </div>
       </div>
