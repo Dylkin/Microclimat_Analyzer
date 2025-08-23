@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play } from 'lucide-react';
 import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, CreateProjectData } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
@@ -13,9 +13,10 @@ import { useAuth } from '../contexts/AuthContext';
 function isValidUUID(uuid: string): boolean {
   const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return regex.test(uuid);
+  onPageChange?: (page: string) => void;
 }
 
-export const ProjectDirectory: React.FC = () => {
+export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => {
   const { user, users } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
@@ -306,6 +307,40 @@ export const ProjectDirectory: React.FC = () => {
         return <Clock className="w-4 h-4 text-yellow-600" />;
       default:
         return <AlertCircle className="w-4 h-4 text-blue-600" />;
+    }
+  };
+
+  // Получение действия для статуса проекта
+  const getProjectAction = (status: ProjectStatus) => {
+    switch (status) {
+      case 'testing_execution':
+        return {
+          label: 'Перейти к испытаниям',
+          page: 'analyzer',
+          icon: Play
+        };
+      case 'protocol_preparation':
+        return {
+          label: 'Подготовить протокол',
+          page: 'analyzer',
+          icon: Play
+        };
+      case 'report_preparation':
+        return {
+          label: 'Подготовить отчет',
+          page: 'analyzer',
+          icon: Play
+        };
+      default:
+        return null;
+    }
+  };
+
+  // Обработчик действия проекта
+  const handleProjectAction = (project: Project) => {
+    const action = getProjectAction(project.status);
+    if (action && onPageChange) {
+      onPageChange(action.page);
     }
   };
 
@@ -602,6 +637,16 @@ export const ProjectDirectory: React.FC = () => {
                         </div>
                       ) : (
                         <div className="flex justify-end space-x-2">
+                          {getProjectAction(project.status) && (
+                            <button
+                              onClick={() => handleProjectAction(project)}
+                              disabled={operationLoading}
+                              className="text-blue-600 hover:text-blue-900"
+                              title={getProjectAction(project.status)?.label}
+                            >
+                              <Play className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleEditProject(project)}
                             disabled={operationLoading}

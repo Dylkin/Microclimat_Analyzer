@@ -39,7 +39,7 @@ const AppContent: React.FC = () => {
       case 'contractors':
         return hasAccess('analyzer') ? <ContractorDirectory /> : <div>Доступ запрещен</div>;
       case 'projects':
-        return hasAccess('analyzer') ? <ProjectDirectory /> : <div>Доступ запрещен</div>;
+        return hasAccess('analyzer') ? <ProjectDirectory onPageChange={setCurrentPage} /> : <div>Доступ запрещен</div>;
       case 'database':
         return hasAccess('database') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
       default:
