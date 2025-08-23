@@ -137,8 +137,18 @@ export const ProjectDirectory: React.FC = () => {
       console.log(`${index + 1}. ID: "${contractor.id}" (тип: ${typeof contractor.id}), Название: "${contractor.name}"`);
     });
     
-    if (!newProject.contractorId) {
+    if (!newProject.contractorId || !newProject.contractorId.trim()) {
       alert('Выберите контрагента');
+      return;
+    }
+
+    // Проверяем, что contractorId является валидным UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const trimmedContractorId = newProject.contractorId.trim();
+    
+    if (!uuidRegex.test(trimmedContractorId)) {
+      console.error('Некорректный UUID контрагента:', trimmedContractorId);
+      alert('Ошибка: некорректный ID контрагента. Обновите страницу и попробуйте снова.');
       return;
     }
 
@@ -147,21 +157,13 @@ export const ProjectDirectory: React.FC = () => {
       return;
     }
 
-    // Проверяем, что contractorId является валидным UUID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(newProject.contractorId)) {
-      console.error('Некорректный UUID контрагента:', newProject.contractorId);
-      alert('Ошибка: некорректный ID контрагента. Обновите страницу и попробуйте снова.');
-      return;
-    }
-
     setOperationLoading(true);
     try {
       // Генерируем название проекта на основе выбранных объектов
-      const selectedObjects = getQualificationObjectsForContractor(newProject.contractorId)
+      const selectedObjects = getQualificationObjectsForContractor(trimmedContractorId)
         .filter(obj => newProject.qualificationObjectIds.includes(obj.id));
       
-      const contractorName = contractors.find(c => c.id === newProject.contractorId)?.name || 'Неизвестный контрагент';
+      const contractorName = contractors.find(c => c.id === trimmedContractorId)?.name || 'Неизвестный контрагент';
       const objectNames = selectedObjects.map(obj => 
         obj.name || obj.vin || obj.serialNumber || 'Без названия'
       ).join(', ');
@@ -170,6 +172,7 @@ export const ProjectDirectory: React.FC = () => {
       
       const projectData = {
         ...newProject,
+        contractorId: trimmedContractorId,
         name: projectName
       };
       
