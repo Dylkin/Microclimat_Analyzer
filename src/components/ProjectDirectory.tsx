@@ -9,6 +9,12 @@ import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { useAuth } from '../contexts/AuthContext';
 
+// UUID validation function
+function isValidUUID(uuid: string): boolean {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return regex.test(uuid);
+}
+
 export const ProjectDirectory: React.FC = () => {
   const { user, users } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -60,13 +66,12 @@ export const ProjectDirectory: React.FC = () => {
       if (contractorService.isAvailable()) {
         const contractorsData = await contractorService.getAllContractors();
         // Фильтруем контрагентов с валидными UUID
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         const validContractors = contractorsData.filter(contractor => {
-          const isValidUuid = uuidRegex.test(contractor.id);
-          if (!isValidUuid) {
+          const isValid = isValidUUID(contractor.id);
+          if (!isValid) {
             console.warn(`Контрагент "${contractor.name}" имеет некорректный UUID: "${contractor.id}"`);
           }
-          return isValidUuid;
+          return isValid;
         });
         setContractors(validContractors);
       }
@@ -117,13 +122,11 @@ export const ProjectDirectory: React.FC = () => {
 
   // Добавление проекта
   const handleAddProject = async () => {
-    // UUID validation regex
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
     console.log('=== ОТЛАДКА СОЗДАНИЯ ПРОЕКТА ===');
     console.log('Данные нового проекта:', newProject);
     console.log('ID контрагента:', newProject.contractorId);
     console.log('Тип ID контрагента:', typeof newProject.contractorId);
+    console.log('Все доступные контрагенты:', contractors.map(c => ({ id: c.id, name: c.name })));
     
     // Проверяем, что contractorId является строкой
     if (typeof newProject.contractorId !== 'string') {
@@ -141,8 +144,9 @@ export const ProjectDirectory: React.FC = () => {
     // Проверяем, что contractorId является валидным UUID
     const trimmedContractorId = newProject.contractorId.trim();
     
-    if (!uuidRegex.test(trimmedContractorId)) {
+    if (!isValidUUID(trimmedContractorId)) {
       console.error('Некорректный UUID контрагента:', trimmedContractorId);
+      console.error('Доступные контрагенты с валидными UUID:', contractors);
       alert('Ошибка: некорректный ID контрагента. Обновите страницу и попробуйте снова.');
       return;
     }
@@ -174,9 +178,10 @@ export const ProjectDirectory: React.FC = () => {
     }
 
     // Проверяем, что все ID объектов квалификации являются валидными UUID
-    const invalidQualificationObjectIds = newProject.qualificationObjectIds.filter(id => !uuidRegex.test(id));
+    const invalidQualificationObjectIds = newProject.qualificationObjectIds.filter(id => !isValidUUID(id));
     if (invalidQualificationObjectIds.length > 0) {
       console.error('Некорректные UUID объектов квалификации:', invalidQualificationObjectIds);
+      console.error('Все объекты квалификации для контрагента:', getQualificationObjectsForContractor(trimmedContractorId));
       alert('Ошибка: некорректные ID объектов квалификации. Обновите страницу и попробуйте снова.');
       return;
     }
@@ -204,12 +209,21 @@ export const ProjectDirectory: React.FC = () => {
       console.log('=== FINAL VALIDATION BEFORE DATABASE CALL ===');
       console.log('Final projectData.contractorId:', projectData.contractorId);
       console.log('Type:', typeof projectData.contractorId);
-      console.log('Is valid UUID:', uuidRegex.test(projectData.contractorId));
+      console.log('Is valid UUID:', isValidUUID(projectData.contractorId));
+      console.log('Final projectData.qualificationObjectIds:', projectData.qualificationObjectIds);
+      console.log('All qualification object IDs are valid UUIDs:', projectData.qualificationObjectIds.every(id => isValidUUID(id)));
       
       // Double-check UUID validity one more time
-      if (!uuidRegex.test(projectData.contractorId)) {
+      if (!isValidUUID(projectData.contractorId)) {
         console.error('CRITICAL: Invalid UUID detected right before database call:', projectData.contractorId);
         alert('Критическая ошибка: некорректный ID контрагента. Обратитесь к администратору.');
+        return;
+      }
+      
+      // Validate all qualification object IDs one more time
+      if (!projectData.qualificationObjectIds.every(id => isValidUUID(id))) {
+        console.error('CRITICAL: Invalid qualification object UUID detected:', projectData.qualificationObjectIds);
+        alert('Критическая ошибка: некорректный ID объекта квалификации. Обратитесь к администратору.');
         return;
       }
       
