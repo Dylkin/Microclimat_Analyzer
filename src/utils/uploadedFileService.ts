@@ -61,9 +61,13 @@ export class UploadedFileService {
   }
 
   // Сохранение файлов в связке с проектом
-  async saveProjectFiles(saveData: SaveFileData, userId: string): Promise<void> {
+  async saveProjectFiles(saveData: SaveFileData, userId: string | null): Promise<void> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
+    }
+
+    if (!userId || !isValidUUID(userId)) {
+      throw new Error('Невалидный ID пользователя');
     }
 
     try {

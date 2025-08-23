@@ -193,7 +193,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       }
 
       return {
-        id: crypto.randomUUID(),
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         name: file.name,
         uploadDate: new Date().toLocaleString('ru-RU'),
         parsingStatus: 'processing' as const,
@@ -348,7 +348,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         qualificationObjectId: selectedQualificationObject,
         objectType: qualificationObject.type,
         files: uploadedFiles
-      }, 'current-user-id'); // TODO: использовать реальный ID пользователя
+      }, user?.id || null);
       
       // Обновляем статус сохранения
       setSaveStatus({
