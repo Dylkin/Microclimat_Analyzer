@@ -341,6 +341,11 @@ export const ContractorDirectory: React.FC = () => {
     }
   };
 
+  // Показать детальную информацию о контрагенте
+  const handleViewContractor = (contractor: Contractor) => {
+    setViewingContractor(contractor);
+    setShowViewContractor(true);
+  };
   if (showMap && selectedContractor) {
     return (
       <ContractorMap
@@ -353,6 +358,111 @@ export const ContractorDirectory: React.FC = () => {
     );
   }
 
+  // Если показываем просмотр контрагента
+  if (viewingContractor) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setViewingContractor(null)}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <Building2 className="w-8 h-8 text-indigo-600" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Просмотр контрагента</h1>
+            <p className="text-gray-600">{viewingContractor.name}</p>
+          </div>
+        </div>
+
+        {/* Contractor Details */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Основная информация</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Наименование</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
+                {viewingContractor.name}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Адрес</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
+                {viewingContractor.address || 'Не указан'}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Дата создания</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
+                {viewingContractor.createdAt.toLocaleDateString('ru-RU')}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Последнее обновление</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
+                {viewingContractor.updatedAt.toLocaleDateString('ru-RU')}
+              </div>
+            </div>
+          </div>
+
+          {/* Coordinates if available */}
+          {viewingContractor.latitude && viewingContractor.longitude && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h3 className="text-sm font-medium text-green-900 mb-2">Координаты</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-green-800">Широта:</span>
+                  <div className="text-green-700">{viewingContractor.latitude.toFixed(6)}</div>
+                </div>
+                <div>
+                  <span className="font-medium text-green-800">Долгота:</span>
+                  <div className="text-green-700">{viewingContractor.longitude.toFixed(6)}</div>
+                </div>
+                <div>
+                  <span className="font-medium text-green-800">Геокодирован:</span>
+                  <div className="text-green-700">
+                    {viewingContractor.geocodedAt?.toLocaleDateString('ru-RU') || 'Неизвестно'}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <button
+                  onClick={() => {
+                    setSelectedContractor(viewingContractor);
+                    setShowMap(true);
+                    setViewingContractor(null);
+                  }}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                >
+                  <Map className="w-4 h-4" />
+                  <span>Показать на карте</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Contacts */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Контакты</h2>
+          
+          {viewingContractor.contacts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {viewingContractor.contacts.map((contact) => (
+                <div key={contact.id} className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <User className="w-4 h-4 text-gray-400" />
+                    <span className="font-medium text-gray-900">{contact.employeeName}</span>
+                  </div>
+                  {contact.phone && (
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Phone className="w-4 h-4 text-gray-400" />
   // Если показываем объекты квалификации
   if (showQualificationObjects && selectedContractorForObjects) {
     return (
