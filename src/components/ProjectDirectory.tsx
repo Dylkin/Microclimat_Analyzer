@@ -740,64 +740,96 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Статистика проектов</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {/* Всего проектов - показываем всегда */}
           <div className="text-center">
             <div className="text-2xl font-bold text-indigo-600">{projects.length}</div>
             <div className="text-sm text-gray-500">Всего проектов</div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">
-              {projects.filter(p => p.status === 'contract_negotiation').length}
+          
+          {/* Согласование договора */}
+          {projects.filter(p => p.status === 'contract_negotiation').length > 0 && (
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600">
+                {projects.filter(p => p.status === 'contract_negotiation').length}
+              </div>
+              <div className="text-sm text-gray-500">Согласование договора</div>
             </div>
-            <div className="text-sm text-gray-500">Согласование договора</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">
-              {projects.filter(p => p.status === 'protocol_preparation').length}
+          )}
+          
+          {/* Подготовка протокола */}
+          {projects.filter(p => p.status === 'protocol_preparation').length > 0 && (
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {projects.filter(p => p.status === 'protocol_preparation').length}
+              </div>
+              <div className="text-sm text-gray-500">Подготовка протокола</div>
             </div>
-            <div className="text-sm text-gray-500">Подготовка протокола</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">
-              {projects.filter(p => ['testing_start', 'testing_completion'].includes(p.status)).length}
+          )}
+          
+          {/* Испытания */}
+          {projects.filter(p => ['testing_start', 'testing_completion'].includes(p.status)).length > 0 && (
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-600">
+                {projects.filter(p => ['testing_start', 'testing_completion'].includes(p.status)).length}
+              </div>
+              <div className="text-sm text-gray-500">Испытания</div>
             </div>
-            <div className="text-sm text-gray-500">Испытания</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">
-              {projects.filter(p => ['report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
+          )}
+          
+          {/* Отчеты */}
+          {projects.filter(p => ['report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length > 0 && (
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600">
+                {projects.filter(p => ['report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
+              </div>
+              <div className="text-sm text-gray-500">Отчеты</div>
             </div>
-            <div className="text-sm text-gray-500">Отчеты</div>
-          </div>
+          )}
         </div>
         
         {/* Summary Statistics */}
         <div className="mt-6 pt-6 border-t border-gray-200">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">
-                {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_start', 'testing_completion', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
+            {/* В работе */}
+            {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_start', 'testing_completion', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-yellow-600">
+                  {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_start', 'testing_completion', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
+                </div>
+                <div className="text-sm text-gray-500">В работе</div>
               </div>
-              <div className="text-sm text-gray-500">В работе</div>
-            </div>
-            <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {projects.filter(p => p.status === 'completed').length}
-            </div>
-            <div className="text-sm text-gray-500">Завершено</div>
+            )}
+            
+            {/* Завершено */}
+            {projects.filter(p => p.status === 'completed').length > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {projects.filter(p => p.status === 'completed').length}
+                </div>
+                <div className="text-sm text-gray-500">Завершено</div>
+              </div>
+            )}
+            
+            {/* Реквалификация */}
+            {projects.filter(p => p.status === 'requalification').length > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-600">
+                  {projects.filter(p => p.status === 'requalification').length}
+                </div>
+                <div className="text-sm text-gray-500">Реквалификация</div>
+              </div>
+            )}
+            
+            {/* Объектов в проектах */}
+            {projects.reduce((sum, p) => sum + p.qualificationObjects.length, 0) > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-600">
+                  {projects.reduce((sum, p) => sum + p.qualificationObjects.length, 0)}
+                </div>
+                <div className="text-sm text-gray-500">Объектов в проектах</div>
+              </div>
+            )}
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">
-              {projects.filter(p => p.status === 'requalification').length}
-            </div>
-            <div className="text-sm text-gray-500">Реквалификация</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-600">
-              {projects.reduce((sum, p) => sum + p.qualificationObjects.length, 0)}
-            </div>
-            <div className="text-sm text-gray-500">Объектов в проектах</div>
-          </div>
-        </div>
         </div>
       </div>
     </div>
