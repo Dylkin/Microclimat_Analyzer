@@ -341,6 +341,12 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   // Получение действия для статуса проекта
   const getProjectAction = (status: ProjectStatus) => {
     switch (status) {
+      case 'contract_negotiation':
+        return {
+          label: 'Согласовать договор',
+          page: 'contract-negotiation',
+          icon: Building2
+        };
       case 'testing_execution':
         return {
           label: 'Перейти к испытаниям',
