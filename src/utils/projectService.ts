@@ -59,6 +59,12 @@ export class ProjectService {
     this.supabase = initSupabase();
   }
 
+  // UUID validation function
+  private isValidUUID(uuid: string): boolean {
+    const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return regex.test(uuid);
+  }
+
   // Проверка доступности Supabase
   isAvailable(): boolean {
     return !!this.supabase;
@@ -203,6 +209,25 @@ export class ProjectService {
 
     try {
       console.log('Добавляем проект:', projectData);
+
+      // Валидация UUID контрагента
+      if (!this.isValidUUID(projectData.contractorId)) {
+        console.error('Некорректный UUID контрагента:', projectData.contractorId);
+        throw new Error(`Некорректный ID контрагента: ${projectData.contractorId}. Ожидается UUID формат.`);
+      }
+
+      // Валидация UUID объектов квалификации
+      const invalidQualificationObjectIds = projectData.qualificationObjectIds.filter(id => !this.isValidUUID(id));
+      if (invalidQualificationObjectIds.length > 0) {
+        console.error('Некорректные UUID объектов квалификации:', invalidQualificationObjectIds);
+        throw new Error(`Некорректные ID объектов квалификации: ${invalidQualificationObjectIds.join(', ')}. Ожидается UUID формат.`);
+      }
+
+      // Валидация UUID пользователя если указан
+      if (userId && !this.isValidUUID(userId)) {
+        console.error('Некорректный UUID пользователя:', userId);
+        throw new Error(`Некорректный ID пользователя: ${userId}. Ожидается UUID формат.`);
+      }
 
       // Добавляем проект
       const { data: projectResult, error: projectError } = await this.supabase
