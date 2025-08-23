@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, CreateProjectData } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
@@ -346,6 +347,12 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           label: 'Согласовать договор',
           page: 'contract-negotiation',
           icon: Building2
+        };
+      case 'protocol_preparation':
+        return {
+          label: 'Подготовить протокол',
+          page: 'protocol-preparation',
+          icon: FileText
         };
       case 'testing_execution':
         return {
