@@ -51,6 +51,12 @@ export class QualificationObjectService {
     this.supabase = initSupabase();
   }
 
+  // Проверка валидности UUID
+  private isValidUUID(uuid: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  }
+
   // Проверка доступности Supabase
   isAvailable(): boolean {
     return !!this.supabase;
@@ -140,7 +146,16 @@ export class QualificationObjectService {
         throw new Error(`Ошибка получения объектов квалификации: ${error.message}`);
       }
 
-      return data.map((obj: DatabaseQualificationObject) => ({
+      // Фильтруем объекты с валидными UUID
+      const validObjects = data.filter((obj: DatabaseQualificationObject) => {
+        if (!this.isValidUUID(obj.id)) {
+          console.warn(`Пропускаем объект квалификации с невалидным UUID: ${obj.id}`);
+          return false;
+        }
+        return true;
+      });
+
+      return validObjects.map((obj: DatabaseQualificationObject) => ({
         id: obj.id,
         contractorId: obj.contractor_id,
         type: obj.type,
@@ -185,7 +200,16 @@ export class QualificationObjectService {
         throw new Error(`Ошибка получения объектов квалификации: ${error.message}`);
       }
 
-      return data.map((obj: DatabaseQualificationObject) => ({
+      // Фильтруем объекты с валидными UUID
+      const validObjects = data.filter((obj: DatabaseQualificationObject) => {
+        if (!this.isValidUUID(obj.id)) {
+          console.warn(`Пропускаем объект квалификации с невалидным UUID: ${obj.id}`);
+          return false;
+        }
+        return true;
+      });
+
+      return validObjects.map((obj: DatabaseQualificationObject) => ({
         id: obj.id,
         contractorId: obj.contractor_id,
         type: obj.type,
