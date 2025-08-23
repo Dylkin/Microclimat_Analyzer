@@ -46,12 +46,10 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     isSaving: boolean;
     lastSaved: Date | null;
     error: string | null;
-    isLoading: boolean;
   }>({
     isSaving: false,
     lastSaved: null,
-    error: null,
-    isLoading: false
+    error: null
   });
 
   const mockData = [
@@ -112,46 +110,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
     loadQualificationObjects();
   }, [selectedContractor, selectedProject]);
-
-  // Загрузка сохраненных данных проекта при инициализации
-  React.useEffect(() => {
-    const loadProjectData = async () => {
-      if (!selectedProject || !databaseService) return;
-      
-      setSaveStatus(prev => ({ ...prev, isLoading: true, error: null }));
-      
-      try {
-        console.log('Загружаем сохраненные данные для проекта:', selectedProject.id);
-        
-        // Здесь будет логика загрузки сохраненных файлов из базы данных
-        // Пока что имитируем загрузку
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // TODO: Реализовать загрузку файлов из базы данных по project_id
-        // const savedFiles = await databaseService.getProjectFiles(selectedProject.id);
-        // if (savedFiles && savedFiles.length > 0) {
-        //   setUploadedFiles(savedFiles);
-        //   console.log('Загружено сохраненных файлов:', savedFiles.length);
-        // }
-        
-        setSaveStatus(prev => ({ 
-          ...prev, 
-          isLoading: false,
-          lastSaved: new Date() // Временно, пока не реализована загрузка
-        }));
-        
-      } catch (error) {
-        console.error('Ошибка загрузки данных проекта:', error);
-        setSaveStatus(prev => ({
-          ...prev,
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Ошибка загрузки данных'
-        }));
-      }
-    };
-
-    loadProjectData();
-  }, [selectedProject]);
 
   // Фильтрация контрагентов по поиску
   const filteredContractors = React.useMemo(() => {
@@ -494,26 +452,12 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         {/* Save Status */}
         {selectedProject && (
           <div className="mb-4">
-            {saveStatus.isLoading && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  <span className="text-sm text-blue-800">
-                    Загрузка сохраненных данных проекта...
-                  </span>
-                </div>
-              </div>
-            )}
-            
             {saveStatus.lastSaved && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="w-4 h-4 text-green-600" />
                   <span className="text-sm text-green-800">
-                    {saveStatus.isLoading ? 
-                      'Загрузка данных проекта...' : 
-                      `Последнее сохранение: ${saveStatus.lastSaved.toLocaleString('ru-RU')}`
-                    }
+                    Последнее сохранение: {saveStatus.lastSaved.toLocaleString('ru-RU')}
                   </span>
                 </div>
               </div>

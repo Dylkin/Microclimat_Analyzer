@@ -215,30 +215,6 @@ class DatabaseService {
     }
   }
   
-  // Получение файлов проекта (заглушка для будущей реализации)
-  async getProjectFiles(projectId: string): Promise<UploadedFile[] | null> {
-    try {
-      // TODO: Реализовать загрузку файлов из Supabase по project_id
-      // Пока что возвращаем null, так как связь с проектами еще не реализована
-      console.log('Запрос файлов для проекта:', projectId);
-      return null;
-    } catch (error) {
-      console.error('Ошибка получения файлов проекта:', error);
-      return null;
-    }
-  }
-  
-  // Сохранение связи файла с проектом (заглушка для будущей реализации)
-  async saveFileProjectAssociation(fileId: string, projectId: string): Promise<void> {
-    try {
-      // TODO: Реализовать сохранение связи файла с проектом в Supabase
-      console.log('Сохранение связи файла с проектом:', { fileId, projectId });
-    } catch (error) {
-      console.error('Ошибка сохранения связи файла с проектом:', error);
-      throw error;
-    }
-  }
-  
   private getStoredData(key: string): any {
     try {
       const data = localStorage.getItem(key);
