@@ -12,7 +12,7 @@ import './index.css';
 
 const AppContent: React.FC = () => {
   const { user, hasAccess } = useAuth();
-  const [currentPage, setCurrentPage] = useState('analyzer');
+  const [currentPage, setCurrentPage] = useState('projects');
   const [showVisualization, setShowVisualization] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
 
