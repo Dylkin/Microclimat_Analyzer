@@ -340,6 +340,22 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         <h1 className="text-2xl font-bold text-gray-900">Microclimat Analyzer</h1>
       </div>
 
+      {/* Информация о проекте */}
+      {selectedProject && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2 mb-2">
+            <FolderOpen className="w-5 h-5 text-blue-600" />
+            <h3 className="text-sm font-medium text-blue-900">Работа в рамках проекта</h3>
+          </div>
+          <div className="text-sm text-blue-800">
+            <div><strong>Проект:</strong> {selectedProject.name}</div>
+            <div><strong>Контрагент:</strong> {selectedProject.contractorName}</div>
+            <div><strong>Статус:</strong> {ProjectStatusLabels[selectedProject.status as ProjectStatus]}</div>
+            <div><strong>Объектов квалификации:</strong> {selectedProject.qualificationObjects.length}</div>
+          </div>
+        </div>
+      )}
+
       {/* Секция загрузки файлов */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
@@ -657,22 +673,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           </div>
         )}
       </div>
-
-      {/* Информация о проекте */}
-      {selectedProject && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <FolderOpen className="w-5 h-5 text-blue-600" />
-            <h3 className="text-sm font-medium text-blue-900">Работа в рамках проекта</h3>
-          </div>
-          <div className="text-sm text-blue-800">
-            <div><strong>Проект:</strong> {selectedProject.name}</div>
-            <div><strong>Контрагент:</strong> {selectedProject.contractorName}</div>
-            <div><strong>Статус:</strong> {ProjectStatusLabels[selectedProject.status as ProjectStatus]}</div>
-            <div><strong>Объектов квалификации:</strong> {selectedProject.qualificationObjects.length}</div>
-          </div>
-        </div>
-      )}
 
       {/* Примечание о внешнем датчике */}
       {uploadedFiles.length > 0 && (
