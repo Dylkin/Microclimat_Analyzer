@@ -632,9 +632,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     Количество записей
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Тип объекта
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     № зоны измерения
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -698,32 +695,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">
                         {file.recordCount ? file.recordCount.toLocaleString('ru-RU') : '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {file.qualificationObjectId ? (
-                          (() => {
-                            const obj = qualificationObjects.find(o => o.id === file.qualificationObjectId);
-                            if (obj) {
-                              switch (obj.type) {
-                                case 'помещение':
-                                  return 'Помещение';
-                                case 'автомобиль':
-                                  return 'Автомобиль';
-                                case 'холодильная_камера':
-                                  return 'Холодильная камера';
-                                case 'холодильник':
-                                  return 'Холодильник';
-                                case 'морозильник':
-                                  return 'Морозильник';
-                                default:
-                                  return obj.type;
-                              }
-                            }
-                            return '-';
-                          })()
-                        ) : '-'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
