@@ -478,7 +478,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
             {selectedProject && (
               <button
                 onClick={handleSaveProject}
-                disabled={saveStatus.isSaving || uploadedFiles.length === 0}
+                disabled={saveStatus.isSaving || uploadedFiles.length === 0 || !selectedQualificationObject}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {saveStatus.isSaving ? (
