@@ -59,32 +59,6 @@ export class ProjectService {
     this.supabase = initSupabase();
   }
 
-  // Проверка конфигурации Supabase
-  getConnectionStatus(): { available: boolean; error?: string } {
-    if (!supabaseUrl) {
-      return { 
-        available: false, 
-        error: 'VITE_SUPABASE_URL не настроен в файле .env' 
-      };
-    }
-    
-    if (!supabaseAnonKey) {
-      return { 
-        available: false, 
-        error: 'VITE_SUPABASE_ANON_KEY не настроен в файле .env' 
-      };
-    }
-    
-    if (!this.supabase) {
-      return { 
-        available: false, 
-        error: 'Не удалось инициализировать клиент Supabase' 
-      };
-    }
-    
-    return { available: true };
-  }
-
   // UUID validation function
   private isValidUUID(uuid: string): boolean {
     const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -93,14 +67,13 @@ export class ProjectService {
 
   // Проверка доступности Supabase
   isAvailable(): boolean {
-    return this.getConnectionStatus().available;
+    return !!this.supabase;
   }
 
   // Получение всех проектов с связанными данными
   async getAllProjects(): Promise<Project[]> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {
@@ -230,9 +203,8 @@ export class ProjectService {
 
   // Добавление нового проекта
   async addProject(projectData: CreateProjectData, userId?: string): Promise<Project> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {
@@ -328,9 +300,8 @@ export class ProjectService {
 
   // Обновление проекта
   async updateProject(id: string, updates: UpdateProjectData): Promise<Project> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {
@@ -393,9 +364,8 @@ export class ProjectService {
 
   // Удаление проекта
   async deleteProject(id: string): Promise<void> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {
@@ -422,9 +392,8 @@ export class ProjectService {
     notes?: string,
     completed?: boolean
   ): Promise<void> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {

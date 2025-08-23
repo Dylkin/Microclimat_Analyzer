@@ -33,42 +33,15 @@ export class UserService {
     this.supabase = initSupabase();
   }
 
-  // Проверка конфигурации Supabase
-  getConnectionStatus(): { available: boolean; error?: string } {
-    if (!supabaseUrl) {
-      return { 
-        available: false, 
-        error: 'VITE_SUPABASE_URL не настроен в файле .env' 
-      };
-    }
-    
-    if (!supabaseAnonKey) {
-      return { 
-        available: false, 
-        error: 'VITE_SUPABASE_ANON_KEY не настроен в файле .env' 
-      };
-    }
-    
-    if (!this.supabase) {
-      return { 
-        available: false, 
-        error: 'Не удалось инициализировать клиент Supabase' 
-      };
-    }
-    
-    return { available: true };
-  }
-
   // Проверка доступности Supabase
   isAvailable(): boolean {
-    return this.getConnectionStatus().available;
+    return !!this.supabase;
   }
 
   // Получение всех пользователей
   async getAllUsers(): Promise<User[]> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {
@@ -98,9 +71,8 @@ export class UserService {
 
   // Получение пользователя по email и паролю
   async getUserByCredentials(email: string, password: string): Promise<User | null> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {
@@ -136,9 +108,8 @@ export class UserService {
 
   // Добавление нового пользователя
   async addUser(user: Omit<User, 'id'>): Promise<User> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {
@@ -195,9 +166,8 @@ export class UserService {
 
   // Обновление пользователя
   async updateUser(id: string, updates: Partial<User>): Promise<User> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {
@@ -240,9 +210,8 @@ export class UserService {
 
   // Удаление пользователя
   async deleteUser(id: string): Promise<void> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {
@@ -264,9 +233,8 @@ export class UserService {
 
   // Сброс пароля пользователя
   async resetPassword(id: string, newPassword: string): Promise<void> {
-    const connectionStatus = this.getConnectionStatus();
-    if (!connectionStatus.available) {
-      throw new Error(connectionStatus.error || 'Supabase не настроен');
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
     }
 
     try {
