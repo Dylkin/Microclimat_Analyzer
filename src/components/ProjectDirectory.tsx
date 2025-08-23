@@ -739,29 +739,85 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       {/* Statistics */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Статистика проектов</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-indigo-600">{projects.length}</div>
             <div className="text-sm text-gray-500">Всего проектов</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-yellow-600">
-              {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_start', 'testing_completion', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
+              {projects.filter(p => p.status === 'contract_negotiation').length}
             </div>
-            <div className="text-sm text-gray-500">В работе</div>
+            <div className="text-sm text-gray-500">Согласование договора</div>
           </div>
           <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">
+              {projects.filter(p => p.status === 'protocol_preparation').length}
+            </div>
+            <div className="text-sm text-gray-500">Подготовка протокола</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-purple-600">
+              {projects.filter(p => ['testing_start', 'testing_completion'].includes(p.status)).length}
+            </div>
+            <div className="text-sm text-gray-500">Испытания</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-orange-600">
+              {projects.filter(p => ['report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
+            </div>
+            <div className="text-sm text-gray-500">Отчеты</div>
+          </div>
+        </div>
+        
+        {/* Detailed Status Breakdown */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h4 className="text-md font-semibold text-gray-900 mb-3">Детализация по статусам</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {Object.entries(ProjectStatusLabels).map(([status, label]) => {
+              const count = projects.filter(p => p.status === status).length;
+              const colorClass = ProjectStatusColors[status as ProjectStatus];
+              
+              return (
+                <div key={status} className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-lg font-bold text-gray-900">{count}</div>
+                  <div className={`text-xs px-2 py-1 rounded-full ${colorClass} mt-1`}>
+                    {label}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        {/* Summary Statistics */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600">
+                {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_start', 'testing_completion', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
+              </div>
+              <div className="text-sm text-gray-500">В работе</div>
+            </div>
+            <div className="text-center">
             <div className="text-2xl font-bold text-green-600">
               {projects.filter(p => p.status === 'completed').length}
             </div>
             <div className="text-sm text-gray-500">Завершено</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold text-red-600">
+              {projects.filter(p => p.status === 'requalification').length}
+            </div>
+            <div className="text-sm text-gray-500">Реквалификация</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-600">
               {projects.reduce((sum, p) => sum + p.qualificationObjects.length, 0)}
             </div>
             <div className="text-sm text-gray-500">Объектов в проектах</div>
           </div>
+        </div>
         </div>
       </div>
     </div>
