@@ -1,6 +1,21 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { User, AuthUser } from '../types/User';
 import { userService } from '../utils/userService';
+
+// Получаем конфигурацию Supabase из переменных окружения
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+let supabase: any = null;
+
+// Инициализация Supabase клиента
+const initSupabase = () => {
+  if (!supabase && supabaseUrl && supabaseAnonKey) {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  return supabase;
+};
 
 // Helper function to validate UUID format
 const isValidUUID = (uuid: string): boolean => {
@@ -42,6 +57,56 @@ const defaultUser: User = {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      const supabaseClient = initSupabase();
+      
+      if (supabaseClient) {
+        try {
+          // Проверяем текущую сессию
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          
+          if (!session) {
+            // Если нет сессии, входим как пользователь по умолчанию
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+              email: 'default@example.com',
+              password: 'defaultpassword123'
+            });
+            
+            if (error) {
+              console.warn('Не удалось войти как пользователь по умолчанию:', error);
+              // Устанавливаем пользователя по умолчанию без аутентификации
+              setUser(defaultUser);
+            } else {
+              // Устанавливаем аутентифицированного пользователя
+              setUser({
+                ...defaultUser,
+                id: data.user?.id || defaultUser.id
+              });
+            }
+          } else {
+            // Если есть сессия, используем данные из неё
+            setUser({
+              ...defaultUser,
+              id: session.user.id
+            });
+          }
+        } catch (error) {
+          console.warn('Ошибка инициализации аутентификации:', error);
+          setUser(defaultUser);
+        }
+      } else {
+        // Если Supabase недоступен, используем пользователя по умолчанию
+        setUser(defaultUser);
+      }
+      
+      setIsInitialized(true);
+    };
+
+    initializeAuth();
+  }, []);
   const [users, setUsers] = useState<User[]>([defaultUser]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,10 +173,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'director':
         return page === 'analyzer' || page === 'help' || page === 'database';
       default:
-        return false;
-    }
-  };
-
+  // Не рендерим детей пока не инициализирована аутентификация
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
   // Авторизация
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
