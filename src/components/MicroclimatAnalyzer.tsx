@@ -1,5 +1,6 @@
 import React from 'react';
 import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart, FolderOpen } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { UploadedFile } from '../types/FileData';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject } from '../types/QualificationObject';
