@@ -49,8 +49,9 @@ export const ContractorDirectory: React.FC = () => {
 
   // Загрузка контрагентов
   const loadContractors = async () => {
-    if (!contractorService.isAvailable()) {
-      setError('Supabase не настроен. Проверьте переменные окружения.');
+    const connectionStatus = contractorService.getConnectionStatus();
+    if (!connectionStatus.available) {
+      setError(`Ошибка подключения к базе данных: ${connectionStatus.error}`);
       return;
     }
 

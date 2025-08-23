@@ -44,7 +44,33 @@ export class ContractorService {
 
   // Проверка доступности Supabase
   isAvailable(): boolean {
-    return !!this.supabase;
+    return !!this.supabase && !!supabaseUrl && !!supabaseAnonKey;
+  }
+
+  // Проверка конфигурации Supabase
+  getConnectionStatus(): { available: boolean; error?: string } {
+    if (!supabaseUrl) {
+      return { 
+        available: false, 
+        error: 'VITE_SUPABASE_URL не настроен в файле .env' 
+      };
+    }
+    
+    if (!supabaseAnonKey) {
+      return { 
+        available: false, 
+        error: 'VITE_SUPABASE_ANON_KEY не настроен в файле .env' 
+      };
+    }
+    
+    if (!this.supabase) {
+      return { 
+        available: false, 
+        error: 'Не удалось инициализировать клиент Supabase' 
+      };
+    }
+    
+    return { available: true };
   }
 
   // Геокодирование адреса через OpenStreetMap Nominatim API
@@ -81,8 +107,9 @@ export class ContractorService {
 
   // Получение всех контрагентов с контактами
   async getAllContractors(): Promise<Contractor[]> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
+    const connectionStatus = this.getConnectionStatus();
+    if (!connectionStatus.available) {
+      throw new Error(connectionStatus.error || 'Supabase не настроен');
     }
 
     try {
@@ -155,8 +182,9 @@ export class ContractorService {
 
   // Добавление нового контрагента
   async addContractor(contractorData: CreateContractorData): Promise<Contractor> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
+    const connectionStatus = this.getConnectionStatus();
+    if (!connectionStatus.available) {
+      throw new Error(connectionStatus.error || 'Supabase не настроен');
     }
 
     try {
@@ -237,8 +265,9 @@ export class ContractorService {
 
   // Обновление контрагента
   async updateContractor(id: string, updates: UpdateContractorData): Promise<Contractor> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
+    const connectionStatus = this.getConnectionStatus();
+    if (!connectionStatus.available) {
+      throw new Error(connectionStatus.error || 'Supabase не настроен');
     }
 
     try {
@@ -313,8 +342,9 @@ export class ContractorService {
 
   // Удаление контрагента
   async deleteContractor(id: string): Promise<void> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
+    const connectionStatus = this.getConnectionStatus();
+    if (!connectionStatus.available) {
+      throw new Error(connectionStatus.error || 'Supabase не настроен');
     }
 
     try {
@@ -335,8 +365,9 @@ export class ContractorService {
 
   // Добавление контакта к контрагенту
   async addContact(contractorId: string, contactData: Omit<ContractorContact, 'id' | 'contractorId' | 'createdAt'>): Promise<ContractorContact> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
+    const connectionStatus = this.getConnectionStatus();
+    if (!connectionStatus.available) {
+      throw new Error(connectionStatus.error || 'Supabase не настроен');
     }
 
     try {
@@ -372,8 +403,9 @@ export class ContractorService {
 
   // Обновление контакта
   async updateContact(id: string, updates: Partial<Omit<ContractorContact, 'id' | 'contractorId' | 'createdAt'>>): Promise<ContractorContact> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
+    const connectionStatus = this.getConnectionStatus();
+    if (!connectionStatus.available) {
+      throw new Error(connectionStatus.error || 'Supabase не настроен');
     }
 
     try {
@@ -410,8 +442,9 @@ export class ContractorService {
 
   // Удаление контакта
   async deleteContact(id: string): Promise<void> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
+    const connectionStatus = this.getConnectionStatus();
+    if (!connectionStatus.available) {
+      throw new Error(connectionStatus.error || 'Supabase не настроен');
     }
 
     try {
