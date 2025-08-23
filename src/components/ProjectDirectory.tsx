@@ -36,18 +36,15 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   
   // Form state
   const [newProject, setNewProject] = useState<CreateProjectData>({
-    description: '',
     contractorId: '',
     qualificationObjectIds: []
   });
 
   const [editProject, setEditProject] = useState<{
-    description: string;
     contractNumber: string;
     status: ProjectStatus;
     qualificationObjectIds: string[];
   }>({
-    description: '',
     contractNumber: '',
     status: 'contract_negotiation',
     qualificationObjectIds: []
@@ -267,7 +264,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       
       // Сбрасываем форму
       setNewProject({
-        description: '',
         contractorId: '',
         qualificationObjectIds: []
       });
@@ -284,7 +280,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   // Редактирование проекта
   const handleEditProject = (project: Project) => {
     setEditProject({
-      description: project.description || '',
       contractNumber: project.contractNumber || '',
       status: project.status,
       qualificationObjectIds: project.qualificationObjects.map(obj => obj.qualificationObjectId)
@@ -296,7 +291,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     setOperationLoading(true);
     try {
       const updatedProject = await projectService.updateProject(editingProject!, {
-        description: editProject.description,
         contractNumber: editProject.contractNumber,
         status: editProject.status,
         qualificationObjectIds: editProject.qualificationObjectIds
@@ -459,19 +453,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Описание
-              </label>
-              <textarea
-                value={newProject.description}
-                onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                rows={3}
-                placeholder="Введите описание проекта"
-              />
-            </div>
-
             {/* Объекты квалификации */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -579,6 +560,9 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Дата создания
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Проект
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -602,23 +586,16 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                 {filteredProjects.map((project) => (
                   <tr key={project.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {project.createdAt.toLocaleDateString('ru-RU')}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       {editingProject === project.id ? (
-                        <textarea
-                          value={editProject.description}
-                          onChange={(e) => setEditProject(prev => ({ ...prev, description: e.target.value }))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          rows={2}
-                          placeholder="Описание"
-                        />
+                        <div className="text-sm font-medium text-gray-900">{project.name}</div>
                       ) : (
                         <div>
                           <div className="text-sm font-medium text-gray-900">{project.name}</div>
-                          {project.description && (
-                            <div className="text-xs text-gray-500 mt-1">{project.description}</div>
-                          )}
-                          <div className="text-xs text-gray-400 mt-1">
-                            Создан: {project.createdAt.toLocaleDateString('ru-RU')}
-                          </div>
                         </div>
                       )}
                     </td>
