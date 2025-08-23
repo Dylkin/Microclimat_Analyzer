@@ -16,6 +16,12 @@ const initSupabase = () => {
   return supabase;
 };
 
+// Helper function to validate UUID format
+const isValidUUID = (uuid: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+};
+
 export interface DatabaseUploadedFile {
   id: string;
   user_id: string | null;
@@ -99,9 +105,15 @@ export class UploadedFileService {
   }
 
   // Получение файлов проекта
-  async getProjectFiles(projectId: string, userId: string): Promise<UploadedFile[]> {
+  async getProjectFiles(projectId: string, userId: string | null): Promise<UploadedFile[]> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
+    }
+
+    // Проверяем валидность userId
+    if (!userId || !isValidUUID(userId)) {
+      console.warn('Невалидный или отсутствующий userId, возвращаем пустой массив');
+      return [];
     }
 
     try {

@@ -2,6 +2,12 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthUser } from '../types/User';
 import { userService } from '../utils/userService';
 
+// Helper function to validate UUID format
+const isValidUUID = (uuid: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+};
+
 interface AuthContextType {
   user: AuthUser | null;
   users: User[];
@@ -305,7 +311,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        // Проверяем, что ID пользователя является валидным UUID
+        if (parsedUser.id && isValidUUID(parsedUser.id)) {
+          setUser(parsedUser);
+        } else {
+          console.warn('Невалидный UUID пользователя в localStorage, очищаем сессию');
+          localStorage.removeItem('currentUser');
+        }
+      } catch (error) {
+        console.error('Ошибка парсинга пользователя из localStorage:', error);
+        localStorage.removeItem('currentUser');
+      }
     }
   }, []);
 
