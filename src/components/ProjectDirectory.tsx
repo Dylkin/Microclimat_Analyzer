@@ -61,33 +61,64 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     try {
       // Загружаем проекты
       if (projectService.isAvailable()) {
-        const projectsData = await projectService.getAllProjects();
-        setProjects(projectsData);
-        setFilteredProjects(projectsData);
+        try {
+          const projectsData = await projectService.getAllProjects();
+          setProjects(projectsData);
+          setFilteredProjects(projectsData);
+        } catch (error) {
+          console.error('Ошибка загрузки проектов:', error);
+          setProjects([]);
+          setFilteredProjects([]);
+        }
+      } else {
+        console.warn('Сервис проектов недоступен');
+        setProjects([]);
+        setFilteredProjects([]);
       }
 
       // Загружаем контрагентов
       if (contractorService.isAvailable()) {
-        const contractorsData = await contractorService.getAllContractors();
-        // Фильтруем контрагентов с валидными UUID
-        const validContractors = contractorsData.filter(contractor => {
-          const isValid = isValidUUID(contractor.id);
-          if (!isValid) {
-            console.warn(`Контрагент "${contractor.name}" имеет некорректный UUID: "${contractor.id}"`);
-          }
-          return isValid;
-        });
-        setContractors(validContractors);
+        try {
+          const contractorsData = await contractorService.getAllContractors();
+          // Фильтруем контрагентов с валидными UUID
+          const validContractors = contractorsData.filter(contractor => {
+            const isValid = isValidUUID(contractor.id);
+            if (!isValid) {
+              console.warn(`Контрагент "${contractor.name}" имеет некорректный UUID: "${contractor.id}"`);
+            }
+            return isValid;
+          });
+          setContractors(validContractors);
+        } catch (error) {
+          console.error('Ошибка загрузки контрагентов:', error);
+          setContractors([]);
+        }
+      } else {
+        console.warn('Сервис контрагентов недоступен');
+        setContractors([]);
       }
 
       // Загружаем все объекты квалификации
       if (qualificationObjectService.isAvailable()) {
-        const objectsData = await qualificationObjectService.getAllQualificationObjects();
-        setQualificationObjects(objectsData);
+        try {
+          const objectsData = await qualificationObjectService.getAllQualificationObjects();
+          setQualificationObjects(objectsData);
+        } catch (error) {
+          console.error('Ошибка загрузки объектов квалификации:', error);
+          setQualificationObjects([]);
+        }
+      } else {
+        console.warn('Сервис объектов квалификации недоступен');
+        setQualificationObjects([]);
+      }
+
+      // Проверяем, есть ли проблемы с подключением к Supabase
+      if (!contractorService.isAvailable() || !projectService.isAvailable() || !qualificationObjectService.isAvailable()) {
+        setError('Подключение к базе данных недоступно. Проверьте настройки Supabase.');
       }
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
-      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+      setError('Ошибка подключения к базе данных. Проверьте настройки Supabase.');
     } finally {
       setLoading(false);
     }
@@ -524,6 +555,19 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
 
       {/* Projects Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
+        {error && (
+          <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400">
+            <div className="flex">
+              <AlertCircle className="w-5 h-5 text-yellow-400 mr-2" />
+              <div>
+                <p className="text-sm text-yellow-700">{error}</p>
+                <p className="text-xs text-yellow-600 mt-1">
+                  Убедитесь, что переменные VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY настроены в файле .env
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="p-8 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>

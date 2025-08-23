@@ -82,7 +82,8 @@ export class ContractorService {
   // Получение всех контрагентов с контактами
   async getAllContractors(): Promise<Contractor[]> {
     if (!this.supabase) {
-      throw new Error('Supabase не настроен');
+      console.warn('Supabase не настроен - возвращаем пустой массив');
+      return [];
     }
 
     try {
@@ -149,7 +150,9 @@ export class ContractorService {
       }));
     } catch (error) {
       console.error('Ошибка при получении контрагентов:', error);
-      throw error;
+      // Возвращаем пустой массив вместо выброса ошибки
+      console.warn('Возвращаем пустой массив контрагентов из-за ошибки подключения');
+      return [];
     }
   }
 
