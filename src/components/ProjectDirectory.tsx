@@ -117,6 +117,9 @@ export const ProjectDirectory: React.FC = () => {
 
   // Добавление проекта
   const handleAddProject = async () => {
+    // UUID validation regex
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     console.log('=== ОТЛАДКА СОЗДАНИЯ ПРОЕКТА ===');
     console.log('Данные нового проекта:', newProject);
     console.log('ID контрагента:', newProject.contractorId);
@@ -136,7 +139,6 @@ export const ProjectDirectory: React.FC = () => {
     }
 
     // Проверяем, что contractorId является валидным UUID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const trimmedContractorId = newProject.contractorId.trim();
     
     if (!uuidRegex.test(trimmedContractorId)) {
@@ -168,6 +170,14 @@ export const ProjectDirectory: React.FC = () => {
     
     if (newProject.qualificationObjectIds.length === 0) {
       alert('Выберите хотя бы один объект квалификации');
+      return;
+    }
+
+    // Проверяем, что все ID объектов квалификации являются валидными UUID
+    const invalidQualificationObjectIds = newProject.qualificationObjectIds.filter(id => !uuidRegex.test(id));
+    if (invalidQualificationObjectIds.length > 0) {
+      console.error('Некорректные UUID объектов квалификации:', invalidQualificationObjectIds);
+      alert('Ошибка: некорректные ID объектов квалификации. Обновите страницу и попробуйте снова.');
       return;
     }
 
