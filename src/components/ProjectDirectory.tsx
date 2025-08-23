@@ -9,13 +9,17 @@ import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { useAuth } from '../contexts/AuthContext';
 
+interface ProjectDirectoryProps {
+  onNavigateToAnalyzer?: (contractorId: string, qualificationObjectId: string) => void;
+}
+
 // UUID validation function
 function isValidUUID(uuid: string): boolean {
   const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return regex.test(uuid);
 }
 
-export const ProjectDirectory: React.FC = () => {
+export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onNavigateToAnalyzer }) => {
   const { user, users } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
@@ -258,6 +262,9 @@ export const ProjectDirectory: React.FC = () => {
   };
 
   const handleSaveEdit = async () => {
+    const oldStatus = projects.find(p => p.id === editingProject)?.status;
+    const newStatus = editProject.status;
+    
     setOperationLoading(true);
     try {
       const updatedProject = await projectService.updateProject(editingProject!, {
@@ -269,6 +276,16 @@ export const ProjectDirectory: React.FC = () => {
       
       setProjects(prev => prev.map(p => p.id === editingProject ? updatedProject : p));
       setEditingProject(null);
+      
+      // Если статус изменился на "testing_execution", переходим к анализатору
+      if (oldStatus !== 'testing_execution' && newStatus === 'testing_execution' && onNavigateToAnalyzer) {
+        // Получаем первый объект квалификации проекта
+        const firstQualificationObject = updatedProject.qualificationObjects[0];
+        if (firstQualificationObject) {
+          onNavigateToAnalyzer(updatedProject.contractorId, firstQualificationObject.qualificationObjectId);
+        }
+      }
+      
       alert('Проект успешно обновлен');
     } catch (error) {
       console.error('Ошибка обновления проекта:', error);

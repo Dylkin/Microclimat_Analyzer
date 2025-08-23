@@ -12,11 +12,15 @@ import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 interface MicroclimatAnalyzerProps {
   showVisualization?: boolean;
   onShowVisualization?: (show: boolean) => void;
+  prefilledContractorId?: string;
+  prefilledQualificationObjectId?: string;
 }
 
 export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({ 
   showVisualization = false, 
-  onShowVisualization 
+  onShowVisualization,
+  prefilledContractorId,
+  prefilledQualificationObjectId
 }) => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const [contractors, setContractors] = React.useState<Contractor[]>([]);
@@ -29,6 +33,27 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const [showQualificationDropdown, setShowQualificationDropdown] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [editingField, setEditingField] = React.useState<{ fileId: string; field: 'zoneNumber' | 'measurementLevel' } | null>(null);
+
+  // Устанавливаем предзаполненные данные при получении
+  React.useEffect(() => {
+    if (prefilledContractorId && contractors.length > 0) {
+      const contractor = contractors.find(c => c.id === prefilledContractorId);
+      if (contractor) {
+        setSelectedContractor(prefilledContractorId);
+        console.log('Предзаполнен контрагент:', contractor.name);
+      }
+    }
+  }, [prefilledContractorId, contractors]);
+
+  React.useEffect(() => {
+    if (prefilledQualificationObjectId && qualificationObjects.length > 0) {
+      const obj = qualificationObjects.find(o => o.id === prefilledQualificationObjectId);
+      if (obj) {
+        setSelectedQualificationObject(prefilledQualificationObjectId);
+        console.log('Предзаполнен объект квалификации:', obj.name || obj.vin || obj.serialNumber);
+      }
+    }
+  }, [prefilledQualificationObjectId, qualificationObjects]);
 
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
@@ -139,13 +164,22 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       };
     }).filter(Boolean) as UploadedFile[];
 
+    // Обновляем файлы с предзаполненными данными
+    const updatedFiles = newFiles.map(file => ({
+      ...file,
+      contractorId: selectedContractor || undefined,
+      qualificationObjectId: selectedQualificationObject || undefined,
+      qualificationObjectName: selectedQualificationObject ? getQualificationObjectName(selectedQualificationObject) : undefined,
+      contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
+    }));
+
     // Добавляем файлы в состояние
-    setUploadedFiles(prev => [...prev, ...newFiles]);
+    setUploadedFiles(prev => [...prev, ...updatedFiles]);
 
     // Парсим файлы
     for (let i = 0; i < fileArray.length; i++) {
       const file = fileArray[i];
-      const fileRecord = newFiles[i];
+      const fileRecord = updatedFiles[i];
       
       if (!fileRecord) continue;
       

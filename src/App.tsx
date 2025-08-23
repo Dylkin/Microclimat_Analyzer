@@ -14,11 +14,20 @@ const AppContent: React.FC = () => {
   const { user, hasAccess } = useAuth();
   const [currentPage, setCurrentPage] = useState('analyzer');
   const [showVisualization, setShowVisualization] = useState(false);
+  const [prefilledData, setPrefilledData] = useState<{
+    contractorId?: string;
+    qualificationObjectId?: string;
+  }>({});
 
   React.useEffect(() => {
     if (!user) return;
   }, [user]);
 
+  const handleNavigateToAnalyzer = (contractorId: string, qualificationObjectId: string) => {
+    setPrefilledData({ contractorId, qualificationObjectId });
+    setCurrentPage('analyzer');
+    setShowVisualization(false);
+  };
   if (!user) {
     return <Login />;
   }
@@ -30,6 +39,8 @@ const AppContent: React.FC = () => {
           <MicroclimatAnalyzer 
             showVisualization={showVisualization}
             onShowVisualization={setShowVisualization}
+            prefilledContractorId={prefilledData.contractorId}
+            prefilledQualificationObjectId={prefilledData.qualificationObjectId}
           />
         ) : <div>Доступ запрещен</div>;
       case 'help':
@@ -39,7 +50,9 @@ const AppContent: React.FC = () => {
       case 'contractors':
         return hasAccess('analyzer') ? <ContractorDirectory /> : <div>Доступ запрещен</div>;
       case 'projects':
-        return hasAccess('analyzer') ? <ProjectDirectory /> : <div>Доступ запрещен</div>;
+        return hasAccess('analyzer') ? (
+          <ProjectDirectory onNavigateToAnalyzer={handleNavigateToAnalyzer} />
+        ) : <div>Доступ запрещен</div>;
       case 'database':
         return hasAccess('database') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
       default:
