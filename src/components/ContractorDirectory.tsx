@@ -29,6 +29,7 @@ export const ContractorDirectory: React.FC = () => {
   const [showQualificationObjects, setShowQualificationObjects] = useState(false);
   const [showAddQualificationForm, setShowAddQualificationForm] = useState(false);
   const [selectedContractorForObjects, setSelectedContractorForObjects] = useState<Contractor | null>(null);
+  const [viewingContractor, setViewingContractor] = useState<Contractor | null>(null);
 
   // Form state
   const [newContractor, setNewContractor] = useState<CreateContractorData>({
