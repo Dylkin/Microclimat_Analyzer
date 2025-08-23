@@ -1,11 +1,13 @@
 export type ProjectStatus = 
   | 'contract_negotiation'
   | 'protocol_preparation'
-  | 'testing_execution'
+  | 'testing_start'
+  | 'testing_completion'
   | 'report_preparation'
   | 'report_approval'
   | 'report_printing'
-  | 'completed';
+  | 'completed'
+  | 'requalification';
 
 export interface Project {
   id: string;
@@ -66,19 +68,23 @@ export interface UpdateProjectData {
 export const ProjectStatusLabels: Record<ProjectStatus, string> = {
   'contract_negotiation': 'Согласование договора',
   'protocol_preparation': 'Подготовка протокола',
-  'testing_execution': 'Проведение испытаний',
+  'testing_start': 'Начало испытаний',
+  'testing_completion': 'Завершение испытаний',
   'report_preparation': 'Подготовка отчета',
   'report_approval': 'Согласование отчета',
   'report_printing': 'Печать отчета',
-  'completed': 'Завершен'
+  'completed': 'Завершен',
+  'requalification': 'Реквалификация'
 };
 
 export const ProjectStatusColors: Record<ProjectStatus, string> = {
   'contract_negotiation': 'bg-yellow-100 text-yellow-800',
   'protocol_preparation': 'bg-blue-100 text-blue-800',
-  'testing_execution': 'bg-purple-100 text-purple-800',
+  'testing_start': 'bg-purple-100 text-purple-800',
+  'testing_completion': 'bg-indigo-100 text-indigo-800',
   'report_preparation': 'bg-orange-100 text-orange-800',
   'report_approval': 'bg-indigo-100 text-indigo-800',
   'report_printing': 'bg-green-100 text-green-800',
-  'completed': 'bg-gray-100 text-gray-800'
+  'completed': 'bg-gray-100 text-gray-800',
+  'requalification': 'bg-red-100 text-red-800'
 };

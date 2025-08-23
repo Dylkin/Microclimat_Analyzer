@@ -246,10 +246,10 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       try {
         // Обновляем статус проекта на следующий этап
         await projectService.updateProject(project.id, {
-          status: 'testing_execution'
+          status: 'testing_start'
         });
         
-        alert('Подготовка протоколов завершена. Проект переведен в стадию "Проведение испытаний"');
+        alert('Подготовка протоколов завершена. Проект переведен в стадию "Начало испытаний"');
         onBack();
       } catch (error) {
         console.error('Ошибка обновления статуса проекта:', error);

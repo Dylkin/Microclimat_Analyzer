@@ -354,15 +354,15 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           page: 'protocol-preparation',
           icon: FileText
         };
-      case 'testing_execution':
+      case 'testing_start':
         return {
-          label: 'Перейти к испытаниям',
+          label: 'Начать испытания',
           page: 'analyzer',
           icon: Play
         };
-      case 'protocol_preparation':
+      case 'testing_completion':
         return {
-          label: 'Подготовить протокол',
+          label: 'Завершить испытания',
           page: 'analyzer',
           icon: Play
         };
@@ -746,7 +746,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-yellow-600">
-              {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_execution', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
+              {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_start', 'testing_completion', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
             </div>
             <div className="text-sm text-gray-500">В работе</div>
           </div>
