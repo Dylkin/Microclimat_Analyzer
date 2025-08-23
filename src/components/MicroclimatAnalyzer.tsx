@@ -7,6 +7,7 @@ import { ProjectStatusLabels, ProjectStatus } from '../types/Project';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { databaseService } from '../utils/database';
+import { uploadedFileService } from '../utils/uploadedFileService';
 import { VI2ParsingService } from '../utils/vi2Parser';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 
@@ -31,6 +32,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   onShowVisualization,
   selectedProject
 }) => {
+  const { user } = useAuth();
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const [contractors, setContractors] = React.useState<Contractor[]>([]);
   const [qualificationObjects, setQualificationObjects] = React.useState<QualificationObject[]>([]);
@@ -51,6 +53,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     lastSaved: null,
     error: null
   });
+  const [projectFilesLoaded, setProjectFilesLoaded] = React.useState(false);
 
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
@@ -79,6 +82,32 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
     loadContractors();
   }, [selectedProject]);
+
+  // Загрузка ранее сохраненных файлов проекта
+  React.useEffect(() => {
+    const loadProjectFiles = async () => {
+      if (!selectedProject || !uploadedFileService.isAvailable() || projectFilesLoaded) {
+        return;
+      }
+
+      try {
+        console.log('Загружаем ранее сохраненные файлы проекта:', selectedProject.id);
+        const projectFiles = await uploadedFileService.getProjectFiles(selectedProject.id, user?.id || 'anonymous');
+        
+        if (projectFiles.length > 0) {
+          console.log('Найдены ранее сохраненные файлы:', projectFiles.length);
+          setUploadedFiles(projectFiles);
+        }
+        
+        setProjectFilesLoaded(true);
+      } catch (error) {
+        console.error('Ошибка загрузки файлов проекта:', error);
+        setProjectFilesLoaded(true);
+      }
+    };
+
+    loadProjectFiles();
+  }, [selectedProject, projectFilesLoaded, user?.id]);
 
   // Загрузка объектов квалификации при выборе контрагента
   React.useEffect(() => {
@@ -241,6 +270,15 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       try {
         // Удаляем данные из базы
         await databaseService.deleteFileData(fileId);
+        
+        // Удаляем из базы данных uploaded_files если файл был сохранен
+        if (uploadedFileService.isAvailable()) {
+          try {
+            await uploadedFileService.deleteFile(fileId);
+          } catch (error) {
+            console.warn('Файл не найден в базе данных или уже удален:', error);
+          }
+        }
       } catch (error) {
         console.error('Ошибка удаления данных из базы:', error);
       }
@@ -288,12 +326,28 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       return;
     }
 
+    if (!selectedQualificationObject) {
+      alert('Выберите объект квалификации для сохранения файлов');
+      return;
+    }
+
+    // Получаем тип объекта квалификации
+    const qualificationObject = qualificationObjects.find(obj => obj.id === selectedQualificationObject);
+    if (!qualificationObject) {
+      alert('Выбранный объект квалификации не найден');
+      return;
+    }
+
     setSaveStatus(prev => ({ ...prev, isSaving: true, error: null }));
 
     try {
-      // Здесь будет логика сохранения файлов в связке с проектом
-      // Пока что просто имитируем сохранение
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Сохраняем файлы в базе данных с привязкой к проекту
+      await uploadedFileService.saveProjectFiles({
+        projectId: selectedProject.id,
+        qualificationObjectId: selectedQualificationObject,
+        objectType: qualificationObject.type,
+        files: uploadedFiles
+      }, 'current-user-id'); // TODO: использовать реальный ID пользователя
       
       // Обновляем статус сохранения
       setSaveStatus({
@@ -305,6 +359,8 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       console.log('Сохранение данных проекта:', {
         projectId: selectedProject.id,
         projectName: selectedProject.name,
+        qualificationObjectId: selectedQualificationObject,
+        objectType: qualificationObject.type,
         filesCount: uploadedFiles.length,
         completedFiles: uploadedFiles.filter(f => f.parsingStatus === 'completed').length
       });
@@ -322,7 +378,20 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const updateFileField = (fileId: string, field: 'zoneNumber' | 'measurementLevel', value: string | number) => {
     setUploadedFiles(prev => prev.map(f => {
       if (f.id === fileId) {
-        return { ...f, [field]: value };
+        const updatedFile = { ...f, [field]: value };
+        
+        // Обновляем в базе данных если файл был сохранен и Supabase доступен
+        if (uploadedFileService.isAvailable()) {
+          const updates: any = {};
+          if (field === 'zoneNumber') updates.zoneNumber = value as number;
+          if (field === 'measurementLevel') updates.measurementLevel = value as string;
+          
+          uploadedFileService.updateFileMetadata(fileId, updates).catch(error => {
+            console.warn('Ошибка обновления метаданных файла в БД:', error);
+          });
+        }
+        
+        return updatedFile;
       }
       return f;
     }));
@@ -452,6 +521,17 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         {/* Save Status */}
         {selectedProject && (
           <div className="mb-4">
+            {!projectFilesLoaded && uploadedFiles.length === 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-sm text-blue-800">
+                    Загрузка ранее сохраненных файлов проекта...
+                  </span>
+                </div>
+              </div>
+            )}
+            
             {saveStatus.lastSaved && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 <div className="flex items-center space-x-2">
@@ -765,8 +845,17 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         ) : (
           <div className="text-center py-8 text-gray-500">
             <Upload className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>Файлы не загружены</p>
-            <p className="text-sm">Нажмите кнопку "Загрузить файлы" для добавления файлов в формате .vi2</p>
+            {selectedProject ? (
+              <>
+                <p>Файлы проекта не найдены</p>
+                <p className="text-sm">Нажмите кнопку "Загрузить файлы" для добавления файлов в формате .vi2 к проекту</p>
+              </>
+            ) : (
+              <>
+                <p>Файлы не загружены</p>
+                <p className="text-sm">Нажмите кнопку "Загрузить файлы" для добавления файлов в формате .vi2</p>
+              </>
+            )}
           </div>
         )}
       </div>

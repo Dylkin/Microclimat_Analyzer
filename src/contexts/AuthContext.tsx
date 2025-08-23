@@ -56,7 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Пользователи загружены из базы данных:', dbUsers.length);
     } catch (error) {
       console.error('Ошибка загрузки пользователей из БД:', error);
-      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+      }, user?.id || 'anonymous');
       
       // Fallback к localStorage
       const savedUsers = localStorage.getItem('users');
