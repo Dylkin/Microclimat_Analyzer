@@ -770,26 +770,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           </div>
         </div>
         
-        {/* Detailed Status Breakdown */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <h4 className="text-md font-semibold text-gray-900 mb-3">Детализация по статусам</h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {Object.entries(ProjectStatusLabels).map(([status, label]) => {
-              const count = projects.filter(p => p.status === status).length;
-              const colorClass = ProjectStatusColors[status as ProjectStatus];
-              
-              return (
-                <div key={status} className="text-center p-3 bg-gray-50 rounded-lg">
-                  <div className="text-lg font-bold text-gray-900">{count}</div>
-                  <div className={`text-xs px-2 py-1 rounded-full ${colorClass} mt-1`}>
-                    {label}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        
         {/* Summary Statistics */}
         <div className="mt-6 pt-6 border-t border-gray-200">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
