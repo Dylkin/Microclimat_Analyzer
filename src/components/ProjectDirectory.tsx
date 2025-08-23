@@ -381,7 +381,8 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
         contractorId: project.contractorId,
         contractorName: project.contractorName,
         qualificationObjects: project.qualificationObjects,
-        status: project.status
+        status: project.status,
+        createdAt: project.createdAt
       };
       onPageChange(action.page, projectData);
     }
