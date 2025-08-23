@@ -6,14 +6,13 @@ dotenv.config();
 
 // Получаем конфигурацию Supabase из переменных окружения
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Ошибка: переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY не настроены');
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Ошибка: переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_SERVICE_ROLE_KEY (или VITE_SUPABASE_ANON_KEY) не настроены');
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function populateMeasurementEquipment() {
   console.log('Начинаем добавление измерительного оборудования...');
