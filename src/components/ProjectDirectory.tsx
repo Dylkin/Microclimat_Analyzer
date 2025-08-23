@@ -200,6 +200,19 @@ export const ProjectDirectory: React.FC = () => {
         name: projectName
       };
       
+      // Final validation before database call
+      console.log('=== FINAL VALIDATION BEFORE DATABASE CALL ===');
+      console.log('Final projectData.contractorId:', projectData.contractorId);
+      console.log('Type:', typeof projectData.contractorId);
+      console.log('Is valid UUID:', uuidRegex.test(projectData.contractorId));
+      
+      // Double-check UUID validity one more time
+      if (!uuidRegex.test(projectData.contractorId)) {
+        console.error('CRITICAL: Invalid UUID detected right before database call:', projectData.contractorId);
+        alert('Критическая ошибка: некорректный ID контрагента. Обратитесь к администратору.');
+        return;
+      }
+      
       const addedProject = await projectService.addProject(projectData, user?.id);
       setProjects(prev => [addedProject, ...prev]);
       
