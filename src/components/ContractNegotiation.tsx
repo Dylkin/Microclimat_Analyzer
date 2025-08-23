@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Building2, Calendar, Save, Edit2, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Building2, Calendar, Save, Edit2, X, CheckCircle, AlertCircle, Upload, FileText, Download, Trash2 } from 'lucide-react';
 import { Project } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels, UpdateQualificationObjectData } from '../types/QualificationObject';
@@ -20,10 +20,24 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
   const [editingObject, setEditingObject] = useState<string | null>(null);
   const [editObjectData, setEditObjectData] = useState<UpdateQualificationObjectData>({});
   const [operationLoading, setOperationLoading] = useState(false);
+  const [editingContractInfo, setEditingContractInfo] = useState(false);
+  const [contractInfo, setContractInfo] = useState({
+    contractNumber: project.contractNumber || '',
+    estimatedCompletionDate: (() => {
+      const date = new Date(project.createdAt);
+      date.setDate(date.getDate() + 7);
+      return date.toISOString().split('T')[0];
+    })()
+  });
+  const [documents, setDocuments] = useState<{
+    commercialOffer: File | null;
+    contract: File | null;
+  }>({
+    commercialOffer: null,
+    contract: null
+  });
 
   // Вычисляем примерную дату завершения (дата создания + 7 дней)
-  const estimatedCompletionDate = new Date(project.createdAt);
-  estimatedCompletionDate.setDate(estimatedCompletionDate.getDate() + 7);
 
   // Загрузка данных
   useEffect(() => {
@@ -98,6 +112,72 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
     } finally {
       setOperationLoading(false);
     }
+  };
+
+  // Сохранение информации о договоре
+  const handleSaveContractInfo = async () => {
+    setOperationLoading(true);
+    try {
+      await projectService.updateProject(project.id, {
+        contractNumber: contractInfo.contractNumber
+      });
+      
+      setEditingContractInfo(false);
+      alert('Информация о договоре успешно обновлена');
+    } catch (error) {
+      console.error('Ошибка обновления информации о договоре:', error);
+      alert(`Ошибка обновления: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // Отмена редактирования информации о договоре
+  const handleCancelContractEdit = () => {
+    setContractInfo({
+      contractNumber: project.contractNumber || '',
+      estimatedCompletionDate: (() => {
+        const date = new Date(project.createdAt);
+        date.setDate(date.getDate() + 7);
+        return date.toISOString().split('T')[0];
+      })()
+    });
+    setEditingContractInfo(false);
+  };
+
+  // Загрузка документов
+  const handleDocumentUpload = (documentType: 'commercialOffer' | 'contract', file: File) => {
+    // Проверяем формат файла
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Можно загружать только файлы в формате PDF или DOCX');
+      return;
+    }
+
+    setDocuments(prev => ({
+      ...prev,
+      [documentType]: file
+    }));
+  };
+
+  // Удаление документа
+  const handleRemoveDocument = (documentType: 'commercialOffer' | 'contract') => {
+    setDocuments(prev => ({
+      ...prev,
+      [documentType]: null
+    }));
+  };
+
+  // Скачивание документа
+  const handleDownloadDocument = (file: File) => {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Отмена редактирования
@@ -359,7 +439,41 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
       </div>
 
       {/* Project Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-blue-900">Информация о договоре</h2>
+          <div className="flex space-x-2">
+            {editingContractInfo ? (
+              <>
+                <button
+                  onClick={handleSaveContractInfo}
+                  disabled={operationLoading}
+                  className="text-green-600 hover:text-green-800 transition-colors"
+                  title="Сохранить изменения"
+                >
+                  <Save className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleCancelContractEdit}
+                  className="text-gray-600 hover:text-gray-800 transition-colors"
+                  title="Отменить изменения"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setEditingContractInfo(true)}
+                disabled={operationLoading}
+                className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                title="Редактировать"
+              >
+                <Edit2 className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <span className="text-sm font-medium text-blue-900">Дата создания:</span>
@@ -367,16 +481,35 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           </div>
           <div>
             <span className="text-sm font-medium text-blue-900">Примерная дата завершения:</span>
-            <div className="flex items-center space-x-2">
-              <Calendar className="w-4 h-4 text-blue-600" />
-              <span className="text-blue-800 font-medium">
-                {estimatedCompletionDate.toLocaleDateString('ru-RU')}
-              </span>
-            </div>
+            {editingContractInfo ? (
+              <input
+                type="date"
+                value={contractInfo.estimatedCompletionDate}
+                onChange={(e) => setContractInfo(prev => ({ ...prev, estimatedCompletionDate: e.target.value }))}
+                className="mt-1 px-2 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <span className="text-blue-800 font-medium">
+                  {new Date(contractInfo.estimatedCompletionDate).toLocaleDateString('ru-RU')}
+                </span>
+              </div>
+            )}
           </div>
           <div>
             <span className="text-sm font-medium text-blue-900">Номер договора:</span>
-            <div className="text-blue-800">{project.contractNumber || 'Не указан'}</div>
+            {editingContractInfo ? (
+              <input
+                type="text"
+                value={contractInfo.contractNumber}
+                onChange={(e) => setContractInfo(prev => ({ ...prev, contractNumber: e.target.value }))}
+                className="mt-1 w-full px-2 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Введите номер договора"
+              />
+            ) : (
+              <div className="text-blue-800">{contractInfo.contractNumber || 'Не указан'}</div>
+            )}
           </div>
         </div>
       </div>
@@ -489,6 +622,154 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
             <p className="text-sm">Проверьте настройки проекта</p>
           </div>
         )}
+      </div>
+
+      {/* Document Upload Section */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Документы договора</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Commercial Offer */}
+          <div>
+            <h3 className="text-md font-medium text-gray-800 mb-3">Коммерческое предложение</h3>
+            {documents.commercialOffer ? (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {documents.commercialOffer.name}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {(documents.commercialOffer.size / 1024 / 1024).toFixed(2)} MB
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleDownloadDocument(documents.commercialOffer!)}
+                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                      title="Скачать"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleRemoveDocument('commercialOffer')}
+                      className="text-red-600 hover:text-red-800 transition-colors"
+                      title="Удалить"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept=".pdf,.docx"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleDocumentUpload('commercialOffer', file);
+                    }
+                  }}
+                  className="hidden"
+                  id="commercial-offer-upload"
+                />
+                <label
+                  htmlFor="commercial-offer-upload"
+                  className="cursor-pointer flex flex-col items-center space-y-2"
+                >
+                  <Upload className="w-8 h-8 text-gray-400" />
+                  <span className="text-sm text-gray-600">
+                    Загрузить коммерческое предложение
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    PDF или DOCX, до 10 MB
+                  </span>
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* Contract */}
+          <div>
+            <h3 className="text-md font-medium text-gray-800 mb-3">Договор</h3>
+            {documents.contract ? (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-5 h-5 text-green-600" />
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {documents.contract.name}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {(documents.contract.size / 1024 / 1024).toFixed(2)} MB
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleDownloadDocument(documents.contract!)}
+                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                      title="Скачать"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleRemoveDocument('contract')}
+                      className="text-red-600 hover:text-red-800 transition-colors"
+                      title="Удалить"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept=".pdf,.docx"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleDocumentUpload('contract', file);
+                    }
+                  }}
+                  className="hidden"
+                  id="contract-upload"
+                />
+                <label
+                  htmlFor="contract-upload"
+                  className="cursor-pointer flex flex-col items-center space-y-2"
+                >
+                  <Upload className="w-8 h-8 text-gray-400" />
+                  <span className="text-sm text-gray-600">
+                    Загрузить договор
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    PDF или DOCX, до 10 MB
+                  </span>
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Document Upload Instructions */}
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 className="text-sm font-medium text-blue-900 mb-2">Требования к документам:</h4>
+          <ul className="text-xs text-blue-800 space-y-1">
+            <li>• Поддерживаемые форматы: PDF, DOCX</li>
+            <li>• Максимальный размер файла: 10 MB</li>
+            <li>• Документы сохраняются локально в браузере</li>
+            <li>• Для постоянного хранения используйте внешние системы документооборота</li>
+          </ul>
+        </div>
       </div>
 
       {/* Actions */}
