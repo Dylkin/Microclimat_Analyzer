@@ -1,8 +1,9 @@
 import React from 'react';
-import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart } from 'lucide-react';
+import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart, FolderOpen } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject } from '../types/QualificationObject';
+import { ProjectStatusLabels, ProjectStatus } from '../types/Project';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { databaseService } from '../utils/database';
@@ -12,11 +13,23 @@ import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 interface MicroclimatAnalyzerProps {
   showVisualization?: boolean;
   onShowVisualization?: (show: boolean) => void;
+  selectedProject?: {
+    id: string;
+    name: string;
+    contractorId: string;
+    contractorName: string;
+    qualificationObjects: Array<{
+      qualificationObjectId: string;
+      qualificationObjectName: string;
+    }>;
+    status: string;
+  } | null;
 }
 
 export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({ 
   showVisualization = false, 
-  onShowVisualization 
+  onShowVisualization,
+  selectedProject
 }) => {
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const [contractors, setContractors] = React.useState<Contractor[]>([]);
@@ -45,13 +58,18 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       try {
         const data = await contractorService.getAllContractors();
         setContractors(data);
+        
+        // Если есть выбранный проект, устанавливаем контрагента
+        if (selectedProject) {
+          setSelectedContractor(selectedProject.contractorId);
+        }
       } catch (error) {
         console.error('Ошибка загрузки контрагентов:', error);
       }
     };
 
     loadContractors();
-  }, []);
+  }, [selectedProject]);
 
   // Загрузка объектов квалификации при выборе контрагента
   React.useEffect(() => {
@@ -64,7 +82,16 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       
       try {
         const data = await qualificationObjectService.getQualificationObjects(selectedContractor);
-        setQualificationObjects(data);
+        
+        // Если есть выбранный проект, фильтруем объекты квалификации
+        if (selectedProject) {
+          const projectObjectIds = selectedProject.qualificationObjects.map(obj => obj.qualificationObjectId);
+          const filteredData = data.filter(obj => projectObjectIds.includes(obj.id));
+          setQualificationObjects(filteredData);
+        } else {
+          setQualificationObjects(data);
+        }
+        
         setSelectedQualificationObject(''); // Сбрасываем выбор объекта при смене контрагента
       } catch (error) {
         console.error('Ошибка загрузки объектов квалификации:', error);
@@ -73,7 +100,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     };
 
     loadQualificationObjects();
-  }, [selectedContractor]);
+  }, [selectedContractor, selectedProject]);
 
   // Фильтрация контрагентов по поиску
   const filteredContractors = React.useMemo(() => {
@@ -341,30 +368,35 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           {/* Селектор контрагента */}
           <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Контрагент
+              Контрагент {selectedProject && <span className="text-blue-600">(из проекта)</span>}
             </label>
             <div className="relative">
               <input
                 type="text"
                 value={selectedContractor ? getContractorName(selectedContractor) : contractorSearch}
                 onChange={(e) => {
+                  if (selectedProject) return; // Блокируем изменения если выбран проект
                   setContractorSearch(e.target.value);
                   if (!selectedContractor) {
                     setShowContractorDropdown(true);
                   }
                 }}
                 onFocus={() => {
+                  if (selectedProject) return; // Блокируем изменения если выбран проект
                   setShowContractorDropdown(true);
                   if (selectedContractor) {
                     setContractorSearch('');
                     setSelectedContractor('');
                   }
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                  selectedProject ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
                 placeholder="Поиск контрагента..."
+                disabled={!!selectedProject}
               />
               
-              {showContractorDropdown && (
+              {showContractorDropdown && !selectedProject && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   {filteredContractors.length > 0 ? (
                     filteredContractors.map((contractor) => (
@@ -396,7 +428,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           {/* Селектор объекта квалификации */}
           <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Объект квалификации
+              Объект квалификации {selectedProject && <span className="text-blue-600">(из проекта)</span>}
             </label>
             <div className="relative">
               <input
@@ -419,7 +451,10 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                 }}
                 disabled={!selectedContractor}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                placeholder={selectedContractor ? "Поиск объекта квалификации..." : "Сначала выберите контрагента"}
+                placeholder={selectedContractor ? 
+                  (selectedProject ? "Объекты квалификации из проекта" : "Поиск объекта квалификации...") : 
+                  "Сначала выберите контрагента"
+                }
               />
               
               {showQualificationDropdown && selectedContractor && (
@@ -445,7 +480,10 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     ))
                   ) : (
                     <div className="px-3 py-2 text-gray-500 text-sm">
-                      Объекты квалификации не найдены
+                      {selectedProject ? 
+                        "В проекте нет объектов квалификации" : 
+                        "Объекты квалификации не найдены"
+                      }
                     </div>
                   )}
                 </div>
@@ -619,6 +657,22 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           </div>
         )}
       </div>
+
+      {/* Информация о проекте */}
+      {selectedProject && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2 mb-2">
+            <FolderOpen className="w-5 h-5 text-blue-600" />
+            <h3 className="text-sm font-medium text-blue-900">Работа в рамках проекта</h3>
+          </div>
+          <div className="text-sm text-blue-800">
+            <div><strong>Проект:</strong> {selectedProject.name}</div>
+            <div><strong>Контрагент:</strong> {selectedProject.contractorName}</div>
+            <div><strong>Статус:</strong> {ProjectStatusLabels[selectedProject.status as ProjectStatus]}</div>
+            <div><strong>Объектов квалификации:</strong> {selectedProject.qualificationObjects.length}</div>
+          </div>
+        </div>
+      )}
 
       {/* Примечание о внешнем датчике */}
       {uploadedFiles.length > 0 && (

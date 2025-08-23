@@ -14,6 +14,7 @@ const AppContent: React.FC = () => {
   const { user, hasAccess } = useAuth();
   const [currentPage, setCurrentPage] = useState('analyzer');
   const [showVisualization, setShowVisualization] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<any>(null);
 
   React.useEffect(() => {
     if (!user) return;
@@ -23,6 +24,14 @@ const AppContent: React.FC = () => {
     return <Login />;
   }
 
+  const handlePageChange = (page: string, projectData?: any) => {
+    setCurrentPage(page);
+    if (projectData) {
+      setSelectedProject(projectData);
+    } else {
+      setSelectedProject(null);
+    }
+  };
   const renderPage = () => {
     switch (currentPage) {
       case 'analyzer':
@@ -30,6 +39,7 @@ const AppContent: React.FC = () => {
           <MicroclimatAnalyzer 
             showVisualization={showVisualization}
             onShowVisualization={setShowVisualization}
+            selectedProject={selectedProject}
           />
         ) : <div>Доступ запрещен</div>;
       case 'help':
@@ -39,19 +49,20 @@ const AppContent: React.FC = () => {
       case 'contractors':
         return hasAccess('analyzer') ? <ContractorDirectory /> : <div>Доступ запрещен</div>;
       case 'projects':
-        return hasAccess('analyzer') ? <ProjectDirectory onPageChange={setCurrentPage} /> : <div>Доступ запрещен</div>;
+        return hasAccess('analyzer') ? <ProjectDirectory onPageChange={handlePageChange} /> : <div>Доступ запрещен</div>;
       case 'database':
         return hasAccess('database') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
       default:
         return <MicroclimatAnalyzer 
           showVisualization={showVisualization}
           onShowVisualization={setShowVisualization}
+          selectedProject={selectedProject}
         />;
     }
   };
 
   return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
+    <Layout currentPage={currentPage} onPageChange={handlePageChange}>
       {renderPage()}
     </Layout>
   );

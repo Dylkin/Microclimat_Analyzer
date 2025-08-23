@@ -16,7 +16,7 @@ function isValidUUID(uuid: string): boolean {
 }
 
 interface ProjectDirectoryProps {
-  onPageChange?: (page: string) => void;
+  onPageChange?: (page: string, projectData?: any) => void;
 }
 
 export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => {
@@ -343,7 +343,16 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   const handleProjectAction = (project: Project) => {
     const action = getProjectAction(project.status);
     if (action && onPageChange) {
-      onPageChange(action.page);
+      // Передаем данные проекта при переходе
+      const projectData = {
+        id: project.id,
+        name: project.name,
+        contractorId: project.contractorId,
+        contractorName: project.contractorName,
+        qualificationObjects: project.qualificationObjects,
+        status: project.status
+      };
+      onPageChange(action.page, projectData);
     }
   };
 

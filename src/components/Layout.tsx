@@ -5,7 +5,7 @@ import { LogOut, BarChart3, Menu, X, HelpCircle, Database, Users, Building2, Fol
 interface LayoutProps {
   children: React.ReactNode;
   currentPage: string;
-  onPageChange: (page: string) => void;
+  onPageChange: (page: string, projectData?: any) => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) => {
