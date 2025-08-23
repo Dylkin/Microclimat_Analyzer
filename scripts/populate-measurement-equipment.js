@@ -13,6 +13,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
+// Создаем клиент Supabase
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function populateMeasurementEquipment() {
   console.log('Начинаем добавление измерительного оборудования...');
