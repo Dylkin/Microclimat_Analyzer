@@ -59,7 +59,16 @@ export const ProjectDirectory: React.FC = () => {
       // Загружаем контрагентов
       if (contractorService.isAvailable()) {
         const contractorsData = await contractorService.getAllContractors();
-        setContractors(contractorsData);
+        // Фильтруем контрагентов с валидными UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const validContractors = contractorsData.filter(contractor => {
+          const isValidUuid = uuidRegex.test(contractor.id);
+          if (!isValidUuid) {
+            console.warn(`Контрагент "${contractor.name}" имеет некорректный UUID: "${contractor.id}"`);
+          }
+          return isValidUuid;
+        });
+        setContractors(validContractors);
       }
 
       // Загружаем все объекты квалификации
