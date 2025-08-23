@@ -9,6 +9,7 @@ import { UserDirectory } from './components/UserDirectory';
 import { ContractorDirectory } from './components/ContractorDirectory';
 import { ProjectDirectory } from './components/ProjectDirectory';
 import { ContractNegotiation } from './components/ContractNegotiation';
+import { MeasurementEquipmentDirectory } from './components/MeasurementEquipmentDirectory';
 import './index.css';
 
 const AppContent: React.FC = () => {
@@ -58,6 +59,8 @@ const AppContent: React.FC = () => {
         return hasAccess('analyzer') ? <ContractorDirectory /> : <div>Доступ запрещен</div>;
       case 'projects':
         return hasAccess('analyzer') ? <ProjectDirectory onPageChange={handlePageChange} /> : <div>Доступ запрещен</div>;
+      case 'measurement-equipment':
+        return hasAccess('analyzer') ? <MeasurementEquipmentDirectory /> : <div>Доступ запрещен</div>;
       case 'database':
         return hasAccess('database') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
       default:

@@ -44,6 +44,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       access: 'analyzer' as const
     },
     {
+      name: 'Измерительное оборудование',
+      key: 'measurement-equipment',
+      icon: Database,
+      access: 'analyzer' as const
+    },
+    {
       name: 'Проверка БД',
       key: 'database',
       icon: Database,
