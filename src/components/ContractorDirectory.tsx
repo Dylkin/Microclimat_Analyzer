@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { contractorService } from '../utils/contractorService';
@@ -23,6 +23,7 @@ export const ContractorDirectory: React.FC = () => {
   const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingContractorData, setEditingContractorData] = useState<Contractor | null>(null);
+  const [showViewContractor, setShowViewContractor] = useState(false);
   
   // Qualification objects state
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
@@ -346,6 +347,7 @@ export const ContractorDirectory: React.FC = () => {
     setViewingContractor(contractor);
     setShowViewContractor(true);
   };
+
   if (showMap && selectedContractor) {
     return (
       <ContractorMap
@@ -463,6 +465,29 @@ export const ContractorDirectory: React.FC = () => {
                   {contact.phone && (
                     <div className="flex items-center space-x-2 mb-2">
                       <Phone className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-700">{contact.phone}</span>
+                    </div>
+                  )}
+                  {contact.comment && (
+                    <div className="flex items-center space-x-2">
+                      <MessageSquare className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-600 text-sm">{contact.comment}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <User className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p>Контакты не добавлены</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // Если показываем объекты квалификации
   if (showQualificationObjects && selectedContractorForObjects) {
     return (
@@ -573,6 +598,7 @@ export const ContractorDirectory: React.FC = () => {
           </div>
         )}
       </div>
+
       {/* Add Contractor Form */}
       {showAddForm && (
         renderContractorForm(false)
@@ -683,14 +709,6 @@ export const ContractorDirectory: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleViewContractor(contractor)}
-                          disabled={operationLoading}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Просмотр"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
                         <button
                           onClick={() => handleEditContractor(contractor)}
                           disabled={operationLoading}
