@@ -57,7 +57,35 @@ const defaultUser: User = {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [users, setUsers] = useState<User[]>([defaultUser]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Сохранение пользователей в localStorage как резервная копия
+  useEffect(() => {
+    localStorage.setItem('users', JSON.stringify(users));
+  }, [users]);
+
+  // Восстановление сессии при загрузке
+  useEffect(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        // Проверяем, что ID пользователя является валидным UUID
+        if (parsedUser.id && isValidUUID(parsedUser.id)) {
+          setUser(parsedUser);
+        } else {
+          console.warn('Невалидный UUID пользователя в localStorage, очищаем сессию');
+          localStorage.removeItem('currentUser');
+        }
+      } catch (error) {
+        console.error('Ошибка парсинга пользователя из localStorage:', error);
+        localStorage.removeItem('currentUser');
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -107,9 +135,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeAuth();
   }, []);
-  const [users, setUsers] = useState<User[]>([defaultUser]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Загрузка пользователей из базы данных
   const loadUsers = async () => {
@@ -150,11 +175,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Сохранение пользователей в localStorage как резервная копия
-  useEffect(() => {
-    localStorage.setItem('users', JSON.stringify(users));
-  }, [users]);
-
   // Загрузка пользователей при инициализации
   useEffect(() => {
     loadUsers();
@@ -173,8 +193,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'director':
         return page === 'analyzer' || page === 'help' || page === 'database';
       default:
+        return false;
     }
-  }
+  };
+
   // Не рендерим детей пока не инициализирована аутентификация
   if (!isInitialized) {
     return (
@@ -378,29 +400,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Восстановление сессии при загрузке
-  useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        // Проверяем, что ID пользователя является валидным UUID
-        if (parsedUser.id && isValidUUID(parsedUser.id)) {
-          setUser(parsedUser);
-        } else {
-          console.warn('Невалидный UUID пользователя в localStorage, очищаем сессию');
-          localStorage.removeItem('currentUser');
-        }
-      } catch (error) {
-        console.error('Ошибка парсинга пользователя из localStorage:', error);
-        localStorage.removeItem('currentUser');
-      }
-    }
-  }, []);
-
   const value = {
     user,
     users,
+    loading,
+    error,
     loading,
     error,
     login,
@@ -411,6 +415,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     changePassword,
     resetPassword,
     hasAccess,
+    reloadUsers: loadUsers
     reloadUsers: loadUsers
   };
 
