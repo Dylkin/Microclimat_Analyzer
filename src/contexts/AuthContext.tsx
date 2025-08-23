@@ -173,6 +173,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'director':
         return page === 'analyzer' || page === 'help' || page === 'database';
       default:
+    }
+  }
   // Не рендерим детей пока не инициализирована аутентификация
   if (!isInitialized) {
     return (
