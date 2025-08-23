@@ -42,6 +42,15 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const [showQualificationDropdown, setShowQualificationDropdown] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [editingField, setEditingField] = React.useState<{ fileId: string; field: 'zoneNumber' | 'measurementLevel' } | null>(null);
+  const [saveStatus, setSaveStatus] = React.useState<{
+    isSaving: boolean;
+    lastSaved: Date | null;
+    error: string | null;
+  }>({
+    isSaving: false,
+    lastSaved: null,
+    error: null
+  });
 
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
@@ -268,6 +277,48 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     });
   };
 
+  const handleSaveProject = async () => {
+    if (!selectedProject) {
+      alert('Нет выбранного проекта для сохранения');
+      return;
+    }
+
+    if (uploadedFiles.length === 0) {
+      alert('Нет файлов для сохранения');
+      return;
+    }
+
+    setSaveStatus(prev => ({ ...prev, isSaving: true, error: null }));
+
+    try {
+      // Здесь будет логика сохранения файлов в связке с проектом
+      // Пока что просто имитируем сохранение
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Обновляем статус сохранения
+      setSaveStatus({
+        isSaving: false,
+        lastSaved: new Date(),
+        error: null
+      });
+
+      console.log('Сохранение данных проекта:', {
+        projectId: selectedProject.id,
+        projectName: selectedProject.name,
+        filesCount: uploadedFiles.length,
+        completedFiles: uploadedFiles.filter(f => f.parsingStatus === 'completed').length
+      });
+
+    } catch (error) {
+      console.error('Ошибка сохранения данных проекта:', error);
+      setSaveStatus({
+        isSaving: false,
+        lastSaved: null,
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+      });
+    }
+  };
+
   const updateFileField = (fileId: string, field: 'zoneNumber' | 'measurementLevel', value: string | number) => {
     setUploadedFiles(prev => prev.map(f => {
       if (f.id === fileId) {
@@ -361,6 +412,25 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Загрузка файлов</h2>
           <div className="flex space-x-3">
+            {selectedProject && (
+              <button
+                onClick={handleSaveProject}
+                disabled={saveStatus.isSaving || uploadedFiles.length === 0}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {saveStatus.isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Сохранение...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Сохранить</span>
+                  </>
+                )}
+              </button>
+            )}
             <button
               onClick={handleExploreData}
               disabled={uploadedFiles.filter(f => f.parsingStatus === 'completed').length === 0}
@@ -378,6 +448,33 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Save Status */}
+        {selectedProject && (
+          <div className="mb-4">
+            {saveStatus.lastSaved && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-green-800">
+                    Последнее сохранение: {saveStatus.lastSaved.toLocaleString('ru-RU')}
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {saveStatus.error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <XCircle className="w-4 h-4 text-red-600" />
+                  <span className="text-sm text-red-800">
+                    Ошибка сохранения: {saveStatus.error}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Селекторы контрагента и объекта квалификации */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
