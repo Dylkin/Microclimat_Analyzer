@@ -258,8 +258,6 @@ export const ContractorDirectory: React.FC = () => {
     try {
       const addedObject = await qualificationObjectService.addQualificationObject(objectData);
       setQualificationObjects(prev => [...prev, addedObject]);
-      setShowAddQualificationForm(false);
-      alert('Объект квалификации успешно добавлен');
     } catch (error) {
       console.error('Ошибка добавления объекта квалификации:', error);
       alert(`Ошибка добавления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);

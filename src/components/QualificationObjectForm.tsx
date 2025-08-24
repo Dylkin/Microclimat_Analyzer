@@ -375,7 +375,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             ) : (
               <>
                 <Plus className="w-4 h-4" />
-                <span>Добавить</span>
+                <span>Сохранить</span>
               </>
             )}
           </button>
