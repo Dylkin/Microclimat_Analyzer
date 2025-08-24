@@ -291,6 +291,26 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
     });
   };
 
+  // Сохранение размещения оборудования для объекта
+  const handleSaveEquipmentPlacement = async (objectId: string) => {
+    setOperationLoading(true);
+    try {
+      // В реальном проекте здесь можно было бы сохранить данные в базе данных
+      // Пока просто имитируем сохранение
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      console.log('Сохранение размещения оборудования для объекта:', objectId);
+      console.log('Данные размещения:', equipmentPlacement[objectId]);
+      
+      alert('Размещение измерительного оборудования сохранено');
+    } catch (error) {
+      console.error('Ошибка сохранения размещения оборудования:', error);
+      alert(`Ошибка сохранения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
   // Получение доступного оборудования для объекта (исключая уже используемое)
   const getAvailableEquipment = (objectId: string, currentLevelId?: string) => {
     const objectZones = equipmentPlacement[objectId] || [];
@@ -520,13 +540,6 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
             <Wrench className="w-5 h-5 text-indigo-600" />
             <span>Размещение измерительного оборудования</span>
           </h4>
-          <button
-            onClick={() => handleAddZone(obj.id)}
-            className="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700 transition-colors flex items-center space-x-1"
-          >
-            <Plus className="w-3 h-3" />
-            <span>Добавить зону</span>
-          </button>
         </div>
 
         {objectZones.length > 0 ? (
@@ -637,12 +650,48 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
                 )}
               </div>
             ))}
+            
+            {/* Кнопки управления зонами */}
+            <div className="flex justify-center space-x-3 pt-4">
+              <button
+                onClick={() => handleAddZone(obj.id)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Добавить зону</span>
+              </button>
+              <button
+                onClick={() => handleSaveEquipmentPlacement(obj.id)}
+                disabled={operationLoading}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {operationLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Сохранение...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Сохранить</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="text-center py-6 text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
             <Wrench className="w-8 h-8 mx-auto mb-2 text-gray-300" />
             <p className="text-sm">Зоны измерения не добавлены</p>
-            <p className="text-xs mt-1">Нажмите "Добавить зону" для создания первой зоны</p>
+            <div className="mt-4">
+              <button
+                onClick={() => handleAddZone(obj.id)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 mx-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Добавить зону</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
