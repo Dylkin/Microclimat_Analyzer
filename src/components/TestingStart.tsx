@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Building2, Play, Edit2, Save, X, MapPin, Car, Refrigerator, Snowflake, Building, Package, Hash, Copy, Map, User, Phone, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Building2, Play, Edit2, Save, X, MapPin, Car, Refrigerator, Snowflake, Building, Package, Hash, Copy, Map, User, Phone, MessageSquare, CheckCircle, AlertCircle, Plus, Trash2, Wrench } from 'lucide-react';
 import { Project } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels, UpdateQualificationObjectData } from '../types/QualificationObject';
+import { MeasurementEquipment } from '../types/MeasurementEquipment';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { projectService } from '../utils/projectService';
+import { measurementEquipmentService } from '../utils/measurementEquipmentService';
+
+interface MeasurementZone {
+  id: string;
+  number: number;
+  levels: MeasurementLevel[];
+}
+
+interface MeasurementLevel {
+  id: string;
+  height: number;
+  equipmentId: string | null;
+}
+
+interface ObjectEquipmentPlacement {
+  [objectId: string]: MeasurementZone[];
+}
 
 interface TestingStartProps {
   project: Project;
@@ -15,6 +33,8 @@ interface TestingStartProps {
 export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) => {
   const [contractor, setContractor] = useState<Contractor | null>(null);
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
+  const [measurementEquipment, setMeasurementEquipment] = useState<MeasurementEquipment[]>([]);
+  const [equipmentPlacement, setEquipmentPlacement] = useState<ObjectEquipmentPlacement>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingObject, setEditingObject] = useState<string | null>(null);
@@ -41,6 +61,12 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
           const projectObjectIds = project.qualificationObjects.map(obj => obj.qualificationObjectId);
           const projectObjects = allObjects.filter(obj => projectObjectIds.includes(obj.id));
           setQualificationObjects(projectObjects);
+        }
+
+        // Загружаем измерительное оборудование
+        if (measurementEquipmentService.isAvailable()) {
+          const equipmentData = await measurementEquipmentService.getAllEquipment();
+          setMeasurementEquipment(equipmentData);
         }
       } catch (error) {
         console.error('Ошибка загрузки данных:', error);
