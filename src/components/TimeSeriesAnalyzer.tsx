@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle, Eye } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -11,9 +11,10 @@ import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplate
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
   onBack?: () => void;
+  viewMode?: boolean;
 }
 
-export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack }) => {
+export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack, viewMode = false }) => {
   const { user } = useAuth();
   const { data, loading, error } = useTimeSeriesData({ files });
   
@@ -898,8 +899,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
       </div>
       {/* Analysis Results Table */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className={`bg-white rounded-lg shadow p-6 ${viewMode ? 'opacity-75 pointer-events-none' : ''}`}>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
+        {viewMode && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Eye className="w-4 h-4 text-blue-600" />
+              <span className="text-sm text-blue-800 font-medium">Режим просмотра</span>
+            </div>
+          </div>
+        )}
         
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1038,11 +1047,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       </div>
 
       {/* Кнопка формирования отчета */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className={`bg-white rounded-lg shadow p-6 ${viewMode ? 'opacity-75 pointer-events-none' : ''}`}>
         <div className="flex flex-col items-center space-y-6">
           <h2 className="text-xl font-semibold text-gray-900 text-center">
             Формирование приложения к отчету с результатами испытаний
           </h2>
+          {viewMode && (
+            <div className="w-full p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <Eye className="w-4 h-4 text-blue-600" />
+                <span className="text-sm text-blue-800 font-medium">Режим просмотра - формирование отчетов недоступно</span>
+              </div>
+            </div>
+          )}
           
           {/* Загрузка шаблона DOCX */}
           <div className="w-full max-w-md">

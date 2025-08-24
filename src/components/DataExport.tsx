@@ -261,13 +261,13 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
   };
 
   const handleSaveProject = async () => {
-    if (uploadedFiles.length === 0) {
-      alert('Нет файлов для сохранения');
+    if (!selectedQualificationObject) {
+      alert('Выберите объект квалификации для сохранения');
       return;
     }
 
-    if (!selectedQualificationObject) {
-      alert('Выберите объект квалификации для сохранения файлов');
+    if (uploadedFiles.length === 0) {
+      alert('Нет файлов для сохранения');
       return;
     }
 
@@ -281,13 +281,43 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     setSaveStatus(prev => ({ ...prev, isSaving: true, error: null }));
 
     try {
-      // Сохраняем файлы в базе данных с привязкой к проекту
-      await uploadedFileService.saveProjectFiles({
-        projectId: project.id,
-        qualificationObjectId: selectedQualificationObject,
-        objectType: qualificationObject.type,
-        files: uploadedFiles
-      }, user?.id || null);
+      // Сохраняем все данные в базу данных
+      console.log('Сохраняем все данные проекта в базу данных...');
+      
+      // 1. Сохраняем файлы в базе данных с привязкой к проекту
+      if (uploadedFileService.isAvailable()) {
+        await uploadedFileService.saveProjectFiles({
+          projectId: project.id,
+          qualificationObjectId: selectedQualificationObject,
+          objectType: qualificationObject.type,
+          files: uploadedFiles
+        }, user?.id || null);
+        console.log('Файлы сохранены в uploaded_files');
+      }
+      
+      // 2. Сохраняем данные измерений в базу данных
+      for (const file of uploadedFiles) {
+        if (file.parsedData && file.parsingStatus === 'completed') {
+          try {
+            await databaseService.saveParsedFileData(file.parsedData, file.id);
+            console.log(`Данные измерений сохранены для файла: ${file.name}`);
+          } catch (error) {
+            console.error(`Ошибка сохранения данных измерений для файла ${file.name}:`, error);
+          }
+        }
+      }
+      
+      // 3. Обновляем статус завершения назначений оборудования
+      for (const file of uploadedFiles) {
+        if (file.parsingStatus === 'completed' && projectEquipmentService.isAvailable()) {
+          try {
+            await projectEquipmentService.completeAssignment(file.id);
+            console.log(`Назначение оборудования завершено для: ${file.id}`);
+          } catch (error) {
+            console.error(`Ошибка завершения назначения для ${file.id}:`, error);
+          }
+        }
+      }
       
       // Обновляем статус сохранения
       setSaveStatus({
@@ -315,7 +345,7 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     }
   };
 
-  const handleExploreData = () => {
+  const handleViewData = () => {
     const completedFiles = uploadedFiles.filter(f => f.parsingStatus === 'completed');
     if (completedFiles.length === 0) {
       alert('Нет обработанных файлов для исследования');
@@ -325,12 +355,13 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     setShowVisualization(true);
   };
 
-  // Если показываем визуализацию, рендерим компонент визуализации
+  // Если показываем визуализацию, рендерим компонент визуализации в режиме просмотра
   if (showVisualization) {
     return (
       <TimeSeriesAnalyzer 
         files={uploadedFiles.filter(f => f.parsingStatus === 'completed')}
         onBack={() => setShowVisualization(false)}
+        viewMode={true}
       />
     );
   }
@@ -508,12 +539,12 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
                 )}
               </button>
               <button
-                onClick={handleExploreData}
+                onClick={handleViewData}
                 disabled={uploadedFiles.filter(f => f.parsingStatus === 'completed').length === 0}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 <BarChart className="w-4 h-4" />
-                <span>Подготовка отчета</span>
+                <span>Просмотр данных</span>
               </button>
             </div>
           </div>
