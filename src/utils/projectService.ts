@@ -81,13 +81,7 @@ export class ProjectService {
   // Получение всех проектов с связанными данными
   async getAllProjects(): Promise<Project[]> {
     if (!this.supabase) {
-      throw new Error('Supabase не настроен. Проверьте переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY в файле .env');
-    }
-
-    // Проверяем подключение к Supabase
-    const isConnected = await testSupabaseConnection();
-    if (!isConnected) {
-      throw new Error('Не удается подключиться к Supabase. Проверьте настройки подключения и доступность сервиса.');
+      throw new Error('Supabase не настроен');
     }
 
     try {

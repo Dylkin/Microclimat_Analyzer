@@ -110,11 +110,11 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
 
       // Проверяем, есть ли проблемы с подключением к Supabase
       if (!contractorService.isAvailable() || !projectService.isAvailable() || !qualificationObjectService.isAvailable()) {
-        setError('Подключение к базе данных недоступно. Нажмите кнопку "Connect to Supabase" в правом верхнем углу для настройки подключения.');
+        setError('Подключение к базе данных недоступно. Проверьте настройки Supabase.');
       }
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
-      setError('Ошибка подключения к базе данных. Нажмите кнопку "Connect to Supabase" в правом верхнем углу для настройки подключения.');
+      setError('Ошибка подключения к базе данных. Проверьте настройки Supabase.');
     } finally {
       setLoading(false);
     }
