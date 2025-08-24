@@ -268,6 +268,44 @@ export const ContractorDirectory: React.FC = () => {
     }
   };
 
+  // Редактирование объекта квалификации
+  const handleEditQualificationObject = async (objectId: string, updates: any) => {
+    setOperationLoading(true);
+    try {
+      const updatedObject = await qualificationObjectService.updateQualificationObject(objectId, updates);
+      setQualificationObjects(prev => prev.map(obj => obj.id === objectId ? updatedObject : obj));
+      alert('Объект квалификации успешно обновлен');
+    } catch (error) {
+      console.error('Ошибка обновления объекта квалификации:', error);
+      alert(`Ошибка обновления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // Показать объект квалификации на карте
+  const handleShowQualificationObjectOnMap = (obj: QualificationObject) => {
+    if (obj.latitude && obj.longitude) {
+      // Создаем временного контрагента с координатами объекта для показа на карте
+      const tempContractor: Contractor = {
+        id: obj.id,
+        name: obj.name || obj.vin || obj.serialNumber || 'Объект квалификации',
+        address: obj.address,
+        latitude: obj.latitude,
+        longitude: obj.longitude,
+        geocodedAt: obj.geocodedAt,
+        createdAt: obj.createdAt,
+        updatedAt: obj.updatedAt,
+        contacts: []
+      };
+      setSelectedContractor(tempContractor);
+      setShowMap(true);
+      setShowQualificationObjects(false);
+      setSelectedContractorForObjects(null);
+    } else {
+      alert('Для этого объекта квалификации не определены координаты');
+    }
+  };
   // Удаление объекта квалификации
   const handleDeleteQualificationObject = async (objectId: string) => {
     if (confirm('Вы уверены, что хотите удалить этот объект квалификации?')) {
@@ -631,15 +669,9 @@ export const ContractorDirectory: React.FC = () => {
         <QualificationObjectsTable
           objects={qualificationObjects}
           onAdd={() => setShowAddQualificationForm(true)}
-          onEdit={(obj) => {
-            // TODO: Implement edit functionality
-            console.log('Edit object:', obj);
-          }}
+          onEdit={handleEditQualificationObject}
           onDelete={handleDeleteQualificationObject}
-          onShowOnMap={(obj) => {
-            // TODO: Implement map functionality for objects
-            console.log('Show on map:', obj);
-          }}
+          onShowOnMap={handleShowQualificationObjectOnMap}
           loading={loading}
         />
       </div>

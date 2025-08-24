@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, MapPin, FileImage, Building, Car, Refrigerator, Snowflake } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Save, X, MapPin, FileImage, Building, Car, Refrigerator, Snowflake } from 'lucide-react';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
 
 interface QualificationObjectsTableProps {
   objects: QualificationObject[];
   onAdd: () => void;
-  onEdit: (object: QualificationObject) => void;
+  onEdit: (objectId: string, updates: any) => void;
   onDelete: (objectId: string) => void;
   onShowOnMap: (object: QualificationObject) => void;
   loading?: boolean;
@@ -21,6 +21,8 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredObjects, setFilteredObjects] = useState<QualificationObject[]>(objects);
+  const [editingObject, setEditingObject] = useState<string | null>(null);
+  const [editData, setEditData] = useState<any>({});
 
   // Поиск по объектам квалификации
   useEffect(() => {
@@ -78,6 +80,178 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
     setFilteredObjects(filtered);
   }, [searchTerm, objects]);
 
+  // Начать редактирование
+  const handleStartEdit = (obj: QualificationObject) => {
+    setEditData({
+      name: obj.name || '',
+      address: obj.address || '',
+      area: obj.area || '',
+      climateSystem: obj.climateSystem || '',
+      vin: obj.vin || '',
+      registrationNumber: obj.registrationNumber || '',
+      bodyVolume: obj.bodyVolume || '',
+      inventoryNumber: obj.inventoryNumber || '',
+      chamberVolume: obj.chamberVolume || '',
+      serialNumber: obj.serialNumber || ''
+    });
+    setEditingObject(obj.id);
+  };
+
+  // Сохранить изменения
+  const handleSaveEdit = (objectId: string) => {
+    // Очищаем пустые значения
+    const cleanedData: any = {};
+    Object.keys(editData).forEach(key => {
+      const value = editData[key];
+      if (value !== '' && value !== null && value !== undefined) {
+        if (key === 'area' || key === 'bodyVolume' || key === 'chamberVolume') {
+          cleanedData[key] = parseFloat(value) || undefined;
+        } else {
+          cleanedData[key] = value;
+        }
+      }
+    });
+    
+    onEdit(objectId, cleanedData);
+    setEditingObject(null);
+    setEditData({});
+  };
+
+  // Отменить редактирование
+  const handleCancelEdit = () => {
+    setEditingObject(null);
+    setEditData({});
+  };
+
+  // Рендер полей редактирования в зависимости от типа объекта
+  const renderEditFields = (obj: QualificationObject) => {
+    switch (obj.type) {
+      case 'помещение':
+        return (
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={editData.name || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Наименование"
+            />
+            <input
+              type="text"
+              value={editData.address || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, address: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Адрес"
+            />
+            <input
+              type="number"
+              step="0.01"
+              value={editData.area || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, area: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Площадь (м²)"
+            />
+            <input
+              type="text"
+              value={editData.climateSystem || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, climateSystem: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Климатическая установка"
+            />
+          </div>
+        );
+      case 'автомобиль':
+        return (
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={editData.vin || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, vin: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="VIN номер"
+            />
+            <input
+              type="text"
+              value={editData.registrationNumber || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, registrationNumber: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Регистрационный номер"
+            />
+            <input
+              type="number"
+              step="0.01"
+              value={editData.bodyVolume || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, bodyVolume: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Объем кузова (м³)"
+            />
+            <input
+              type="text"
+              value={editData.climateSystem || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, climateSystem: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Климатическая установка"
+            />
+          </div>
+        );
+      case 'холодильная_камера':
+        return (
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={editData.name || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Наименование"
+            />
+            <input
+              type="text"
+              value={editData.inventoryNumber || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, inventoryNumber: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Инвентарный номер"
+            />
+            <input
+              type="number"
+              step="0.01"
+              value={editData.chamberVolume || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, chamberVolume: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Объем камеры (м³)"
+            />
+            <input
+              type="text"
+              value={editData.climateSystem || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, climateSystem: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Климатическая установка"
+            />
+          </div>
+        );
+      case 'холодильник':
+      case 'морозильник':
+        return (
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={editData.serialNumber || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, serialNumber: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Серийный номер"
+            />
+            <input
+              type="text"
+              value={editData.inventoryNumber || ''}
+              onChange={(e) => setEditData(prev => ({ ...prev, inventoryNumber: e.target.value }))}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="Инвентарный номер"
+            />
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'помещение':
@@ -214,7 +388,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {renderObjectDetails(obj)}
+                      {editingObject === obj.id ? renderEditFields(obj) : renderObjectDetails(obj)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
@@ -241,22 +415,41 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => onEdit(obj)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          title="Редактировать"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => onDelete(obj.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Удалить"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {editingObject === obj.id ? (
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => handleSaveEdit(obj.id)}
+                            className="text-green-600 hover:text-green-900"
+                            title="Сохранить"
+                          >
+                            <Save className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="text-gray-600 hover:text-gray-900"
+                            title="Отмена"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => handleStartEdit(obj)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                            title="Редактировать"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onDelete(obj.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Удалить"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
