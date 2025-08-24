@@ -406,7 +406,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const handleExploreData = () => {
     const completedFiles = uploadedFiles.filter(f => f.parsingStatus === 'completed');
     if (completedFiles.length === 0) {
-      alert('Нет обработанных файлов для исследования');
+      alert('Нет обработанных файлов для подготовки отчета');
       return;
     }
     
@@ -593,7 +593,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
               className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               <BarChart className="w-4 h-4" />
-              <span>Исследовать данные</span>
+              <span>Подготовка отчета</span>
             </button>
             <button
               onClick={triggerFileUpload}
