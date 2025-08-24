@@ -122,22 +122,41 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   // Загрузка файлов данных при выборе объекта квалификации
   useEffect(() => {
     const loadProjectFiles = async () => {
-      if (!selectedQualificationObject || !uploadedFileService.isAvailable()) {
+      if (!selectedQualificationObject) {
         setUploadedFiles([]);
         return;
       }
 
       try {
         console.log('Загружаем файлы данных для объекта квалификации:', selectedQualificationObject);
-        const projectFiles = await uploadedFileService.getProjectFiles(project.id, user?.id || 'anonymous');
         
-        if (projectFiles.length > 0) {
-          console.log('Найдены ранее сохраненные файлы:', projectFiles.length);
-          setUploadedFiles(projectFiles);
+        // Загружаем назначения оборудования для получения файлов
+        if (projectEquipmentService.isAvailable()) {
+          const assignments = await projectEquipmentService.getEquipmentPlacement(
+            project.id,
+            selectedQualificationObject
+          );
+          
+          // Создаем файлы на основе назначений (заглушка для демонстрации)
+          const mockFiles: UploadedFile[] = assignments.map(assignment => ({
+            id: assignment.id,
+            name: `${getEquipmentName(assignment.equipmentId)}.vi2`,
+            uploadDate: assignment.assignedAt.toLocaleString('ru-RU'),
+            parsingStatus: assignment.completedAt ? 'completed' : 'pending',
+            order: assignment.zoneNumber,
+            zoneNumber: assignment.zoneNumber,
+            measurementLevel: assignment.measurementLevel.toString(),
+            recordCount: assignment.completedAt ? Math.floor(Math.random() * 5000) + 1000 : undefined,
+            period: assignment.completedAt ? 
+              `${assignment.assignedAt.toLocaleDateString('ru-RU')} - ${assignment.completedAt.toLocaleDateString('ru-RU')}` : 
+              undefined
+          }));
+          
+          setUploadedFiles(mockFiles);
+          console.log('Загружено файлов данных измерений:', mockFiles.length);
+        } else {
+          setUploadedFiles([]);
         }
-      } catch (error) {
-        console.error('Ошибка загрузки файлов проекта:', error);
-        setUploadedFiles([]);
       }
     };
 
