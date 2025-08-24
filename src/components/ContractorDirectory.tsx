@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft, Eye } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft, Eye, Copy } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { contractorService } from '../utils/contractorService';
@@ -477,23 +477,31 @@ export const ContractorDirectory: React.FC = () => {
           {viewingContractor.latitude && viewingContractor.longitude && (
             <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
               <h3 className="text-sm font-medium text-green-900 mb-2">Координаты</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-green-800">Широта:</span>
-                  <div className="text-green-700">{viewingContractor.latitude.toFixed(6)}</div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm text-green-800">
+                  <span className="font-medium">Координаты:</span>
+                  <span className="ml-2 font-mono">{viewingContractor.latitude.toFixed(6)}, {viewingContractor.longitude.toFixed(6)}</span>
                 </div>
-                <div>
-                  <span className="font-medium text-green-800">Долгота:</span>
-                  <div className="text-green-700">{viewingContractor.longitude.toFixed(6)}</div>
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Геокодирован:</span>
-                  <div className="text-green-700">
-                    {viewingContractor.geocodedAt?.toLocaleDateString('ru-RU') || 'Неизвестно'}
-                  </div>
-                </div>
+                <button
+                  onClick={() => {
+                    const coordinates = `${viewingContractor.latitude!.toFixed(6)}, ${viewingContractor.longitude!.toFixed(6)}`;
+                    navigator.clipboard.writeText(coordinates).then(() => {
+                      alert('Координаты скопированы в буфер обмена');
+                    }).catch(() => {
+                      alert('Ошибка копирования координат');
+                    });
+                  }}
+                  className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
+                  title="Скопировать координаты"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Скопировать координаты</span>
+                </button>
               </div>
-              <div className="mt-3">
+              <div className="text-xs text-green-700 mb-3">
+                Геокодирован: {viewingContractor.geocodedAt?.toLocaleDateString('ru-RU')} в {viewingContractor.geocodedAt?.toLocaleTimeString('ru-RU') || 'Неизвестно'}
+              </div>
+              <div>
                 <button
                   onClick={() => {
                     setSelectedContractor(viewingContractor);
