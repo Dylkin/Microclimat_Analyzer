@@ -277,8 +277,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         }
       } catch (error) {
         console.error('Ошибка удаления данных из базы:', error);
-      } catch (error) {
-        console.error('Ошибка удаления файла:', error);
       } finally {
         setOperationLoading(false);
       }
