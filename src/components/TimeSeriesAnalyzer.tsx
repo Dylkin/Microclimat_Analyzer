@@ -688,19 +688,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
         </div>
 
-        {/* Zoom Controls */}
-        {zoomState && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Управление масштабом</label>
-            <button
-              onClick={handleResetZoom}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Сбросить масштаб
-            </button>
-          </div>
-        )}
-
         {/* Contract Information - moved test type to markers section */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Информация о договоре</label>
@@ -769,7 +756,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       {/* Test Information and Markers - always visible */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Испытания</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Испытания</h3>
+          {/* Zoom Controls */}
+          {zoomState && (
+            <button
+              onClick={handleResetZoom}
+              className="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+            >
+              Сбросить масштаб
+            </button>
+          )}
+        </div>
         
         {/* Test Type Selection */}
         <div className="mb-6">
