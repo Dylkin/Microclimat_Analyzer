@@ -685,100 +685,224 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         )}
       </div>
 
-      {/* Document Upload Section */}
+      {/* Commercial Offer Section */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Документы договора</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Коммерческое предложение</h2>
+          <div className="flex items-center space-x-3">
+            <span className="text-sm text-gray-600">Статус:</span>
+            <select
+              value={commercialOfferStatus}
+              onChange={(e) => setCommercialOfferStatus(e.target.value as DocumentStatus)}
+              className="px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            >
+              {Object.entries(DocumentStatusLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Commercial Offer */}
-          <div>
-            <h3 className="text-md font-medium text-gray-800 mb-3">{DocumentTypeLabels.commercial_offer}</h3>
-            {(() => {
-              const document = getDocumentByType('commercial_offer');
-              return document ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {document.fileName}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {(document.fileSize / 1024 / 1024).toFixed(2)} MB
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Загружен: {document.uploadedAt.toLocaleString('ru-RU')}
-                        {document.uploadedByName && ` • ${document.uploadedByName}`}
-                      </div>
+        {/* Commercial Offer Document */}
+        {(() => {
+          const document = getDocumentByType('commercial_offer');
+          return document ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {document.fileName}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {(document.fileSize / 1024 / 1024).toFixed(2)} MB
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Загружен: {document.uploadedAt.toLocaleString('ru-RU')}
+                      {document.uploadedByName && ` • ${document.uploadedByName}`}
                     </div>
                   </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleDownloadDocument(document)}
-                      disabled={operationLoading}
-                      className="text-blue-600 hover:text-blue-800 transition-colors"
-                      title="Скачать"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleRemoveDocument(document.id, 'commercial_offer')}
-                      disabled={operationLoading}
-                      className="text-red-600 hover:text-red-800 transition-colors"
-                      title="Удалить"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleDownloadDocument(document)}
+                    disabled={operationLoading}
+                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                    title="Скачать"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleRemoveDocument(document.id, 'commercial_offer')}
+                    disabled={operationLoading}
+                    className="text-red-600 hover:text-red-800 transition-colors"
+                    title="Удалить"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              {uploadingDocument === 'commercial_offer' ? (
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                  <span className="text-sm text-gray-600">Сохранение документа...</span>
+                </div>
               ) : (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                {uploadingDocument === 'commercial_offer' ? (
-                  <div className="flex flex-col items-center space-y-2">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                    <span className="text-sm text-gray-600">Сохранение документа...</span>
-                  </div>
-                ) : (
-                  <>
-                <input
-                  type="file"
-                  accept=".pdf,.docx"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      handleDocumentUpload('commercial_offer', file);
-                    }
-                  }}
-                  className="hidden"
-                  id="commercial-offer-upload"
-                />
-                <label
-                  htmlFor="commercial-offer-upload"
-                  className="cursor-pointer flex flex-col items-center space-y-2"
-                >
-                  <Upload className="w-8 h-8 text-gray-400" />
-                  <span className="text-sm text-gray-600">
-                      Загрузить {DocumentTypeLabels.commercial_offer.toLowerCase()}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    PDF или DOCX, до 10 MB
-                  </span>
-                </label>
-                  </>
-                )}
-              </div>
-              );
-            })()}
-          </div>
+                <>
+                  <input
+                    type="file"
+                    accept=".pdf,.docx"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleDocumentUpload('commercial_offer', file);
+                      }
+                    }}
+                    className="hidden"
+                    id="commercial-offer-upload"
+                  />
+                  <label
+                    htmlFor="commercial-offer-upload"
+                    className="cursor-pointer flex flex-col items-center space-y-2"
+                  >
+                    <Upload className="w-8 h-8 text-gray-400" />
+                    <span className="text-sm text-gray-600">
+                      Загрузить коммерческое предложение
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      PDF или DOCX, до 10 MB
+                    </span>
+                  </label>
+                </>
+              )}
+            </div>
+          );
+        })()}
+        
+        {/* Status Badge */}
+        <div className="mt-4 flex justify-center">
+          <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${DocumentStatusColors[commercialOfferStatus]}`}>
+            {DocumentStatusLabels[commercialOfferStatus]}
+          </span>
+        </div>
 
-          {/* Contract */}
-          <div>
-            <h3 className="text-md font-medium text-gray-800 mb-3">{DocumentTypeLabels.contract}</h3>
-            {(() => {
-              const document = getDocumentByType('contract');
-              return document ? (
+        {/* Instructions */}
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 className="text-sm font-medium text-blue-900 mb-2">Требования к коммерческому предложению:</h4>
+          <ul className="text-xs text-blue-800 space-y-1">
+            <li>• Поддерживаемые форматы: PDF, DOCX</li>
+            <li>• Максимальный размер файла: 10 MB</li>
+            <li>• Документ сохраняется в базе данных проекта</li>
+            <li>• При загрузке нового документа старый автоматически заменяется</li>
+            <li>• Документ доступен для скачивания всем участникам проекта</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Contract Actions */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Действия по договору</h2>
+          <div className="flex items-center space-x-3">
+            <span className="text-sm text-gray-600">Статус:</span>
+            <select
+              value={contractStatus}
+              onChange={(e) => setContractStatus(e.target.value as DocumentStatus)}
+              className="px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            >
+              {Object.entries(DocumentStatusLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        
+        {/* Contract Information */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-md font-semibold text-blue-900">Договор</h3>
+            <div className="flex space-x-2">
+              {editingContractInfo ? (
+                <>
+                  <button
+                    onClick={handleSaveContractInfo}
+                    disabled={operationLoading}
+                    className="text-green-600 hover:text-green-800 transition-colors"
+                    title="Сохранить изменения"
+                  >
+                    <Save className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={handleCancelContractEdit}
+                    className="text-gray-600 hover:text-gray-800 transition-colors"
+                    title="Отменить изменения"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setEditingContractInfo(true)}
+                  disabled={operationLoading}
+                  className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                  title="Редактировать"
+                >
+                  <Edit2 className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <span className="text-sm font-medium text-blue-900">Дата создания:</span>
+              <div className="text-blue-800">{project.createdAt.toLocaleDateString('ru-RU')}</div>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-blue-900">Примерная дата завершения:</span>
+              {editingContractInfo ? (
+                <input
+                  type="date"
+                  value={contractInfo.estimatedCompletionDate}
+                  onChange={(e) => setContractInfo(prev => ({ ...prev, estimatedCompletionDate: e.target.value }))}
+                  className="mt-1 px-2 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                  <span className="text-blue-800 font-medium">
+                    {new Date(contractInfo.estimatedCompletionDate).toLocaleDateString('ru-RU')}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div>
+              <span className="text-sm font-medium text-blue-900">Номер договора:</span>
+              {editingContractInfo ? (
+                <input
+                  type="text"
+                  value={contractInfo.contractNumber}
+                  onChange={(e) => setContractInfo(prev => ({ ...prev, contractNumber: e.target.value }))}
+                  className="mt-1 w-full px-2 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Введите номер договора"
+                />
+              ) : (
+                <div className="text-blue-800">{contractInfo.contractNumber || 'Не указан'}</div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Contract Document Upload */}
+        <div className="mb-6">
+          <h3 className="text-md font-medium text-gray-800 mb-3">Загрузка договора</h3>
+          {(() => {
+            const document = getDocumentByType('contract');
+            return document ? (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -816,7 +940,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
                   </div>
                 </div>
               </div>
-              ) : (
+            ) : (
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                 {uploadingDocument === 'contract' ? (
                   <div className="flex flex-col items-center space-y-2">
@@ -825,54 +949,42 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
                   </div>
                 ) : (
                   <>
-                <input
-                  type="file"
-                  accept=".pdf,.docx"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      handleDocumentUpload('contract', file);
-                    }
-                  }}
-                  className="hidden"
-                  id="contract-upload"
-                />
-                <label
-                  htmlFor="contract-upload"
-                  className="cursor-pointer flex flex-col items-center space-y-2"
-                >
-                  <Upload className="w-8 h-8 text-gray-400" />
-                  <span className="text-sm text-gray-600">
-                      Загрузить {DocumentTypeLabels.contract.toLowerCase()}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    PDF или DOCX, до 10 MB
-                  </span>
-                </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.docx"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleDocumentUpload('contract', file);
+                        }
+                      }}
+                      className="hidden"
+                      id="contract-upload"
+                    />
+                    <label
+                      htmlFor="contract-upload"
+                      className="cursor-pointer flex flex-col items-center space-y-2"
+                    >
+                      <Upload className="w-8 h-8 text-gray-400" />
+                      <span className="text-sm text-gray-600">
+                        Загрузить договор
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        PDF или DOCX, до 10 MB
+                      </span>
+                    </label>
                   </>
                 )}
               </div>
-              );
-            })()}
-          </div>
+            );
+          })()}
         </div>
-
-        {/* Document Upload Instructions */}
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <h4 className="text-sm font-medium text-blue-900 mb-2">Требования к документам:</h4>
-          <ul className="text-xs text-blue-800 space-y-1">
-            <li>• Поддерживаемые форматы: PDF, DOCX</li>
-            <li>• Максимальный размер файла: 10 MB</li>
-            <li>• Документы сохраняются в базе данных проекта</li>
-            <li>• При загрузке нового документа старый автоматически заменяется</li>
-            <li>• Документы доступны для скачивания всем участникам проекта</li>
-          </ul>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Действия по договору</h2>
+        
+        {/* Contract Status Badge */}
+        <div className="mb-6 flex justify-center">
+          <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${DocumentStatusColors[contractStatus]}`}>
+            {DocumentStatusLabels[contractStatus]}
+          </span>
         
         <div className="space-y-4">
           <div className="flex items-center space-x-3 p-4 bg-green-50 border border-green-200 rounded-lg">
