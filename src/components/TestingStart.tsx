@@ -8,6 +8,7 @@ import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { measurementEquipmentService } from '../utils/measurementEquipmentService';
 import { projectService } from '../utils/projectService';
+import { projectEquipmentService, CreateProjectEquipmentAssignmentData } from '../utils/projectEquipmentService';
 
 interface MeasurementLevel {
   id: string;
@@ -295,16 +296,39 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
   const handleSaveEquipmentPlacement = async (objectId: string) => {
     setOperationLoading(true);
     try {
-      // В реальном проекте здесь можно было бы сохранить данные в базе данных
-      // Пока просто имитируем сохранение
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const objectZones = equipmentPlacement[objectId] || [];
+      
+      // Подготавливаем данные для сохранения
+      const assignments: CreateProjectEquipmentAssignmentData[] = [];
+      
+      objectZones.forEach(zone => {
+        zone.levels.forEach(level => {
+          if (level.equipmentId) {
+            assignments.push({
+              projectId: project.id,
+              qualificationObjectId: objectId,
+              equipmentId: level.equipmentId,
+              zoneNumber: zone.number,
+              measurementLevel: level.height
+            });
+          }
+        });
+      });
+      
+      // Сохраняем в базе данных
+      if (projectEquipmentService.isAvailable()) {
+        await projectEquipmentService.saveEquipmentPlacement(
+          project.id,
+          objectId,
+          assignments
+        );
+      }
       
       console.log('Сохранение размещения оборудования для объекта:', objectId);
-      console.log('Данные размещения:', equipmentPlacement[objectId]);
+      console.log('Сохранено назначений:', assignments.length);
       
     } catch (error) {
       console.error('Ошибка сохранения размещения оборудования:', error);
-      alert(`Ошибка сохранения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }
@@ -621,11 +645,6 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
                                 ]}
                                 placeholder="Поиск оборудования..."
                               />
-                              {selectedEquipment && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  S/N: {selectedEquipment.serialNumber}
-                                </div>
-                              )}
                             </div>
                             <div className="flex items-end">
                               <button
