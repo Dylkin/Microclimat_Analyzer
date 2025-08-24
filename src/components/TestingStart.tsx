@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Building2, Play, Edit2, Save, X, MapPin, Car, Refrigerator, Snowflake, Building, Package, Hash, Copy, Map, User, Phone, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Building2, Play, Edit2, Save, X, MapPin, Car, Refrigerator, Snowflake, Building, Package, Hash, Copy, Map, User, Phone, MessageSquare, CheckCircle, AlertCircle, Plus, Trash2, Wrench } from 'lucide-react';
 import { Project } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels, UpdateQualificationObjectData } from '../types/QualificationObject';
+import { MeasurementEquipment } from '../types/MeasurementEquipment';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
+import { measurementEquipmentService } from '../utils/measurementEquipmentService';
 import { projectService } from '../utils/projectService';
+
+interface MeasurementLevel {
+  id: string;
+  height: number;
+  equipmentId: string | null;
+}
+
+interface MeasurementZone {
+  id: string;
+  number: number;
+  levels: MeasurementLevel[];
+}
+
+interface ObjectEquipmentPlacement {
+  [objectId: string]: MeasurementZone[];
+}
 
 interface TestingStartProps {
   project: Project;
@@ -15,6 +33,8 @@ interface TestingStartProps {
 export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) => {
   const [contractor, setContractor] = useState<Contractor | null>(null);
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
+  const [measurementEquipment, setMeasurementEquipment] = useState<MeasurementEquipment[]>([]);
+  const [equipmentPlacement, setEquipmentPlacement] = useState<ObjectEquipmentPlacement>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingObject, setEditingObject] = useState<string | null>(null);
@@ -41,6 +61,12 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
           const projectObjectIds = project.qualificationObjects.map(obj => obj.qualificationObjectId);
           const projectObjects = allObjects.filter(obj => projectObjectIds.includes(obj.id));
           setQualificationObjects(projectObjects);
+        }
+
+        // Загружаем измерительное оборудование
+        if (measurementEquipmentService.isAvailable()) {
+          const equipmentData = await measurementEquipmentService.getAllEquipment();
+          setMeasurementEquipment(equipmentData);
         }
       } catch (error) {
         console.error('Ошибка загрузки данных:', error);
@@ -117,6 +143,153 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
   const handleCancelEdit = () => {
     setEditingObject(null);
     setEditObjectData({});
+  };
+
+  // Добавление зоны измерения
+  const handleAddZone = (objectId: string) => {
+    setEquipmentPlacement(prev => {
+      const objectZones = prev[objectId] || [];
+      const nextNumber = objectZones.length > 0 ? Math.max(...objectZones.map(z => z.number)) + 1 : 1;
+      
+      const newZone: MeasurementZone = {
+        id: crypto.randomUUID(),
+        number: nextNumber,
+        levels: []
+      };
+      
+      return {
+        ...prev,
+        [objectId]: [...objectZones, newZone]
+      };
+    });
+  };
+
+  // Удаление зоны измерения
+  const handleRemoveZone = (objectId: string, zoneId: string) => {
+    setEquipmentPlacement(prev => {
+      const objectZones = prev[objectId] || [];
+      return {
+        ...prev,
+        [objectId]: objectZones.filter(zone => zone.id !== zoneId)
+      };
+    });
+  };
+
+  // Добавление уровня измерения
+  const handleAddLevel = (objectId: string, zoneId: string) => {
+    setEquipmentPlacement(prev => {
+      const objectZones = prev[objectId] || [];
+      return {
+        ...prev,
+        [objectId]: objectZones.map(zone => {
+          if (zone.id === zoneId) {
+            const newLevel: MeasurementLevel = {
+              id: crypto.randomUUID(),
+              height: 0,
+              equipmentId: null
+            };
+            return {
+              ...zone,
+              levels: [...zone.levels, newLevel]
+            };
+          }
+          return zone;
+        })
+      };
+    });
+  };
+
+  // Удаление уровня измерения
+  const handleRemoveLevel = (objectId: string, zoneId: string, levelId: string) => {
+    setEquipmentPlacement(prev => {
+      const objectZones = prev[objectId] || [];
+      return {
+        ...prev,
+        [objectId]: objectZones.map(zone => {
+          if (zone.id === zoneId) {
+            return {
+              ...zone,
+              levels: zone.levels.filter(level => level.id !== levelId)
+            };
+          }
+          return zone;
+        })
+      };
+    });
+  };
+
+  // Обновление высоты уровня
+  const handleUpdateLevelHeight = (objectId: string, zoneId: string, levelId: string, height: number) => {
+    setEquipmentPlacement(prev => {
+      const objectZones = prev[objectId] || [];
+      return {
+        ...prev,
+        [objectId]: objectZones.map(zone => {
+          if (zone.id === zoneId) {
+            return {
+              ...zone,
+              levels: zone.levels.map(level => {
+                if (level.id === levelId) {
+                  return { ...level, height };
+                }
+                return level;
+              })
+            };
+          }
+          return zone;
+        })
+      };
+    });
+  };
+
+  // Обновление оборудования уровня
+  const handleUpdateLevelEquipment = (objectId: string, zoneId: string, levelId: string, equipmentId: string | null) => {
+    // Проверяем, что оборудование не используется в других уровнях этого объекта
+    if (equipmentId) {
+      const objectZones = equipmentPlacement[objectId] || [];
+      const isEquipmentUsed = objectZones.some(zone => 
+        zone.levels.some(level => level.id !== levelId && level.equipmentId === equipmentId)
+      );
+      
+      if (isEquipmentUsed) {
+        const equipment = measurementEquipment.find(eq => eq.id === equipmentId);
+        alert(`Оборудование "${equipment?.name}" уже используется в другом уровне этого объекта квалификации`);
+        return;
+      }
+    }
+
+    setEquipmentPlacement(prev => {
+      const objectZones = prev[objectId] || [];
+      return {
+        ...prev,
+        [objectId]: objectZones.map(zone => {
+          if (zone.id === zoneId) {
+            return {
+              ...zone,
+              levels: zone.levels.map(level => {
+                if (level.id === levelId) {
+                  return { ...level, equipmentId };
+                }
+                return level;
+              })
+            };
+          }
+          return zone;
+        })
+      };
+    });
+  };
+
+  // Получение доступного оборудования для объекта (исключая уже используемое)
+  const getAvailableEquipment = (objectId: string, currentLevelId?: string) => {
+    const objectZones = equipmentPlacement[objectId] || [];
+    const usedEquipmentIds = objectZones.flatMap(zone => 
+      zone.levels
+        .filter(level => level.id !== currentLevelId && level.equipmentId)
+        .map(level => level.equipmentId!)
+    );
+    
+    return measurementEquipment.filter(eq => !usedEquipmentIds.includes(eq.id));
   };
 
   // Рендер полей в зависимости от типа объекта
@@ -319,6 +492,147 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
               onChange={(e) => setEditObjectData(prev => ({ ...prev, climateSystem: e.target.value }))}
               className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Рендер блока размещения измерительного оборудования
+  const renderEquipmentPlacement = (obj: QualificationObject) => {
+    const objectZones = equipmentPlacement[obj.id] || [];
+    
+    return (
+      <div className="mt-6 border-t border-gray-200 pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-md font-medium text-gray-900 flex items-center space-x-2">
+            <Wrench className="w-5 h-5 text-indigo-600" />
+            <span>Размещение измерительного оборудования</span>
+          </h4>
+          <button
+            onClick={() => handleAddZone(obj.id)}
+            className="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700 transition-colors flex items-center space-x-1"
+          >
+            <Plus className="w-3 h-3" />
+            <span>Добавить зону</span>
+          </button>
+        </div>
+
+        {objectZones.length > 0 ? (
+          <div className="space-y-4">
+            {objectZones.map((zone) => (
+              <div key={zone.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h5 className="text-sm font-medium text-gray-900">
+                    Зона измерения № {zone.number}
+                  </h5>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleAddLevel(obj.id, zone.id)}
+                      className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700 transition-colors flex items-center space-x-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Уровень</span>
+                    </button>
+                    <button
+                      onClick={() => handleRemoveZone(obj.id, zone.id)}
+                      className="text-red-600 hover:text-red-800 transition-colors"
+                      title="Удалить зону"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {zone.levels.length > 0 ? (
+                  <div className="space-y-3">
+                    {zone.levels.map((level) => {
+                      const availableEquipment = getAvailableEquipment(obj.id, level.id);
+                      const selectedEquipment = level.equipmentId ? 
+                        measurementEquipment.find(eq => eq.id === level.equipmentId) : null;
+                      
+                      return (
+                        <div key={level.id} className="bg-white border border-gray-200 rounded p-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Высота (м.)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={level.height}
+                                onChange={(e) => handleUpdateLevelHeight(
+                                  obj.id, 
+                                  zone.id, 
+                                  level.id, 
+                                  parseFloat(e.target.value) || 0
+                                )}
+                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                placeholder="0.0"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Измерительное оборудование
+                              </label>
+                              <select
+                                value={level.equipmentId || ''}
+                                onChange={(e) => handleUpdateLevelEquipment(
+                                  obj.id, 
+                                  zone.id, 
+                                  level.id, 
+                                  e.target.value || null
+                                )}
+                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                              >
+                                <option value="">Выберите оборудование</option>
+                                {availableEquipment.map((equipment) => (
+                                  <option key={equipment.id} value={equipment.id}>
+                                    {equipment.name} ({equipment.type})
+                                  </option>
+                                ))}
+                                {selectedEquipment && !availableEquipment.find(eq => eq.id === selectedEquipment.id) && (
+                                  <option value={selectedEquipment.id}>
+                                    {selectedEquipment.name} ({selectedEquipment.type}) - Используется
+                                  </option>
+                                )}
+                              </select>
+                              {selectedEquipment && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  S/N: {selectedEquipment.serialNumber}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-end">
+                              <button
+                                onClick={() => handleRemoveLevel(obj.id, zone.id, level.id)}
+                                className="text-red-600 hover:text-red-800 transition-colors"
+                                title="Удалить уровень"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500 bg-white border border-gray-200 rounded">
+                    <p className="text-sm">Уровни измерения не добавлены</p>
+                    <p className="text-xs mt-1">Нажмите "Уровень" для добавления</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-6 text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+            <Wrench className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+            <p className="text-sm">Зоны измерения не добавлены</p>
+            <p className="text-xs mt-1">Нажмите "Добавить зону" для создания первой зоны</p>
           </div>
         )}
       </div>
@@ -599,6 +913,8 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
                 </div>
 
                 {renderObjectFields(obj)}
+
+                {renderEquipmentPlacement(obj)}
               </div>
             ))}
           </div>
