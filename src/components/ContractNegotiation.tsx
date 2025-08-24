@@ -4,6 +4,7 @@ import { Project } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels, UpdateQualificationObjectData } from '../types/QualificationObject';
 import { ProjectDocument, DocumentType, DocumentTypeLabels } from '../types/ProjectDocument';
+import { DocumentStatus, DocumentStatusLabels, DocumentStatusColors } from '../types/ProjectDocument';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { projectService } from '../utils/projectService';
@@ -35,6 +36,8 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
     })()
   });
   const [uploadingDocument, setUploadingDocument] = useState<DocumentType | null>(null);
+  const [commercialOfferStatus, setCommercialOfferStatus] = useState<DocumentStatus>('draft');
+  const [contractStatus, setContractStatus] = useState<DocumentStatus>('draft');
 
   // Вычисляем примерную дату завершения (дата создания + 7 дней)
 
@@ -70,6 +73,17 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
       if (projectDocumentService.isAvailable()) {
         const documentsData = await projectDocumentService.getProjectDocuments(project.id);
         setProjectDocuments(documentsData);
+        
+        // Устанавливаем статусы документов на основе их наличия
+        const hasCommercialOffer = documentsData.some(doc => doc.documentType === 'commercial_offer');
+        const hasContract = documentsData.some(doc => doc.documentType === 'contract');
+        
+        if (hasCommercialOffer) {
+          setCommercialOfferStatus('ready_to_send');
+        }
+        if (hasContract) {
+          setContractStatus('ready_to_send');
+        }
       }
     };
 
@@ -183,6 +197,13 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         const filtered = prev.filter(doc => doc.documentType !== documentType);
         return [...filtered, savedDocument];
       });
+      
+      // Обновляем статус документа
+      if (documentType === 'commercial_offer') {
+        setCommercialOfferStatus('ready_to_send');
+      } else if (documentType === 'contract') {
+        setContractStatus('ready_to_send');
+      }
 
       alert(`${DocumentTypeLabels[documentType]} успешно сохранен`);
     } catch (error) {
@@ -202,6 +223,13 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         
         // Удаляем из локального состояния
         setProjectDocuments(prev => prev.filter(doc => doc.id !== documentId));
+        
+        // Сбрасываем статус документа
+        if (documentType === 'commercial_offer') {
+          setCommercialOfferStatus('draft');
+        } else if (documentType === 'contract') {
+          setContractStatus('draft');
+        }
         
         alert(`${DocumentTypeLabels[documentType]} успешно удален`);
       } catch (error) {
