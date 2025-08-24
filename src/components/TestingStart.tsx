@@ -152,17 +152,31 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
       const objectZones = prev[objectId] || [];
       const nextNumber = objectZones.length > 0 ? Math.max(...objectZones.map(z => z.number)) + 1 : 1;
       
-      // Автоматически добавляем первый уровень с высотой 0.3 м
-      const defaultLevel: MeasurementLevel = {
-        id: crypto.randomUUID(),
-        height: 0.3,
-        equipmentId: null
-      };
+      // Если это первая зона, добавляем уровень по умолчанию
+      // Если есть предыдущие зоны, копируем уровни из последней зоны
+      let levelsToAdd: MeasurementLevel[];
+      
+      if (objectZones.length === 0) {
+        // Первая зона - добавляем уровень по умолчанию
+        levelsToAdd = [{
+          id: crypto.randomUUID(),
+          height: 0.3,
+          equipmentId: null
+        }];
+      } else {
+        // Копируем уровни из последней зоны (без назначенного оборудования)
+        const lastZone = objectZones[objectZones.length - 1];
+        levelsToAdd = lastZone.levels.map(level => ({
+          id: crypto.randomUUID(),
+          height: level.height,
+          equipmentId: null // Сбрасываем назначенное оборудование
+        }));
+      }
       
       const newZone: MeasurementZone = {
         id: crypto.randomUUID(),
         number: nextNumber,
-        levels: [defaultLevel]
+        levels: levelsToAdd
       };
       
       return {
