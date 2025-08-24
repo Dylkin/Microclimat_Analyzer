@@ -44,6 +44,29 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
   const [loadingAssignments, setLoadingAssignments] = React.useState(false);
   const [measurementEquipment, setMeasurementEquipment] = React.useState<MeasurementEquipment[]>([]);
 
+  // Загрузка ранее сохраненных файлов проекта
+  React.useEffect(() => {
+    const loadProjectFiles = async () => {
+      if (!selectedQualificationObject || !uploadedFileService.isAvailable()) {
+        return;
+      }
+
+      try {
+        console.log('Загружаем ранее сохраненные файлы для объекта квалификации:', selectedQualificationObject);
+        const projectFiles = await uploadedFileService.getProjectFiles(project.id, user?.id || 'anonymous');
+        
+        if (projectFiles.length > 0) {
+          console.log('Найдены ранее сохраненные файлы:', projectFiles.length);
+          setUploadedFiles(projectFiles);
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки файлов проекта:', error);
+      }
+    };
+
+    loadProjectFiles();
+  }, [selectedQualificationObject, project.id, user?.id]);
+
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
     const loadContractors = async () => {
