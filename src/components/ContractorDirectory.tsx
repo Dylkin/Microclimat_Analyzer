@@ -975,6 +975,15 @@ export const ContractorDirectory: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Введите адрес (будет геокодирован автоматически)"
               />
+              <div className="mt-1 text-xs text-gray-500">
+                <p className="mb-1"><strong>Формат адреса для успешного геокодирования:</strong></p>
+                <ul className="space-y-0.5 list-disc list-inside">
+                  <li>Страна, город, улица, дом: "Беларусь, Минск, ул. Дунина-Марцинкевича, 3"</li>
+                  <li>Город, улица, дом: "Минск, ул. Дунина-Марцинкевича, 3"</li>
+                  <li>Полный адрес: "220030, г. Минск, ул. Дунина-Марцинкевича, 3"</li>
+                </ul>
+                <p className="mt-1 text-gray-400">Чем подробнее адрес, тем точнее геокодирование</p>
+              </div>
             </div>
           </div>
 
