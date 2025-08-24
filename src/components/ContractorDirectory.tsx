@@ -434,6 +434,30 @@ export const ContractorDirectory: React.FC = () => {
               <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
                 {viewingContractor.address || 'Не указан'}
               </div>
+              {/* Результат геокодирования */}
+              {viewingContractor.address && (
+                <div className="mt-2">
+                  {viewingContractor.latitude && viewingContractor.longitude ? (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-green-700 font-medium">Адрес геокодирован</span>
+                      <span className="text-gray-500">
+                        ({viewingContractor.latitude.toFixed(6)}, {viewingContractor.longitude.toFixed(6)})
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                      <span className="text-yellow-700 font-medium">Адрес не геокодирован</span>
+                    </div>
+                  )}
+                  {viewingContractor.geocodedAt && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Геокодирован: {viewingContractor.geocodedAt.toLocaleDateString('ru-RU')} в {viewingContractor.geocodedAt.toLocaleTimeString('ru-RU')}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             <div>
