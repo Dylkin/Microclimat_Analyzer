@@ -42,11 +42,9 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   });
 
   const [editProject, setEditProject] = useState<{
-    contractNumber: string;
     status: ProjectStatus;
     qualificationObjectIds: string[];
   }>({
-    contractNumber: '',
     status: 'contract_negotiation',
     qualificationObjectIds: []
   });
@@ -281,7 +279,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   // Редактирование проекта
   const handleEditProject = (project: Project) => {
     setEditProject({
-      contractNumber: project.contractNumber || '',
       status: project.status,
       qualificationObjectIds: project.qualificationObjects.map(obj => obj.qualificationObjectId)
     });
@@ -292,7 +289,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     setOperationLoading(true);
     try {
       const updatedProject = await projectService.updateProject(editingProject!, {
-        contractNumber: editProject.contractNumber,
         status: editProject.status,
         qualificationObjectIds: editProject.qualificationObjectIds
       });
@@ -650,13 +646,9 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {editingProject === project.id ? (
-                        <input
-                          type="text"
-                          value={editProject.contractNumber}
-                          onChange={(e) => setEditProject(prev => ({ ...prev, contractNumber: e.target.value }))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          placeholder="№ договора"
-                        />
+                        <div className="text-sm text-gray-900">
+                          {project.contractNumber || '-'}
+                        </div>
                       ) : (
                         <div className="text-sm text-gray-900">
                           {project.contractNumber || '-'}
