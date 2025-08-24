@@ -69,7 +69,7 @@ export const ProjectStatusLabels: Record<ProjectStatus, string> = {
   'contract_negotiation': 'Согласование договора',
   'protocol_preparation': 'Подготовка протокола',
   'testing_start': 'Начало испытаний',
-  'testing_completion': 'Завершение испытаний',
+  'testing_completion': 'Выгрузка данных',
   'report_preparation': 'Подготовка отчета',
   'report_approval': 'Согласование отчета',
   'report_printing': 'Печать отчета',
