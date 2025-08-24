@@ -13,6 +13,7 @@ import { ProtocolPreparation } from './components/ProtocolPreparation';
 import { TestingStart } from './components/TestingStart';
 import { MeasurementEquipmentDirectory } from './components/MeasurementEquipmentDirectory';
 import { DataExport } from './components/DataExport';
+import { ReportPreparation } from './components/ReportPreparation';
 import './index.css';
 
 const AppContent: React.FC = () => {
@@ -71,6 +72,13 @@ const AppContent: React.FC = () => {
       case 'data-export':
         return hasAccess('analyzer') && selectedProject ? (
           <DataExport 
+            project={selectedProject}
+            onBack={() => handlePageChange('projects')}
+          />
+        ) : <div>Доступ запрещен или проект не выбран</div>;
+      case 'report-preparation':
+        return hasAccess('analyzer') && selectedProject ? (
+          <ReportPreparation 
             project={selectedProject}
             onBack={() => handlePageChange('projects')}
           />
