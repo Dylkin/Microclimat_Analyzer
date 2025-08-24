@@ -42,6 +42,64 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
   const [editObjectData, setEditObjectData] = useState<UpdateQualificationObjectData>({});
   const [operationLoading, setOperationLoading] = useState(false);
 
+  // Загрузка сохраненного размещения оборудования при инициализации
+  useEffect(() => {
+    const loadSavedEquipmentPlacement = async () => {
+      if (!projectEquipmentService.isAvailable()) return;
+      
+      try {
+        // Загружаем сохраненные назначения для всех объектов проекта
+        const allAssignments = await projectEquipmentService.getProjectEquipmentAssignments(project.id);
+        
+        // Группируем назначения по объектам квалификации
+        const placementByObject: ObjectEquipmentPlacement = {};
+        
+        allAssignments.forEach(assignment => {
+          const objectId = assignment.qualificationObjectId;
+          
+          if (!placementByObject[objectId]) {
+            placementByObject[objectId] = [];
+          }
+          
+          // Находим или создаем зону
+          let zone = placementByObject[objectId].find(z => z.number === assignment.zoneNumber);
+          if (!zone) {
+            zone = {
+              id: crypto.randomUUID(),
+              number: assignment.zoneNumber,
+              levels: []
+            };
+            placementByObject[objectId].push(zone);
+          }
+          
+          // Добавляем уровень
+          zone.levels.push({
+            id: crypto.randomUUID(),
+            height: assignment.measurementLevel,
+            equipmentId: assignment.equipmentId
+          });
+        });
+        
+        // Сортируем зоны и уровни
+        Object.keys(placementByObject).forEach(objectId => {
+          placementByObject[objectId].sort((a, b) => a.number - b.number);
+          placementByObject[objectId].forEach(zone => {
+            zone.levels.sort((a, b) => a.height - b.height);
+          });
+        });
+        
+        setEquipmentPlacement(placementByObject);
+        console.log('Загружено сохраненное размещение оборудования:', placementByObject);
+      } catch (error) {
+        console.error('Ошибка загрузки сохраненного размещения оборудования:', error);
+      }
+    };
+    
+    if (qualificationObjects.length > 0) {
+      loadSavedEquipmentPlacement();
+    }
+  }, [project.id, qualificationObjects]);
+
   // Загрузка данных
   useEffect(() => {
     const loadData = async () => {
