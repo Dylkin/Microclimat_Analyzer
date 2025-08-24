@@ -502,12 +502,118 @@ export const ContractorDirectory: React.FC = () => {
             }}
             className="text-gray-600 hover:text-gray-900 transition-colors"
           >
-            <X className="w-6 h-6" />
+            <ArrowLeft className="w-6 h-6" />
           </button>
           <Building2 className="w-8 h-8 text-indigo-600" />
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Объекты квалификации</h1>
             <p className="text-gray-600">{selectedContractorForObjects.name}</p>
+          </div>
+        </div>
+
+        {/* Contractor Information */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Информация о контрагенте</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Наименование</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
+                {selectedContractorForObjects.name}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Адрес</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
+                {selectedContractorForObjects.address || 'Не указан'}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Дата создания</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
+                {selectedContractorForObjects.createdAt.toLocaleDateString('ru-RU')}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Последнее обновление</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
+                {selectedContractorForObjects.updatedAt.toLocaleDateString('ru-RU')}
+              </div>
+            </div>
+          </div>
+
+          {/* Coordinates if available */}
+          {selectedContractorForObjects.latitude && selectedContractorForObjects.longitude && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h3 className="text-sm font-medium text-green-900 mb-2">Координаты</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-green-800">Широта:</span>
+                  <div className="text-green-700">{selectedContractorForObjects.latitude.toFixed(6)}</div>
+                </div>
+                <div>
+                  <span className="font-medium text-green-800">Долгота:</span>
+                  <div className="text-green-700">{selectedContractorForObjects.longitude.toFixed(6)}</div>
+                </div>
+                <div>
+                  <span className="font-medium text-green-800">Геокодирован:</span>
+                  <div className="text-green-700">
+                    {selectedContractorForObjects.geocodedAt?.toLocaleDateString('ru-RU') || 'Неизвестно'}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <button
+                  onClick={() => {
+                    setSelectedContractor(selectedContractorForObjects);
+                    setShowMap(true);
+                    setShowQualificationObjects(false);
+                    setSelectedContractorForObjects(null);
+                  }}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                >
+                  <Map className="w-4 h-4" />
+                  <span>Показать на карте</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Contacts */}
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Контакты</h3>
+            {selectedContractorForObjects.contacts.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {selectedContractorForObjects.contacts.map((contact) => (
+                  <div key={contact.id} className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <User className="w-4 h-4 text-gray-400" />
+                      <span className="font-medium text-gray-900">{contact.employeeName}</span>
+                    </div>
+                    {contact.phone && (
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Phone className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-700">{contact.phone}</span>
+                      </div>
+                    )}
+                    {contact.comment && (
+                      <div className="flex items-center space-x-2">
+                        <MessageSquare className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-600 text-sm">{contact.comment}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                <User className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">Контакты не добавлены</p>
+              </div>
+            )}
           </div>
         </div>
 
