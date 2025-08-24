@@ -302,7 +302,6 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
       console.log('Сохранение размещения оборудования для объекта:', objectId);
       console.log('Данные размещения:', equipmentPlacement[objectId]);
       
-      alert('Размещение измерительного оборудования сохранено');
     } catch (error) {
       console.error('Ошибка сохранения размещения оборудования:', error);
       alert(`Ошибка сохранения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
