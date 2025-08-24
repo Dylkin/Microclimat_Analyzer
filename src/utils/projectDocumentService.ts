@@ -56,9 +56,28 @@ export class ProjectDocumentService {
         fileSize: documentData.file.size
       });
 
-      // Конвертируем файл в бинарные данные
-      const fileBuffer = await this.fileToArrayBuffer(documentData.file);
-      const fileBytes = new Uint8Array(fileBuffer);
+      // Создаем уникальное имя файла
+      const timestamp = Date.now();
+      const fileExtension = documentData.file.name.split('.').pop();
+      const uniqueFileName = `${documentData.projectId}/${qualificationObjectId || 'project'}/${documentData.documentType}_${timestamp}.${fileExtension}`;
+
+      // Загружаем файл в Supabase Storage
+      const { data: uploadData, error: uploadError } = await this.supabase.storage
+        .from('project-documents')
+        .upload(uniqueFileName, documentData.file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Ошибка загрузки файла в Storage:', uploadError);
+        throw new Error(`Ошибка загрузки файла: ${uploadError.message}`);
+      }
+
+      // Получаем публичный URL файла
+      const { data: urlData } = this.supabase.storage
+        .from('project-documents')
+        .getPublicUrl(uniqueFileName);
 
       // Подготавливаем данные для вставки
       const insertData = {
@@ -66,7 +85,7 @@ export class ProjectDocumentService {
         document_type: documentData.documentType,
         file_name: documentData.file.name,
         file_size: documentData.file.size,
-        file_content: fileBytes,
+        file_url: urlData.publicUrl,
         mime_type: documentData.file.type,
         uploaded_by: documentData.uploadedBy || null,
         qualification_object_id: qualificationObjectId || null
@@ -227,6 +246,18 @@ export class ProjectDocumentService {
     try {
       console.log('Удаляем документ:', documentId);
 
+      // Сначала получаем информацию о файле для удаления из Storage
+      const { data: docData, error: fetchError } = await this.supabase
+        .from('project_documents')
+        .select('file_url')
+        .eq('id', documentId)
+        .single();
+
+      if (fetchError) {
+        console.error('Ошибка получения информации о документе:', fetchError);
+      }
+
+      // Удаляем запись из базы данных
       const { error } = await this.supabase
         .from('project_documents')
         .delete()
@@ -235,6 +266,24 @@ export class ProjectDocumentService {
       if (error) {
         console.error('Ошибка удаления документа:', error);
         throw new Error(`Ошибка удаления документа: ${error.message}`);
+      }
+
+      // Удаляем файл из Storage (если URL получен успешно)
+      if (docData?.file_url) {
+        try {
+          const urlPath = new URL(docData.file_url).pathname;
+          const filePath = urlPath.split('/').slice(-3).join('/'); // Получаем путь файла
+          
+          const { error: storageError } = await this.supabase.storage
+            .from('project-documents')
+            .remove([filePath]);
+
+          if (storageError) {
+            console.warn('Ошибка удаления файла из Storage:', storageError);
+          }
+        } catch (storageError) {
+          console.warn('Ошибка при удалении файла из Storage:', storageError);
+        }
       }
 
       console.log('Документ успешно удален');

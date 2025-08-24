@@ -27,7 +27,7 @@ export interface DatabaseProjectDocument {
   document_type: DocumentType;
   file_name: string;
   file_size: number;
-  file_content: Uint8Array;
+  file_url: string;
   mime_type: string;
   uploaded_by: string | null;
   uploaded_at: string;
