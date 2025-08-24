@@ -10,6 +10,7 @@ import { ContractorDirectory } from './components/ContractorDirectory';
 import { ProjectDirectory } from './components/ProjectDirectory';
 import { ContractNegotiation } from './components/ContractNegotiation';
 import { ProtocolPreparation } from './components/ProtocolPreparation';
+import { TestingStart } from './components/TestingStart';
 import { MeasurementEquipmentDirectory } from './components/MeasurementEquipmentDirectory';
 import './index.css';
 
@@ -55,6 +56,13 @@ const AppContent: React.FC = () => {
       case 'protocol-preparation':
         return hasAccess('analyzer') && selectedProject ? (
           <ProtocolPreparation 
+            project={selectedProject}
+            onBack={() => handlePageChange('projects')}
+          />
+        ) : <div>Доступ запрещен или проект не выбран</div>;
+      case 'testing-start':
+        return hasAccess('analyzer') && selectedProject ? (
+          <TestingStart 
             project={selectedProject}
             onBack={() => handlePageChange('projects')}
           />
