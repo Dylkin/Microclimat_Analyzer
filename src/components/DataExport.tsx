@@ -14,6 +14,9 @@ import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 import { projectEquipmentService, ProjectEquipmentAssignment } from '../utils/projectEquipmentService';
 import { measurementEquipmentService } from '../utils/measurementEquipmentService';
 import { MeasurementEquipment } from '../types/MeasurementEquipment';
+import { projectDocumentService } from '../utils/projectDocumentService';
+import { ProjectDocument, DocumentType, DocumentTypeLabels } from '../types/ProjectDocument';
+import { FileText } from 'lucide-react';
 
 interface DataExportProps {
   project: Project;
