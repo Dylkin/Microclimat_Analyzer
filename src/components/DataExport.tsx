@@ -12,6 +12,9 @@ import { uploadedFileService } from '../utils/uploadedFileService';
 import { VI2ParsingService } from '../utils/vi2Parser';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 import { projectEquipmentService, ProjectEquipmentAssignment } from '../utils/projectEquipmentService';
+import { measurementEquipmentService } from '../utils/measurementEquipmentService';
+import { MeasurementEquipment } from '../types/MeasurementEquipment';
+import { VI2ParsingService } from '../utils/vi2Parser';
 
 interface DataExportProps {
   project: Project;
@@ -40,6 +43,7 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
   const [showVisualization, setShowVisualization] = React.useState(false);
   const [equipmentAssignments, setEquipmentAssignments] = React.useState<ProjectEquipmentAssignment[]>([]);
   const [loadingAssignments, setLoadingAssignments] = React.useState(false);
+  const [measurementEquipment, setMeasurementEquipment] = React.useState<MeasurementEquipment[]>([]);
 
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
@@ -55,6 +59,22 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     };
 
     loadContractors();
+  }, []);
+
+  // Загрузка измерительного оборудования при инициализации
+  React.useEffect(() => {
+    const loadMeasurementEquipment = async () => {
+      if (!measurementEquipmentService.isAvailable()) return;
+      
+      try {
+        const data = await measurementEquipmentService.getAllEquipment();
+        setMeasurementEquipment(data);
+      } catch (error) {
+        console.error('Ошибка загрузки измерительного оборудования:', error);
+      }
+    };
+
+    loadMeasurementEquipment();
   }, []);
 
   // Загрузка объектов квалификации при выборе контрагента
@@ -138,6 +158,12 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     return obj.name || obj.vin || obj.serialNumber || `${obj.type} (без названия)`;
   };
 
+  // Получение названия измерительного оборудования по ID
+  const getEquipmentName = (equipmentId: string) => {
+    const equipment = measurementEquipment.find(eq => eq.id === equipmentId);
+    return equipment ? equipment.name : `Оборудование #${equipmentId.substring(0, 8)}`;
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, assignmentId: string) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -148,9 +174,9 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
       return;
     }
 
-    // Создаем запись для файла с начальным статусом
+    // Создаем запись для файла с ID назначения для связи
     const newFile: UploadedFile = {
-      id: crypto.randomUUID(),
+      id: assignmentId, // Используем ID назначения для связи
       name: file.name,
       uploadDate: new Date().toLocaleString('ru-RU'),
       parsingStatus: 'processing' as const,
@@ -165,7 +191,7 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     setUploadedFiles(prev => [...prev, newFile]);
 
     try {
-      // Реальный парсинг файла
+      // Реальный парсинг файла (код из MicroclimatAnalyzer)
       console.log(`Парсинг файла: ${file.name}`);
       
       // Используем универсальный парсер VI2
@@ -173,10 +199,10 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
       const parsedData = await parsingService.parseFile(file);
       
       // Сохраняем в базу данных
-      await databaseService.saveParsedFileData(parsedData, newFile.id);
+      await databaseService.saveParsedFileData(parsedData, assignmentId);
       
       setUploadedFiles(prev => prev.map(f => {
-        if (f.id === newFile.id) {
+        if (f.id === assignmentId) {
           const period = `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`;
           return {
             ...f,
@@ -194,7 +220,7 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
       
       // Обновляем статус на ошибку
       setUploadedFiles(prev => prev.map(f => {
-        if (f.id === newFile.id) {
+        if (f.id === assignmentId) {
           return {
             ...f,
             parsingStatus: 'error' as const,
@@ -529,7 +555,7 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Наименование оборудования
+                      Наименование
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       № зоны измерения
@@ -556,7 +582,7 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
                       <tr key={assignment.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
-                            Оборудование #{assignment.equipmentId.substring(0, 8)}
+                            {getEquipmentName(assignment.equipmentId)}
                           </div>
                           <div className="text-xs text-gray-500">
                             Назначено: {assignment.assignedAt.toLocaleDateString('ru-RU')}
