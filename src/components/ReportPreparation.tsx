@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, Building2, FolderOpen, Download, AlertCircle } from 'lucide-react';
+import { ArrowLeft, FileText, Building2, FolderOpen, Download, AlertCircle, BarChart3, Settings, Zap, Eye, EyeOff, RotateCcw, Save as SaveIcon } from 'lucide-react';
 import { Project } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
 import { ProjectDocument, DocumentTypeLabels } from '../types/ProjectDocument';
 import { UploadedFile } from '../types/FileData';
+import { TimeSeriesPoint, ChartLimits, VerticalMarker, ZoomState, DataType } from '../types/TimeSeriesData';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { projectDocumentService } from '../utils/projectDocumentService';
 import { uploadedFileService } from '../utils/uploadedFileService';
-import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
+import { TimeSeriesChart } from './TimeSeriesChart';
+import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
+import { saveAs } from 'file-saver';
+import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ReportPreparationProps {
@@ -29,7 +33,31 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [operationLoading, setOperationLoading] = useState(false);
-  const [showAnalyzer, setShowAnalyzer] = useState(false);
+
+  // Time series analyzer state
+  const [dataType, setDataType] = useState<DataType>('temperature');
+  const [limits, setLimits] = useState<ChartLimits>({});
+  const [markers, setMarkers] = useState<VerticalMarker[]>([]);
+  const [zoomState, setZoomState] = useState<ZoomState | undefined>();
+  const [showLimitsPanel, setShowLimitsPanel] = useState(false);
+  const [showMarkersPanel, setShowMarkersPanel] = useState(false);
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [newMarkerLabel, setNewMarkerLabel] = useState('');
+  const [editingMarker, setEditingMarker] = useState<string | null>(null);
+  const [editMarkerLabel, setEditMarkerLabel] = useState('');
+  const [conclusions, setConclusions] = useState('');
+  const [researchObject, setResearchObject] = useState('');
+  const [conditioningSystem, setConditioningSystem] = useState('');
+  const [testType, setTestType] = useState('');
+  const [executor, setExecutor] = useState('');
+  const [testDate, setTestDate] = useState('');
+  const [reportNo, setReportNo] = useState('');
+  const [reportDate, setReportDate] = useState('');
+
+  // Load time series data
+  const { data: timeSeriesData, loading: dataLoading, error: dataError } = useTimeSeriesData({
+    files: uploadedFiles.filter(f => f.parsingStatus === 'completed')
+  });
 
   // Загрузка данных при инициализации
   useEffect(() => {
@@ -137,6 +165,236 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
     return obj.name || obj.vin || obj.serialNumber || `${obj.type} (без названия)`;
   };
 
+  // Chart dimensions
+  const chartWidth = 1200;
+  const chartHeight = 600;
+  const chartMargin = { top: 40, right: 80, bottom: 80, left: 80 };
+
+  // Handle zoom change
+  const handleZoomChange = (newZoomState: ZoomState) => {
+    setZoomState(newZoomState);
+  };
+
+  // Handle marker addition
+  const handleMarkerAdd = (timestamp: number) => {
+    const newMarker: VerticalMarker = {
+      id: crypto.randomUUID(),
+      timestamp,
+      label: newMarkerLabel || `Маркер ${markers.length + 1}`,
+      color: '#8b5cf6',
+      type: 'test'
+    };
+    setMarkers(prev => [...prev, newMarker]);
+    setNewMarkerLabel('');
+  };
+
+  // Handle marker edit
+  const handleMarkerEdit = (markerId: string, newLabel: string) => {
+    setMarkers(prev => prev.map(marker => 
+      marker.id === markerId ? { ...marker, label: newLabel } : marker
+    ));
+    setEditingMarker(null);
+    setEditMarkerLabel('');
+  };
+
+  // Handle marker delete
+  const handleMarkerDelete = (markerId: string) => {
+    setMarkers(prev => prev.filter(marker => marker.id !== markerId));
+  };
+
+  // Reset zoom
+  const handleResetZoom = () => {
+    setZoomState(undefined);
+  };
+
+  // Update limits
+  const updateLimits = (type: DataType, min?: number, max?: number) => {
+    setLimits(prev => ({
+      ...prev,
+      [type]: { min, max }
+    }));
+  };
+
+  // Calculate analysis results
+  const calculateAnalysisResults = () => {
+    if (!timeSeriesData) return [];
+
+    const results: any[] = [];
+    const fileGroups = new Map<string, TimeSeriesPoint[]>();
+
+    // Group points by file
+    timeSeriesData.points.forEach(point => {
+      if (!fileGroups.has(point.fileId)) {
+        fileGroups.set(point.fileId, []);
+      }
+      fileGroups.get(point.fileId)!.push(point);
+    });
+
+    // Calculate statistics for each file
+    fileGroups.forEach((points, fileId) => {
+      // Filter points by zoom if applied
+      let filteredPoints = points;
+      if (zoomState) {
+        filteredPoints = points.filter(p => 
+          p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
+        );
+      }
+
+      if (filteredPoints.length === 0) return;
+
+      const values = filteredPoints
+        .map(p => dataType === 'temperature' ? p.temperature : p.humidity)
+        .filter(v => v !== undefined) as number[];
+
+      if (values.length === 0) return;
+
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      const avgValue = values.reduce((sum, val) => sum + val, 0) / values.length;
+
+      // Check compliance with limits
+      let meetsLimits = 'Не установлены';
+      if (limits[dataType]) {
+        const currentLimits = limits[dataType]!;
+        const minOk = currentLimits.min === undefined || minValue >= currentLimits.min;
+        const maxOk = currentLimits.max === undefined || maxValue <= currentLimits.max;
+        meetsLimits = minOk && maxOk ? 'Да' : 'Нет';
+      }
+
+      // Get file info
+      const file = uploadedFiles.find(f => f.name === fileId);
+      const isExternal = file?.zoneNumber === 999;
+
+      results.push({
+        fileId,
+        fileName: fileId,
+        zoneNumber: isExternal ? 'Внешний' : (file?.zoneNumber || '-'),
+        measurementLevel: file?.measurementLevel || '-',
+        loggerName: fileId.substring(0, 6),
+        serialNumber: file?.parsedData?.deviceMetadata?.serialNumber || '-',
+        minTemp: minValue.toFixed(1),
+        maxTemp: maxValue.toFixed(1),
+        avgTemp: avgValue.toFixed(1),
+        meetsLimits,
+        isExternal
+      });
+    });
+
+    return results.sort((a, b) => {
+      // External sensors last
+      if (a.isExternal && !b.isExternal) return 1;
+      if (!a.isExternal && b.isExternal) return -1;
+      // Then by zone number
+      const aZone = typeof a.zoneNumber === 'number' ? a.zoneNumber : 999;
+      const bZone = typeof b.zoneNumber === 'number' ? b.zoneNumber : 999;
+      return aZone - bZone;
+    });
+  };
+
+  // Export data as CSV
+  const handleExportCSV = () => {
+    if (!timeSeriesData) return;
+
+    let dataToExport = timeSeriesData.points;
+    if (zoomState) {
+      dataToExport = timeSeriesData.points.filter(p => 
+        p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
+      );
+    }
+
+    const csvContent = [
+      ['Время', 'Файл', 'Зона', 'Уровень', 'Температура (°C)', 'Влажность (%)'].join(','),
+      ...dataToExport.map(point => {
+        const file = uploadedFiles.find(f => f.name === point.fileId);
+        const zoneDisplay = point.zoneNumber === 999 ? 'Внешний' : (point.zoneNumber || '-');
+        return [
+          new Date(point.timestamp).toLocaleString('ru-RU'),
+          point.fileId,
+          zoneDisplay,
+          file?.measurementLevel || '-',
+          point.temperature?.toFixed(1) || '',
+          point.humidity?.toFixed(1) || ''
+        ].join(',');
+      })
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `microclimate_data_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  // Generate standard report
+  const handleGenerateStandardReport = async () => {
+    const results = calculateAnalysisResults();
+    if (results.length === 0) {
+      alert('Нет данных для создания отчета');
+      return;
+    }
+
+    try {
+      // Create report content
+      const reportContent = [
+        'ОТЧЕТ ПО АНАЛИЗУ МИКРОКЛИМАТА',
+        '',
+        `Дата создания: ${new Date().toLocaleDateString('ru-RU')}`,
+        `Тип данных: ${dataType === 'temperature' ? 'Температура' : 'Влажность'}`,
+        '',
+        'РЕЗУЛЬТАТЫ АНАЛИЗА:',
+        '',
+        'Зона\tУровень\tЛоггер\tСерийный №\tМин.\tМакс.\tСреднее\tСоответствие',
+        ...results.map(r => 
+          `${r.zoneNumber}\t${r.measurementLevel}\t${r.loggerName}\t${r.serialNumber}\t${r.minTemp}\t${r.maxTemp}\t${r.avgTemp}\t${r.meetsLimits}`
+        )
+      ].join('\n');
+
+      const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
+      saveAs(blob, `microclimate_report_${new Date().toISOString().split('T')[0]}.txt`);
+    } catch (error) {
+      console.error('Ошибка создания отчета:', error);
+      alert('Ошибка создания отчета');
+    }
+  };
+
+  // Generate report with template
+  const handleGenerateTemplateReport = async (templateFile: File) => {
+    const results = calculateAnalysisResults();
+    if (results.length === 0) {
+      alert('Нет данных для создания отчета');
+      return;
+    }
+
+    try {
+      const chartElement = document.getElementById('time-series-chart');
+      if (!chartElement) {
+        alert('График не найден');
+        return;
+      }
+
+      const templateData: TemplateReportData = {
+        title: 'Анализ микроклимата',
+        date: new Date().toLocaleDateString('ru-RU'),
+        dataType,
+        analysisResults: results,
+        conclusions,
+        researchObject,
+        conditioningSystem,
+        testType,
+        limits,
+        executor,
+        testDate,
+        reportNo,
+        reportDate
+      };
+
+      const processor = DocxTemplateProcessor.getInstance();
+      const reportBlob = await processor.processTemplate(templateFile, templateData, chartElement);
+      
+      saveAs(reportBlob, `microclimate_report_${new Date().toISOString().split('T')[0]}.docx`);
+    } catch (error) {
+      console.error('Ошибка создания отчета по шаблону:', error);
+      alert('Ошибка создания отчета по шаблону');
+    }
+  };
+
   // Скачивание дополнительного документа
   const handleDownloadAdditionalDocument = async (document: ProjectDocument) => {
     try {
@@ -164,27 +422,6 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   const getAdditionalDocumentByType = (documentType: 'layout_scheme' | 'test_data'): ProjectDocument | null => {
     return additionalDocuments.find(doc => doc.documentType === documentType) || null;
   };
-
-  // Переход к анализатору данных
-  const handleStartAnalysis = () => {
-    const completedFiles = uploadedFiles.filter(f => f.parsingStatus === 'completed');
-    if (completedFiles.length === 0) {
-      alert('Нет обработанных файлов для анализа');
-      return;
-    }
-    
-    setShowAnalyzer(true);
-  };
-
-  // Если показываем анализатор, рендерим компонент анализа
-  if (showAnalyzer) {
-    return (
-      <TimeSeriesAnalyzer 
-        files={uploadedFiles.filter(f => f.parsingStatus === 'completed')}
-        onBack={() => setShowAnalyzer(false)}
-      />
-    );
-  }
 
   if (loading) {
     return (
@@ -494,101 +731,441 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
         </div>
       )}
 
-      {/* Файлы данных */}
-      {selectedQualificationObject && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Файлы данных измерений</h2>
-            <button
-              onClick={handleStartAnalysis}
-              disabled={uploadedFiles.filter(f => f.parsingStatus === 'completed').length === 0}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              <FileText className="w-4 h-4" />
-              <span>Начать анализ данных</span>
-            </button>
+      {/* Time Series Analysis */}
+      {selectedQualificationObject && uploadedFiles.filter(f => f.parsingStatus === 'completed').length > 0 && (
+        <div className="space-y-6">
+          {/* Controls */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Анализ временных рядов</h2>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setDataType('temperature')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    dataType === 'temperature'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Температура
+                </button>
+                <button
+                  onClick={() => setDataType('humidity')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    dataType === 'humidity'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                  disabled={!timeSeriesData?.hasHumidity}
+                >
+                  Влажность
+                </button>
+                <button
+                  onClick={() => setShowLimitsPanel(!showLimitsPanel)}
+                  className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors flex items-center space-x-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Лимиты</span>
+                </button>
+                <button
+                  onClick={() => setShowMarkersPanel(!showMarkersPanel)}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                >
+                  <Zap className="w-4 h-4" />
+                  <span>Маркеры</span>
+                </button>
+                <button
+                  onClick={() => setShowExportPanel(!showExportPanel)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                >
+                  <SaveIcon className="w-4 h-4" />
+                  <span>Экспорт</span>
+                </button>
+                {zoomState && (
+                  <button
+                    onClick={handleResetZoom}
+                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Сбросить масштаб</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Limits Panel */}
+            {showLimitsPanel && (
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <h3 className="text-md font-semibold text-yellow-900 mb-3">
+                  Установка лимитов для {dataType === 'temperature' ? 'температуры' : 'влажности'}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-yellow-800 mb-1">
+                      Минимальное значение
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={limits[dataType]?.min || ''}
+                      onChange={(e) => updateLimits(dataType, parseFloat(e.target.value) || undefined, limits[dataType]?.max)}
+                      className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                      placeholder={`Мин. ${dataType === 'temperature' ? '°C' : '%'}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-yellow-800 mb-1">
+                      Максимальное значение
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={limits[dataType]?.max || ''}
+                      onChange={(e) => updateLimits(dataType, limits[dataType]?.min, parseFloat(e.target.value) || undefined)}
+                      className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                      placeholder={`Макс. ${dataType === 'temperature' ? '°C' : '%'}`}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Markers Panel */}
+            {showMarkersPanel && (
+              <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <h3 className="text-md font-semibold text-purple-900 mb-3">Управление маркерами</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-purple-800 mb-1">
+                      Название нового маркера
+                    </label>
+                    <input
+                      type="text"
+                      value={newMarkerLabel}
+                      onChange={(e) => setNewMarkerLabel(e.target.value)}
+                      className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      placeholder="Введите название маркера (необязательно)"
+                    />
+                    <p className="text-xs text-purple-600 mt-1">
+                      Сделайте двойной клик по графику для добавления маркера
+                    </p>
+                  </div>
+                  
+                  {markers.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-purple-800 mb-2">Существующие маркеры:</h4>
+                      <div className="space-y-2">
+                        {markers.map(marker => (
+                          <div key={marker.id} className="flex items-center justify-between bg-white p-2 rounded border border-purple-200">
+                            {editingMarker === marker.id ? (
+                              <div className="flex items-center space-x-2 flex-1">
+                                <input
+                                  type="text"
+                                  value={editMarkerLabel}
+                                  onChange={(e) => setEditMarkerLabel(e.target.value)}
+                                  className="flex-1 px-2 py-1 border border-purple-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                />
+                                <button
+                                  onClick={() => handleMarkerEdit(marker.id, editMarkerLabel)}
+                                  className="text-green-600 hover:text-green-800"
+                                >
+                                  <SaveIcon className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingMarker(null);
+                                    setEditMarkerLabel('');
+                                  }}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center space-x-2">
+                                  <div 
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: marker.color }}
+                                  ></div>
+                                  <span className="text-sm text-gray-700">
+                                    {marker.label} - {new Date(marker.timestamp).toLocaleString('ru-RU')}
+                                  </span>
+                                </div>
+                                <div className="flex space-x-1">
+                                  <button
+                                    onClick={() => {
+                                      setEditingMarker(marker.id);
+                                      setEditMarkerLabel(marker.label || '');
+                                    }}
+                                    className="text-purple-600 hover:text-purple-800"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => handleMarkerDelete(marker.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Export Panel */}
+            {showExportPanel && (
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <h3 className="text-md font-semibold text-green-900 mb-3">Экспорт данных и отчетов</h3>
+                
+                {/* Report Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-green-800 mb-1">Объект исследования</label>
+                    <input
+                      type="text"
+                      value={researchObject}
+                      onChange={(e) => setResearchObject(e.target.value)}
+                      className="w-full px-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      placeholder="Введите объект исследования"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-green-800 mb-1">Климатическая установка</label>
+                    <input
+                      type="text"
+                      value={conditioningSystem}
+                      onChange={(e) => setConditioningSystem(e.target.value)}
+                      className="w-full px-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      placeholder="Введите тип климатической установки"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-green-800 mb-1">Тип испытания</label>
+                    <input
+                      type="text"
+                      value={testType}
+                      onChange={(e) => setTestType(e.target.value)}
+                      className="w-full px-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      placeholder="Введите тип испытания"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-green-800 mb-1">Исполнитель</label>
+                    <input
+                      type="text"
+                      value={executor}
+                      onChange={(e) => setExecutor(e.target.value)}
+                      className="w-full px-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      placeholder="Введите исполнителя"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-green-800 mb-1">Дата испытания</label>
+                    <input
+                      type="date"
+                      value={testDate}
+                      onChange={(e) => setTestDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-green-800 mb-1">Номер договора</label>
+                    <input
+                      type="text"
+                      value={reportNo}
+                      onChange={(e) => setReportNo(e.target.value)}
+                      className="w-full px-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      placeholder="Введите номер договора"
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-green-800 mb-1">Выводы</label>
+                  <textarea
+                    value={conclusions}
+                    onChange={(e) => setConclusions(e.target.value)}
+                    className="w-full px-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    rows={3}
+                    placeholder="Введите выводы по результатам анализа"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleExportCSV}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Экспорт CSV
+                  </button>
+                  <button
+                    onClick={handleGenerateStandardReport}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Стандартный отчет
+                  </button>
+                  <div>
+                    <input
+                      type="file"
+                      accept=".docx"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleGenerateTemplateReport(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="template-upload"
+                    />
+                    <label
+                      htmlFor="template-upload"
+                      className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors cursor-pointer inline-block"
+                    >
+                      Отчет по шаблону
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {uploadedFiles.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Имя файла
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Период данных
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Количество записей
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      № зоны
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Уровень (м.)
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Статус
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {uploadedFiles.map((file) => (
-                    <tr key={file.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{file.name}</div>
-                          <div className="text-xs text-gray-500">{file.uploadDate}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {file.period || '-'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {file.recordCount ? file.recordCount.toLocaleString('ru-RU') : '-'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {file.zoneNumber === 999 ? 'Внешний' : (file.zoneNumber || '-')}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {file.measurementLevel || '-'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          {file.parsingStatus === 'completed' ? (
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                              Готов к анализу
-                            </span>
-                          ) : (
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                              {file.parsingStatus === 'processing' ? 'Обработка' : 'Ошибка'}
-                            </span>
-                          )}
-                        </div>
-                        {file.errorMessage && (
-                          <div className="text-xs text-red-600 mt-1">{file.errorMessage}</div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Chart */}
+          {timeSeriesData && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  График {dataType === 'temperature' ? 'температуры' : 'влажности'}
+                </h3>
+                <div className="text-sm text-gray-600">
+                  {zoomState ? 'Увеличенный масштаб' : 'Полный масштаб'} • 
+                  Точек данных: {timeSeriesData.points.filter(p => 
+                    zoomState ? (p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime) : true
+                  ).length.toLocaleString('ru-RU')}
+                </div>
+              </div>
+              
+              {dataLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                    <p className="text-gray-500">Загрузка данных...</p>
+                  </div>
+                </div>
+              ) : dataError ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-600">Ошибка загрузки данных: {dataError}</p>
+                </div>
+              ) : (
+                <div id="time-series-chart">
+                  <TimeSeriesChart
+                    data={timeSeriesData.points}
+                    width={chartWidth}
+                    height={chartHeight}
+                    margin={chartMargin}
+                    dataType={dataType}
+                    limits={limits}
+                    markers={markers}
+                    zoomState={zoomState}
+                    onZoomChange={handleZoomChange}
+                    onMarkerAdd={handleMarkerAdd}
+                    yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
+                  />
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>Файлы данных не найдены</p>
-              <p className="text-sm">Загрузите файлы на этапе "Выгрузка данных"</p>
+          )}
+
+          {/* Analysis Results Table */}
+          {timeSeriesData && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
+              
+              {(() => {
+                const results = calculateAnalysisResults();
+                return results.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            № зоны
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Уровень (м.)
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Логгер
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Серийный №
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Мин. {dataType === 'temperature' ? '°C' : '%'}
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Макс. {dataType === 'temperature' ? '°C' : '%'}
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Среднее {dataType === 'temperature' ? '°C' : '%'}
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Соответствие лимитам
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {results.map((result, index) => (
+                          <tr key={index} className={result.isExternal ? 'bg-gray-50' : 'hover:bg-gray-50'}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {result.zoneNumber}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {result.measurementLevel}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {result.loggerName}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                              {result.serialNumber}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {result.minTemp}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {result.maxTemp}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {result.avgTemp}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                result.meetsLimits === 'Да' ? 'bg-green-100 text-green-800' :
+                                result.meetsLimits === 'Нет' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {result.meetsLimits}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p>Нет данных для анализа</p>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -604,15 +1181,15 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-indigo-100 text-indigo-800 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">2</span>
-            <p>Убедитесь, что все необходимые документы загружены (схема расстановки, данные испытаний)</p>
+            <p>Проанализируйте данные измерений с помощью интерактивного графика</p>
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-indigo-100 text-indigo-800 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">3</span>
-            <p>Проверьте наличие файлов данных измерений в статусе "Готов к анализу"</p>
+            <p>Установите лимиты и добавьте маркеры для детального анализа</p>
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-indigo-100 text-indigo-800 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">4</span>
-            <p>Нажмите "Начать анализ данных" для перехода к анализатору временных рядов</p>
+            <p>Заполните поля отчета и экспортируйте результаты в нужном формате</p>
           </div>
         </div>
       </div>
