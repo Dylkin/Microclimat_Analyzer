@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Download, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart, FolderOpen } from 'lucide-react';
+import { ArrowLeft, Download, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, BarChart, FolderOpen } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { UploadedFile } from '../types/FileData';
 import { Contractor } from '../types/Contractor';
@@ -11,6 +11,7 @@ import { databaseService } from '../utils/database';
 import { uploadedFileService } from '../utils/uploadedFileService';
 import { VI2ParsingService } from '../utils/vi2Parser';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
+import { projectEquipmentService, ProjectEquipmentAssignment } from '../utils/projectEquipmentService';
 
 interface DataExportProps {
   project: Project;
@@ -24,12 +25,8 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
   const [qualificationObjects, setQualificationObjects] = React.useState<QualificationObject[]>([]);
   const [selectedContractor, setSelectedContractor] = React.useState<string>(project.contractorId);
   const [selectedQualificationObject, setSelectedQualificationObject] = React.useState<string>('');
-  const [contractorSearch, setContractorSearch] = React.useState('');
   const [qualificationSearch, setQualificationSearch] = React.useState('');
-  const [showContractorDropdown, setShowContractorDropdown] = React.useState(false);
   const [showQualificationDropdown, setShowQualificationDropdown] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [editingField, setEditingField] = React.useState<{ fileId: string; field: 'zoneNumber' | 'measurementLevel' } | null>(null);
   const [saveStatus, setSaveStatus] = React.useState<{
     isSaving: boolean;
     lastSaved: Date | null;
@@ -39,15 +36,10 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     lastSaved: null,
     error: null
   });
-  const [projectFilesLoaded, setProjectFilesLoaded] = React.useState(false);
   const [operationLoading, setOperationLoading] = React.useState(false);
   const [showVisualization, setShowVisualization] = React.useState(false);
-
-  // Сброс состояния загрузки файлов при смене объекта квалификации
-  React.useEffect(() => {
-    setProjectFilesLoaded(false);
-    setUploadedFiles([]);
-  }, [selectedQualificationObject]);
+  const [equipmentAssignments, setEquipmentAssignments] = React.useState<ProjectEquipmentAssignment[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = React.useState(false);
 
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
@@ -64,32 +56,6 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
 
     loadContractors();
   }, []);
-
-  // Загрузка ранее сохраненных файлов проекта
-  React.useEffect(() => {
-    const loadProjectFiles = async () => {
-      if (!selectedQualificationObject || !uploadedFileService.isAvailable() || projectFilesLoaded) {
-        return;
-      }
-
-      try {
-        console.log('Загружаем ранее сохраненные файлы проекта:', project.id);
-        const projectFiles = await uploadedFileService.getProjectFiles(project.id, user?.id || 'anonymous');
-        
-        if (projectFiles.length > 0) {
-          console.log('Найдены ранее сохраненные файлы:', projectFiles.length);
-          setUploadedFiles(projectFiles);
-        }
-        
-        setProjectFilesLoaded(true);
-      } catch (error) {
-        console.error('Ошибка загрузки файлов проекта:', error);
-        setProjectFilesLoaded(true);
-      }
-    };
-
-    loadProjectFiles();
-  }, [selectedQualificationObject, projectFilesLoaded, user?.id, project.id]);
 
   // Загрузка объектов квалификации при выборе контрагента
   React.useEffect(() => {
@@ -118,15 +84,32 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     loadQualificationObjects();
   }, [selectedContractor, project]);
 
-  // Фильтрация контрагентов по поиску
-  const filteredContractors = React.useMemo(() => {
-    if (!contractorSearch.trim()) return contractors;
-    
-    return contractors.filter(contractor =>
-      contractor.name.toLowerCase().includes(contractorSearch.toLowerCase()) ||
-      (contractor.address && contractor.address.toLowerCase().includes(contractorSearch.toLowerCase()))
-    );
-  }, [contractors, contractorSearch]);
+  // Загрузка назначений оборудования при выборе объекта квалификации
+  React.useEffect(() => {
+    const loadEquipmentAssignments = async () => {
+      if (!selectedQualificationObject || !projectEquipmentService.isAvailable()) {
+        setEquipmentAssignments([]);
+        return;
+      }
+
+      setLoadingAssignments(true);
+      try {
+        const assignments = await projectEquipmentService.getEquipmentPlacement(
+          project.id,
+          selectedQualificationObject
+        );
+        setEquipmentAssignments(assignments);
+        console.log('Загружены назначения оборудования:', assignments.length);
+      } catch (error) {
+        console.error('Ошибка загрузки назначений оборудования:', error);
+        setEquipmentAssignments([]);
+      } finally {
+        setLoadingAssignments(false);
+      }
+    };
+
+    loadEquipmentAssignments();
+  }, [selectedQualificationObject, project.id]);
 
   // Фильтрация объектов квалификации по поиску
   const filteredQualificationObjects = React.useMemo(() => {
@@ -155,92 +138,75 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     return obj.name || obj.vin || obj.serialNumber || `${obj.type} (без названия)`;
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files) return;
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, assignmentId: string) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    const fileArray = Array.from(files);
-    
-    // Создаем записи для файлов с начальным статусом
-    const newFiles: UploadedFile[] = fileArray.map((file, index) => {
-      // Проверяем расширение файла
-      if (!file.name.toLowerCase().endsWith('.vi2')) {
-        alert(`Файл "${file.name}" имеет неподдерживаемый формат. Поддерживаются только файлы .vi2`);
-        return null;
-      }
+    // Проверяем расширение файла
+    if (!file.name.toLowerCase().endsWith('.vi2')) {
+      alert(`Файл "${file.name}" имеет неподдерживаемый формат. Поддерживаются только файлы .vi2`);
+      return;
+    }
 
-      return {
-        id: crypto.randomUUID(),
-        name: file.name,
-        uploadDate: new Date().toLocaleString('ru-RU'),
-        parsingStatus: 'processing' as const,
-        order: uploadedFiles.length + index,
-        contractorId: selectedContractor || undefined,
-        qualificationObjectId: selectedQualificationObject || undefined,
-        qualificationObjectName: selectedQualificationObject ? getQualificationObjectName(selectedQualificationObject) : undefined,
-        contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
-      };
-    }).filter(Boolean) as UploadedFile[];
+    // Создаем запись для файла с начальным статусом
+    const newFile: UploadedFile = {
+      id: crypto.randomUUID(),
+      name: file.name,
+      uploadDate: new Date().toLocaleString('ru-RU'),
+      parsingStatus: 'processing' as const,
+      order: uploadedFiles.length,
+      contractorId: selectedContractor || undefined,
+      qualificationObjectId: selectedQualificationObject || undefined,
+      qualificationObjectName: selectedQualificationObject ? getQualificationObjectName(selectedQualificationObject) : undefined,
+      contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
+    };
 
-    // Добавляем файлы в состояние
-    setUploadedFiles(prev => [...prev, ...newFiles]);
+    // Добавляем файл в состояние
+    setUploadedFiles(prev => [...prev, newFile]);
 
-    // Парсим файлы
-    for (let i = 0; i < fileArray.length; i++) {
-      const file = fileArray[i];
-      const fileRecord = newFiles[i];
+    try {
+      // Реальный парсинг файла
+      console.log(`Парсинг файла: ${file.name}`);
       
-      if (!fileRecord) continue;
+      // Используем универсальный парсер VI2
+      const parsingService = new VI2ParsingService();
+      const parsedData = await parsingService.parseFile(file);
       
-      try {
-        // Реальный парсинг файла
-        console.log(`Парсинг файла: ${file.name}`);
-        
-        // Читаем файл как ArrayBuffer
-        const arrayBuffer = await file.arrayBuffer();
-        
-        // Используем универсальный парсер VI2
-        const parsingService = new VI2ParsingService();
-        const parsedData = await parsingService.parseFile(file);
-        
-        // Сохраняем в базу данных
-        await databaseService.saveParsedFileData(parsedData, fileRecord.id);
-        
-        setUploadedFiles(prev => prev.map(f => {
-          if (f.id === fileRecord.id) {
-            const period = `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`;
-            return {
-              ...f,
-              parsingStatus: 'completed' as const, 
-              parsedData,
-              recordCount: parsedData.recordCount,
-              period
-            };
-          }
-          return f;
-        }));
-        
-      } catch (error) {
-        console.error('Ошибка парсинга файла:', error);
-        
-        // Обновляем статус на ошибку
-        setUploadedFiles(prev => prev.map(f => {
-          if (f.id === fileRecord.id) {
-            return {
-              ...f,
-              parsingStatus: 'error' as const,
-              errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка'
-            };
-          }
-          return f;
-        }));
-      }
+      // Сохраняем в базу данных
+      await databaseService.saveParsedFileData(parsedData, newFile.id);
+      
+      setUploadedFiles(prev => prev.map(f => {
+        if (f.id === newFile.id) {
+          const period = `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`;
+          return {
+            ...f,
+            parsingStatus: 'completed' as const, 
+            parsedData,
+            recordCount: parsedData.recordCount,
+            period
+          };
+        }
+        return f;
+      }));
+      
+    } catch (error) {
+      console.error('Ошибка парсинга файла:', error);
+      
+      // Обновляем статус на ошибку
+      setUploadedFiles(prev => prev.map(f => {
+        if (f.id === newFile.id) {
+          return {
+            ...f,
+            parsingStatus: 'error' as const,
+            errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка'
+          };
+        }
+        return f;
+      }));
     }
 
     // Очищаем input для возможности загрузки того же файла повторно
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    event.target.value = '';
   };
 
   const handleDeleteFile = async (fileId: string) => {
@@ -267,33 +233,6 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
       // Удаляем из состояния
       setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
     }
-  };
-
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
-  };
-
-  const moveFile = (fileId: string, direction: 'up' | 'down') => {
-    setUploadedFiles(prev => {
-      const sortedFiles = [...prev].sort((a, b) => a.order - b.order);
-      const currentIndex = sortedFiles.findIndex(f => f.id === fileId);
-      
-      if (currentIndex === -1) return prev;
-      if (direction === 'up' && currentIndex === 0) return prev;
-      if (direction === 'down' && currentIndex === sortedFiles.length - 1) return prev;
-      
-      const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-      
-      // Меняем местами order
-      const currentFile = sortedFiles[currentIndex];
-      const targetFile = sortedFiles[newIndex];
-      
-      return prev.map(f => {
-        if (f.id === currentFile.id) return { ...f, order: targetFile.order };
-        if (f.id === targetFile.id) return { ...f, order: currentFile.order };
-        return f;
-      });
-    });
   };
 
   const handleSaveProject = async () => {
@@ -351,28 +290,6 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     }
   };
 
-  const updateFileField = (fileId: string, field: 'zoneNumber' | 'measurementLevel', value: string | number) => {
-    setUploadedFiles(prev => prev.map(f => {
-      if (f.id === fileId) {
-        const updatedFile = { ...f, [field]: value };
-        
-        // Обновляем в базе данных если файл был сохранен и Supabase доступен
-        if (uploadedFileService.isAvailable()) {
-          const updates: any = {};
-          if (field === 'zoneNumber') updates.zoneNumber = value as number;
-          if (field === 'measurementLevel') updates.measurementLevel = value as string;
-          
-          uploadedFileService.updateFileMetadata(fileId, updates).catch(error => {
-            console.warn('Ошибка обновления метаданных файла в БД:', error);
-          });
-        }
-        
-        return updatedFile;
-      }
-      return f;
-    }));
-  };
-
   const handleExploreData = () => {
     const completedFiles = uploadedFiles.filter(f => f.parsingStatus === 'completed');
     if (completedFiles.length === 0) {
@@ -423,8 +340,10 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     }
   };
 
-  // Сортируем файлы по порядку для отображения
-  const sortedFiles = [...uploadedFiles].sort((a, b) => a.order - b.order);
+  // Получение файла для конкретного назначения оборудования
+  const getFileForAssignment = (assignmentId: string): UploadedFile | undefined => {
+    return uploadedFiles.find(file => file.id === assignmentId);
+  };
 
   return (
     <div className="space-y-6">
@@ -515,6 +434,8 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
                           setSelectedQualificationObject(obj.id);
                           setQualificationSearch('');
                           setShowQualificationDropdown(false);
+                          // Сбрасываем загруженные файлы при смене объекта
+                          setUploadedFiles([]);
                         }}
                         className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
                       >
@@ -538,256 +459,194 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
         </div>
       </div>
 
-      {/* Секция загрузки файлов */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Загрузка файлов данных измерений</h2>
-          <div className="flex space-x-3">
-            <button
-              onClick={handleSaveProject}
-              disabled={saveStatus.isSaving || uploadedFiles.length === 0 || !selectedQualificationObject}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {saveStatus.isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Сохранение...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Сохранить</span>
-                </>
-              )}
-            </button>
-            <button
-              onClick={handleExploreData}
-              disabled={uploadedFiles.filter(f => f.parsingStatus === 'completed').length === 0 || !selectedQualificationObject}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              <BarChart className="w-4 h-4" />
-              <span>Исследовать данные</span>
-            </button>
-            <button
-              onClick={triggerFileUpload}
-              disabled={!selectedQualificationObject}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              <Upload className="w-4 h-4" />
-              <span>Загрузить файлы в формате Vi2</span>
-            </button>
+      {/* Секция назначений оборудования */}
+      {selectedQualificationObject && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Назначения оборудования</h2>
+            <div className="flex space-x-3">
+              <button
+                onClick={handleSaveProject}
+                disabled={saveStatus.isSaving || uploadedFiles.length === 0}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {saveStatus.isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Сохранение...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Сохранить</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleExploreData}
+                disabled={uploadedFiles.filter(f => f.parsingStatus === 'completed').length === 0}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                <BarChart className="w-4 h-4" />
+                <span>Исследовать данные</span>
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Save Status */}
-        <div className="mb-4">
-          {!projectFilesLoaded && uploadedFiles.length === 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                <span className="text-sm text-blue-800">
-                  Загрузка ранее сохраненных файлов проекта...
-                </span>
+          {/* Save Status */}
+          <div className="mb-4">
+            {saveStatus.lastSaved && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-green-800">
+                    Последнее сохранение: {saveStatus.lastSaved.toLocaleString('ru-RU')}
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
-          
-          {saveStatus.lastSaved && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span className="text-sm text-green-800">
-                  Последнее сохранение: {saveStatus.lastSaved.toLocaleString('ru-RU')}
-                </span>
+            )}
+            
+            {saveStatus.error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <XCircle className="w-4 h-4 text-red-600" />
+                  <span className="text-sm text-red-800">
+                    Ошибка сохранения: {saveStatus.error}
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
-          
-          {saveStatus.error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <XCircle className="w-4 h-4 text-red-600" />
-                <span className="text-sm text-red-800">
-                  Ошибка сохранения: {saveStatus.error}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".vi2"
-          multiple
-          onChange={handleFileUpload}
-          className="hidden"
-        />
+            )}
+          </div>
 
-        {uploadedFiles.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-                    Порядок
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Имя файла
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Период данных
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Количество записей
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    № зоны измерения
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Уровень измерения (м.)
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Статус
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Удалить
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {sortedFiles.map((file, index) => (
-                  <tr key={file.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <div className="flex flex-col space-y-1">
-                        <button
-                          onClick={() => moveFile(file.id, 'up')}
-                          disabled={index === 0}
-                          className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <ChevronUp className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => moveFile(file.id, 'down')}
-                          disabled={index === sortedFiles.length - 1}
-                          className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <ChevronDown className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{file.name}</div>
-                        <div className="text-xs text-gray-500">{file.uploadDate}</div>
-                        {file.parsedData && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            {file.parsedData.deviceMetadata.deviceModel} (S/N: {file.parsedData.deviceMetadata.serialNumber})
-                          </div>
-                        )}
-                        {file.contractorId && (
-                          <div className="text-xs text-blue-600 mt-1">
-                            📋 {getContractorName(file.contractorId)}
-                          </div>
-                        )}
-                        {file.qualificationObjectId && (
-                          <div className="text-xs text-green-600 mt-1">
-                            🏢 {getQualificationObjectName(file.qualificationObjectId)}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {file.period || '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {file.recordCount ? file.recordCount.toLocaleString('ru-RU') : '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editingField?.fileId === file.id && editingField?.field === 'zoneNumber' ? (
-                        <input
-                          type="number"
-                          min="1"
-                          max="99"
-                          value={file.zoneNumber || ''}
-                          onChange={(e) => updateFileField(file.id, 'zoneNumber', parseInt(e.target.value) || '')}
-                          onBlur={() => setEditingField(null)}
-                          onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          autoFocus
-                        />
-                      ) : (
-                        <div
-                          onClick={() => setEditingField({ fileId: file.id, field: 'zoneNumber' })}
-                          className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
-                        >
-                          {file.zoneNumber || 'Нажмите для ввода'}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editingField?.fileId === file.id && editingField?.field === 'measurementLevel' ? (
-                        <input
-                          type="text"
-                          value={file.measurementLevel || ''}
-                          onChange={(e) => updateFileField(file.id, 'measurementLevel', e.target.value)}
-                          onBlur={() => setEditingField(null)}
-                          onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
-                          className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          autoFocus
-                        />
-                      ) : (
-                        <div
-                          onClick={() => setEditingField({ fileId: file.id, field: 'measurementLevel' })}
-                          className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
-                        >
-                          {file.measurementLevel || 'Нажмите для ввода'}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(file.parsingStatus)}
-                        <span className="text-sm text-gray-900">{getStatusText(file.parsingStatus)}</span>
-                      </div>
-                      {file.errorMessage && (
-                        <div className="text-xs text-red-600 mt-1">{file.errorMessage}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button
-                        onClick={() => handleDeleteFile(file.id)}
-                        disabled={operationLoading}
-                        className="text-red-600 hover:text-red-900 transition-colors"
-                        title="Удалить файл"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
+          {loadingAssignments ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">Загрузка назначений оборудования...</p>
+            </div>
+          ) : equipmentAssignments.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Наименование оборудования
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      № зоны измерения
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Уровень измерения (м.)
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Файл данных
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Статус
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Действия
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <Upload className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>Файлы данных измерений не найдены</p>
-            <p className="text-sm">Нажмите кнопку "Загрузить файлы" для добавления файлов в формате .vi2 к проекту</p>
-          </div>
-        )}
-      </div>
-
-      {/* Примечание о внешнем датчике */}
-      {uploadedFiles.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-600 text-sm font-medium">
-            <strong>Примечание:</strong> Для внешнего датчика указать № зоны измерения 999.
-          </p>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {equipmentAssignments.map((assignment) => {
+                    const assignedFile = getFileForAssignment(assignment.id);
+                    
+                    return (
+                      <tr key={assignment.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            Оборудование #{assignment.equipmentId.substring(0, 8)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Назначено: {assignment.assignedAt.toLocaleDateString('ru-RU')}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {assignment.zoneNumber === 999 ? 'Внешний' : assignment.zoneNumber}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {assignment.measurementLevel || '-'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {assignedFile ? (
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{assignedFile.name}</div>
+                              <div className="text-xs text-gray-500">{assignedFile.uploadDate}</div>
+                              {assignedFile.period && (
+                                <div className="text-xs text-gray-500">{assignedFile.period}</div>
+                              )}
+                              {assignedFile.recordCount && (
+                                <div className="text-xs text-gray-500">
+                                  {assignedFile.recordCount.toLocaleString('ru-RU')} записей
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">Файл не загружен</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {assignedFile ? (
+                            <div className="flex items-center space-x-2">
+                              {getStatusIcon(assignedFile.parsingStatus)}
+                              <span className="text-sm text-gray-900">{getStatusText(assignedFile.parsingStatus)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                          {assignedFile?.errorMessage && (
+                            <div className="text-xs text-red-600 mt-1">{assignedFile.errorMessage}</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex justify-end space-x-2">
+                            {!assignedFile ? (
+                              <>
+                                <input
+                                  type="file"
+                                  accept=".vi2"
+                                  onChange={(e) => handleFileUpload(e, assignment.id)}
+                                  className="hidden"
+                                  id={`file-upload-${assignment.id}`}
+                                />
+                                <label
+                                  htmlFor={`file-upload-${assignment.id}`}
+                                  className="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700 transition-colors cursor-pointer flex items-center space-x-1"
+                                >
+                                  <Upload className="w-3 h-3" />
+                                  <span>Загрузить файл</span>
+                                </label>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => handleDeleteFile(assignedFile.id)}
+                                disabled={operationLoading}
+                                className="text-red-600 hover:text-red-900 transition-colors"
+                                title="Удалить файл"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Upload className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p>Назначения оборудования не найдены</p>
+              <p className="text-sm">Сначала настройте размещение оборудования на этапе "Начало испытаний"</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -801,11 +660,11 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-indigo-100 text-indigo-800 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">2</span>
-            <p>Загрузите файлы данных измерений в формате .vi2 с логгеров</p>
+            <p>Для каждого назначения оборудования загрузите соответствующий файл данных в формате .vi2</p>
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-indigo-100 text-indigo-800 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">3</span>
-            <p>Укажите номера зон измерения и уровни для каждого файла</p>
+            <p>Убедитесь, что все файлы успешно обработаны (статус "Обработан")</p>
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-indigo-100 text-indigo-800 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">4</span>
