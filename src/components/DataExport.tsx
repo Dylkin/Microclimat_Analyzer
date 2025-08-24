@@ -14,7 +14,6 @@ import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 import { projectEquipmentService, ProjectEquipmentAssignment } from '../utils/projectEquipmentService';
 import { measurementEquipmentService } from '../utils/measurementEquipmentService';
 import { MeasurementEquipment } from '../types/MeasurementEquipment';
-import { VI2ParsingService } from '../utils/vi2Parser';
 
 interface DataExportProps {
   project: Project;
