@@ -502,7 +502,6 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
         return [...filtered, savedDocument];
       });
       
-      alert(`${DocumentTypeLabels[documentType]} успешно сохранен`);
     } catch (error) {
       console.error('Ошибка сохранения дополнительного документа:', error);
       alert(`Ошибка сохранения документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -523,7 +522,6 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
         // Удаляем из локального состояния
         setAdditionalDocuments(prev => prev.filter(doc => doc.id !== documentId));
         
-        alert(`${DocumentTypeLabels[documentType]} успешно удален`);
       } catch (error) {
         console.error('Ошибка удаления дополнительного документа:', error);
         alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
