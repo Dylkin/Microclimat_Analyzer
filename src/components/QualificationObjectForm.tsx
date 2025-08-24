@@ -40,6 +40,13 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     };
 
     onAdd(submitData);
+    
+    // Очищаем все поля формы после успешного добавления
+    setObjectData({
+      contractorId,
+      type: 'помещение'
+    });
+    setPlanFile(null);
   };
 
   const validateRequiredFields = (): boolean => {
