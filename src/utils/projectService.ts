@@ -16,7 +16,7 @@ let supabase: any = null;
 
 // Инициализация Supabase клиента
 const initSupabase = () => {
-  if (!supabase && supabaseUrl && supabaseAnonKey) {
+  if (!supabase && supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
     console.log('Initializing Supabase with URL:', supabaseUrl);
     console.log('Supabase URL exists:', !!supabaseUrl);
     console.log('Supabase Anon Key exists:', !!supabaseAnonKey);

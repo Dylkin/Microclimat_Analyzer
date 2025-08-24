@@ -14,7 +14,7 @@ let supabase: any = null;
 
 // Инициализация Supabase клиента
 const initSupabase = () => {
-  if (!supabase && supabaseUrl && supabaseAnonKey) {
+  if (!supabase && supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
     supabase = createClient(supabaseUrl, supabaseAnonKey);
   }
   return supabase;
