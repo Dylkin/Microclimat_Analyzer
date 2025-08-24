@@ -43,7 +43,7 @@ export class ProjectDocumentService {
   }
 
   // Сохранение документа проекта
-  async saveDocument(documentData: CreateProjectDocumentData): Promise<ProjectDocument> {
+  async saveDocument(documentData: CreateProjectDocumentData, qualificationObjectId?: string): Promise<ProjectDocument> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
     }
@@ -68,16 +68,15 @@ export class ProjectDocumentService {
         file_size: documentData.file.size,
         file_content: fileBytes,
         mime_type: documentData.file.type,
-        uploaded_by: documentData.uploadedBy || null
+        uploaded_by: documentData.uploadedBy || null,
+        qualification_object_id: qualificationObjectId || null
       };
 
-      // Используем upsert для замены существующего документа того же типа
+      // Для схемы расстановки и данных испытаний используем уникальность по проекту + объект + тип
+      // Для остальных документов - по проекту + тип
       const { data, error } = await this.supabase
         .from('project_documents')
-        .upsert(insertData, { 
-          onConflict: 'project_id,document_type',
-          ignoreDuplicates: false 
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -106,7 +105,7 @@ export class ProjectDocumentService {
   }
 
   // Получение документов проекта
-  async getProjectDocuments(projectId: string): Promise<ProjectDocument[]> {
+  async getProjectDocuments(projectId: string, qualificationObjectId?: string): Promise<ProjectDocument[]> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
     }
@@ -114,7 +113,7 @@ export class ProjectDocumentService {
     try {
       console.log('Загружаем документы проекта:', projectId);
 
-      const { data, error } = await this.supabase
+      let query = this.supabase
         .from('project_documents')
         .select(`
           id,
@@ -125,9 +124,19 @@ export class ProjectDocumentService {
           mime_type,
           uploaded_by,
           uploaded_at,
-          created_at
+          created_at,
+          qualification_object_id
         `)
-        .eq('project_id', projectId)
+        .eq('project_id', projectId);
+
+      // Если указан объект квалификации, фильтруем по нему или берем общие документы проекта
+      if (qualificationObjectId) {
+        query = query.or(`qualification_object_id.eq.${qualificationObjectId},qualification_object_id.is.null`);
+      } else {
+        query = query.is('qualification_object_id', null);
+      }
+
+      const { data, error } = await query
         .order('uploaded_at', { ascending: false });
 
       if (error) {
@@ -168,7 +177,8 @@ export class ProjectDocumentService {
         uploadedBy: doc.uploaded_by || undefined,
         uploadedByName: doc.uploaded_by ? usersMap.get(doc.uploaded_by) : undefined,
         uploadedAt: new Date(doc.uploaded_at),
-        createdAt: new Date(doc.created_at)
+        createdAt: new Date(doc.created_at),
+        qualificationObjectId: doc.qualification_object_id || undefined
       }));
     } catch (error) {
       console.error('Ошибка при получении документов проекта:', error);

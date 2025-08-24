@@ -1,4 +1,4 @@
-export type DocumentType = 'commercial_offer' | 'contract';
+export type DocumentType = 'commercial_offer' | 'contract' | 'layout_scheme' | 'test_data';
 
 export interface ProjectDocument {
   id: string;
@@ -11,6 +11,7 @@ export interface ProjectDocument {
   uploadedByName?: string;
   uploadedAt: Date;
   createdAt: Date;
+  qualificationObjectId?: string;
 }
 
 export interface CreateProjectDocumentData {
@@ -35,7 +36,9 @@ export interface DatabaseProjectDocument {
 
 export const DocumentTypeLabels: Record<DocumentType, string> = {
   'commercial_offer': 'Коммерческое предложение',
-  'contract': 'Договор'
+  'contract': 'Договор',
+  'layout_scheme': 'Схема расстановки',
+  'test_data': 'Данные о проведении испытаний'
 };
 
 export type DocumentStatus = 'draft' | 'ready_to_send' | 'sent' | 'under_review' | 'approved';

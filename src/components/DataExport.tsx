@@ -43,6 +43,8 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
   const [equipmentAssignments, setEquipmentAssignments] = React.useState<ProjectEquipmentAssignment[]>([]);
   const [loadingAssignments, setLoadingAssignments] = React.useState(false);
   const [measurementEquipment, setMeasurementEquipment] = React.useState<MeasurementEquipment[]>([]);
+  const [additionalDocuments, setAdditionalDocuments] = React.useState<ProjectDocument[]>([]);
+  const [uploadingAdditionalDoc, setUploadingAdditionalDoc] = React.useState<DocumentType | null>(null);
 
   // Загрузка ранее сохраненных файлов проекта
   React.useEffect(() => {
@@ -67,6 +69,33 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
     loadProjectFiles();
   }, [selectedQualificationObject, project.id, user?.id]);
 
+  // Загрузка дополнительных документов при выборе объекта квалификации
+  React.useEffect(() => {
+    const loadAdditionalDocuments = async () => {
+      if (!selectedQualificationObject || !projectDocumentService.isAvailable()) {
+        setAdditionalDocuments([]);
+        return;
+      }
+
+      try {
+        console.log('Загружаем дополнительные документы для объекта квалификации:', selectedQualificationObject);
+        const documents = await projectDocumentService.getProjectDocuments(project.id, selectedQualificationObject);
+        
+        // Фильтруем только дополнительные документы (схема расстановки и данные испытаний)
+        const additionalDocs = documents.filter(doc => 
+          doc.documentType === 'layout_scheme' || doc.documentType === 'test_data'
+        );
+        
+        setAdditionalDocuments(additionalDocs);
+        console.log('Загружено дополнительных документов:', additionalDocs.length);
+      } catch (error) {
+        console.error('Ошибка загрузки дополнительных документов:', error);
+        setAdditionalDocuments([]);
+      }
+    };
+
+    loadAdditionalDocuments();
+  }, [selectedQualificationObject, project.id]);
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
     const loadContractors = async () => {
@@ -289,8 +318,8 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
       return;
     }
 
-    if (uploadedFiles.length === 0) {
-      alert('Нет файлов для сохранения');
+    if (uploadedFiles.length === 0 && additionalDocuments.length === 0) {
+      alert('Нет данных для сохранения');
       return;
     }
 
@@ -308,7 +337,7 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
       console.log('Сохраняем все данные проекта в базу данных...');
       
       // 1. Сохраняем файлы в базе данных с привязкой к проекту
-      if (uploadedFileService.isAvailable()) {
+      if (uploadedFiles.length > 0 && uploadedFileService.isAvailable()) {
         await uploadedFileService.saveProjectFiles({
           projectId: project.id,
           qualificationObjectId: selectedQualificationObject,
@@ -342,6 +371,9 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
         }
       }
       
+      // 4. Дополнительные документы уже сохранены при загрузке
+      console.log('Дополнительные документы уже сохранены:', additionalDocuments.length);
+      
       // Обновляем статус сохранения
       setSaveStatus({
         isSaving: false,
@@ -355,7 +387,8 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
         qualificationObjectId: selectedQualificationObject,
         objectType: qualificationObject.type,
         filesCount: uploadedFiles.length,
-        completedFiles: uploadedFiles.filter(f => f.parsingStatus === 'completed').length
+        completedFiles: uploadedFiles.filter(f => f.parsingStatus === 'completed').length,
+        additionalDocuments: additionalDocuments.length
       });
 
     } catch (error) {
@@ -422,6 +455,107 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
   // Получение файла для конкретного назначения оборудования
   const getFileForAssignment = (assignmentId: string): UploadedFile | undefined => {
     return uploadedFiles.find(file => file.id === assignmentId);
+  };
+
+  // Загрузка дополнительного документа
+  const handleAdditionalDocumentUpload = async (documentType: DocumentType, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Проверяем формат файла
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Можно загружать только файлы в формате PDF, JPG или PNG');
+      return;
+    }
+
+    // Проверяем размер файла (максимум 10 MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Размер файла не должен превышать 10 MB');
+      return;
+    }
+
+    if (!selectedQualificationObject) {
+      alert('Выберите объект квалификации');
+      return;
+    }
+
+    setUploadingAdditionalDoc(documentType);
+
+    try {
+      const documentData = {
+        projectId: project.id,
+        documentType,
+        file,
+        uploadedBy: user?.id
+      };
+
+      const savedDocument = await projectDocumentService.saveDocument(documentData, selectedQualificationObject);
+      
+      // Обновляем список дополнительных документов
+      setAdditionalDocuments(prev => {
+        // Удаляем старый документ того же типа если есть
+        const filtered = prev.filter(doc => doc.documentType !== documentType);
+        return [...filtered, savedDocument];
+      });
+      
+      alert(`${DocumentTypeLabels[documentType]} успешно сохранен`);
+    } catch (error) {
+      console.error('Ошибка сохранения дополнительного документа:', error);
+      alert(`Ошибка сохранения документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setUploadingAdditionalDoc(null);
+      // Очищаем input
+      event.target.value = '';
+    }
+  };
+
+  // Удаление дополнительного документа
+  const handleRemoveAdditionalDocument = async (documentId: string, documentType: DocumentType) => {
+    if (confirm(`Вы уверены, что хотите удалить ${DocumentTypeLabels[documentType].toLowerCase()}?`)) {
+      setOperationLoading(true);
+      try {
+        await projectDocumentService.deleteDocument(documentId);
+        
+        // Удаляем из локального состояния
+        setAdditionalDocuments(prev => prev.filter(doc => doc.id !== documentId));
+        
+        alert(`${DocumentTypeLabels[documentType]} успешно удален`);
+      } catch (error) {
+        console.error('Ошибка удаления дополнительного документа:', error);
+        alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      } finally {
+        setOperationLoading(false);
+      }
+    }
+  };
+
+  // Скачивание дополнительного документа
+  const handleDownloadAdditionalDocument = async (document: ProjectDocument) => {
+    try {
+      setOperationLoading(true);
+      
+      const blob = await projectDocumentService.getDocumentContent(document.id);
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = document.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Ошибка скачивания дополнительного документа:', error);
+      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // Получение документа по типу
+  const getAdditionalDocumentByType = (documentType: DocumentType): ProjectDocument | null => {
+    return additionalDocuments.find(doc => doc.documentType === documentType) || null;
   };
 
   return (
@@ -726,6 +860,181 @@ export const DataExport: React.FC<DataExportProps> = ({ project, onBack }) => {
               <p className="text-sm">Сначала настройте размещение оборудования на этапе "Начало испытаний"</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Дополнительные документы */}
+      {selectedQualificationObject && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Дополнительные документы</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Схема расстановки */}
+            <div>
+              <h3 className="text-md font-medium text-gray-800 mb-3">Схема расстановки</h3>
+              {(() => {
+                const document = getAdditionalDocumentByType('layout_scheme');
+                return document ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {document.fileName}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {(document.fileSize / 1024 / 1024).toFixed(2)} MB
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Загружен: {document.uploadedAt.toLocaleString('ru-RU')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleDownloadAdditionalDocument(document)}
+                          disabled={operationLoading}
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
+                          title="Скачать"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveAdditionalDocument(document.id, 'layout_scheme')}
+                          disabled={operationLoading}
+                          className="text-red-600 hover:text-red-800 transition-colors"
+                          title="Удалить"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    {uploadingAdditionalDoc === 'layout_scheme' ? (
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        <span className="text-sm text-gray-600">Сохранение документа...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => handleAdditionalDocumentUpload('layout_scheme', e)}
+                          className="hidden"
+                          id="layout-scheme-upload"
+                        />
+                        <label
+                          htmlFor="layout-scheme-upload"
+                          className="cursor-pointer flex flex-col items-center space-y-2"
+                        >
+                          <Upload className="w-8 h-8 text-gray-400" />
+                          <span className="text-sm text-gray-600">
+                            Загрузить схему расстановки
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            PDF, JPG, PNG до 10 MB
+                          </span>
+                        </label>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Данные о проведении испытаний */}
+            <div>
+              <h3 className="text-md font-medium text-gray-800 mb-3">Данные о проведении испытаний</h3>
+              {(() => {
+                const document = getAdditionalDocumentByType('test_data');
+                return document ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <FileText className="w-5 h-5 text-green-600" />
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {document.fileName}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {(document.fileSize / 1024 / 1024).toFixed(2)} MB
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Загружен: {document.uploadedAt.toLocaleString('ru-RU')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleDownloadAdditionalDocument(document)}
+                          disabled={operationLoading}
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
+                          title="Скачать"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveAdditionalDocument(document.id, 'test_data')}
+                          disabled={operationLoading}
+                          className="text-red-600 hover:text-red-800 transition-colors"
+                          title="Удалить"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    {uploadingAdditionalDoc === 'test_data' ? (
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        <span className="text-sm text-gray-600">Сохранение документа...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => handleAdditionalDocumentUpload('test_data', e)}
+                          className="hidden"
+                          id="test-data-upload"
+                        />
+                        <label
+                          htmlFor="test-data-upload"
+                          className="cursor-pointer flex flex-col items-center space-y-2"
+                        >
+                          <Upload className="w-8 h-8 text-gray-400" />
+                          <span className="text-sm text-gray-600">
+                            Загрузить данные о проведении испытаний
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            PDF, JPG, PNG до 10 MB
+                          </span>
+                        </label>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Инструкции по дополнительным документам */}
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="text-sm font-medium text-blue-900 mb-2">Требования к дополнительным документам:</h4>
+            <ul className="text-xs text-blue-800 space-y-1">
+              <li>• <strong>Схема расстановки:</strong> План размещения измерительного оборудования</li>
+              <li>• <strong>Данные о проведении испытаний:</strong> Протоколы, фотографии, дополнительная документация</li>
+              <li>• Поддерживаемые форматы: PDF, JPG, PNG</li>
+              <li>• Максимальный размер файла: 10 MB</li>
+              <li>• Документы привязываются к выбранному объекту квалификации</li>
+            </ul>
+          </div>
         </div>
       )}
 
