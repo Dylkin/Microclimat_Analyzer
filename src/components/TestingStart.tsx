@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Building2, Play, Edit2, Save, X, MapPin, Car, Refrigerator, Snowflake, Building, Package, Hash, Copy, Map, User, Phone, MessageSquare, CheckCircle, AlertCircle, Plus, Trash2, Wrench } from 'lucide-react';
 import { Project } from '../types/Project';
 import { Contractor } from '../types/Contractor';
