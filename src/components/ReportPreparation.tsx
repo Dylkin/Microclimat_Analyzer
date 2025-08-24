@@ -131,6 +131,41 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
         console.log('Загружаем файлы данных для объекта квалификации:', selectedQualificationObject);
         
         // Загружаем назначения оборудования для получения файлов
+        const assignments = await projectEquipmentService.getEquipmentPlacement(
+          project.id,
+          selectedQualificationObject
+        );
+        
+        // Создаем mock-файлы на основе назначений
+        const mockFiles: UploadedFile[] = assignments.map((assignment, index) => ({
+          id: assignment.id,
+          name: `${getEquipmentName(assignment.equipmentId)}.vi2`,
+          uploadDate: new Date().toLocaleString('ru-RU'),
+          parsingStatus: 'completed' as const,
+          order: index,
+          zoneNumber: assignment.zoneNumber,
+          measurementLevel: assignment.measurementLevel?.toString(),
+          parsedData: {
+            fileName: `${getEquipmentName(assignment.equipmentId)}.vi2`,
+            deviceMetadata: {
+              deviceType: 2,
+              deviceModel: 'Testo 174H',
+              serialNumber: `SN-${assignment.id.substring(0, 8)}`
+            },
+            measurements: [],
+            startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            endDate: new Date(),
+            recordCount: 10080,
+            parsingStatus: 'completed'
+          }
+        }));
+        
+        setUploadedFiles(mockFiles);
+        console.log('Mock-файлы созданы:', mockFiles.length);
+      } catch (error) {
+        console.error('Ошибка загрузки файлов данных:', error);
+        setUploadedFiles([]);
+      }
         if (projectEquipmentService.isAvailable()) {
           const assignments = await projectEquipmentService.getEquipmentPlacement(
             project.id,
