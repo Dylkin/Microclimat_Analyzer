@@ -350,12 +350,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
         };
       case 'testing_completion':
         return {
-          label: 'Завершить испытания',
-          page: 'analyzer',
-          icon: Play
-        };
-      case 'testing_completion':
-        return {
           label: 'Выгрузить данные',
           page: 'data-export',
           icon: Download
