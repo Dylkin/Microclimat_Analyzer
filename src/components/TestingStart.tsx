@@ -152,21 +152,17 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
       const objectZones = prev[objectId] || [];
       const nextNumber = objectZones.length > 0 ? Math.max(...objectZones.map(z => z.number)) + 1 : 1;
       
-      // Копируем уровни из предыдущей зоны если она есть
-      let levelsFromPreviousZone: MeasurementLevel[] = [];
-      if (objectZones.length > 0) {
-        const lastZone = objectZones[objectZones.length - 1];
-        levelsFromPreviousZone = lastZone.levels.map(level => ({
-          id: crypto.randomUUID(),
-          height: level.height,
-          equipmentId: null // Сбрасываем выбранное оборудование
-        }));
-      }
+      // Автоматически добавляем первый уровень с высотой 0.3 м
+      const defaultLevel: MeasurementLevel = {
+        id: crypto.randomUUID(),
+        height: 0.3,
+        equipmentId: null
+      };
       
       const newZone: MeasurementZone = {
         id: crypto.randomUUID(),
         number: nextNumber,
-        levels: levelsFromPreviousZone
+        levels: [defaultLevel]
       };
       
       return {
@@ -573,22 +569,13 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
                   <h5 className="text-sm font-medium text-gray-900">
                     Зона измерения № {zone.number}
                   </h5>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleAddLevel(obj.id, zone.id)}
-                      className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700 transition-colors flex items-center space-x-1"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Уровень</span>
-                    </button>
-                    <button
-                      onClick={() => handleRemoveZone(obj.id, zone.id)}
-                      className="text-red-600 hover:text-red-800 transition-colors"
-                      title="Удалить зону"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleRemoveZone(obj.id, zone.id)}
+                    className="text-red-600 hover:text-red-800 transition-colors"
+                    title="Удалить зону"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
 
                 {zone.levels.length > 0 ? (
@@ -659,11 +646,30 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
                         </div>
                       );
                     })}
+                    
+                    {/* Кнопка добавления уровня под последним уровнем */}
+                    <div className="flex justify-center pt-2">
+                      <button
+                        onClick={() => handleAddLevel(obj.id, zone.id)}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Уровень</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-4 text-gray-500 bg-white border border-gray-200 rounded">
                     <p className="text-sm">Уровни измерения не добавлены</p>
-                    <p className="text-xs mt-1">Нажмите "Уровень" для добавления</p>
+                    <div className="mt-3">
+                      <button
+                        onClick={() => handleAddLevel(obj.id, zone.id)}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1 mx-auto"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Уровень</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
