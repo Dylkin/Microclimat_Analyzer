@@ -57,6 +57,14 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const [projectFilesLoaded, setProjectFilesLoaded] = React.useState(false);
   const [operationLoading, setOperationLoading] = React.useState(false);
 
+  // Сброс состояния загрузки файлов при смене объекта квалификации
+  React.useEffect(() => {
+    if (selectedProject) {
+      setProjectFilesLoaded(false);
+      setUploadedFiles([]);
+    }
+  }, [selectedQualificationObject]);
+
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
     const loadContractors = async () => {
@@ -81,7 +89,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   // Загрузка ранее сохраненных файлов проекта
   React.useEffect(() => {
     const loadProjectFiles = async () => {
-      if (!selectedProject || !uploadedFileService.isAvailable() || projectFilesLoaded) {
+      if (!selectedProject || !selectedQualificationObject || !uploadedFileService.isAvailable() || projectFilesLoaded) {
         return;
       }
 
@@ -102,7 +110,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     };
 
     loadProjectFiles();
-  }, [selectedProject, projectFilesLoaded, user?.id]);
+  }, [selectedProject, selectedQualificationObject, projectFilesLoaded, user?.id]);
 
   // Загрузка объектов квалификации при выборе контрагента
   React.useEffect(() => {
