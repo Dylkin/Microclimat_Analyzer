@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play } from 'lucide-react';
+import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play, Download } from 'lucide-react';
 import { FileText } from 'lucide-react';
 import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, CreateProjectData } from '../types/Project';
 import { Contractor } from '../types/Contractor';
@@ -359,6 +359,12 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           label: 'Начать испытания',
           page: 'testing-start',
           icon: Play
+        };
+      case 'testing_completion':
+        return {
+          label: 'Выгрузить данные',
+          page: 'data-export',
+          icon: Download
         };
       case 'report_preparation':
         return {
