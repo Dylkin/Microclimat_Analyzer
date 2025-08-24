@@ -267,7 +267,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
         qualificationObjectIds: []
       });
       setShowAddForm(false);
-      alert('Проект успешно создан');
     } catch (error) {
       console.error('Ошибка добавления проекта:', error);
       alert(`Ошибка создания проекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
