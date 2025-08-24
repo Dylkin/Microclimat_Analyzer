@@ -684,7 +684,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                             <button
                               onClick={() => handleProjectAction(project)}
                               disabled={operationLoading}
-                              className="text-blue-600 hover:text-blue-900"
+                             className="text-green-600 hover:text-green-900"
                               title={getProjectAction(project.status)?.label}
                             >
                               <Play className="w-4 h-4" />
