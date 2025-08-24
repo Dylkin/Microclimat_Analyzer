@@ -135,6 +135,12 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
 
   // Сохранение информации о договоре
   const handleSaveContractInfo = async () => {
+    // Проверяем обязательность номера договора для статуса "Согласовано"
+    if (contractStatus === 'approved' && !contractInfo.contractNumber.trim()) {
+      alert('Номер договора обязателен для заполнения при статусе "Согласовано"');
+      return;
+    }
+
     setOperationLoading(true);
     try {
       await projectService.updateProject(project.id, {
