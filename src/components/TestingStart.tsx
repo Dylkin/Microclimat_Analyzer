@@ -151,10 +151,21 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
       const objectZones = prev[objectId] || [];
       const nextNumber = objectZones.length > 0 ? Math.max(...objectZones.map(z => z.number)) + 1 : 1;
       
+      // Копируем уровни из предыдущей зоны если она есть
+      let levelsFromPreviousZone: MeasurementLevel[] = [];
+      if (objectZones.length > 0) {
+        const lastZone = objectZones[objectZones.length - 1];
+        levelsFromPreviousZone = lastZone.levels.map(level => ({
+          id: crypto.randomUUID(),
+          height: level.height,
+          equipmentId: null // Сбрасываем выбранное оборудование
+        }));
+      }
+      
       const newZone: MeasurementZone = {
         id: crypto.randomUUID(),
         number: nextNumber,
-        levels: []
+        levels: levelsFromPreviousZone
       };
       
       return {
@@ -577,28 +588,27 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
                               <label className="block text-xs font-medium text-gray-700 mb-1">
                                 Измерительное оборудование
                               </label>
-                              <select
+                              <SearchableSelect
                                 value={level.equipmentId || ''}
-                                onChange={(e) => handleUpdateLevelEquipment(
+                                onChange={(value) => handleUpdateLevelEquipment(
                                   obj.id, 
                                   zone.id, 
                                   level.id, 
-                                  e.target.value || null
+                                  value || null
                                 )}
-                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                              >
-                                <option value="">Выберите оборудование</option>
-                                {availableEquipment.map((equipment) => (
-                                  <option key={equipment.id} value={equipment.id}>
-                                    {equipment.name} ({equipment.type})
-                                  </option>
-                                ))}
-                                {selectedEquipment && !availableEquipment.find(eq => eq.id === selectedEquipment.id) && (
-                                  <option value={selectedEquipment.id}>
-                                    {selectedEquipment.name} ({selectedEquipment.type}) - Используется
-                                  </option>
-                                )}
-                              </select>
+                                options={[
+                                  { value: '', label: 'Выберите оборудование' },
+                                  ...availableEquipment.map(equipment => ({
+                                    value: equipment.id,
+                                    label: `${equipment.name} (${equipment.type})`
+                                  })),
+                                  ...(selectedEquipment && !availableEquipment.find(eq => eq.id === selectedEquipment.id) ? [{
+                                    value: selectedEquipment.id,
+                                    label: `${selectedEquipment.name} (${selectedEquipment.type}) - Используется`
+                                  }] : [])
+                                ]}
+                                placeholder="Поиск оборудования..."
+                              />
                               {selectedEquipment && (
                                 <div className="text-xs text-gray-500 mt-1">
                                   S/N: {selectedEquipment.serialNumber}
@@ -986,6 +996,121 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Компонент выпадающего списка с поиском
+interface SearchableSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  placeholder?: string;
+}
+
+const SearchableSelect: React.FC<SearchableSelectProps> = ({
+  value,
+  onChange,
+  options,
+  placeholder = "Поиск..."
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredOptions, setFilteredOptions] = useState(options);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Фильтрация опций по поисковому запросу
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredOptions(options);
+      return;
+    }
+
+    const filtered = options.filter(option =>
+      option.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      option.value.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredOptions(filtered);
+  }, [searchTerm, options]);
+
+  // Закрытие при клике вне компонента
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearchTerm('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Получение текста выбранной опции
+  const selectedOption = options.find(opt => opt.value === value);
+  const displayText = selectedOption ? selectedOption.label : '';
+
+  const handleSelect = (optionValue: string) => {
+    onChange(optionValue);
+    setIsOpen(false);
+    setSearchTerm('');
+  };
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm cursor-pointer bg-white flex items-center justify-between"
+      >
+        <span className={value ? 'text-gray-900' : 'text-gray-500'}>
+          {displayText || 'Выберите оборудование'}
+        </span>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-hidden">
+          {/* Поле поиска */}
+          <div className="p-2 border-b border-gray-200">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder={placeholder}
+              autoFocus
+            />
+          </div>
+          
+          {/* Список опций */}
+          <div className="max-h-48 overflow-y-auto">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((option) => (
+                <div
+                  key={option.value}
+                  onClick={() => handleSelect(option.value)}
+                  className={`px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm ${
+                    value === option.value ? 'bg-indigo-50 text-indigo-700' : 'text-gray-900'
+                  }`}
+                >
+                  {option.label}
+                </div>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-sm text-gray-500">
+                Ничего не найдено
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
