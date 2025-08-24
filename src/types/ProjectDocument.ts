@@ -37,3 +37,21 @@ export const DocumentTypeLabels: Record<DocumentType, string> = {
   'commercial_offer': 'Коммерческое предложение',
   'contract': 'Договор'
 };
+
+export type DocumentStatus = 'draft' | 'ready_to_send' | 'sent' | 'under_review' | 'approved';
+
+export const DocumentStatusLabels: Record<DocumentStatus, string> = {
+  'draft': 'Черновик',
+  'ready_to_send': 'Готово к отправке',
+  'sent': 'Отправлено',
+  'under_review': 'Согласование',
+  'approved': 'Согласовано'
+};
+
+export const DocumentStatusColors: Record<DocumentStatus, string> = {
+  'draft': 'bg-gray-100 text-gray-800',
+  'ready_to_send': 'bg-blue-100 text-blue-800',
+  'sent': 'bg-yellow-100 text-yellow-800',
+  'under_review': 'bg-orange-100 text-orange-800',
+  'approved': 'bg-green-100 text-green-800'
+};
