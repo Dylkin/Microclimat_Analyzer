@@ -55,6 +55,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     error: null
   });
   const [projectFilesLoaded, setProjectFilesLoaded] = React.useState(false);
+  const [operationLoading, setOperationLoading] = React.useState(false);
 
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
@@ -261,6 +262,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
   const handleDeleteFile = async (fileId: string) => {
     if (confirm('Вы уверены, что хотите удалить этот файл?')) {
+      setOperationLoading(true);
       try {
         // Удаляем данные из базы
         await databaseService.deleteFileData(fileId);
@@ -275,6 +277,10 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         }
       } catch (error) {
         console.error('Ошибка удаления данных из базы:', error);
+      } catch (error) {
+        console.error('Ошибка удаления файла:', error);
+      } finally {
+        setOperationLoading(false);
       }
       
       // Удаляем из состояния
@@ -901,15 +907,8 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button
-                        onClick={() => handleViewContractor(contractor)}
-                        disabled={operationLoading}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Просмотр"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
                         onClick={() => handleDeleteFile(file.id)}
+                        disabled={operationLoading}
                         className="text-red-600 hover:text-red-900 transition-colors"
                         title="Удалить файл"
                       >
