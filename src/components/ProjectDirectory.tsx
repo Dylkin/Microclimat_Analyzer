@@ -294,7 +294,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       
       setProjects(prev => prev.map(p => p.id === editingProject ? updatedProject : p));
       setEditingProject(null);
-      alert('Проект успешно обновлен');
     } catch (error) {
       console.error('Ошибка обновления проекта:', error);
       alert(`Ошибка обновления проекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
