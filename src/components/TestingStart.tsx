@@ -796,6 +796,12 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
 
   // Завершение начала испытаний
   const handleCompleteTestingStart = async () => {
+    // Проверяем доступность Supabase перед обновлением
+    if (!projectService.isAvailable()) {
+      alert('Подключение к базе данных недоступно. Проверьте настройки Supabase.');
+      return;
+    }
+
     if (confirm('Вы уверены, что хотите завершить этап "Начало испытаний" и перейти к следующему этапу?')) {
       setOperationLoading(true);
       try {
@@ -808,7 +814,12 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
         onBack();
       } catch (error) {
         console.error('Ошибка обновления статуса проекта:', error);
-        alert(`Ошибка обновления статуса проекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+        const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+        if (errorMessage.includes('Failed to fetch')) {
+          alert('Ошибка подключения к базе данных. Проверьте настройки Supabase и подключение к интернету.');
+        } else {
+          alert(`Ошибка обновления статуса проекта: ${errorMessage}`);
+        }
       } finally {
         setOperationLoading(false);
       }
