@@ -81,8 +81,7 @@ export class ProjectService {
   // Получение всех проектов с связанными данными
   async getAllProjects(): Promise<Project[]> {
     if (!this.supabase) {
-      console.warn('Supabase не настроен - возвращаем пустой массив');
-      return [];
+      throw new Error('Supabase не настроен');
     }
 
     try {

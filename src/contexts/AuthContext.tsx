@@ -148,28 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       const dbUsers = await userService.getAllUsers();
-      if (dbUsers.length > 0) {
-        setUsers(dbUsers);
-      } else {
-        // Если из БД пришел пустой массив, используем локальные данные
-        const savedUsers = localStorage.getItem('users');
-        if (savedUsers) {
-          try {
-            const parsedUsers = JSON.parse(savedUsers);
-            const hasDefaultUser = parsedUsers.some((u: User) => u.isDefault);
-            if (!hasDefaultUser) {
-              setUsers([defaultUser, ...parsedUsers]);
-            } else {
-              setUsers(parsedUsers);
-            }
-          } catch (parseError) {
-            console.error('Ошибка парсинга пользователей из localStorage:', parseError);
-            setUsers([defaultUser]);
-          }
-        } else {
-          setUsers([defaultUser]);
-        }
-      }
+      setUsers(dbUsers);
       console.log('Пользователи загружены из базы данных:', dbUsers.length);
     } catch (error) {
       console.error('Ошибка загрузки пользователей из БД:', error);

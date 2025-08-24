@@ -234,8 +234,7 @@ export class UserService {
   // Сброс пароля пользователя
   async resetPassword(id: string, newPassword: string): Promise<void> {
     if (!this.supabase) {
-      console.warn('Supabase не настроен - сброс пароля невозможен');
-      throw new Error('База данных недоступна');
+      throw new Error('Supabase не настроен');
     }
 
     try {
