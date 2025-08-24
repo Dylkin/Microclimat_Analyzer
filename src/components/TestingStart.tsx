@@ -625,6 +625,141 @@ export const TestingStart: React.FC<TestingStartProps> = ({ project, onBack }) =
                 </div>
 
                 {renderObjectFields(obj)}
+
+                {/* Размещение измерительного оборудования */}
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-md font-medium text-gray-900">Размещение измерительного оборудования</h4>
+                    <button
+                      onClick={() => addMeasurementZone(obj.id)}
+                      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Добавить зону</span>
+                    </button>
+                  </div>
+
+                  {/* Зоны измерения */}
+                  {equipmentPlacement[obj.id] && equipmentPlacement[obj.id].length > 0 ? (
+                    <div className="space-y-4">
+                      {equipmentPlacement[obj.id].map((zone) => (
+                        <div key={zone.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h5 className="text-sm font-medium text-gray-800">
+                              Зона измерения № {zone.number}
+                            </h5>
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => addMeasurementLevel(obj.id, zone.id)}
+                                className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>Добавить уровень</span>
+                              </button>
+                              <button
+                                onClick={() => removeMeasurementZone(obj.id, zone.id)}
+                                className="text-red-600 hover:text-red-800 transition-colors"
+                                title="Удалить зону"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Уровни измерения */}
+                          {zone.levels.length > 0 ? (
+                            <div className="space-y-3">
+                              {zone.levels.map((level) => {
+                                const selectedEquipment = measurementEquipment.find(eq => eq.id === level.equipmentId);
+                                const availableEquipment = getAvailableEquipment(obj.id, level.id);
+                                
+                                return (
+                                  <div key={level.id} className="bg-white border border-gray-200 rounded p-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          Высота уровня (м.)
+                                        </label>
+                                        <input
+                                          type="number"
+                                          step="0.1"
+                                          value={level.height}
+                                          onChange={(e) => updateMeasurementLevel(
+                                            obj.id, 
+                                            zone.id, 
+                                            level.id, 
+                                            { height: parseFloat(e.target.value) || 0 }
+                                          )}
+                                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                          placeholder="0.0"
+                                        />
+                                      </div>
+                                      
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          Измерительное оборудование
+                                        </label>
+                                        <select
+                                          value={level.equipmentId || ''}
+                                          onChange={(e) => updateMeasurementLevel(
+                                            obj.id, 
+                                            zone.id, 
+                                            level.id, 
+                                            { equipmentId: e.target.value || null }
+                                          )}
+                                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                        >
+                                          <option value="">Выберите оборудование</option>
+                                          {availableEquipment.map((equipment) => (
+                                            <option key={equipment.id} value={equipment.id}>
+                                              {equipment.name} ({equipment.type})
+                                            </option>
+                                          ))}
+                                          {selectedEquipment && !availableEquipment.find(eq => eq.id === selectedEquipment.id) && (
+                                            <option value={selectedEquipment.id}>
+                                              {selectedEquipment.name} ({selectedEquipment.type}) - Уже выбрано
+                                            </option>
+                                          )}
+                                        </select>
+                                        {selectedEquipment && (
+                                          <div className="mt-1 text-xs text-gray-500">
+                                            S/N: {selectedEquipment.serialNumber}
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="flex items-end">
+                                        <button
+                                          onClick={() => removeMeasurementLevel(obj.id, zone.id, level.id)}
+                                          className="text-red-600 hover:text-red-800 transition-colors"
+                                          title="Удалить уровень"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-center py-4 text-gray-500 bg-white border border-gray-200 rounded">
+                              <Wrench className="w-6 h-6 mx-auto mb-2 text-gray-300" />
+                              <p className="text-sm">Уровни измерения не добавлены</p>
+                              <p className="text-xs">Нажмите "Добавить уровень" для создания</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+                      <Building className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">Зоны измерения не добавлены</p>
+                      <p className="text-xs">Нажмите "Добавить зону" для создания первой зоны</p>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
