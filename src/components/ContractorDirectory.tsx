@@ -312,6 +312,7 @@ export const ContractorDirectory: React.FC = () => {
         setQualificationObjects(prev => prev.filter(obj => obj.id !== objectId));
       } catch (error) {
         console.error('Ошибка удаления объекта квалификации:', error);
+        alert(`Ошибка удаления: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       } finally {
         setOperationLoading(false);
       }
