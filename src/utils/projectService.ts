@@ -231,15 +231,22 @@ export class ProjectService {
 
       // Проверяем существование пользователя в локальной таблице users
       if (userId) {
-        const { data: userExists, error: userCheckError } = await this.supabase
-          .from('users')
-          .select('id')
-          .eq('id', userId)
-          .single();
+        try {
+          const { data: userExists, error: userCheckError } = await this.supabase
+            .from('users')
+            .select('id')
+            .eq('id', userId)
+            .single();
 
-        if (userCheckError || !userExists) {
-          console.warn(`Пользователь с ID ${userId} не найден в таблице users. Создаем проект без привязки к пользователю.`);
-          userId = undefined;
+          if (userCheckError || !userExists) {
+            console.warn(`Пользователь с ID ${userId} не найден в таблице users. Создаем проект без привязки к пользователю.`);
+            userId = null;
+          } else {
+            console.log(`Пользователь с ID ${userId} найден в таблице users`);
+          }
+        } catch (userError) {
+          console.warn(`Ошибка проверки пользователя ${userId}:`, userError);
+          userId = null;
         }
       }
 
@@ -250,7 +257,7 @@ export class ProjectService {
           name: projectData.name,
           description: projectData.description || null,
           contractor_id: projectData.contractorId,
-          created_by: userId || null
+          created_by: userId
         })
         .select()
         .single();
