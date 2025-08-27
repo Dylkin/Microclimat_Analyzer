@@ -178,7 +178,6 @@ export const ContractorDirectory: React.FC = () => {
         contacts: []
       });
       setShowAddForm(false);
-      // Убираем alert об успешном добавлении
     } catch (error) {
       console.error('Ошибка добавления контрагента:', error);
       alert(`Ошибка добавления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -248,7 +247,6 @@ export const ContractorDirectory: React.FC = () => {
       setQualificationObjects([]);
       setFilteredQualificationObjects([]);
       setQualificationSearchTerm('');
-      // Убираем alert об успешном обновлении
     } catch (error) {
       console.error('Ошибка обновления контрагента:', error);
       alert(`Ошибка обновления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -264,7 +262,6 @@ export const ContractorDirectory: React.FC = () => {
       try {
         await contractorService.deleteContractor(contractorId);
         setContractors(prev => prev.filter(c => c.id !== contractorId));
-        // Убираем alert об успешном удалении
       } catch (error) {
         console.error('Ошибка удаления контрагента:', error);
         alert(`Ошибка удаления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -281,7 +278,6 @@ export const ContractorDirectory: React.FC = () => {
       const addedObject = await qualificationObjectService.addQualificationObject(objectData);
       setQualificationObjects(prev => [...prev, addedObject]);
       setShowAddQualificationForm(false);
-      // Убираем alert об успешном добавлении
     } catch (error) {
       console.error('Ошибка добавления объекта квалификации:', error);
       alert(`Ошибка добавления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -296,6 +292,33 @@ export const ContractorDirectory: React.FC = () => {
     setShowAddQualificationForm(true);
   };
 
+  // Сохранение изменений объекта квалификации
+  const handleSaveQualificationObject = async (objectData: CreateQualificationObjectData) => {
+    setOperationLoading(true);
+    try {
+      if (editingQualificationObject) {
+        // Обновляем существующий объект
+        const updatedObject = await qualificationObjectService.updateQualificationObject(
+          editingQualificationObject.id,
+          objectData
+        );
+        setQualificationObjects(prev => prev.map(obj => 
+          obj.id === editingQualificationObject.id ? updatedObject : obj
+        ));
+      } else {
+        // Добавляем новый объект
+        const addedObject = await qualificationObjectService.addQualificationObject(objectData);
+        setQualificationObjects(prev => [...prev, addedObject]);
+      }
+      setShowAddQualificationForm(false);
+      setEditingQualificationObject(null);
+    } catch (error) {
+      console.error('Ошибка сохранения объекта квалификации:', error);
+      alert(`Ошибка сохранения объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
   // Удаление объекта квалификации
   const handleDeleteQualificationObject = async (objectId: string) => {
     if (confirm('Вы уверены, что хотите удалить этот объект квалификации?')) {
@@ -303,7 +326,6 @@ export const ContractorDirectory: React.FC = () => {
       try {
         await qualificationObjectService.deleteQualificationObject(objectId);
         setQualificationObjects(prev => prev.filter(obj => obj.id !== objectId));
-        // Убираем alert об успешном удалении
       } catch (error) {
         console.error('Ошибка удаления объекта квалификации:', error);
         alert(`Ошибка удаления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -491,7 +513,7 @@ export const ContractorDirectory: React.FC = () => {
               <div className="mb-6">
                 <QualificationObjectForm
                   contractorId={editingContractorData.id}
-                  onAdd={handleAddQualificationObject}
+                  onAdd={handleSaveQualificationObject}
                   onCancel={() => {
                     setShowAddQualificationForm(false);
                     setEditingQualificationObject(null);
@@ -530,9 +552,6 @@ export const ContractorDirectory: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Адрес
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Контакты
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
@@ -601,11 +620,6 @@ export const ContractorDirectory: React.FC = () => {
                             )}
                           </div>
                         ))}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 text-sm">Нет контактов</span>
-                    )}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
                       <button
