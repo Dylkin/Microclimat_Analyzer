@@ -175,7 +175,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Дата создания</label>
-            <p className="text-gray-900">{project.createdAt?.toLocaleDateString('ru-RU') || 'Не указана'}</p>
+            <p className="text-gray-900">{project.createdAt ? project.createdAt.toLocaleDateString('ru-RU') : 'Не указана'}</p>
           </div>
         </div>
         {project.description && (

@@ -98,6 +98,19 @@ export class ProjectDocumentService {
     }
 
     try {
+      // Проверяем существование bucket 'documents'
+      const { data: buckets, error: bucketsError } = await this.supabase.storage.listBuckets();
+      
+      if (bucketsError) {
+        console.error('Ошибка получения списка buckets:', bucketsError);
+        throw new Error(`Ошибка доступа к Storage: ${bucketsError.message}`);
+      }
+      
+      const documentsBucket = buckets?.find(bucket => bucket.name === 'documents');
+      if (!documentsBucket) {
+        throw new Error('Bucket "documents" не найден в Supabase Storage. Убедитесь, что миграция 20250827170518_lucky_shadow.sql была применена.');
+      }
+      
       // Генерируем уникальное имя файла
       const fileExt = file.name.split('.').pop();
       const fileName = `${projectId}_${documentType}_${Date.now()}.${fileExt}`;
@@ -110,13 +123,17 @@ export class ProjectDocumentService {
 
       if (uploadError) {
         console.error('Ошибка загрузки файла в Storage:', uploadError);
-        throw new Error(`Ошибка загрузки файла: ${uploadError.message}`);
+        throw new Error(`Ошибка загрузки файла в bucket 'documents': ${uploadError.message}. Проверьте настройки Storage и политики доступа.`);
       }
 
       // Получаем публичный URL файла
       const { data: urlData } = this.supabase.storage
         .from('documents')
         .getPublicUrl(filePath);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Не удалось получить публичный URL файла');
+      }
 
       // Сохраняем информацию о документе в базе данных
       const { data: docData, error: docError } = await this.supabase
