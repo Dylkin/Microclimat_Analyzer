@@ -9,6 +9,7 @@ interface QualificationObjectsTableProps {
   onDelete: (objectId: string) => void;
   onShowOnMap: (object: QualificationObject) => void;
   loading?: boolean;
+  hideAddButton?: boolean;
 }
 
 export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps> = ({
@@ -17,7 +18,8 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
   onEdit,
   onDelete,
   onShowOnMap,
-  loading = false
+  loading = false,
+  hideAddButton = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredObjects, setFilteredObjects] = useState<QualificationObject[]>(objects);
@@ -156,13 +158,15 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             </div>
           )}
         </div>
-        <button
-          onClick={onAdd}
-          className="ml-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Добавить объект</span>
-        </button>
+        {!hideAddButton && (
+          <button
+            onClick={onAdd}
+            className="ml-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Добавить объект</span>
+          </button>
+        )}
       </div>
 
       {/* Table */}

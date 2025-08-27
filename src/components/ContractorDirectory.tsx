@@ -26,9 +26,10 @@ export const ContractorDirectory: React.FC = () => {
   
   // Qualification objects state
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
-  const [showQualificationObjects, setShowQualificationObjects] = useState(false);
+  const [filteredQualificationObjects, setFilteredQualificationObjects] = useState<QualificationObject[]>([]);
+  const [qualificationSearchTerm, setQualificationSearchTerm] = useState('');
   const [showAddQualificationForm, setShowAddQualificationForm] = useState(false);
-  const [selectedContractorForObjects, setSelectedContractorForObjects] = useState<Contractor | null>(null);
+  const [editingQualificationObject, setEditingQualificationObject] = useState<QualificationObject | null>(null);
 
   // Form state
   const [newContractor, setNewContractor] = useState<CreateContractorData>({
@@ -118,6 +119,7 @@ export const ContractorDirectory: React.FC = () => {
     try {
       const objects = await qualificationObjectService.getQualificationObjects(contractorId);
       setQualificationObjects(objects);
+      setFilteredQualificationObjects(objects);
     } catch (error) {
       console.error('Ошибка загрузки объектов квалификации:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
@@ -125,6 +127,30 @@ export const ContractorDirectory: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Поиск по объектам квалификации
+  useEffect(() => {
+    if (!qualificationSearchTerm.trim()) {
+      setFilteredQualificationObjects(qualificationObjects);
+      return;
+    }
+
+    const filtered = qualificationObjects.filter(obj => {
+      const searchLower = qualificationSearchTerm.toLowerCase();
+      
+      return (
+        (obj.name && obj.name.toLowerCase().includes(searchLower)) ||
+        (obj.address && obj.address.toLowerCase().includes(searchLower)) ||
+        (obj.vin && obj.vin.toLowerCase().includes(searchLower)) ||
+        (obj.serialNumber && obj.serialNumber.toLowerCase().includes(searchLower)) ||
+        (obj.inventoryNumber && obj.inventoryNumber.toLowerCase().includes(searchLower)) ||
+        (obj.registrationNumber && obj.registrationNumber.toLowerCase().includes(searchLower)) ||
+        obj.type.toLowerCase().includes(searchLower)
+      );
+    });
+
+    setFilteredQualificationObjects(filtered);
+  }, [qualificationSearchTerm, qualificationObjects]);
 
   // Добавление контрагента
   const handleAddContractor = async () => {
@@ -152,7 +178,7 @@ export const ContractorDirectory: React.FC = () => {
         contacts: []
       });
       setShowAddForm(false);
-      alert('Контрагент успешно добавлен');
+      // Убираем alert об успешном добавлении
     } catch (error) {
       console.error('Ошибка добавления контрагента:', error);
       alert(`Ошибка добавления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -174,6 +200,8 @@ export const ContractorDirectory: React.FC = () => {
     });
     setEditingContractorData(contractor);
     setShowEditForm(true);
+    // Загружаем объекты квалификации для редактируемого контрагента
+    loadQualificationObjects(contractor.id);
   };
 
   const handleSaveEdit = async () => {
@@ -217,7 +245,10 @@ export const ContractorDirectory: React.FC = () => {
       });
       setShowEditForm(false);
       setEditingContractorData(null);
-      alert('Контрагент успешно обновлен');
+      setQualificationObjects([]);
+      setFilteredQualificationObjects([]);
+      setQualificationSearchTerm('');
+      // Убираем alert об успешном обновлении
     } catch (error) {
       console.error('Ошибка обновления контрагента:', error);
       alert(`Ошибка обновления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -233,7 +264,7 @@ export const ContractorDirectory: React.FC = () => {
       try {
         await contractorService.deleteContractor(contractorId);
         setContractors(prev => prev.filter(c => c.id !== contractorId));
-        alert('Контрагент успешно удален');
+        // Убираем alert об успешном удалении
       } catch (error) {
         console.error('Ошибка удаления контрагента:', error);
         alert(`Ошибка удаления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -243,13 +274,6 @@ export const ContractorDirectory: React.FC = () => {
     }
   };
 
-  // Показать объекты квалификации контрагента
-  const handleShowQualificationObjects = (contractor: Contractor) => {
-    setSelectedContractorForObjects(contractor);
-    setShowQualificationObjects(true);
-    loadQualificationObjects(contractor.id);
-  };
-
   // Добавление объекта квалификации
   const handleAddQualificationObject = async (objectData: CreateQualificationObjectData) => {
     setOperationLoading(true);
@@ -257,13 +281,19 @@ export const ContractorDirectory: React.FC = () => {
       const addedObject = await qualificationObjectService.addQualificationObject(objectData);
       setQualificationObjects(prev => [...prev, addedObject]);
       setShowAddQualificationForm(false);
-      alert('Объект квалификации успешно добавлен');
+      // Убираем alert об успешном добавлении
     } catch (error) {
       console.error('Ошибка добавления объекта квалификации:', error);
       alert(`Ошибка добавления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }
+  };
+
+  // Редактирование объекта квалификации
+  const handleEditQualificationObject = (obj: QualificationObject) => {
+    setEditingQualificationObject(obj);
+    setShowAddQualificationForm(true);
   };
 
   // Удаление объекта квалификации
@@ -273,7 +303,7 @@ export const ContractorDirectory: React.FC = () => {
       try {
         await qualificationObjectService.deleteQualificationObject(objectId);
         setQualificationObjects(prev => prev.filter(obj => obj.id !== objectId));
-        alert('Объект квалификации успешно удален');
+        // Убираем alert об успешном удалении
       } catch (error) {
         console.error('Ошибка удаления объекта квалификации:', error);
         alert(`Ошибка удаления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -352,58 +382,6 @@ export const ContractorDirectory: React.FC = () => {
     );
   }
 
-  // Если показываем объекты квалификации
-  if (showQualificationObjects && selectedContractorForObjects) {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => {
-              setShowQualificationObjects(false);
-              setSelectedContractorForObjects(null);
-              setQualificationObjects([]);
-            }}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-          <Building2 className="w-8 h-8 text-indigo-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Объекты квалификации</h1>
-            <p className="text-gray-600">{selectedContractorForObjects.name}</p>
-          </div>
-        </div>
-
-        {/* Add Qualification Object Form */}
-        {showAddQualificationForm && (
-          <QualificationObjectForm
-            contractorId={selectedContractorForObjects.id}
-            onAdd={handleAddQualificationObject}
-            onCancel={() => setShowAddQualificationForm(false)}
-            loading={operationLoading}
-          />
-        )}
-
-        {/* Qualification Objects Table */}
-        <QualificationObjectsTable
-          objects={qualificationObjects}
-          onAdd={() => setShowAddQualificationForm(true)}
-          onEdit={(obj) => {
-            // TODO: Implement edit functionality
-            console.log('Edit object:', obj);
-          }}
-          onDelete={handleDeleteQualificationObject}
-          onShowOnMap={(obj) => {
-            // TODO: Implement map functionality for objects
-            console.log('Show on map:', obj);
-          }}
-          loading={loading}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Индикатор загрузки */}
@@ -462,14 +440,83 @@ export const ContractorDirectory: React.FC = () => {
           </div>
         )}
       </div>
+
       {/* Add Contractor Form */}
       {showAddForm && (
-        renderContractorForm(false)
+        <div className="space-y-6">
+          {renderContractorForm(false)}
+          {/* Объекты квалификации для нового контрагента будут доступны после создания */}
+        </div>
       )}
 
       {/* Edit Contractor Form */}
       {showEditForm && editingContractorData && (
-        renderContractorForm(true)
+        <div className="space-y-6">
+          {renderContractorForm(true)}
+          
+          {/* Объекты квалификации для редактируемого контрагента */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Объекты квалификации</h3>
+              <button
+                onClick={() => setShowAddQualificationForm(true)}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Добавить объект</span>
+              </button>
+            </div>
+
+            {/* Поиск по объектам квалификации */}
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={qualificationSearchTerm}
+                  onChange={(e) => setQualificationSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Поиск по объектам квалификации..."
+                />
+              </div>
+              {qualificationSearchTerm && (
+                <div className="mt-2 text-sm text-gray-600">
+                  Найдено: {filteredQualificationObjects.length} из {qualificationObjects.length} объектов
+                </div>
+              )}
+            </div>
+
+            {/* Add Qualification Object Form */}
+            {showAddQualificationForm && (
+              <div className="mb-6">
+                <QualificationObjectForm
+                  contractorId={editingContractorData.id}
+                  onAdd={handleAddQualificationObject}
+                  onCancel={() => {
+                    setShowAddQualificationForm(false);
+                    setEditingQualificationObject(null);
+                  }}
+                  loading={operationLoading}
+                  editingObject={editingQualificationObject}
+                />
+              </div>
+            )}
+
+            {/* Qualification Objects Table */}
+            <QualificationObjectsTable
+              objects={filteredQualificationObjects}
+              onAdd={() => setShowAddQualificationForm(true)}
+              onEdit={handleEditQualificationObject}
+              onDelete={handleDeleteQualificationObject}
+              onShowOnMap={(obj) => {
+                // TODO: Implement map functionality for objects
+                console.log('Show on map:', obj);
+              }}
+              loading={loading}
+              hideAddButton={true}
+            />
+          </div>
+        </div>
       )}
 
       {/* Contractors Table */}
@@ -487,9 +534,6 @@ export const ContractorDirectory: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Контакты
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Объекты
-                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
                 </th>
@@ -499,40 +543,40 @@ export const ContractorDirectory: React.FC = () => {
               {filteredContractors.map((contractor) => (
                 <tr key={contractor.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{contractor.name}</div>
-                        <div className="text-xs text-gray-500">
-                          Создан: {contractor.createdAt.toLocaleDateString('ru-RU')}
-                        </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{contractor.name}</div>
+                      <div className="text-xs text-gray-500">
+                        Создан: {contractor.createdAt.toLocaleDateString('ru-RU')}
                       </div>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
-                      <div>
-                        {contractor.address ? (
-                          <div className="flex items-start space-x-2">
-                            <div className="flex-1">
-                              <div className="text-sm text-gray-900">{contractor.address}</div>
-                              {contractor.latitude && contractor.longitude && (
-                                <div className="text-xs text-green-600 flex items-center space-x-1 mt-1">
-                                  <MapPin className="w-3 h-3" />
-                                  <span>Геокодирован</span>
-                                </div>
-                              )}
-                            </div>
+                    <div>
+                      {contractor.address ? (
+                        <div className="flex items-start space-x-2">
+                          <div className="flex-1">
+                            <div className="text-sm text-gray-900">{contractor.address}</div>
                             {contractor.latitude && contractor.longitude && (
-                              <button
-                                onClick={() => showContractorOnMap(contractor)}
-                                className="text-blue-600 hover:text-blue-800"
-                                title="Показать на карте"
-                              >
-                                <Map className="w-4 h-4" />
-                              </button>
+                              <div className="text-xs text-green-600 flex items-center space-x-1 mt-1">
+                                <MapPin className="w-3 h-3" />
+                                <span>Геокодирован</span>
+                              </div>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">Не указан</span>
-                        )}
-                      </div>
+                          {contractor.latitude && contractor.longitude && (
+                            <button
+                              onClick={() => showContractorOnMap(contractor)}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="Показать на карте"
+                            >
+                              <Map className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">Не указан</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     {contractor.contacts.length > 0 ? (
@@ -562,33 +606,25 @@ export const ContractorDirectory: React.FC = () => {
                       <span className="text-gray-400 text-sm">Нет контактов</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => handleShowQualificationObjects(contractor)}
-                      className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
-                    >
-                      Объекты квалификации
-                    </button>
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleEditContractor(contractor)}
-                          disabled={operationLoading}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          title="Редактировать"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteContractor(contractor.id)}
-                          disabled={operationLoading}
-                          className="text-red-600 hover:text-red-900"
-                          title="Удалить"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => handleEditContractor(contractor)}
+                        disabled={operationLoading}
+                        className="text-indigo-600 hover:text-indigo-900"
+                        title="Редактировать"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteContractor(contractor.id)}
+                        disabled={operationLoading}
+                        className="text-red-600 hover:text-red-900"
+                        title="Удалить"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -627,6 +663,9 @@ export const ContractorDirectory: React.FC = () => {
       setShowEditForm(false);
       setEditingContractorData(null);
       setEditContractor({ name: '', address: '', contacts: [] });
+      setQualificationObjects([]);
+      setFilteredQualificationObjects([]);
+      setQualificationSearchTerm('');
     } : () => setShowAddForm(false);
 
     return (

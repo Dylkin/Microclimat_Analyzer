@@ -11,17 +11,37 @@ interface QualificationObjectFormProps {
   onAdd: (objectData: CreateQualificationObjectData) => void;
   onCancel: () => void;
   loading?: boolean;
+  editingObject?: QualificationObject | null;
 }
 
 export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
   contractorId,
   onAdd,
   onCancel,
-  loading = false
+  loading = false,
+  editingObject = null
 }) => {
-  const [objectData, setObjectData] = useState<CreateQualificationObjectData>({
-    contractorId,
-    type: 'помещение'
+  const [objectData, setObjectData] = useState<CreateQualificationObjectData>(() => {
+    if (editingObject) {
+      return {
+        contractorId,
+        type: editingObject.type,
+        name: editingObject.name,
+        address: editingObject.address,
+        area: editingObject.area,
+        climateSystem: editingObject.climateSystem,
+        vin: editingObject.vin,
+        registrationNumber: editingObject.registrationNumber,
+        bodyVolume: editingObject.bodyVolume,
+        inventoryNumber: editingObject.inventoryNumber,
+        chamberVolume: editingObject.chamberVolume,
+        serialNumber: editingObject.serialNumber
+      };
+    }
+    return {
+      contractorId,
+      type: 'помещение'
+    };
   });
 
   const [planFile, setPlanFile] = useState<File | null>(null);
@@ -355,7 +375,9 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         )}
 
         <div className="flex justify-end space-x-3 pt-4">
-          <button
+          <h3 className="text-lg font-semibold text-gray-900">
+            {editingObject ? 'Редактировать объект квалификации' : 'Добавить объект квалификации'}
+          </h3>
             type="button"
             onClick={onCancel}
             className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
@@ -370,12 +392,12 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Добавление...</span>
+                <span>{editingObject ? 'Сохранение...' : 'Добавление...'}</span>
               </>
             ) : (
               <>
-                <Plus className="w-4 h-4" />
-                <span>Добавить</span>
+                {editingObject ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                <span>{editingObject ? 'Сохранить' : 'Добавить'}</span>
               </>
             )}
           </button>
