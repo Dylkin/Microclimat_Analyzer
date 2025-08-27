@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { AuthProvider, useAuth } from '../contexts/AuthContext';
-import { Login } from './Login';
-import { Layout } from './Layout';
-import { MicroclimatAnalyzer } from './MicroclimatAnalyzer';
-import { Help } from './Help';
-import { DatabaseTest } from './DatabaseTest';
-import { UserDirectory } from './UserDirectory';
-import { ContractorDirectory } from './ContractorDirectory';
-import { ContractNegotiation } from './ContractNegotiation';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Login } from './components/Login';
+import { Layout } from './components/Layout';
+import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
+import { Help } from './components/Help';
+import { DatabaseTest } from './components/DatabaseTest';
+import { UserDirectory } from './components/UserDirectory';
+import { ContractorDirectory } from './components/ContractorDirectory';
+import { ProjectDirectory } from './components/ProjectDirectory';
+import { ContractNegotiation } from './components/ContractNegotiation';
+import './index.css';
 
 const AppContent: React.FC = () => {
   const { user, hasAccess } = useAuth();
@@ -77,5 +79,4 @@ function App() {
   );
 }
 
-export const ProjectDirectory = App;
 export default App;
