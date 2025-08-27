@@ -152,7 +152,6 @@ export const ContractorDirectory: React.FC = () => {
         contacts: []
       });
       setShowAddForm(false);
-      alert('Контрагент успешно добавлен');
     } catch (error) {
       console.error('Ошибка добавления контрагента:', error);
       alert(`Ошибка добавления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -217,7 +216,6 @@ export const ContractorDirectory: React.FC = () => {
       });
       setShowEditForm(false);
       setEditingContractorData(null);
-      alert('Контрагент успешно обновлен');
     } catch (error) {
       console.error('Ошибка обновления контрагента:', error);
       alert(`Ошибка обновления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -487,9 +485,6 @@ export const ContractorDirectory: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Контакты
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Объекты
-                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
                 </th>
@@ -562,14 +557,6 @@ export const ContractorDirectory: React.FC = () => {
                       <span className="text-gray-400 text-sm">Нет контактов</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => handleShowQualificationObjects(contractor)}
-                      className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
-                    >
-                      Объекты квалификации
-                    </button>
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
                         <button
@@ -579,6 +566,14 @@ export const ContractorDirectory: React.FC = () => {
                           title="Редактировать"
                         >
                           <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleShowQualificationObjects(contractor)}
+                          disabled={operationLoading}
+                          className="text-purple-600 hover:text-purple-900"
+                          title="Объекты квалификации"
+                        >
+                          <Building2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteContractor(contractor.id)}
@@ -744,6 +739,20 @@ export const ContractorDirectory: React.FC = () => {
         </div>
 
         <div className="flex justify-end space-x-3 mt-6">
+          <button
+            type="button"
+            onClick={() => {
+              const contractor = isEdit ? editingContractorData : null;
+              if (contractor) {
+                handleShowQualificationObjects(contractor);
+              }
+            }}
+            disabled={isEdit ? !editingContractorData : !newContractor.name.trim()}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Объекты квалификации</span>
+          </button>
           <button
             onClick={onCancel}
             className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
