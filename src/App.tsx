@@ -8,6 +8,7 @@ import { DatabaseTest } from './components/DatabaseTest';
 import { UserDirectory } from './components/UserDirectory';
 import { ContractorDirectory } from './components/ContractorDirectory';
 import { ProjectDirectory } from './components/ProjectDirectory';
+import { ContractNegotiation } from './components/ContractNegotiation';
 import './index.css';
 
 const AppContent: React.FC = () => {
