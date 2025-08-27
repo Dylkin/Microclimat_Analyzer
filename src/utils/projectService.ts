@@ -232,6 +232,7 @@ export class ProjectService {
       // Проверяем существование пользователя в локальной таблице users
       if (userId) {
         try {
+          console.log(`Проверяем существование пользователя с ID: ${userId}`);
           const { data: userExists, error: userCheckError } = await this.supabase
             .from('users')
             .select('id')
@@ -239,7 +240,8 @@ export class ProjectService {
             .single();
 
           if (userCheckError || !userExists) {
-            console.warn(`Пользователь с ID ${userId} не найден в таблице users. Создаем проект без привязки к пользователю.`);
+            console.warn(`Пользователь с ID ${userId} не найден в таблице users:`, userCheckError);
+            console.warn('Создаем проект без привязки к пользователю.');
             userId = null;
           } else {
             console.log(`Пользователь с ID ${userId} найден в таблице users`);
@@ -250,7 +252,29 @@ export class ProjectService {
         }
       }
 
+      // Проверяем существование контрагента
+      console.log(`Проверяем существование контрагента с ID: ${projectData.contractorId}`);
+      const { data: contractorExists, error: contractorCheckError } = await this.supabase
+        .from('contractors')
+        .select('id, name')
+        .eq('id', projectData.contractorId)
+        .single();
+
+      if (contractorCheckError || !contractorExists) {
+        console.error(`Контрагент с ID ${projectData.contractorId} не найден:`, contractorCheckError);
+        throw new Error(`Контрагент с ID ${projectData.contractorId} не найден в базе данных`);
+      } else {
+        console.log(`Контрагент найден: ${contractorExists.name} (ID: ${contractorExists.id})`);
+      }
+
       // Добавляем проект
+      console.log('Данные для вставки в projects:', {
+        name: projectData.name,
+        description: projectData.description || null,
+        contractor_id: projectData.contractorId,
+        created_by: userId
+      });
+      
       const { data: projectResult, error: projectError } = await this.supabase
         .from('projects')
         .insert({
@@ -264,6 +288,12 @@ export class ProjectService {
 
       if (projectError) {
         console.error('Ошибка добавления проекта:', projectError);
+        console.error('Детали ошибки:', {
+          code: projectError.code,
+          message: projectError.message,
+          details: projectError.details,
+          hint: projectError.hint
+        });
         throw new Error(`Ошибка добавления проекта: ${projectError.message}`);
       }
 
