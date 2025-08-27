@@ -244,7 +244,9 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
                     </h4>
                     <p className="text-sm text-gray-500">
                       {formatFileSize(getDocumentByType('commercial_offer')!.fileSize)} • 
-                      Загружен {getDocumentByType('commercial_offer')!.uploadedAt.toLocaleDateString('ru-RU')}
+                      Загружен {getDocumentByType('commercial_offer')!.uploadedAt instanceof Date 
+                        ? getDocumentByType('commercial_offer')!.uploadedAt.toLocaleDateString('ru-RU')
+                        : 'Дата загрузки неизвестна'}
                     </p>
                   </div>
                 </div>
@@ -329,7 +331,9 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
                     </h4>
                     <p className="text-sm text-gray-500">
                       {formatFileSize(getDocumentByType('contract')!.fileSize)} • 
-                      Загружен {getDocumentByType('contract')!.uploadedAt.toLocaleDateString('ru-RU')}
+                      Загружен {getDocumentByType('contract')!.uploadedAt instanceof Date 
+                        ? getDocumentByType('contract')!.uploadedAt.toLocaleDateString('ru-RU')
+                        : 'Дата загрузки неизвестна'}
                     </p>
                   </div>
                 </div>
