@@ -8,7 +8,7 @@ import { DatabaseTest } from './DatabaseTest';
 import { UserDirectory } from './UserDirectory';
 import { ContractorDirectory } from './ContractorDirectory';
 import { ContractNegotiation } from './ContractNegotiation';
-import './index.css';
+import '../index.css';
 
 const AppContent: React.FC = () => {
   const { user, hasAccess } = useAuth();
