@@ -226,8 +226,21 @@ export class ProjectService {
       // Валидация UUID пользователя если указан
       if (userId && !this.isValidUUID(userId)) {
         console.error('Некорректный UUID пользователя:', userId);
-        console.warn(`Некорректный ID пользователя: ${userId}. Используем null вместо некорректного ID.`);
-        userId = undefined; // Устанавливаем undefined для некорректного UUID
+        throw new Error(`Некорректный ID пользователя: ${userId}. Ожидается UUID формат.`);
+      }
+
+      // Проверяем существование пользователя в локальной таблице users
+      if (userId) {
+        const { data: userExists, error: userCheckError } = await this.supabase
+          .from('users')
+          .select('id')
+          .eq('id', userId)
+          .single();
+
+        if (userCheckError || !userExists) {
+          console.warn(`Пользователь с ID ${userId} не найден в таблице users. Создаем проект без привязки к пользователю.`);
+          userId = undefined;
+        }
       }
 
       // Добавляем проект
