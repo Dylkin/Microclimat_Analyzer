@@ -94,10 +94,19 @@ export class UploadedFileService {
       // Используем upsert для обновления существующих записей или создания новых
       const { error } = await this.supabase
         .from('uploaded_files')
-        .upsert(filesToInsert, { onConflict: 'id' });
+        .upsert(filesToInsert, { 
+          onConflict: 'id',
+          ignoreDuplicates: false 
+        });
 
       if (error) {
         console.error('Ошибка сохранения файлов:', error);
+        console.error('Детали ошибки:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         throw new Error(`Ошибка сохранения файлов: ${error.message}`);
       }
 
@@ -130,13 +139,36 @@ export class UploadedFileService {
 
       const { data, error } = await this.supabase
         .from('uploaded_files')
-        .select('*')
+        .select(`
+          id,
+          user_id,
+          name,
+          original_name,
+          upload_date,
+          parsing_status,
+          error_message,
+          record_count,
+          period_start,
+          period_end,
+          zone_number,
+          measurement_level,
+          file_order,
+          object_type,
+          created_at,
+          updated_at
+        `)
         .eq('user_id', userId)
         .gte('upload_date', thirtyDaysAgo.toISOString())
         .order('file_order', { ascending: true });
 
       if (error) {
         console.error('Ошибка получения файлов проекта:', error);
+        console.error('Детали ошибки:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         throw new Error(`Ошибка получения файлов проекта: ${error.message}`);
       }
 
