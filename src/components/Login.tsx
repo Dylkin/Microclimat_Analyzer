@@ -101,17 +101,6 @@ export const Login: React.FC = () => {
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <button
-            onClick={fillDefaultCredentials}
-            className="w-full text-sm text-indigo-600 hover:text-indigo-700 transition-colors"
-          >
-            Использовать данные администратора по умолчанию
-          </button>
-          <div className="mt-2 text-xs text-gray-500 text-center">
-            pavel.dylkin@gmail.com / 00016346
-          </div>
-        </div>
       </div>
     </div>
   );
