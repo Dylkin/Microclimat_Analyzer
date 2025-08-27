@@ -21,65 +21,6 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
   loading = false,
   hideAddButton = false
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filteredObjects, setFilteredObjects] = useState<QualificationObject[]>(objects);
-
-  // Поиск по объектам квалификации
-  useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredObjects(objects);
-      return;
-    }
-
-    const filtered = objects.filter(obj => {
-      const searchLower = searchTerm.toLowerCase();
-      
-      // Поиск по типу
-      if (QualificationObjectTypeLabels[obj.type].toLowerCase().includes(searchLower)) {
-        return true;
-      }
-      
-      // Поиск по наименованию
-      if (obj.name && obj.name.toLowerCase().includes(searchLower)) {
-        return true;
-      }
-      
-      // Поиск по адресу
-      if (obj.address && obj.address.toLowerCase().includes(searchLower)) {
-        return true;
-      }
-      
-      // Поиск по климатической установке
-      if (obj.climateSystem && obj.climateSystem.toLowerCase().includes(searchLower)) {
-        return true;
-      }
-      
-      // Поиск по VIN
-      if (obj.vin && obj.vin.toLowerCase().includes(searchLower)) {
-        return true;
-      }
-      
-      // Поиск по регистрационному номеру
-      if (obj.registrationNumber && obj.registrationNumber.toLowerCase().includes(searchLower)) {
-        return true;
-      }
-      
-      // Поиск по инвентарному номеру
-      if (obj.inventoryNumber && obj.inventoryNumber.toLowerCase().includes(searchLower)) {
-        return true;
-      }
-      
-      // Поиск по серийному номеру
-      if (obj.serialNumber && obj.serialNumber.toLowerCase().includes(searchLower)) {
-        return true;
-      }
-      
-      return false;
-    });
-
-    setFilteredObjects(filtered);
-  }, [searchTerm, objects]);
-
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'помещение':
@@ -139,33 +80,18 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
 
   return (
     <div className="space-y-4">
-      {/* Header with search and add button */}
-      <div className="flex items-center justify-between">
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Поиск по объектам квалификации..."
-            />
-          </div>
-          {searchTerm && (
-            <div className="mt-2 text-sm text-gray-600">
-              Найдено: {filteredObjects.length} из {objects.length} объектов
-            </div>
-          )}
-        </div>
+      {/* Header with add button */}
+      <div className="flex items-center justify-end">
         {!hideAddButton && (
-          <button
-            onClick={onAdd}
-            className="ml-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Добавить объект</span>
-          </button>
+          <div className="flex justify-end">
+            <button
+              onClick={onAdd}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Добавить объект</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -176,7 +102,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
             <p className="text-gray-500">Загрузка объектов квалификации...</p>
           </div>
-        ) : filteredObjects.length > 0 ? (
+        ) : objects.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -199,7 +125,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredObjects.map((obj) => (
+                {objects.map((obj) => (
                   <tr key={obj.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
@@ -270,17 +196,8 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
         ) : (
           <div className="text-center py-8 text-gray-500">
             <Building className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            {searchTerm ? (
-              <>
-                <p>По запросу "{searchTerm}" ничего не найдено</p>
-                <p className="text-sm">Попробуйте изменить поисковый запрос</p>
-              </>
-            ) : (
-              <>
-                <p>Объекты квалификации не найдены</p>
-                <p className="text-sm">Нажмите кнопку "Добавить объект" для создания первой записи</p>
-              </>
-            )}
+            <p>Объекты квалификации не найдены</p>
+            <p className="text-sm">Нажмите кнопку "Добавить объект" для создания первой записи</p>
           </div>
         )}
       </div>

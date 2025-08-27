@@ -382,16 +382,6 @@ export const ContractorDirectory: React.FC = () => {
     }
   };
 
-  // Показать контрагента на карте
-  const showContractorOnMap = (contractor: Contractor) => {
-    if (contractor.latitude && contractor.longitude) {
-      setSelectedContractor(contractor);
-      setShowMap(true);
-    } else {
-      alert('Для этого контрагента не определены координаты');
-    }
-  };
-
   if (showMap && selectedContractor) {
     return (
       <ContractorMap
@@ -445,23 +435,25 @@ export const ContractorDirectory: React.FC = () => {
       </div>
 
       {/* Search */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Поиск по наименованию, адресу, сотрудникам, телефонам..."
-          />
-        </div>
-        {searchTerm && (
-          <div className="mt-2 text-sm text-gray-600">
-            Найдено: {filteredContractors.length} из {contractors.length} контрагентов
+      {!showAddForm && !showEditForm && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Поиск по наименованию, адресу, сотрудникам, телефонам..."
+            />
           </div>
-        )}
-      </div>
+          {searchTerm && (
+            <div className="mt-2 text-sm text-gray-600">
+              Найдено: {filteredContractors.length} из {contractors.length} контрагентов
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add Contractor Form */}
       {showAddForm && (
@@ -487,25 +479,6 @@ export const ContractorDirectory: React.FC = () => {
                 <Plus className="w-4 h-4" />
                 <span>Добавить объект</span>
               </button>
-            </div>
-
-            {/* Поиск по объектам квалификации */}
-            <div className="mb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={qualificationSearchTerm}
-                  onChange={(e) => setQualificationSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Поиск по объектам квалификации..."
-                />
-              </div>
-              {qualificationSearchTerm && (
-                <div className="mt-2 text-sm text-gray-600">
-                  Найдено: {filteredQualificationObjects.length} из {qualificationObjects.length} объектов
-                </div>
-              )}
             </div>
 
             {/* Add Qualification Object Form */}
@@ -542,135 +515,126 @@ export const ContractorDirectory: React.FC = () => {
       )}
 
       {/* Contractors Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Контрагент
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Адрес
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Контакты
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Действия
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredContractors.map((contractor) => (
-                <tr key={contractor.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{contractor.name}</div>
-                      <div className="text-xs text-gray-500">
-                        Создан: {contractor.createdAt.toLocaleDateString('ru-RU')}
+      {!showAddForm && !showEditForm && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Контрагент
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Адрес
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Контакты
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Действия
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredContractors.map((contractor) => (
+                  <tr key={contractor.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{contractor.name}</div>
+                        <div className="text-xs text-gray-500">
+                          Создан: {contractor.createdAt.toLocaleDateString('ru-RU')}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      {contractor.address ? (
-                        <div className="flex items-start space-x-2">
-                          <div className="flex-1">
-                            <div className="text-sm text-gray-900">{contractor.address}</div>
-                            {contractor.latitude && contractor.longitude && (
-                              <div className="text-xs text-green-600 flex items-center space-x-1 mt-1">
-                                <MapPin className="w-3 h-3" />
-                                <span>Геокодирован</span>
-                              </div>
-                            )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        {contractor.address ? (
+                          <div className="flex items-start space-x-2">
+                            <div className="flex-1">
+                              <div className="text-sm text-gray-900">{contractor.address}</div>
+                              {contractor.latitude && contractor.longitude && (
+                                <div className="text-xs text-green-600 flex items-center space-x-1 mt-1">
+                                  <MapPin className="w-3 h-3" />
+                                  <span>Геокодирован</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {contractor.latitude && contractor.longitude && (
-                            <button
-                              onClick={() => showContractorOnMap(contractor)}
-                              className="text-blue-600 hover:text-blue-800"
-                              title="Показать на карте"
-                            >
-                              <Map className="w-4 h-4" />
-                            </button>
-                          )}
+                        ) : (
+                          <span className="text-gray-400 text-sm">Не указан</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {contractor.contacts.length > 0 ? (
+                        <div className="space-y-2">
+                          {contractor.contacts.map((contact) => (
+                            <div key={contact.id} className="text-sm">
+                              <div className="flex items-center space-x-1">
+                                <User className="w-3 h-3 text-gray-400" />
+                                <span className="font-medium">{contact.employeeName}</span>
+                              </div>
+                              {contact.phone && (
+                                <div className="flex items-center space-x-1 text-gray-600">
+                                  <Phone className="w-3 h-3" />
+                                  <span>{contact.phone}</span>
+                                </div>
+                              )}
+                              {contact.comment && (
+                                <div className="flex items-center space-x-1 text-gray-500">
+                                  <MessageSquare className="w-3 h-3" />
+                                  <span className="text-xs">{contact.comment}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       ) : (
-                        <span className="text-gray-400 text-sm">Не указан</span>
+                        <span className="text-gray-400 text-sm">Нет контактов</span>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {contractor.contacts.length > 0 ? (
-                      <div className="space-y-2">
-                        {contractor.contacts.map((contact) => (
-                          <div key={contact.id} className="text-sm">
-                            <div className="flex items-center space-x-1">
-                              <User className="w-3 h-3 text-gray-400" />
-                              <span className="font-medium">{contact.employeeName}</span>
-                            </div>
-                            {contact.phone && (
-                              <div className="flex items-center space-x-1 text-gray-600">
-                                <Phone className="w-3 h-3" />
-                                <span>{contact.phone}</span>
-                              </div>
-                            )}
-                            {contact.comment && (
-                              <div className="flex items-center space-x-1 text-gray-500">
-                                <MessageSquare className="w-3 h-3" />
-                                <span className="text-xs">{contact.comment}</span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => handleEditContractor(contractor)}
+                          disabled={operationLoading}
+                          className="text-indigo-600 hover:text-indigo-900"
+                          title="Редактировать"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteContractor(contractor.id)}
+                          disabled={operationLoading}
+                          className="text-red-600 hover:text-red-900"
+                          title="Удалить"
+                        </button>
                       </div>
-                    ) : (
-                      <span className="text-gray-400 text-sm">Нет контактов</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => handleEditContractor(contractor)}
-                        disabled={operationLoading}
-                        className="text-indigo-600 hover:text-indigo-900"
-                        title="Редактировать"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteContractor(contractor.id)}
-                        disabled={operationLoading}
-                        className="text-red-600 hover:text-red-900"
-                        title="Удалить"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredContractors.length === 0 && !loading && (
-          <div className="text-center py-8 text-gray-500">
-            <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            {searchTerm ? (
-              <>
-                <p>По запросу "{searchTerm}" ничего не найдено</p>
-                <p className="text-sm">Попробуйте изменить поисковый запрос</p>
-              </>
-            ) : (
-              <>
-                <p>Контрагенты не найдены</p>
-                <p className="text-sm">Нажмите кнопку "Добавить контрагента" для создания первой записи</p>
-              </>
-            )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+
+          {filteredContractors.length === 0 && !loading && (
+            <div className="text-center py-8 text-gray-500">
+              <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              {searchTerm ? (
+                <>
+                  <p>По запросу "{searchTerm}" ничего не найдено</p>
+                  <p className="text-sm">Попробуйте изменить поисковый запрос</p>
+                </>
+              ) : (
+                <>
+                  <p>Контрагенты не найдены</p>
+                  <p className="text-sm">Нажмите кнопку "Добавить контрагента" для создания первой записи</p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 
