@@ -43,12 +43,10 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
 
   const [editProject, setEditProject] = useState<{
     description: string;
-    contractNumber: string;
     status: ProjectStatus;
     qualificationObjectIds: string[];
   }>({
     description: '',
-    contractNumber: '',
     status: 'contract_negotiation',
     qualificationObjectIds: []
   });
@@ -236,7 +234,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       
       // Сбрасываем форму
       setNewProject({
-        description: '',
         contractorId: '',
         qualificationObjectIds: []
       });
@@ -254,7 +251,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   const handleEditProject = (project: Project) => {
     setEditProject({
       description: project.description || '',
-      contractNumber: project.contractNumber || '',
       status: project.status,
       qualificationObjectIds: project.qualificationObjects.map(obj => obj.qualificationObjectId)
     });
@@ -266,7 +262,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     try {
       const updatedProject = await projectService.updateProject(editingProject!, {
         description: editProject.description,
-        contractNumber: editProject.contractNumber,
         status: editProject.status,
         qualificationObjectIds: editProject.qualificationObjectIds
       });
@@ -546,9 +541,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Объекты
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Договор
-                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Действия
                   </th>
@@ -612,21 +604,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                         {project.qualificationObjects.slice(0, 2).map(obj => obj.qualificationObjectName).join(', ')}
                         {project.qualificationObjects.length > 2 && '...'}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editingProject === project.id ? (
-                        <input
-                          type="text"
-                          value={editProject.contractNumber}
-                          onChange={(e) => setEditProject(prev => ({ ...prev, contractNumber: e.target.value }))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          placeholder="№ договора"
-                        />
-                      ) : (
-                        <div className="text-sm text-gray-900">
-                          {project.contractNumber || '-'}
-                        </div>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       {editingProject === project.id ? (
