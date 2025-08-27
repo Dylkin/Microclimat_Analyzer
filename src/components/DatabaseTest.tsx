@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Database, CheckCircle, XCircle, Loader, AlertTriangle } from 'lucide-react';
+import { Database, CheckCircle, XCircle, Loader, AlertTriangle, Settings } from 'lucide-react';
+import { SupabaseConnectionTest } from './SupabaseConnectionTest';
 
 interface TableInfo {
   name: string;
@@ -10,6 +11,7 @@ interface TableInfo {
 
 export const DatabaseTest: React.FC = () => {
   const [tables, setTables] = useState<TableInfo[]>([]);
+  const [showConnectionTest, setShowConnectionTest] = useState(false);
   const [loading, setLoading] = useState(false);
   const [supabaseConfig, setSupabaseConfig] = useState<{
     url: string;
@@ -114,6 +116,22 @@ export const DatabaseTest: React.FC = () => {
     }
   };
 
+  if (showConnectionTest) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowConnectionTest(false)}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            ← Назад к проверке БД
+          </button>
+        </div>
+        <SupabaseConnectionTest />
+      </div>
+    );
+  }
+
   const accessibleCount = tables.filter(t => t.accessible).length;
   const totalCount = tables.length;
 
@@ -122,6 +140,13 @@ export const DatabaseTest: React.FC = () => {
       <div className="flex items-center space-x-3">
         <Database className="w-8 h-8 text-indigo-600" />
         <h1 className="text-2xl font-bold text-gray-900">Проверка базы данных</h1>
+        <button
+          onClick={() => setShowConnectionTest(true)}
+          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1"
+        >
+          <Settings className="w-4 h-4" />
+          <span>Диагностика подключения</span>
+        </button>
       </div>
 
       {/* Конфигурация Supabase */}
