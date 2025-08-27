@@ -51,7 +51,7 @@ const AppContent: React.FC = () => {
       case 'projects':
         return hasAccess('analyzer') ? <ProjectDirectory onPageChange={handlePageChange} /> : <div>Доступ запрещен</div>;
       case 'database':
-        return hasAccess('analyzer') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
+        return hasAccess('database') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
       default:
         return <MicroclimatAnalyzer 
           showVisualization={showVisualization}
