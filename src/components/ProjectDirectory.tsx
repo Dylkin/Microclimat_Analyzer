@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play, Download } from 'lucide-react';
-import { FileText } from 'lucide-react';
+import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play } from 'lucide-react';
 import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, CreateProjectData } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
@@ -37,14 +36,17 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   
   // Form state
   const [newProject, setNewProject] = useState<CreateProjectData>({
+    description: '',
     contractorId: '',
     qualificationObjectIds: []
   });
 
   const [editProject, setEditProject] = useState<{
+    description: string;
     status: ProjectStatus;
     qualificationObjectIds: string[];
   }>({
+    description: '',
     status: 'contract_negotiation',
     qualificationObjectIds: []
   });
@@ -57,64 +59,33 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     try {
       // Загружаем проекты
       if (projectService.isAvailable()) {
-        try {
-          const projectsData = await projectService.getAllProjects();
-          setProjects(projectsData);
-          setFilteredProjects(projectsData);
-        } catch (error) {
-          console.error('Ошибка загрузки проектов:', error);
-          setProjects([]);
-          setFilteredProjects([]);
-        }
-      } else {
-        console.warn('Сервис проектов недоступен');
-        setProjects([]);
-        setFilteredProjects([]);
+        const projectsData = await projectService.getAllProjects();
+        setProjects(projectsData);
+        setFilteredProjects(projectsData);
       }
 
       // Загружаем контрагентов
       if (contractorService.isAvailable()) {
-        try {
-          const contractorsData = await contractorService.getAllContractors();
-          // Фильтруем контрагентов с валидными UUID
-          const validContractors = contractorsData.filter(contractor => {
-            const isValid = isValidUUID(contractor.id);
-            if (!isValid) {
-              console.warn(`Контрагент "${contractor.name}" имеет некорректный UUID: "${contractor.id}"`);
-            }
-            return isValid;
-          });
-          setContractors(validContractors);
-        } catch (error) {
-          console.error('Ошибка загрузки контрагентов:', error);
-          setContractors([]);
-        }
-      } else {
-        console.warn('Сервис контрагентов недоступен');
-        setContractors([]);
+        const contractorsData = await contractorService.getAllContractors();
+        // Фильтруем контрагентов с валидными UUID
+        const validContractors = contractorsData.filter(contractor => {
+          const isValid = isValidUUID(contractor.id);
+          if (!isValid) {
+            console.warn(`Контрагент "${contractor.name}" имеет некорректный UUID: "${contractor.id}"`);
+          }
+          return isValid;
+        });
+        setContractors(validContractors);
       }
 
       // Загружаем все объекты квалификации
       if (qualificationObjectService.isAvailable()) {
-        try {
-          const objectsData = await qualificationObjectService.getAllQualificationObjects();
-          setQualificationObjects(objectsData);
-        } catch (error) {
-          console.error('Ошибка загрузки объектов квалификации:', error);
-          setQualificationObjects([]);
-        }
-      } else {
-        console.warn('Сервис объектов квалификации недоступен');
-        setQualificationObjects([]);
-      }
-
-      // Проверяем, есть ли проблемы с подключением к Supabase
-      if (!contractorService.isAvailable() || !projectService.isAvailable() || !qualificationObjectService.isAvailable()) {
-        setError('Подключение к базе данных недоступно. Проверьте настройки Supabase.');
+        const objectsData = await qualificationObjectService.getAllQualificationObjects();
+        setQualificationObjects(objectsData);
       }
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
-      setError('Ошибка подключения к базе данных. Проверьте настройки Supabase.');
+      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
     } finally {
       setLoading(false);
     }
@@ -267,6 +238,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
         qualificationObjectIds: []
       });
       setShowAddForm(false);
+      alert('Проект успешно создан');
     } catch (error) {
       console.error('Ошибка добавления проекта:', error);
       alert(`Ошибка создания проекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -278,6 +250,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   // Редактирование проекта
   const handleEditProject = (project: Project) => {
     setEditProject({
+      description: project.description || '',
       status: project.status,
       qualificationObjectIds: project.qualificationObjects.map(obj => obj.qualificationObjectId)
     });
@@ -288,12 +261,14 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     setOperationLoading(true);
     try {
       const updatedProject = await projectService.updateProject(editingProject!, {
+        description: editProject.description,
         status: editProject.status,
         qualificationObjectIds: editProject.qualificationObjectIds
       });
       
       setProjects(prev => prev.map(p => p.id === editingProject ? updatedProject : p));
       setEditingProject(null);
+      alert('Проект успешно обновлен');
     } catch (error) {
       console.error('Ошибка обновления проекта:', error);
       alert(`Ошибка обновления проекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -336,28 +311,22 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   // Получение действия для статуса проекта
   const getProjectAction = (status: ProjectStatus) => {
     switch (status) {
-      case 'contract_negotiation':
+      case 'testing_execution':
         return {
-          label: 'Согласовать договор',
-          page: 'contract-negotiation',
-          icon: Building2
+          label: 'Перейти к испытаниям',
+          page: 'analyzer',
+          icon: Play
         };
       case 'protocol_preparation':
         return {
           label: 'Подготовить протокол',
-          page: 'protocol-preparation',
-          icon: FileText
-        };
-      case 'testing_completion':
-        return {
-          label: 'Выгрузить данные',
-          page: 'data-export',
-          icon: Download
+          page: 'analyzer',
+          icon: Play
         };
       case 'report_preparation':
         return {
-          label: 'Подготовка отчета',
-          page: 'report-preparation',
+          label: 'Подготовить отчет',
+          page: 'analyzer',
           icon: Play
         };
       default:
@@ -376,8 +345,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
         contractorId: project.contractorId,
         contractorName: project.contractorName,
         qualificationObjects: project.qualificationObjects,
-        status: project.status,
-        createdAt: project.createdAt
+        status: project.status
       };
       onPageChange(action.page, projectData);
     }
@@ -453,6 +421,19 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Описание
+              </label>
+              <textarea
+                value={newProject.description}
+                onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                rows={3}
+                placeholder="Введите описание проекта"
+              />
             </div>
 
             {/* Объекты квалификации */}
@@ -538,19 +519,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
 
       {/* Projects Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        {error && (
-          <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400">
-            <div className="flex">
-              <AlertCircle className="w-5 h-5 text-yellow-400 mr-2" />
-              <div>
-                <p className="text-sm text-yellow-700">{error}</p>
-                <p className="text-xs text-yellow-600 mt-1">
-                  Убедитесь, что переменные VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY настроены в файле .env
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
         {loading ? (
           <div className="p-8 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
@@ -561,9 +529,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Дата создания
-                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Проект
                   </th>
@@ -576,9 +541,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Объекты
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Договор
-                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Действия
                   </th>
@@ -588,16 +550,23 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                 {filteredProjects.map((project) => (
                   <tr key={project.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {project.createdAt.toLocaleDateString('ru-RU')}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
                       {editingProject === project.id ? (
-                        <div className="text-sm font-medium text-gray-900">{project.name}</div>
+                        <textarea
+                          value={editProject.description}
+                          onChange={(e) => setEditProject(prev => ({ ...prev, description: e.target.value }))}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          rows={2}
+                          placeholder="Описание"
+                        />
                       ) : (
                         <div>
                           <div className="text-sm font-medium text-gray-900">{project.name}</div>
+                          {project.description && (
+                            <div className="text-xs text-gray-500 mt-1">{project.description}</div>
+                          )}
+                          <div className="text-xs text-gray-400 mt-1">
+                            Создан: {project.createdAt.toLocaleDateString('ru-RU')}
+                          </div>
                         </div>
                       )}
                     </td>
@@ -636,17 +605,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                         {project.qualificationObjects.length > 2 && '...'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editingProject === project.id ? (
-                        <div className="text-sm text-gray-900">
-                          {project.contractNumber || '-'}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-900">
-                          {project.contractNumber || '-'}
-                        </div>
-                      )}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       {editingProject === project.id ? (
                         <div className="flex justify-end space-x-2">
@@ -672,7 +630,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                             <button
                               onClick={() => handleProjectAction(project)}
                               disabled={operationLoading}
-                             className="text-green-600 hover:text-green-900"
+                              className="text-blue-600 hover:text-blue-900"
                               title={getProjectAction(project.status)?.label}
                             >
                               <Play className="w-4 h-4" />
@@ -723,96 +681,28 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       {/* Statistics */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Статистика проектов</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {/* Всего проектов - показываем всегда */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-indigo-600">{projects.length}</div>
             <div className="text-sm text-gray-500">Всего проектов</div>
           </div>
-          
-          {/* Согласование договора */}
-          {projects.filter(p => p.status === 'contract_negotiation').length > 0 && (
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">
-                {projects.filter(p => p.status === 'contract_negotiation').length}
-              </div>
-              <div className="text-sm text-gray-500">Согласование договора</div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-yellow-600">
+              {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_execution', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
             </div>
-          )}
-          
-          {/* Подготовка протокола */}
-          {projects.filter(p => p.status === 'protocol_preparation').length > 0 && (
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {projects.filter(p => p.status === 'protocol_preparation').length}
-              </div>
-              <div className="text-sm text-gray-500">Подготовка протокола</div>
+            <div className="text-sm text-gray-500">В работе</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">
+              {projects.filter(p => p.status === 'completed').length}
             </div>
-          )}
-          
-          {/* Испытания */}
-          {projects.filter(p => ['testing_start', 'testing_completion'].includes(p.status)).length > 0 && (
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {projects.filter(p => ['testing_start', 'testing_completion'].includes(p.status)).length}
-              </div>
-              <div className="text-sm text-gray-500">Испытания</div>
+            <div className="text-sm text-gray-500">Завершено</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">
+              {projects.reduce((sum, p) => sum + p.qualificationObjects.length, 0)}
             </div>
-          )}
-          
-          {/* Отчеты */}
-          {projects.filter(p => ['report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length > 0 && (
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">
-                {projects.filter(p => ['report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
-              </div>
-              <div className="text-sm text-gray-500">Отчеты</div>
-            </div>
-          )}
-        </div>
-        
-        {/* Summary Statistics */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* В работе */}
-            {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_start', 'testing_completion', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length > 0 && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-600">
-                  {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_start', 'testing_completion', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
-                </div>
-                <div className="text-sm text-gray-500">В работе</div>
-              </div>
-            )}
-            
-            {/* Завершено */}
-            {projects.filter(p => p.status === 'completed').length > 0 && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {projects.filter(p => p.status === 'completed').length}
-                </div>
-                <div className="text-sm text-gray-500">Завершено</div>
-              </div>
-            )}
-            
-            {/* Реквалификация */}
-            {projects.filter(p => p.status === 'requalification').length > 0 && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">
-                  {projects.filter(p => p.status === 'requalification').length}
-                </div>
-                <div className="text-sm text-gray-500">Реквалификация</div>
-              </div>
-            )}
-            
-            {/* Объектов в проектах */}
-            {projects.reduce((sum, p) => sum + p.qualificationObjects.length, 0) > 0 && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-600">
-                  {projects.reduce((sum, p) => sum + p.qualificationObjects.length, 0)}
-                </div>
-                <div className="text-sm text-gray-500">Объектов в проектах</div>
-              </div>
-            )}
+            <div className="text-sm text-gray-500">Объектов в проектах</div>
           </div>
         </div>
       </div>

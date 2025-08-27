@@ -14,10 +14,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
 
   const navigation = [
     {
-      name: 'Проекты',
-      key: 'projects',
-      icon: FolderOpen,
+      name: 'Microclimat Analyzer',
+      key: 'analyzer',
+      icon: BarChart3,
       access: 'analyzer' as const
+    },
+    {
+      name: 'Справка',
+      key: 'help',
+      icon: HelpCircle,
+      access: 'help' as const
     },
     {
       name: 'Пользователи',
@@ -32,9 +38,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       access: 'analyzer' as const
     },
     {
-      name: 'Измерительное оборудование',
-      key: 'measurement-equipment',
-      icon: Database,
+      name: 'Проекты',
+      key: 'projects',
+      icon: FolderOpen,
       access: 'analyzer' as const
     },
     {
@@ -42,18 +48,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       key: 'database',
       icon: Database,
       access: 'analyzer' as const
-    },
-    {
-      name: 'Microclimat Analyzer',
-      key: 'analyzer',
-      icon: BarChart3,
-      access: 'analyzer' as const
-    },
-    {
-      name: 'Справка',
-      key: 'help',
-      icon: HelpCircle,
-      access: 'help' as const
     }
   ];
 

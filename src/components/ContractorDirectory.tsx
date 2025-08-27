@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft, Eye, Copy } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { contractorService } from '../utils/contractorService';
@@ -23,14 +23,13 @@ export const ContractorDirectory: React.FC = () => {
   const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingContractorData, setEditingContractorData] = useState<Contractor | null>(null);
-  const [showViewContractor, setShowViewContractor] = useState(false);
   
   // Qualification objects state
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
-  const [showQualificationObjects, setShowQualificationObjects] = useState(false);
+  const [filteredQualificationObjects, setFilteredQualificationObjects] = useState<QualificationObject[]>([]);
+  const [qualificationSearchTerm, setQualificationSearchTerm] = useState('');
   const [showAddQualificationForm, setShowAddQualificationForm] = useState(false);
-  const [selectedContractorForObjects, setSelectedContractorForObjects] = useState<Contractor | null>(null);
-  const [viewingContractor, setViewingContractor] = useState<Contractor | null>(null);
+  const [editingQualificationObject, setEditingQualificationObject] = useState<QualificationObject | null>(null);
 
   // Form state
   const [newContractor, setNewContractor] = useState<CreateContractorData>({
@@ -120,6 +119,7 @@ export const ContractorDirectory: React.FC = () => {
     try {
       const objects = await qualificationObjectService.getQualificationObjects(contractorId);
       setQualificationObjects(objects);
+      setFilteredQualificationObjects(objects);
     } catch (error) {
       console.error('Ошибка загрузки объектов квалификации:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
@@ -128,17 +128,39 @@ export const ContractorDirectory: React.FC = () => {
     }
   };
 
+  // Поиск по объектам квалификации
+  useEffect(() => {
+    if (!qualificationSearchTerm.trim()) {
+      setFilteredQualificationObjects(qualificationObjects);
+      return;
+    }
+
+    const filtered = qualificationObjects.filter(obj => {
+      const searchLower = qualificationSearchTerm.toLowerCase();
+      
+      return (
+        (obj.name && obj.name.toLowerCase().includes(searchLower)) ||
+        (obj.address && obj.address.toLowerCase().includes(searchLower)) ||
+        (obj.vin && obj.vin.toLowerCase().includes(searchLower)) ||
+        (obj.serialNumber && obj.serialNumber.toLowerCase().includes(searchLower)) ||
+        (obj.inventoryNumber && obj.inventoryNumber.toLowerCase().includes(searchLower)) ||
+        (obj.registrationNumber && obj.registrationNumber.toLowerCase().includes(searchLower)) ||
+        obj.type.toLowerCase().includes(searchLower)
+      );
+    });
+
+    setFilteredQualificationObjects(filtered);
+  }, [qualificationSearchTerm, qualificationObjects]);
+
   // Добавление контрагента
   const handleAddContractor = async () => {
     if (!newContractor.name.trim()) {
-      alert('Введите наименование контрагента');
       return;
     }
 
     // Проверяем, что у всех контактов заполнено имя сотрудника
     const invalidContacts = newContractor.contacts.filter(contact => !contact.employeeName.trim());
     if (invalidContacts.length > 0) {
-      alert('Заполните имена сотрудников для всех контактов');
       return;
     }
 
@@ -154,10 +176,8 @@ export const ContractorDirectory: React.FC = () => {
         contacts: []
       });
       setShowAddForm(false);
-      alert('Контрагент успешно добавлен');
     } catch (error) {
       console.error('Ошибка добавления контрагента:', error);
-      alert(`Ошибка добавления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }
@@ -176,11 +196,12 @@ export const ContractorDirectory: React.FC = () => {
     });
     setEditingContractorData(contractor);
     setShowEditForm(true);
+    // Загружаем объекты квалификации для редактируемого контрагента
+    loadQualificationObjects(contractor.id);
   };
 
   const handleSaveEdit = async () => {
     if (!editContractor.name.trim()) {
-      alert('Введите наименование контрагента');
       return;
     }
 
@@ -211,18 +232,10 @@ export const ContractorDirectory: React.FC = () => {
       
       setContractors(prev => prev.map(c => c.id === editingContractorData!.id ? finalContractor : c));
       
-      // Сбрасываем форму
-      setEditContractor({
-        name: '',
-        address: '',
-        contacts: []
-      });
-      setShowEditForm(false);
-      setEditingContractorData(null);
-      alert('Контрагент успешно обновлен');
+      // НЕ сбрасываем форму и НЕ возвращаемся к списку
+      console.log('Контрагент успешно обновлен');
     } catch (error) {
       console.error('Ошибка обновления контрагента:', error);
-      alert(`Ошибка обновления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }
@@ -235,21 +248,12 @@ export const ContractorDirectory: React.FC = () => {
       try {
         await contractorService.deleteContractor(contractorId);
         setContractors(prev => prev.filter(c => c.id !== contractorId));
-        alert('Контрагент успешно удален');
       } catch (error) {
         console.error('Ошибка удаления контрагента:', error);
-        alert(`Ошибка удаления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       } finally {
         setOperationLoading(false);
       }
     }
-  };
-
-  // Показать объекты квалификации контрагента
-  const handleShowQualificationObjects = (contractor: Contractor) => {
-    setSelectedContractorForObjects(contractor);
-    setShowQualificationObjects(true);
-    loadQualificationObjects(contractor.id);
   };
 
   // Добавление объекта квалификации
@@ -258,50 +262,44 @@ export const ContractorDirectory: React.FC = () => {
     try {
       const addedObject = await qualificationObjectService.addQualificationObject(objectData);
       setQualificationObjects(prev => [...prev, addedObject]);
+      setShowAddQualificationForm(false);
     } catch (error) {
       console.error('Ошибка добавления объекта квалификации:', error);
-      alert(`Ошибка добавления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }
   };
 
   // Редактирование объекта квалификации
-  const handleEditQualificationObject = async (objectId: string, updates: any) => {
-    setOperationLoading(true);
-    try {
-      const updatedObject = await qualificationObjectService.updateQualificationObject(objectId, updates);
-      setQualificationObjects(prev => prev.map(obj => obj.id === objectId ? updatedObject : obj));
-      alert('Объект квалификации успешно обновлен');
-    } catch (error) {
-      console.error('Ошибка обновления объекта квалификации:', error);
-      alert(`Ошибка обновления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setOperationLoading(false);
-    }
+  const handleEditQualificationObject = (obj: QualificationObject) => {
+    setEditingQualificationObject(obj);
+    setShowAddQualificationForm(true);
   };
 
-  // Показать объект квалификации на карте
-  const handleShowQualificationObjectOnMap = (obj: QualificationObject) => {
-    if (obj.latitude && obj.longitude) {
-      // Создаем временного контрагента с координатами объекта для показа на карте
-      const tempContractor: Contractor = {
-        id: obj.id,
-        name: obj.name || obj.vin || obj.serialNumber || 'Объект квалификации',
-        address: obj.address,
-        latitude: obj.latitude,
-        longitude: obj.longitude,
-        geocodedAt: obj.geocodedAt,
-        createdAt: obj.createdAt,
-        updatedAt: obj.updatedAt,
-        contacts: []
-      };
-      setSelectedContractor(tempContractor);
-      setShowMap(true);
-      setShowQualificationObjects(false);
-      setSelectedContractorForObjects(null);
-    } else {
-      alert('Для этого объекта квалификации не определены координаты');
+  // Сохранение изменений объекта квалификации
+  const handleSaveQualificationObject = async (objectData: CreateQualificationObjectData) => {
+    setOperationLoading(true);
+    try {
+      if (editingQualificationObject) {
+        // Обновляем существующий объект
+        const updatedObject = await qualificationObjectService.updateQualificationObject(
+          editingQualificationObject.id,
+          objectData
+        );
+        setQualificationObjects(prev => prev.map(obj => 
+          obj.id === editingQualificationObject.id ? updatedObject : obj
+        ));
+      } else {
+        // Добавляем новый объект
+        const addedObject = await qualificationObjectService.addQualificationObject(objectData);
+        setQualificationObjects(prev => [...prev, addedObject]);
+      }
+      setShowAddQualificationForm(false);
+      setEditingQualificationObject(null);
+    } catch (error) {
+      console.error('Ошибка сохранения объекта квалификации:', error);
+    } finally {
+      setOperationLoading(false);
     }
   };
   // Удаление объекта квалификации
@@ -311,10 +309,8 @@ export const ContractorDirectory: React.FC = () => {
       try {
         await qualificationObjectService.deleteQualificationObject(objectId);
         setQualificationObjects(prev => prev.filter(obj => obj.id !== objectId));
-        alert('Объект квалификации успешно удален');
       } catch (error) {
         console.error('Ошибка удаления объекта квалификации:', error);
-        alert(`Ошибка удаления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       } finally {
         setOperationLoading(false);
       }
@@ -368,22 +364,6 @@ export const ContractorDirectory: React.FC = () => {
     }
   };
 
-  // Показать контрагента на карте
-  const showContractorOnMap = (contractor: Contractor) => {
-    if (contractor.latitude && contractor.longitude) {
-      setSelectedContractor(contractor);
-      setShowMap(true);
-    } else {
-      alert('Для этого контрагента не определены координаты');
-    }
-  };
-
-  // Показать детальную информацию о контрагенте
-  const handleViewContractor = (contractor: Contractor) => {
-    setViewingContractor(contractor);
-    setShowViewContractor(true);
-  };
-
   if (showMap && selectedContractor) {
     return (
       <ContractorMap
@@ -396,539 +376,6 @@ export const ContractorDirectory: React.FC = () => {
     );
   }
 
-  // Если показываем просмотр контрагента
-  if (viewingContractor) {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => setViewingContractor(null)}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <Building2 className="w-8 h-8 text-indigo-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Просмотр контрагента</h1>
-            <p className="text-gray-600">{viewingContractor.name}</p>
-          </div>
-        </div>
-
-        {/* Contractor Details */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Основная информация</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Наименование</label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
-                {viewingContractor.name}
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Адрес</label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
-                {viewingContractor.address || 'Не указан'}
-              </div>
-              {/* Результат геокодирования */}
-              {viewingContractor.address && (
-                <div className="mt-2">
-                  {viewingContractor.latitude && viewingContractor.longitude ? (
-                    <div className="flex items-center space-x-2 text-sm">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-green-700 font-medium">Адрес геокодирован</span>
-                      <span className="text-gray-500">
-                        ({viewingContractor.latitude.toFixed(6)}, {viewingContractor.longitude.toFixed(6)})
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2 text-sm">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      <span className="text-yellow-700 font-medium">Адрес не геокодирован</span>
-                    </div>
-                  )}
-                  {viewingContractor.geocodedAt && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Геокодирован: {viewingContractor.geocodedAt.toLocaleDateString('ru-RU')} в {viewingContractor.geocodedAt.toLocaleTimeString('ru-RU')}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Дата создания</label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
-                {viewingContractor.createdAt.toLocaleDateString('ru-RU')}
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Последнее обновление</label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
-                {viewingContractor.updatedAt.toLocaleDateString('ru-RU')}
-              </div>
-            </div>
-          </div>
-
-          {/* Coordinates if available */}
-          {viewingContractor.latitude && viewingContractor.longitude && (
-            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h3 className="text-sm font-medium text-green-900 mb-2">Координаты</h3>
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm text-green-800">
-                  <span className="font-medium">Координаты:</span>
-                  <span className="ml-2 font-mono">{viewingContractor.latitude.toFixed(6)}, {viewingContractor.longitude.toFixed(6)}</span>
-                </div>
-                <button
-                  onClick={() => {
-                    const coordinates = `${viewingContractor.latitude!.toFixed(6)}, ${viewingContractor.longitude!.toFixed(6)}`;
-                    navigator.clipboard.writeText(coordinates).then(() => {
-                      alert('Координаты скопированы в буфер обмена');
-                    }).catch(() => {
-                      alert('Ошибка копирования координат');
-                    });
-                  }}
-                  className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
-                  title="Скопировать координаты"
-                >
-                  <Copy className="w-3 h-3" />
-                  <span>Скопировать координаты</span>
-                </button>
-              </div>
-              <div className="text-xs text-green-700 mb-3">
-                Геокодирован: {viewingContractor.geocodedAt?.toLocaleDateString('ru-RU')} в {viewingContractor.geocodedAt?.toLocaleTimeString('ru-RU') || 'Неизвестно'}
-              </div>
-              <div>
-                <button
-                  onClick={() => {
-                    setSelectedContractor(viewingContractor);
-                    setShowMap(true);
-                    setViewingContractor(null);
-                  }}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-                >
-                  <Map className="w-4 h-4" />
-                  <span>Показать на карте</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Contacts */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Контакты</h2>
-          
-          {viewingContractor.contacts.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {viewingContractor.contacts.map((contact) => (
-                <div key={contact.id} className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <User className="w-4 h-4 text-gray-400" />
-                    <span className="font-medium text-gray-900">{contact.employeeName}</span>
-                  </div>
-                  {contact.phone && (
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-700">{contact.phone}</span>
-                    </div>
-                  )}
-                  {contact.comment && (
-                    <div className="flex items-center space-x-2">
-                      <MessageSquare className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-600 text-sm">{contact.comment}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <User className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>Контакты не добавлены</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Если показываем объекты квалификации
-  if (showQualificationObjects && selectedContractorForObjects) {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => {
-              setShowQualificationObjects(false);
-              setSelectedContractorForObjects(null);
-              setQualificationObjects([]);
-            }}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <Building2 className="w-8 h-8 text-indigo-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Объекты квалификации</h1>
-            <p className="text-gray-600">{selectedContractorForObjects.name}</p>
-          </div>
-        </div>
-
-        {/* Contractor Information */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Информация о контрагенте</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Наименование</label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
-                {selectedContractorForObjects.name}
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Адрес</label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
-                {selectedContractorForObjects.address || 'Не указан'}
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Дата создания</label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
-                {selectedContractorForObjects.createdAt.toLocaleDateString('ru-RU')}
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Последнее обновление</label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
-                {selectedContractorForObjects.updatedAt.toLocaleDateString('ru-RU')}
-              </div>
-            </div>
-          </div>
-
-          {/* Coordinates if available */}
-          {selectedContractorForObjects.latitude && selectedContractorForObjects.longitude && (
-            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h3 className="text-sm font-medium text-green-900 mb-2">Координаты</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-green-800">Широта:</span>
-                  <div className="text-green-700">{selectedContractorForObjects.latitude.toFixed(6)}</div>
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Долгота:</span>
-                  <div className="text-green-700">{selectedContractorForObjects.longitude.toFixed(6)}</div>
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Геокодирован:</span>
-                  <div className="text-green-700">
-                    {selectedContractorForObjects.geocodedAt?.toLocaleDateString('ru-RU') || 'Неизвестно'}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3">
-                <button
-                  onClick={() => {
-                    setSelectedContractor(selectedContractorForObjects);
-                    setShowMap(true);
-                    setShowQualificationObjects(false);
-                    setSelectedContractorForObjects(null);
-                  }}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-                >
-                  <Map className="w-4 h-4" />
-                  <span>Показать на карте</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Contacts */}
-          <div className="mt-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Контакты</h3>
-            {selectedContractorForObjects.contacts.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedContractorForObjects.contacts.map((contact) => (
-                  <div key={contact.id} className="bg-gray-50 p-4 rounded-lg">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <User className="w-4 h-4 text-gray-400" />
-                      <span className="font-medium text-gray-900">{contact.employeeName}</span>
-                    </div>
-                    {contact.phone && (
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Phone className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-700">{contact.phone}</span>
-                      </div>
-                    )}
-                    {contact.comment && (
-                      <div className="flex items-center space-x-2">
-                        <MessageSquare className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600 text-sm">{contact.comment}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                <User className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm">Контакты не добавлены</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Add Qualification Object Form */}
-        {showAddQualificationForm && (
-          <QualificationObjectForm
-            contractorId={selectedContractorForObjects.id}
-            onAdd={handleAddQualificationObject}
-            onCancel={() => setShowAddQualificationForm(false)}
-            loading={operationLoading}
-          />
-        )}
-
-        {/* Qualification Objects Table */}
-        <QualificationObjectsTable
-          objects={qualificationObjects}
-          onAdd={() => setShowAddQualificationForm(true)}
-          onEdit={handleEditQualificationObject}
-          onDelete={handleDeleteQualificationObject}
-          onShowOnMap={handleShowQualificationObjectOnMap}
-          loading={loading}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Индикатор загрузки */}
-      {loading && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <Loader className="animate-spin w-4 h-4 text-blue-600" />
-            <span className="text-blue-700">Загрузка контрагентов...</span>
-          </div>
-        </div>
-      )}
-
-      {/* Ошибка */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start space-x-2">
-            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки данных</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <Building2 className="w-8 h-8 text-indigo-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Справочник контрагентов</h1>
-        </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Добавить контрагента</span>
-        </button>
-      </div>
-
-      {/* Search */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Поиск по наименованию, адресу, сотрудникам, телефонам..."
-          />
-        </div>
-        {searchTerm && (
-          <div className="mt-2 text-sm text-gray-600">
-            Найдено: {filteredContractors.length} из {contractors.length} контрагентов
-          </div>
-        )}
-      </div>
-
-      {/* Add Contractor Form */}
-      {showAddForm && (
-        renderContractorForm(false)
-      )}
-
-      {/* Edit Contractor Form */}
-      {showEditForm && editingContractorData && (
-        renderContractorForm(true)
-      )}
-
-      {/* Contractors Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Контрагент
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Адрес
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Контакты
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Объекты
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Действия
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredContractors.map((contractor) => (
-                <tr key={contractor.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{contractor.name}</div>
-                        <div className="text-xs text-gray-500">
-                          Создан: {contractor.createdAt.toLocaleDateString('ru-RU')}
-                        </div>
-                      </div>
-                  </td>
-                  <td className="px-6 py-4">
-                      <div>
-                        {contractor.address ? (
-                          <div className="flex items-start space-x-2">
-                            <div className="flex-1">
-                              <div className="text-sm text-gray-900">{contractor.address}</div>
-                              {contractor.latitude && contractor.longitude && (
-                                <div className="text-xs text-green-600 flex items-center space-x-1 mt-1">
-                                  <MapPin className="w-3 h-3" />
-                                  <span>Геокодирован</span>
-                                </div>
-                              )}
-                            </div>
-                            {contractor.latitude && contractor.longitude && (
-                              <button
-                                onClick={() => showContractorOnMap(contractor)}
-                                className="text-blue-600 hover:text-blue-800"
-                                title="Показать на карте"
-                              >
-                                <Map className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">Не указан</span>
-                        )}
-                      </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {contractor.contacts.length > 0 ? (
-                      <div className="space-y-2">
-                        {contractor.contacts.map((contact) => (
-                          <div key={contact.id} className="text-sm">
-                            <div className="flex items-center space-x-1">
-                              <User className="w-3 h-3 text-gray-400" />
-                              <span className="font-medium">{contact.employeeName}</span>
-                            </div>
-                            {contact.phone && (
-                              <div className="flex items-center space-x-1 text-gray-600">
-                                <Phone className="w-3 h-3" />
-                                <span>{contact.phone}</span>
-                              </div>
-                            )}
-                            {contact.comment && (
-                              <div className="flex items-center space-x-1 text-gray-500">
-                                <MessageSquare className="w-3 h-3" />
-                                <span className="text-xs">{contact.comment}</span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 text-sm">Нет контактов</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => handleShowQualificationObjects(contractor)}
-                      className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
-                    >
-                      Объекты квалификации
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleViewContractor(contractor)}
-                          disabled={operationLoading}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Просмотр"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEditContractor(contractor)}
-                          disabled={operationLoading}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          title="Редактировать"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteContractor(contractor.id)}
-                          disabled={operationLoading}
-                          className="text-red-600 hover:text-red-900"
-                          title="Удалить"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredContractors.length === 0 && !loading && (
-          <div className="text-center py-8 text-gray-500">
-            <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            {searchTerm ? (
-              <>
-                <p>По запросу "{searchTerm}" ничего не найдено</p>
-                <p className="text-sm">Попробуйте изменить поисковый запрос</p>
-              </>
-            ) : (
-              <>
-                <p>Контрагенты не найдены</p>
-                <p className="text-sm">Нажмите кнопку "Добавить контрагента" для создания первой записи</p>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
   // Функция для рендеринга формы (добавление/редактирование)
   function renderContractorForm(isEdit: boolean) {
     const formData = isEdit ? editContractor : newContractor;
@@ -940,6 +387,9 @@ export const ContractorDirectory: React.FC = () => {
       setShowEditForm(false);
       setEditingContractorData(null);
       setEditContractor({ name: '', address: '', contacts: [] });
+      setQualificationObjects([]);
+      setFilteredQualificationObjects([]);
+      setQualificationSearchTerm('');
     } : () => setShowAddForm(false);
 
     return (
@@ -981,24 +431,6 @@ export const ContractorDirectory: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Введите адрес (будет геокодирован автоматически)"
               />
-              <div className="mt-1 text-xs text-gray-500">
-                <p className="mb-1"><strong>Формат адреса для успешного геокодирования:</strong></p>
-                <ul className="space-y-0.5 list-disc list-inside">
-                  <li>Страна, город, улица, дом: "Беларусь, Минск, ул. Дунина-Марцинкевича, 3"</li>
-                  <li>Город, улица, дом: "Минск, ул. Дунина-Марцинкевича, 3"</li>
-                  <li>Полный адрес: "220030, г. Минск, ул. Дунина-Марцинкевича, 3"</li>
-                </ul>
-                <p className="mt-1 text-gray-400">Чем подробнее адрес, тем точнее геокодирование</p>
-              </div>
-              <div className="mt-1 text-xs text-gray-500">
-                <p className="mb-1"><strong>Формат адреса для успешного геокодирования:</strong></p>
-                <ul className="space-y-0.5 list-disc list-inside">
-                  <li>Страна, город, улица, дом: "Беларусь, Минск, ул. Дунина-Марцинкевича, 3"</li>
-                  <li>Город, улица, дом: "Минск, ул. Дунина-Марцинкевича, 3"</li>
-                  <li>Полный адрес: "220030, г. Минск, ул. Дунина-Марцинкевича, 3"</li>
-                </ul>
-                <p className="mt-1 text-gray-400">Чем подробнее адрес, тем точнее геокодирование</p>
-              </div>
             </div>
           </div>
 
@@ -1092,4 +524,286 @@ export const ContractorDirectory: React.FC = () => {
       </div>
     );
   }
+
+  return (
+    <div className="space-y-6">
+      {/* Индикатор загрузки */}
+      {loading && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2">
+            <Loader className="animate-spin w-4 h-4 text-blue-600" />
+            <span className="text-blue-700">Загрузка контрагентов...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Ошибка */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start space-x-2">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки данных</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          {(showAddForm || showEditForm) && (
+            <button
+              onClick={() => {
+                if (showAddForm) {
+                  setShowAddForm(false);
+                } else if (showEditForm) {
+                  setShowEditForm(false);
+                  setEditingContractorData(null);
+                  setEditContractor({ name: '', address: '', contacts: [] });
+                  setQualificationObjects([]);
+                  setFilteredQualificationObjects([]);
+                  setQualificationSearchTerm('');
+                  setShowAddQualificationForm(false);
+                  setEditingQualificationObject(null);
+                }
+              }}
+              className="text-gray-600 hover:text-gray-900 transition-colors flex items-center space-x-2"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Назад к справочнику</span>
+            </button>
+          )}
+          <Building2 className="w-8 h-8 text-indigo-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Справочник контрагентов</h1>
+        </div>
+        {!showAddForm && !showEditForm && (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Добавить контрагента</span>
+          </button>
+        )}
+      </div>
+
+      {/* Search */}
+      {!showAddForm && !showEditForm && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Поиск по наименованию, адресу, сотрудникам, телефонам..."
+            />
+          </div>
+          {searchTerm && (
+            <div className="mt-2 text-sm text-gray-600">
+              Найдено: {filteredContractors.length} из {contractors.length} контрагентов
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Contractor Form */}
+      {showAddForm && (
+        <div className="space-y-6">
+          {renderContractorForm(false)}
+          {/* Объекты квалификации для нового контрагента будут доступны после создания */}
+        </div>
+      )}
+
+      {/* Edit Contractor Form */}
+      {showEditForm && editingContractorData && (
+        <div className="space-y-6">
+          {renderContractorForm(true)}
+          
+          {/* Объекты квалификации для редактируемого контрагента */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Объекты квалификации</h3>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowAddQualificationForm(true)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Добавить объект</span>
+                </button>
+                <button
+                  onClick={() => {
+                    // Сохраняем изменения без возврата к списку
+                    console.log('Сохранение изменений объектов квалификации');
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Сохранить</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Add Qualification Object Form */}
+            {showAddQualificationForm && (
+              <div className="mb-6">
+                <QualificationObjectForm
+                  contractorId={editingContractorData.id}
+                  onAdd={handleAddQualificationObject}
+                  onCancel={() => {
+                    setShowAddQualificationForm(false);
+                    setEditingQualificationObject(null);
+                  }}
+                  loading={operationLoading}
+                  editingObject={editingQualificationObject}
+                />
+              </div>
+            )}
+
+            {/* Qualification Objects Table */}
+            <QualificationObjectsTable
+              objects={filteredQualificationObjects}
+              onAdd={() => setShowAddQualificationForm(true)}
+              onEdit={handleEditQualificationObject}
+              onDelete={handleDeleteQualificationObject}
+              onShowOnMap={(obj) => {
+                // TODO: Implement map functionality for objects
+                console.log('Show on map:', obj);
+              }}
+              loading={loading}
+              hideAddButton={true}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Contractors Table */}
+      {!showAddForm && !showEditForm && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Контрагент
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Адрес
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Контакты
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Действия
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredContractors.map((contractor) => (
+                  <tr key={contractor.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{contractor.name}</div>
+                        <div className="text-xs text-gray-500">
+                          Создан: {contractor.createdAt.toLocaleDateString('ru-RU')}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        {contractor.address ? (
+                          <div className="flex items-start space-x-2">
+                            <div className="flex-1">
+                              <div className="text-sm text-gray-900">{contractor.address}</div>
+                              {contractor.latitude && contractor.longitude && (
+                                <div className="text-xs text-green-600 flex items-center space-x-1 mt-1">
+                                  <MapPin className="w-3 h-3" />
+                                  <span>Геокодирован</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">Не указан</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {contractor.contacts.length > 0 ? (
+                        <div className="space-y-2">
+                          {contractor.contacts.map((contact) => (
+                            <div key={contact.id} className="text-sm">
+                              <div className="flex items-center space-x-1">
+                                <User className="w-3 h-3 text-gray-400" />
+                                <span className="font-medium">{contact.employeeName}</span>
+                              </div>
+                              {contact.phone && (
+                                <div className="flex items-center space-x-1 text-gray-600">
+                                  <Phone className="w-3 h-3" />
+                                  <span>{contact.phone}</span>
+                                </div>
+                              )}
+                              {contact.comment && (
+                                <div className="flex items-center space-x-1 text-gray-500">
+                                  <MessageSquare className="w-3 h-3" />
+                                  <span className="text-xs">{contact.comment}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">Нет контактов</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => handleEditContractor(contractor)}
+                          disabled={operationLoading}
+                          className="text-indigo-600 hover:text-indigo-900"
+                          title="Редактировать"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteContractor(contractor.id)}
+                          disabled={operationLoading}
+                          className="text-red-600 hover:text-red-900"
+                          title="Удалить"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredContractors.length === 0 && !loading && (
+            <div className="text-center py-8 text-gray-500">
+              <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              {searchTerm ? (
+                <>
+                  <p>По запросу "{searchTerm}" ничего не найдено</p>
+                  <p className="text-sm">Попробуйте изменить поисковый запрос</p>
+                </>
+              ) : (
+                <>
+                  <p>Контрагенты не найдены</p>
+                  <p className="text-sm">Нажмите кнопку "Добавить контрагента" для создания первой записи</p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 };

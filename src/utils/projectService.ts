@@ -17,15 +17,7 @@ let supabase: any = null;
 // Инициализация Supabase клиента
 const initSupabase = () => {
   if (!supabase && supabaseUrl && supabaseAnonKey) {
-    console.log('Initializing Supabase with URL:', supabaseUrl);
-    console.log('Supabase URL exists:', !!supabaseUrl);
-    console.log('Supabase Anon Key exists:', !!supabaseAnonKey);
     supabase = createClient(supabaseUrl, supabaseAnonKey);
-  } else {
-    console.warn('Supabase not initialized - missing environment variables:', {
-      hasUrl: !!supabaseUrl,
-      hasKey: !!supabaseAnonKey
-    });
   }
   return supabase;
 };

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle, Eye } from 'lucide-react';
+import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -11,10 +11,9 @@ import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplate
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
   onBack?: () => void;
-  viewMode?: boolean;
 }
 
-export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack, viewMode = false }) => {
+export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack }) => {
   const { user } = useAuth();
   const { data, loading, error } = useTimeSeriesData({ files });
   
@@ -689,6 +688,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           </div>
         </div>
 
+        {/* Zoom Controls */}
+        {zoomState && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Управление масштабом</label>
+            <button
+              onClick={handleResetZoom}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Сбросить масштаб
+            </button>
+          </div>
+        )}
+
         {/* Contract Information - moved test type to markers section */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Информация о договоре</label>
@@ -757,18 +769,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       {/* Test Information and Markers - always visible */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Испытания</h3>
-          {/* Zoom Controls */}
-          {zoomState && (
-            <button
-              onClick={handleResetZoom}
-              className="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
-            >
-              Сбросить масштаб
-            </button>
-          )}
-        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Испытания</h3>
         
         {/* Test Type Selection */}
         <div className="mb-6">
@@ -899,16 +900,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
       </div>
       {/* Analysis Results Table */}
-      <div className={`bg-white rounded-lg shadow p-6 ${viewMode ? 'opacity-75 pointer-events-none' : ''}`}>
+      <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
-        {viewMode && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <Eye className="w-4 h-4 text-blue-600" />
-              <span className="text-sm text-blue-800 font-medium">Режим просмотра</span>
-            </div>
-          </div>
-        )}
         
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1047,19 +1040,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       </div>
 
       {/* Кнопка формирования отчета */}
-      <div className={`bg-white rounded-lg shadow p-6 ${viewMode ? 'opacity-75 pointer-events-none' : ''}`}>
+      <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-col items-center space-y-6">
           <h2 className="text-xl font-semibold text-gray-900 text-center">
             Формирование приложения к отчету с результатами испытаний
           </h2>
-          {viewMode && (
-            <div className="w-full p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <Eye className="w-4 h-4 text-blue-600" />
-                <span className="text-sm text-blue-800 font-medium">Режим просмотра - формирование отчетов недоступно</span>
-              </div>
-            </div>
-          )}
           
           {/* Загрузка шаблона DOCX */}
           <div className="w-full max-w-md">

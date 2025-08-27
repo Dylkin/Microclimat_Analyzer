@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart, FolderOpen } from 'lucide-react';
+import { BarChart3, Thermometer, Droplets, Wind, Sun, Upload, Trash2, Clock, CheckCircle, XCircle, Loader, ChevronUp, ChevronDown, BarChart, FolderOpen } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { UploadedFile } from '../types/FileData';
 import { Contractor } from '../types/Contractor';
@@ -55,15 +55,13 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     error: null
   });
   const [projectFilesLoaded, setProjectFilesLoaded] = React.useState(false);
-  const [operationLoading, setOperationLoading] = React.useState(false);
 
-  // Сброс состояния загрузки файлов при смене объекта квалификации
-  React.useEffect(() => {
-    if (selectedProject) {
-      setProjectFilesLoaded(false);
-      setUploadedFiles([]);
-    }
-  }, [selectedQualificationObject]);
+  const mockData = [
+    { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
+    { label: 'Влажность', value: '65%', icon: Droplets, color: 'text-blue-600', bg: 'bg-blue-100' },
+    { label: 'Скорость ветра', value: '3.2 м/с', icon: Wind, color: 'text-green-600', bg: 'bg-green-100' },
+    { label: 'Освещенность', value: '850 лк', icon: Sun, color: 'text-yellow-600', bg: 'bg-yellow-100' }
+  ];
 
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
@@ -89,7 +87,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   // Загрузка ранее сохраненных файлов проекта
   React.useEffect(() => {
     const loadProjectFiles = async () => {
-      if (!selectedProject || !selectedQualificationObject || !uploadedFileService.isAvailable() || projectFilesLoaded) {
+      if (!selectedProject || !uploadedFileService.isAvailable() || projectFilesLoaded) {
         return;
       }
 
@@ -110,7 +108,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     };
 
     loadProjectFiles();
-  }, [selectedProject, selectedQualificationObject, projectFilesLoaded, user?.id]);
+  }, [selectedProject, projectFilesLoaded, user?.id]);
 
   // Загрузка объектов квалификации при выборе контрагента
   React.useEffect(() => {
@@ -195,7 +193,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       }
 
       return {
-        id: crypto.randomUUID(),
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         name: file.name,
         uploadDate: new Date().toLocaleString('ru-RU'),
         parsingStatus: 'processing' as const,
@@ -270,7 +268,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
   const handleDeleteFile = async (fileId: string) => {
     if (confirm('Вы уверены, что хотите удалить этот файл?')) {
-      setOperationLoading(true);
       try {
         // Удаляем данные из базы
         await databaseService.deleteFileData(fileId);
@@ -285,8 +282,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         }
       } catch (error) {
         console.error('Ошибка удаления данных из базы:', error);
-      } finally {
-        setOperationLoading(false);
       }
       
       // Удаляем из состояния
@@ -406,7 +401,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const handleExploreData = () => {
     const completedFiles = uploadedFiles.filter(f => f.parsingStatus === 'completed');
     if (completedFiles.length === 0) {
-      alert('Нет обработанных файлов для подготовки отчета');
+      alert('Нет обработанных файлов для исследования');
       return;
     }
     
@@ -468,97 +463,16 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
       {/* Информация о проекте */}
       {selectedProject && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-2">
             <FolderOpen className="w-5 h-5 text-blue-600" />
             <h3 className="text-sm font-medium text-blue-900">Работа в рамках проекта</h3>
           </div>
-          <div className="text-sm text-blue-800 mb-4">
+          <div className="text-sm text-blue-800">
             <div><strong>Проект:</strong> {selectedProject.name}</div>
             <div><strong>Контрагент:</strong> {selectedProject.contractorName}</div>
             <div><strong>Статус:</strong> {ProjectStatusLabels[selectedProject.status as ProjectStatus]}</div>
             <div><strong>Объектов квалификации:</strong> {selectedProject.qualificationObjects.length}</div>
-          </div>
-          
-          {/* Селекторы контрагента и объекта квалификации */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Селектор контрагента */}
-            <div className="relative">
-              <label className="block text-sm font-medium text-blue-900 mb-1">
-                Контрагент (из проекта)
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={getContractorName(selectedContractor)}
-                  className="w-full px-3 py-2 border border-blue-300 rounded-lg bg-blue-100 cursor-not-allowed text-blue-800"
-                  disabled
-                />
-              </div>
-            </div>
-
-            {/* Селектор объекта квалификации */}
-            <div className="relative">
-              <label className="block text-sm font-medium text-blue-900 mb-1">
-                Объект квалификации (из проекта) *
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={selectedQualificationObject ? getQualificationObjectName(selectedQualificationObject) : qualificationSearch}
-                  onChange={(e) => {
-                    setQualificationSearch(e.target.value);
-                    if (!selectedQualificationObject) {
-                      setShowQualificationDropdown(true);
-                    }
-                  }}
-                  onFocus={() => {
-                    if (selectedContractor) {
-                      setShowQualificationDropdown(true);
-                      if (selectedQualificationObject) {
-                        setQualificationSearch('');
-                        setSelectedQualificationObject('');
-                      }
-                    }
-                  }}
-                  disabled={!selectedContractor}
-                  className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  placeholder={selectedContractor ? 
-                    "Объекты квалификации из проекта" : 
-                    "Сначала выберите контрагента"
-                  }
-                />
-                
-                {showQualificationDropdown && selectedContractor && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {filteredQualificationObjects.length > 0 ? (
-                      filteredQualificationObjects.map((obj) => (
-                        <div
-                          key={obj.id}
-                          onClick={() => {
-                            setSelectedQualificationObject(obj.id);
-                            setQualificationSearch('');
-                            setShowQualificationDropdown(false);
-                          }}
-                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        >
-                          <div className="font-medium text-gray-900">
-                            {obj.name || obj.vin || obj.serialNumber || 'Без названия'}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {obj.type} {obj.address && `• ${obj.address}`}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-3 py-2 text-gray-500 text-sm">
-                        В проекте нет объектов квалификации
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -571,7 +485,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
             {selectedProject && (
               <button
                 onClick={handleSaveProject}
-                disabled={saveStatus.isSaving || uploadedFiles.length === 0 || !selectedQualificationObject}
+                disabled={saveStatus.isSaving || uploadedFiles.length === 0}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {saveStatus.isSaving ? (
@@ -589,16 +503,15 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
             )}
             <button
               onClick={handleExploreData}
-              disabled={uploadedFiles.filter(f => f.parsingStatus === 'completed').length === 0 || (selectedProject && !selectedQualificationObject)}
+              disabled={uploadedFiles.filter(f => f.parsingStatus === 'completed').length === 0}
               className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               <BarChart className="w-4 h-4" />
-              <span>Подготовка отчета</span>
+              <span>Исследовать данные</span>
             </button>
             <button
               onClick={triggerFileUpload}
-              disabled={selectedProject && !selectedQualificationObject}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
             >
               <Upload className="w-4 h-4" />
               <span>Загрузить файлы в формате Vi2</span>
@@ -644,129 +557,134 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           </div>
         )}
 
-        
-        {/* Селекторы для проектов без выбранного проекта */}
-        {!selectedProject && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* Селектор контрагента */}
+        {/* Селекторы контрагента и объекта квалификации */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Селектор контрагента */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Контрагент {selectedProject && <span className="text-blue-600">(из проекта)</span>}
+            </label>
             <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Контрагент
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={selectedContractor ? getContractorName(selectedContractor) : contractorSearch}
-                  onChange={(e) => {
-                    setContractorSearch(e.target.value);
-                    if (!selectedContractor) {
-                      setShowContractorDropdown(true);
-                    }
-                  }}
-                  onFocus={() => {
+              <input
+                type="text"
+                value={selectedContractor ? getContractorName(selectedContractor) : contractorSearch}
+                onChange={(e) => {
+                  if (selectedProject) return; // Блокируем изменения если выбран проект
+                  setContractorSearch(e.target.value);
+                  if (!selectedContractor) {
                     setShowContractorDropdown(true);
-                    if (selectedContractor) {
-                      setContractorSearch('');
-                      setSelectedContractor('');
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Поиск контрагента..."
-                />
-                
-                {showContractorDropdown && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {filteredContractors.length > 0 ? (
-                      filteredContractors.map((contractor) => (
-                        <div
-                          key={contractor.id}
-                          onClick={() => {
-                            setSelectedContractor(contractor.id);
-                            setContractorSearch('');
-                            setShowContractorDropdown(false);
-                          }}
-                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        >
-                          <div className="font-medium text-gray-900">{contractor.name}</div>
-                          {contractor.address && (
-                            <div className="text-sm text-gray-500">{contractor.address}</div>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-3 py-2 text-gray-500 text-sm">
-                        Контрагенты не найдены
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Селектор объекта квалификации */}
-            <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объект квалификации
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={selectedQualificationObject ? getQualificationObjectName(selectedQualificationObject) : qualificationSearch}
-                  onChange={(e) => {
-                    setQualificationSearch(e.target.value);
-                    if (!selectedQualificationObject) {
-                      setShowQualificationDropdown(true);
-                    }
-                  }}
-                  onFocus={() => {
-                    if (selectedContractor) {
-                      setShowQualificationDropdown(true);
-                      if (selectedQualificationObject) {
-                        setQualificationSearch('');
-                        setSelectedQualificationObject('');
-                      }
-                    }
-                  }}
-                  disabled={!selectedContractor}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  placeholder={selectedContractor ? 
-                    "Поиск объекта квалификации..." : 
-                    "Сначала выберите контрагента"
                   }
-                />
-                
-                {showQualificationDropdown && selectedContractor && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {filteredQualificationObjects.length > 0 ? (
-                      filteredQualificationObjects.map((obj) => (
-                        <div
-                          key={obj.id}
-                          onClick={() => {
-                            setSelectedQualificationObject(obj.id);
-                            setQualificationSearch('');
-                            setShowQualificationDropdown(false);
-                          }}
-                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        >
-                          <div className="font-medium text-gray-900">
-                            {obj.name || obj.vin || obj.serialNumber || 'Без названия'}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {obj.type} {obj.address && `• ${obj.address}`}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-3 py-2 text-gray-500 text-sm">
-                        Объекты квалификации не найдены
+                }}
+                onFocus={() => {
+                  if (selectedProject) return; // Блокируем изменения если выбран проект
+                  setShowContractorDropdown(true);
+                  if (selectedContractor) {
+                    setContractorSearch('');
+                    setSelectedContractor('');
+                  }
+                }}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                  selectedProject ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
+                placeholder="Поиск контрагента..."
+                disabled={!!selectedProject}
+              />
+              
+              {showContractorDropdown && !selectedProject && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredContractors.length > 0 ? (
+                    filteredContractors.map((contractor) => (
+                      <div
+                        key={contractor.id}
+                        onClick={() => {
+                          setSelectedContractor(contractor.id);
+                          setContractorSearch('');
+                          setShowContractorDropdown(false);
+                        }}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">{contractor.name}</div>
+                        {contractor.address && (
+                          <div className="text-sm text-gray-500">{contractor.address}</div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-gray-500 text-sm">
+                      Контрагенты не найдены
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        )}
+
+          {/* Селектор объекта квалификации */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Объект квалификации {selectedProject && <span className="text-blue-600">(из проекта)</span>}
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={selectedQualificationObject ? getQualificationObjectName(selectedQualificationObject) : qualificationSearch}
+                onChange={(e) => {
+                  setQualificationSearch(e.target.value);
+                  if (!selectedQualificationObject) {
+                    setShowQualificationDropdown(true);
+                  }
+                }}
+                onFocus={() => {
+                  if (selectedContractor) {
+                    setShowQualificationDropdown(true);
+                    if (selectedQualificationObject) {
+                      setQualificationSearch('');
+                      setSelectedQualificationObject('');
+                    }
+                  }
+                }}
+                disabled={!selectedContractor}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder={selectedContractor ? 
+                  (selectedProject ? "Объекты квалификации из проекта" : "Поиск объекта квалификации...") : 
+                  "Сначала выберите контрагента"
+                }
+              />
+              
+              {showQualificationDropdown && selectedContractor && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredQualificationObjects.length > 0 ? (
+                    filteredQualificationObjects.map((obj) => (
+                      <div
+                        key={obj.id}
+                        onClick={() => {
+                          setSelectedQualificationObject(obj.id);
+                          setQualificationSearch('');
+                          setShowQualificationDropdown(false);
+                        }}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">
+                          {obj.name || obj.vin || obj.serialNumber || 'Без названия'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {obj.type} {obj.address && `• ${obj.address}`}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-gray-500 text-sm">
+                      {selectedProject ? 
+                        "В проекте нет объектов квалификации" : 
+                        "Объекты квалификации не найдены"
+                      }
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
         
         <input
           ref={fileInputRef}
@@ -914,7 +832,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button
                         onClick={() => handleDeleteFile(file.id)}
-                        disabled={operationLoading}
                         className="text-red-600 hover:text-red-900 transition-colors"
                         title="Удалить файл"
                       >

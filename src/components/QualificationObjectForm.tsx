@@ -11,17 +11,37 @@ interface QualificationObjectFormProps {
   onAdd: (objectData: CreateQualificationObjectData) => void;
   onCancel: () => void;
   loading?: boolean;
+  editingObject?: QualificationObject | null;
 }
 
 export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
   contractorId,
   onAdd,
   onCancel,
-  loading = false
+  loading = false,
+  editingObject = null
 }) => {
-  const [objectData, setObjectData] = useState<CreateQualificationObjectData>({
-    contractorId,
-    type: 'помещение'
+  const [objectData, setObjectData] = useState<CreateQualificationObjectData>(() => {
+    if (editingObject) {
+      return {
+        contractorId,
+        type: editingObject.type,
+        name: editingObject.name,
+        address: editingObject.address,
+        area: editingObject.area,
+        climateSystem: editingObject.climateSystem,
+        vin: editingObject.vin,
+        registrationNumber: editingObject.registrationNumber,
+        bodyVolume: editingObject.bodyVolume,
+        inventoryNumber: editingObject.inventoryNumber,
+        chamberVolume: editingObject.chamberVolume,
+        serialNumber: editingObject.serialNumber
+      };
+    }
+    return {
+      contractorId,
+      type: 'помещение'
+    };
   });
 
   const [planFile, setPlanFile] = useState<File | null>(null);
@@ -40,13 +60,6 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     };
 
     onAdd(submitData);
-    
-    // Очищаем все поля формы после успешного добавления
-    setObjectData({
-      contractorId,
-      type: 'помещение'
-    });
-    setPlanFile(null);
   };
 
   const validateRequiredFields = (): boolean => {
@@ -377,12 +390,12 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Добавление...</span>
+                <span>{editingObject ? 'Сохранение...' : 'Добавление...'}</span>
               </>
             ) : (
               <>
                 <Plus className="w-4 h-4" />
-                <span>Сохранить</span>
+                <span>{editingObject ? 'Сохранить' : 'Добавить'}</span>
               </>
             )}
           </button>

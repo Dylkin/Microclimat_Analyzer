@@ -1,25 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { User, AuthUser } from '../types/User';
 import { userService } from '../utils/userService';
 
-// Получаем конфигурацию Supabase из переменных окружения
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-let supabase: any = null;
-
-// Инициализация Supabase клиента
-const initSupabase = () => {
-  if (!supabase && supabaseUrl && supabaseAnonKey) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-  }
-  return supabase;
-};
-
 // Helper function to validate UUID format
 const isValidUUID = (uuid: string): boolean => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(uuid);
 };
 
@@ -47,7 +32,7 @@ export const useAuth = () => {
 };
 
 const defaultUser: User = {
-  id: '00000000-0000-4000-8000-000000000001',
+  id: '00000000-0000-0000-0000-000000000001',
   fullName: 'Дылкин П.А.',
   email: 'pavel.dylkin@gmail.com',
   password: '00016346',
@@ -60,81 +45,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [users, setUsers] = useState<User[]>([defaultUser]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // Сохранение пользователей в localStorage как резервная копия
-  useEffect(() => {
-    localStorage.setItem('users', JSON.stringify(users));
-  }, [users]);
-
-  // Восстановление сессии при загрузке
-  useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        // Проверяем, что ID пользователя является валидным UUID
-        if (parsedUser.id && isValidUUID(parsedUser.id)) {
-          setUser(parsedUser);
-        } else {
-          console.warn('Невалидный UUID пользователя в localStorage, очищаем сессию');
-          localStorage.removeItem('currentUser');
-        }
-      } catch (error) {
-        console.error('Ошибка парсинга пользователя из localStorage:', error);
-        localStorage.removeItem('currentUser');
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    const initializeAuth = async () => {
-      const supabaseClient = initSupabase();
-      
-      if (supabaseClient) {
-        try {
-          // Проверяем текущую сессию
-          const { data: { session } } = await supabaseClient.auth.getSession();
-          
-          if (!session) {
-            // Если нет сессии, входим как пользователь по умолчанию
-            const { data, error } = await supabaseClient.auth.signInWithPassword({
-              email: 'default@example.com',
-              password: 'defaultpassword123'
-            });
-            
-            if (error) {
-              console.warn('Не удалось войти как пользователь по умолчанию:', error);
-              // Устанавливаем пользователя по умолчанию без аутентификации
-              setUser(defaultUser);
-            } else {
-              // Устанавливаем аутентифицированного пользователя
-              setUser({
-                ...defaultUser,
-                id: data.user?.id || defaultUser.id
-              });
-            }
-          } else {
-            // Если есть сессия, используем данные из неё
-            setUser({
-              ...defaultUser,
-              id: session.user.id
-            });
-          }
-        } catch (error) {
-          console.warn('Ошибка инициализации аутентификации:', error);
-          setUser(defaultUser);
-        }
-      } else {
-        // Если Supabase недоступен, используем пользователя по умолчанию
-        setUser(defaultUser);
-      }
-      
-      setIsInitialized(true);
-    };
-
-    initializeAuth();
-  }, []);
 
   // Загрузка пользователей из базы данных
   const loadUsers = async () => {
@@ -175,6 +85,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Сохранение пользователей в localStorage как резервная копия
+  useEffect(() => {
+    localStorage.setItem('users', JSON.stringify(users));
+  }, [users]);
+
   // Загрузка пользователей при инициализации
   useEffect(() => {
     loadUsers();
@@ -197,14 +112,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Не рендерим детей пока не инициализирована аутентификация
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
   // Авторизация
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -400,11 +307,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Восстановление сессии при загрузке
+  useEffect(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        // Проверяем, что ID пользователя является валидным UUID
+        if (parsedUser.id && isValidUUID(parsedUser.id)) {
+          setUser(parsedUser);
+        } else {
+          console.warn('Невалидный UUID пользователя в localStorage, очищаем сессию');
+          localStorage.removeItem('currentUser');
+        }
+      } catch (error) {
+        console.error('Ошибка парсинга пользователя из localStorage:', error);
+        localStorage.removeItem('currentUser');
+      }
+    }
+  }, []);
+
   const value = {
     user,
     users,
-    loading,
-    error,
     loading,
     error,
     login,
