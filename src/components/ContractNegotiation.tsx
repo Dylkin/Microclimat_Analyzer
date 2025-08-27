@@ -121,6 +121,10 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
     return documents.find(doc => doc.documentType === type);
   };
 
+  // Get documents once to avoid repeated calls and undefined access
+  const commercialOfferDoc = getDocumentByType('commercial_offer');
+  const contractDoc = getDocumentByType('contract');
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -171,7 +175,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Дата создания</label>
-            <p className="text-gray-900">{project.createdAt.toLocaleDateString('ru-RU')}</p>
+            <p className="text-gray-900">{project.createdAt?.toLocaleDateString('ru-RU') || 'Не указана'}</p>
           </div>
         </div>
         {project.description && (
@@ -201,10 +205,10 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
-              {getStatusIcon(!!getDocumentByType('commercial_offer'))}
+              {getStatusIcon(!!commercialOfferDoc)}
               <h3 className="text-lg font-semibold text-gray-900">Коммерческое предложение</h3>
             </div>
-            {!getDocumentByType('commercial_offer') && (
+            {!commercialOfferDoc && (
               <label className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center space-x-2">
                 {uploading.commercial_offer ? (
                   <>
@@ -233,38 +237,38 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
             )}
           </div>
 
-          {getDocumentByType('commercial_offer') ? (
+          {commercialOfferDoc ? (
             <div className="border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <FileText className="w-8 h-8 text-blue-600" />
                   <div>
                     <h4 className="font-medium text-gray-900">
-                      {getDocumentByType('commercial_offer')!.fileName}
+                      {commercialOfferDoc.fileName}
                     </h4>
                     <p className="text-sm text-gray-500">
-                      {formatFileSize(getDocumentByType('commercial_offer')!.fileSize)} • 
-                      Загружен {getDocumentByType('commercial_offer')!.uploadedAt.toLocaleDateString('ru-RU')}
+                      {formatFileSize(commercialOfferDoc.fileSize)} • 
+                      Загружен {commercialOfferDoc.uploadedAt.toLocaleDateString('ru-RU')}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => handleViewDocument(getDocumentByType('commercial_offer')!)}
+                    onClick={() => handleViewDocument(commercialOfferDoc)}
                     className="text-blue-600 hover:text-blue-800 transition-colors"
                     title="Просмотреть документ"
                   >
                     <Eye className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => handleDownloadDocument(getDocumentByType('commercial_offer')!)}
+                    onClick={() => handleDownloadDocument(commercialOfferDoc)}
                     className="text-green-600 hover:text-green-800 transition-colors"
                     title="Скачать документ"
                   >
                     <Download className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => handleDeleteDocument(getDocumentByType('commercial_offer')!.id, 'commercial_offer')}
+                    onClick={() => handleDeleteDocument(commercialOfferDoc.id, 'commercial_offer')}
                     className="text-red-600 hover:text-red-800 transition-colors"
                     title="Удалить документ"
                   >
@@ -286,10 +290,10 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
-              {getStatusIcon(!!getDocumentByType('contract'))}
+              {getStatusIcon(!!contractDoc)}
               <h3 className="text-lg font-semibold text-gray-900">Договор</h3>
             </div>
-            {!getDocumentByType('contract') && (
+            {!contractDoc && (
               <label className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center space-x-2">
                 {uploading.contract ? (
                   <>
@@ -318,38 +322,38 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
             )}
           </div>
 
-          {getDocumentByType('contract') ? (
+          {contractDoc ? (
             <div className="border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <FileText className="w-8 h-8 text-green-600" />
                   <div>
                     <h4 className="font-medium text-gray-900">
-                      {getDocumentByType('contract')!.fileName}
+                      {contractDoc.fileName}
                     </h4>
                     <p className="text-sm text-gray-500">
-                      {formatFileSize(getDocumentByType('contract')!.fileSize)} • 
-                      Загружен {getDocumentByType('contract')!.uploadedAt.toLocaleDateString('ru-RU')}
+                      {formatFileSize(contractDoc.fileSize)} • 
+                      Загружен {contractDoc.uploadedAt.toLocaleDateString('ru-RU')}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => handleViewDocument(getDocumentByType('contract')!)}
+                    onClick={() => handleViewDocument(contractDoc)}
                     className="text-blue-600 hover:text-blue-800 transition-colors"
                     title="Просмотреть документ"
                   >
                     <Eye className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => handleDownloadDocument(getDocumentByType('contract')!)}
+                    onClick={() => handleDownloadDocument(contractDoc)}
                     className="text-green-600 hover:text-green-800 transition-colors"
                     title="Скачать документ"
                   >
                     <Download className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => handleDeleteDocument(getDocumentByType('contract')!.id, 'contract')}
+                    onClick={() => handleDeleteDocument(contractDoc.id, 'contract')}
                     className="text-red-600 hover:text-red-800 transition-colors"
                     title="Удалить документ"
                   >
@@ -375,29 +379,29 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center space-x-3">
-              {getStatusIcon(!!getDocumentByType('commercial_offer'))}
+              {getStatusIcon(!!commercialOfferDoc)}
               <span className="font-medium text-gray-900">Коммерческое предложение</span>
             </div>
             <span className={`text-sm px-2 py-1 rounded-full ${
-              getDocumentByType('commercial_offer') 
+              commercialOfferDoc 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-yellow-100 text-yellow-800'
             }`}>
-              {getDocumentByType('commercial_offer') ? 'Загружено' : 'Ожидает загрузки'}
+              {commercialOfferDoc ? 'Загружено' : 'Ожидает загрузки'}
             </span>
           </div>
 
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center space-x-3">
-              {getStatusIcon(!!getDocumentByType('contract'))}
+              {getStatusIcon(!!contractDoc)}
               <span className="font-medium text-gray-900">Договор</span>
             </div>
             <span className={`text-sm px-2 py-1 rounded-full ${
-              getDocumentByType('contract') 
+              contractDoc 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-yellow-100 text-yellow-800'
             }`}>
-              {getDocumentByType('contract') ? 'Загружено' : 'Ожидает загрузки'}
+              {contractDoc ? 'Загружено' : 'Ожидает загрузки'}
             </span>
           </div>
         </div>
