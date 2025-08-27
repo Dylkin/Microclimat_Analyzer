@@ -298,6 +298,7 @@ export const ContractorDirectory: React.FC = () => {
       setEditingQualificationObject(null);
     } catch (error) {
       console.error('Ошибка сохранения объекта квалификации:', error);
+      alert(`Ошибка сохранения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }

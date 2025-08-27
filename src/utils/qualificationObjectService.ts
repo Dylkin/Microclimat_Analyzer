@@ -280,6 +280,17 @@ export class QualificationObjectService {
 
       if (objectError) {
         console.error('Ошибка добавления объекта квалификации:', objectError);
+        
+        // Проверяем специфические ошибки уникальности
+        if (objectError.code === '23505') {
+          if (objectError.message.includes('qualification_objects_vin_unique')) {
+            throw new Error('Объект квалификации с таким VIN номером уже существует');
+          }
+          if (objectError.message.includes('qualification_objects_serial_number_unique')) {
+            throw new Error('Объект квалификации с таким серийным номером уже существует');
+          }
+        }
+        
         throw new Error(`Ошибка добавления объекта квалификации: ${objectError.message}`);
       }
 
@@ -389,6 +400,17 @@ export class QualificationObjectService {
 
       if (error) {
         console.error('Ошибка обновления объекта квалификации:', error);
+        
+        // Проверяем специфические ошибки уникальности
+        if (error.code === '23505') {
+          if (error.message.includes('qualification_objects_vin_unique')) {
+            throw new Error('Объект квалификации с таким VIN номером уже существует');
+          }
+          if (error.message.includes('qualification_objects_serial_number_unique')) {
+            throw new Error('Объект квалификации с таким серийным номером уже существует');
+          }
+        }
+        
         throw new Error(`Ошибка обновления объекта квалификации: ${error.message}`);
       }
 
