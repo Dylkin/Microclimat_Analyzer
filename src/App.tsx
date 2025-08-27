@@ -8,15 +8,13 @@ import { DatabaseTest } from './components/DatabaseTest';
 import { UserDirectory } from './components/UserDirectory';
 import { ContractorDirectory } from './components/ContractorDirectory';
 import { ProjectDirectory } from './components/ProjectDirectory';
-import { ContractNegotiation } from './components/ContractNegotiation';
-import { Project } from './types/Project';
 import './index.css';
 
 const AppContent: React.FC = () => {
   const { user, hasAccess } = useAuth();
   const [currentPage, setCurrentPage] = useState('projects');
   const [showVisualization, setShowVisualization] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedProject, setSelectedProject] = useState<any>(null);
 
   React.useEffect(() => {
     if (!user) return;
@@ -36,16 +34,6 @@ const AppContent: React.FC = () => {
   };
   const renderPage = () => {
     switch (currentPage) {
-     case 'contract_negotiation':
-       return hasAccess('analyzer') && selectedProject ? (
-         <ContractNegotiation 
-           project={selectedProject}
-           onBack={() => handlePageChange('projects')}
-           onProjectUpdate={(updatedProject) => {
-             setSelectedProject(updatedProject);
-           }}
-         />
-       ) : <div>Доступ запрещен или проект не выбран</div>;
       case 'analyzer':
         return hasAccess('analyzer') ? (
           <MicroclimatAnalyzer 

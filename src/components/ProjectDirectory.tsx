@@ -1,325 +1,710 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, FileText, Calendar, User, Building2, MapPin } from 'lucide-react';
+import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play } from 'lucide-react';
+import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, CreateProjectData } from '../types/Project';
+import { Contractor } from '../types/Contractor';
+import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
+import { User as UserType } from '../types/User';
 import { projectService } from '../utils/projectService';
 import { contractorService } from '../utils/contractorService';
-import { userService } from '../utils/userService';
-import type { Project } from '../types/Project';
-import type { Contractor } from '../types/Contractor';
-import type { User as UserType } from '../types/User';
+import { qualificationObjectService } from '../utils/qualificationObjectService';
+import { useAuth } from '../contexts/AuthContext';
+
+// UUID validation function
+function isValidUUID(uuid: string): boolean {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return regex.test(uuid);
+}
 
 interface ProjectDirectoryProps {
-  onPageChange: (page: string, projectData?: any) => void;
+  onPageChange?: (page: string, projectData?: any) => void;
 }
 
 export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => {
+  const { user, users } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
-  const [users, setUsers] = useState<UserType[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newProject, setNewProject] = useState({
-    name: '',
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [operationLoading, setOperationLoading] = useState(false);
+  
+  // UI state
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingProject, setEditingProject] = useState<string | null>(null);
+  
+  // Form state
+  const [newProject, setNewProject] = useState<CreateProjectData>({
     description: '',
-    contractor_id: '',
-    contract_number: ''
+    contractorId: '',
+    qualificationObjectIds: []
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const [editProject, setEditProject] = useState<{
+    description: string;
+    status: ProjectStatus;
+    qualificationObjectIds: string[];
+  }>({
+    description: '',
+    status: 'contract_negotiation',
+    qualificationObjectIds: []
+  });
 
+  // Загрузка данных
   const loadData = async () => {
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      
-      console.log('userService:', userService); // посмотрите что в объекте
-      console.log('getAll function:', userService.getAll); // проверьте существует ли функция
-      
-      const [projectsData, contractorsData, usersData] = await Promise.all([
-        projectService.getAllProjects(),
-        contractorService.getAllContractors(),
-        typeof userService.getAll === 'function' 
-          ? userService.getAll()
-          : (() => {
-              console.error('userService.getAll is not a function');
-              return []; // Заглушка для продолжения работы
-            })()
-      ]);
-      setProjects(projectsData);
-      setContractors(contractorsData);
-      setUsers(Array.isArray(usersData) ? usersData : usersData?.data || []);
+      // Загружаем проекты
+      if (projectService.isAvailable()) {
+        const projectsData = await projectService.getAllProjects();
+        setProjects(projectsData);
+        setFilteredProjects(projectsData);
+      }
+
+      // Загружаем контрагентов
+      if (contractorService.isAvailable()) {
+        const contractorsData = await contractorService.getAllContractors();
+        // Фильтруем контрагентов с валидными UUID
+        const validContractors = contractorsData.filter(contractor => {
+          const isValid = isValidUUID(contractor.id);
+          if (!isValid) {
+            console.warn(`Контрагент "${contractor.name}" имеет некорректный UUID: "${contractor.id}"`);
+          }
+          return isValid;
+        });
+        setContractors(validContractors);
+      }
+
+      // Загружаем все объекты квалификации
+      if (qualificationObjectService.isAvailable()) {
+        const objectsData = await qualificationObjectService.getAllQualificationObjects();
+        setQualificationObjects(objectsData);
+      }
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Ошибка загрузки данных:', error);
+      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateProject = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Поиск по проектам
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredProjects(projects);
+      return;
+    }
+
+    const filtered = projects.filter(project => {
+      const searchLower = searchTerm.toLowerCase();
+      
+      return (
+        project.name.toLowerCase().includes(searchLower) ||
+        (project.description && project.description.toLowerCase().includes(searchLower)) ||
+        (project.contractorName && project.contractorName.toLowerCase().includes(searchLower)) ||
+        (project.contractNumber && project.contractNumber.toLowerCase().includes(searchLower)) ||
+        ProjectStatusLabels[project.status].toLowerCase().includes(searchLower)
+      );
+    });
+
+    setFilteredProjects(filtered);
+  }, [searchTerm, projects]);
+
+  // Получение объектов квалификации для выбранного контрагента
+  const getQualificationObjectsForContractor = (contractorId: string) => {
+    return qualificationObjects.filter(obj => obj.contractorId === contractorId);
+  };
+
+  // Добавление проекта
+  const handleAddProject = async () => {
+    console.log('=== ОТЛАДКА СОЗДАНИЯ ПРОЕКТА ===');
+    console.log('Данные нового проекта:', newProject);
+    console.log('ID контрагента:', newProject.contractorId);
+    console.log('Тип ID контрагента:', typeof newProject.contractorId);
+    console.log('Все доступные контрагенты:', contractors.map(c => ({ id: c.id, name: c.name })));
+    
+    // Проверяем, что contractorId является строкой
+    if (typeof newProject.contractorId !== 'string') {
+      console.error('Contractor ID не является строкой:', newProject.contractorId);
+      alert('Ошибка: некорректный тип ID контрагента');
+      return;
+    }
+
+    // Проверяем, что contractorId не пустой
+    if (!newProject.contractorId || !newProject.contractorId.trim()) {
+      alert('Выберите контрагента');
+      return;
+    }
+
+    // Проверяем, что contractorId является валидным UUID
+    const trimmedContractorId = newProject.contractorId.trim();
+    
+    if (!isValidUUID(trimmedContractorId)) {
+      console.error('Некорректный UUID контрагента:', trimmedContractorId);
+      console.error('Доступные контрагенты с валидными UUID:', contractors);
+      alert('Ошибка: некорректный ID контрагента. Обновите страницу и попробуйте снова.');
+      return;
+    }
+
+    // Находим выбранного контрагента в списке
+    const selectedContractor = contractors.find(c => c.id === trimmedContractorId);
+    console.log('Найденный контрагент:', selectedContractor);
+    
+    if (!selectedContractor) {
+      console.error('Контрагент не найден в списке:', trimmedContractorId);
+      alert('Ошибка: выбранный контрагент не найден. Обновите страницу и попробуйте снова.');
+      return;
+    }
+    
+    if (selectedContractor) {
+      console.log('ID найденного контрагента:', selectedContractor.id);
+      console.log('Тип ID найденного контрагента:', typeof selectedContractor.id);
+    }
+    
+    // Проверяем все контрагенты на корректность UUID
+    console.log('Все контрагенты:');
+    contractors.forEach((contractor, index) => {
+      console.log(`${index + 1}. ID: "${contractor.id}" (тип: ${typeof contractor.id}), Название: "${contractor.name}"`);
+    });
+    
+    if (newProject.qualificationObjectIds.length === 0) {
+      alert('Выберите хотя бы один объект квалификации');
+      return;
+    }
+
+    // Проверяем, что все ID объектов квалификации являются валидными UUID
+    const invalidQualificationObjectIds = newProject.qualificationObjectIds.filter(id => !isValidUUID(id));
+    if (invalidQualificationObjectIds.length > 0) {
+      console.error('Некорректные UUID объектов квалификации:', invalidQualificationObjectIds);
+      console.error('Все объекты квалификации для контрагента:', getQualificationObjectsForContractor(trimmedContractorId));
+      alert('Ошибка: некорректные ID объектов квалификации. Обновите страницу и попробуйте снова.');
+      return;
+    }
+
+    setOperationLoading(true);
     try {
-      await projectService.create(newProject);
-      setNewProject({ name: '', description: '', contractor_id: '', contract_number: '' });
-      setShowCreateForm(false);
-      loadData();
+      // Генерируем название проекта на основе выбранных объектов
+      const selectedObjects = getQualificationObjectsForContractor(trimmedContractorId)
+        .filter(obj => newProject.qualificationObjectIds.includes(obj.id));
+      
+      const contractorName = contractors.find(c => c.id === trimmedContractorId)?.name || 'Неизвестный контрагент';
+      const objectNames = selectedObjects.map(obj => 
+        obj.name || obj.vin || obj.serialNumber || 'Без названия'
+      ).join(', ');
+      
+      const projectName = `${contractorName} - ${objectNames}`;
+      
+      const projectData = {
+        ...newProject,
+        contractorId: trimmedContractorId,
+        name: projectName
+      };
+      
+      // Final validation before database call
+      console.log('=== FINAL VALIDATION BEFORE DATABASE CALL ===');
+      console.log('Final projectData.contractorId:', projectData.contractorId);
+      console.log('Type:', typeof projectData.contractorId);
+      console.log('Is valid UUID:', isValidUUID(projectData.contractorId));
+      console.log('Final projectData.qualificationObjectIds:', projectData.qualificationObjectIds);
+      console.log('All qualification object IDs are valid UUIDs:', projectData.qualificationObjectIds.every(id => isValidUUID(id)));
+      
+      // Double-check UUID validity one more time
+      if (!isValidUUID(projectData.contractorId)) {
+        console.error('CRITICAL: Invalid UUID detected right before database call:', projectData.contractorId);
+        alert('Критическая ошибка: некорректный ID контрагента. Обратитесь к администратору.');
+        return;
+      }
+      
+      // Validate all qualification object IDs one more time
+      if (!projectData.qualificationObjectIds.every(id => isValidUUID(id))) {
+        console.error('CRITICAL: Invalid qualification object UUID detected:', projectData.qualificationObjectIds);
+        alert('Критическая ошибка: некорректный ID объекта квалификации. Обратитесь к администратору.');
+        return;
+      }
+      
+      const addedProject = await projectService.addProject(projectData, user?.id);
+      setProjects(prev => [addedProject, ...prev]);
+      
+      // Сбрасываем форму
+      setNewProject({
+        contractorId: '',
+        qualificationObjectIds: []
+      });
+      setShowAddForm(false);
+      alert('Проект успешно создан');
     } catch (error) {
-      console.error('Error creating project:', error);
+      console.error('Ошибка добавления проекта:', error);
+      alert(`Ошибка создания проекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
     }
   };
 
-  const getContractorName = (contractorId: string) => {
-    const contractor = contractors.find(c => c.id === contractorId);
-    return contractor?.name || 'Неизвестный контрагент';
+  // Редактирование проекта
+  const handleEditProject = (project: Project) => {
+    setEditProject({
+      description: project.description || '',
+      status: project.status,
+      qualificationObjectIds: project.qualificationObjects.map(obj => obj.qualificationObjectId)
+    });
+    setEditingProject(project.id);
   };
 
-  const getUserName = (userId: string | null) => {
-    if (!userId) return 'Не назначен';
-    const user = users.find(u => u.id === userId);
-    return user?.full_name || 'Неизвестный пользователь';
+  const handleSaveEdit = async () => {
+    setOperationLoading(true);
+    try {
+      const updatedProject = await projectService.updateProject(editingProject!, {
+        description: editProject.description,
+        status: editProject.status,
+        qualificationObjectIds: editProject.qualificationObjectIds
+      });
+      
+      setProjects(prev => prev.map(p => p.id === editingProject ? updatedProject : p));
+      setEditingProject(null);
+      alert('Проект успешно обновлен');
+    } catch (error) {
+      console.error('Ошибка обновления проекта:', error);
+      alert(`Ошибка обновления проекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
   };
 
-  const getStatusLabel = (status: string) => {
-    const statusLabels: Record<string, string> = {
-      contract_negotiation: 'Согласование договора',
-      protocol_preparation: 'Подготовка протокола',
-      testing_start: 'Начало испытаний',
-      testing_execution: 'Выполнение испытаний',
-      testing_completion: 'Завершение испытаний',
-      report_preparation: 'Подготовка отчета',
-      report_approval: 'Утверждение отчета',
-      report_printing: 'Печать отчета',
-      completed: 'Завершен',
-      requalification: 'Переквалификация'
-    };
-    return statusLabels[status] || status;
+  // Удаление проекта
+  const handleDeleteProject = async (projectId: string) => {
+    if (confirm('Вы уверены, что хотите удалить этот проект?')) {
+      setOperationLoading(true);
+      try {
+        await projectService.deleteProject(projectId);
+        setProjects(prev => prev.filter(p => p.id !== projectId));
+        alert('Проект успешно удален');
+      } catch (error) {
+        console.error('Ошибка удаления проекта:', error);
+        alert(`Ошибка удаления проекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      } finally {
+        setOperationLoading(false);
+      }
+    }
   };
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      contract_negotiation: 'bg-yellow-100 text-yellow-800',
-      protocol_preparation: 'bg-blue-100 text-blue-800',
-      testing_start: 'bg-purple-100 text-purple-800',
-      testing_execution: 'bg-indigo-100 text-indigo-800',
-      testing_completion: 'bg-green-100 text-green-800',
-      report_preparation: 'bg-orange-100 text-orange-800',
-      report_approval: 'bg-pink-100 text-pink-800',
-      report_printing: 'bg-gray-100 text-gray-800',
-      completed: 'bg-emerald-100 text-emerald-800',
-      requalification: 'bg-red-100 text-red-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getActionButton = (project: Project) => {
-    switch (project.status) {
+  // Получение иконки статуса
+  const getStatusIcon = (status: ProjectStatus) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'contract_negotiation':
-        return (
-          <button
-            onClick={() => onPageChange('contract_negotiation', project)}
-            className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-          >
-            <FileText className="w-4 h-4 mr-1" />
-            Согласовать договор
-          </button>
-        );
+      case 'protocol_preparation':
+      case 'report_approval':
+        return <Clock className="w-4 h-4 text-yellow-600" />;
+      default:
+        return <AlertCircle className="w-4 h-4 text-blue-600" />;
+    }
+  };
+
+  // Получение действия для статуса проекта
+  const getProjectAction = (status: ProjectStatus) => {
+    switch (status) {
+      case 'testing_execution':
+        return {
+          label: 'Перейти к испытаниям',
+          page: 'analyzer',
+          icon: Play
+        };
+      case 'protocol_preparation':
+        return {
+          label: 'Подготовить протокол',
+          page: 'analyzer',
+          icon: Play
+        };
+      case 'report_preparation':
+        return {
+          label: 'Подготовить отчет',
+          page: 'analyzer',
+          icon: Play
+        };
       default:
         return null;
     }
   };
 
-  const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getContractorName(project.contractor_id).toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  // Обработчик действия проекта
+  const handleProjectAction = (project: Project) => {
+    const action = getProjectAction(project.status);
+    if (action && onPageChange) {
+      // Передаем данные проекта при переходе
+      const projectData = {
+        id: project.id,
+        name: project.name,
+        contractorId: project.contractorId,
+        contractorName: project.contractorName,
+        qualificationObjects: project.qualificationObjects,
+        status: project.status
+      };
+      onPageChange(action.page, projectData);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Проекты</h1>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <FolderOpen className="w-8 h-8 text-indigo-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Проекты квалификации</h1>
+        </div>
         <button
-          onClick={() => setShowCreateForm(true)}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          onClick={() => setShowAddForm(true)}
+          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
         >
-          <Plus className="w-5 h-5 mr-2" />
-          Создать проект
+          <Plus className="w-4 h-4" />
+          <span>Создать проект</span>
         </button>
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-        <input
-          type="text"
-          placeholder="Поиск проектов..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Поиск по проектам..."
+          />
+        </div>
+        {searchTerm && (
+          <div className="mt-2 text-sm text-gray-600">
+            Найдено: {filteredProjects.length} из {projects.length} проектов
+          </div>
+        )}
       </div>
 
-      {/* Create Project Form */}
-      {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Создать новый проект</h2>
-            <form onSubmit={handleCreateProject} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Название проекта
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newProject.name}
-                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Описание
-                </label>
-                <textarea
-                  value={newProject.description}
-                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Контрагент
-                </label>
-                <select
-                  required
-                  value={newProject.contractor_id}
-                  onChange={(e) => setNewProject({ ...newProject, contractor_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Выберите контрагента</option>
-                  {contractors.map(contractor => (
-                    <option key={contractor.id} value={contractor.id}>
-                      {contractor.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Номер договора
-                </label>
-                <input
-                  type="text"
-                  value={newProject.contract_number}
-                  onChange={(e) => setNewProject({ ...newProject, contract_number: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateForm(false)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Создать
-                </button>
-              </div>
-            </form>
+      {/* Add Project Form */}
+      {showAddForm && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Создать проект</h2>
+            <button
+              onClick={() => setShowAddForm(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Контрагент *
+              </label>
+              <select
+                value={newProject.contractorId}
+                onChange={(e) => setNewProject(prev => ({ 
+                  ...prev, 
+                  contractorId: e.target.value,
+                  qualificationObjectIds: [] // Сбрасываем выбранные объекты
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="">Выберите контрагента</option>
+                {contractors.map((contractor) => (
+                  <option key={contractor.id} value={contractor.id}>
+                    {contractor.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Описание
+              </label>
+              <textarea
+                value={newProject.description}
+                onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                rows={3}
+                placeholder="Введите описание проекта"
+              />
+            </div>
+
+            {/* Объекты квалификации */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Объекты квалификации *
+              </label>
+              {newProject.contractorId ? (
+                <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                  {getQualificationObjectsForContractor(newProject.contractorId).map((obj) => {
+                    const objectName = obj.name || obj.vin || obj.serialNumber || 'Без названия';
+                    return (
+                      <label key={obj.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded">
+                        <input
+                          type="checkbox"
+                          checked={newProject.qualificationObjectIds.includes(obj.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewProject(prev => ({
+                                ...prev,
+                                qualificationObjectIds: [...prev.qualificationObjectIds, obj.id]
+                              }));
+                            } else {
+                              setNewProject(prev => ({
+                                ...prev,
+                                qualificationObjectIds: prev.qualificationObjectIds.filter(id => id !== obj.id)
+                              }));
+                            }
+                          }}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">{objectName}</div>
+                          <div className="text-xs text-gray-500">
+                            {QualificationObjectTypeLabels[obj.type]}
+                            {obj.address && ` • ${obj.address}`}
+                            {obj.vin && ` • VIN: ${obj.vin}`}
+                            {obj.serialNumber && ` • S/N: ${obj.serialNumber}`}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                  {getQualificationObjectsForContractor(newProject.contractorId).length === 0 && (
+                    <div className="text-center py-4 text-gray-500">
+                      <p className="text-sm">У выбранного контрагента нет объектов квалификации</p>
+                      <p className="text-xs mt-1">Сначала добавьте объекты в справочнике контрагентов</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <p className="text-sm text-gray-500 text-center">
+                    Сначала выберите контрагента для отображения объектов квалификации
+                  </p>
+                </div>
+              )}
+              {newProject.contractorId && newProject.qualificationObjectIds.length > 0 && (
+                <div className="mt-2 text-sm text-green-600">
+                  Выбрано объектов: {newProject.qualificationObjectIds.length}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={() => setShowAddForm(false)}
+              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Отмена
+            </button>
+            <button
+              onClick={handleAddProject}
+              disabled={operationLoading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {operationLoading ? 'Создание...' : 'Создать проект'}
+            </button>
           </div>
         </div>
       )}
 
       {/* Projects Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Проект
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Контрагент
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Статус
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Создан
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Действия
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredProjects.map((project) => (
-              <tr key={project.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">{project.name}</div>
-                    {project.description && (
-                      <div className="text-sm text-gray-500">{project.description}</div>
-                    )}
-                    {project.contract_number && (
-                      <div className="text-xs text-gray-400">Договор: {project.contract_number}</div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <Building2 className="w-4 h-4 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-900">{getContractorName(project.contractor_id)}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(project.status)}`}>
-                    {getStatusLabel(project.status)}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    {new Date(project.created_at).toLocaleDateString('ru-RU')}
-                  </div>
-                  {project.created_by && (
-                    <div className="flex items-center mt-1">
-                      <User className="w-4 h-4 mr-1" />
-                      <span className="text-xs">{getUserName(project.created_by)}</span>
-                    </div>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  {getActionButton(project)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        
-        {filteredProjects.length === 0 && (
-          <div className="text-center py-12">
-            <FileText className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">Нет проектов</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchTerm ? 'Проекты не найдены по вашему запросу.' : 'Начните с создания нового проекта.'}
-            </p>
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <p className="text-gray-500">Загрузка проектов...</p>
+          </div>
+        ) : filteredProjects.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Проект
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Контрагент
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Статус
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Объекты
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Действия
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredProjects.map((project) => (
+                  <tr key={project.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {editingProject === project.id ? (
+                        <textarea
+                          value={editProject.description}
+                          onChange={(e) => setEditProject(prev => ({ ...prev, description: e.target.value }))}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          rows={2}
+                          placeholder="Описание"
+                        />
+                      ) : (
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{project.name}</div>
+                          {project.description && (
+                            <div className="text-xs text-gray-500 mt-1">{project.description}</div>
+                          )}
+                          <div className="text-xs text-gray-400 mt-1">
+                            Создан: {project.createdAt.toLocaleDateString('ru-RU')}
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <Building2 className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-900">{project.contractorName}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {editingProject === project.id ? (
+                        <select
+                          value={editProject.status}
+                          onChange={(e) => setEditProject(prev => ({ ...prev, status: e.target.value as ProjectStatus }))}
+                          className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        >
+                          {Object.entries(ProjectStatusLabels).map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          {getStatusIcon(project.status)}
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ProjectStatusColors[project.status]}`}>
+                            {ProjectStatusLabels[project.status]}
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900">
+                        {project.qualificationObjects.length} объект(ов)
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {project.qualificationObjects.slice(0, 2).map(obj => obj.qualificationObjectName).join(', ')}
+                        {project.qualificationObjects.length > 2 && '...'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      {editingProject === project.id ? (
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={handleSaveEdit}
+                            disabled={operationLoading}
+                            className="text-green-600 hover:text-green-900"
+                            title="Сохранить"
+                          >
+                            <Save className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setEditingProject(null)}
+                            className="text-gray-600 hover:text-gray-900"
+                            title="Отмена"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end space-x-2">
+                          {getProjectAction(project.status) && (
+                            <button
+                              onClick={() => handleProjectAction(project)}
+                              disabled={operationLoading}
+                              className="text-blue-600 hover:text-blue-900"
+                              title={getProjectAction(project.status)?.label}
+                            >
+                              <Play className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEditProject(project)}
+                            disabled={operationLoading}
+                            className="text-indigo-600 hover:text-indigo-900"
+                            title="Редактировать"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProject(project.id)}
+                            disabled={operationLoading}
+                            className="text-red-600 hover:text-red-900"
+                            title="Удалить"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <FolderOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            {searchTerm ? (
+              <>
+                <p>По запросу "{searchTerm}" ничего не найдено</p>
+                <p className="text-sm">Попробуйте изменить поисковый запрос</p>
+              </>
+            ) : (
+              <>
+                <p>Проекты не найдены</p>
+                <p className="text-sm">Нажмите кнопку "Создать проект" для создания первого проекта</p>
+              </>
+            )}
           </div>
         )}
+      </div>
+
+      {/* Statistics */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Статистика проектов</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-indigo-600">{projects.length}</div>
+            <div className="text-sm text-gray-500">Всего проектов</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-yellow-600">
+              {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_execution', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
+            </div>
+            <div className="text-sm text-gray-500">В работе</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">
+              {projects.filter(p => p.status === 'completed').length}
+            </div>
+            <div className="text-sm text-gray-500">Завершено</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">
+              {projects.reduce((sum, p) => sum + p.qualificationObjects.length, 0)}
+            </div>
+            <div className="text-sm text-gray-500">Объектов в проектах</div>
+          </div>
+        </div>
       </div>
     </div>
   );
