@@ -41,7 +41,6 @@ export interface DatabaseProjectDocument {
 
 export class ProjectDocumentService {
   private supabase: any;
-  private readonly STORAGE_KEY = 'project_documents';
 
   constructor() {
     this.supabase = initSupabase();
@@ -49,70 +48,37 @@ export class ProjectDocumentService {
 
   // Проверка доступности Supabase
   isAvailable(): boolean {
-    return true; // Всегда доступен, используем локальное хранение для файлов
-  }
-
-  // Получение сохраненных документов из localStorage
-  private getStoredDocuments(): { [key: string]: any } {
-    try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      return stored ? JSON.parse(stored) : {};
-    } catch (error) {
-      console.error('Ошибка чтения документов из localStorage:', error);
-      return {};
-    }
-  }
-
-  // Сохранение документов в localStorage
-  private saveDocuments(documents: { [key: string]: any }): void {
-    try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(documents));
-    } catch (error) {
-      console.error('Ошибка сохранения документов в localStorage:', error);
-      throw new Error('Не удалось сохранить документ');
-    }
-  }
-
-  // Конвертация файла в base64 для хранения
-  private async fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.split(',')[1]); // Убираем префикс data:...;base64,
-      };
-      reader.onerror = () => reject(new Error('Ошибка чтения файла'));
-      reader.readAsDataURL(file);
-    });
-  }
-
-  // Конвертация base64 обратно в Blob
-  private base64ToBlob(base64: string, mimeType: string): Blob {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: mimeType });
+    return !!this.supabase;
   }
 
   // Получение документов проекта
   async getProjectDocuments(projectId: string): Promise<ProjectDocument[]> {
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
+    }
+
     try {
-      const documents = this.getStoredDocuments();
-      const projectDocuments = Object.values(documents).filter((doc: any) => doc.projectId === projectId);
-      
-      return projectDocuments.map((doc: any) => ({
+      const { data, error } = await this.supabase
+        .from('project_documents')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('uploaded_at', { ascending: false });
+
+      if (error) {
+        console.error('Ошибка получения документов проекта:', error);
+        throw new Error(`Ошибка получения документов: ${error.message}`);
+      }
+
+      return data.map((doc: DatabaseProjectDocument) => ({
         id: doc.id,
-        projectId: doc.projectId,
-        documentType: doc.documentType,
-        fileName: doc.fileName,
-        fileSize: doc.fileSize,
-        fileUrl: doc.fileUrl,
-        mimeType: doc.mimeType,
-        uploadedBy: doc.uploadedBy,
-        uploadedAt: new Date(doc.uploadedAt)
+        projectId: doc.project_id,
+        documentType: doc.document_type,
+        fileName: doc.file_name,
+        fileSize: doc.file_size,
+        fileUrl: doc.file_url,
+        mimeType: doc.mime_type,
+        uploadedBy: doc.uploaded_by,
+        uploadedAt: new Date(doc.uploaded_at)
       }));
     } catch (error) {
       console.error('Ошибка при получении документов проекта:', error);
@@ -127,49 +93,62 @@ export class ProjectDocumentService {
     file: File,
     userId?: string
   ): Promise<ProjectDocument> {
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
+    }
+
     try {
-      // Конвертируем файл в base64 для локального хранения
-      const base64Content = await this.fileToBase64(file);
-      
-      // Создаем URL для файла
-      const fileUrl = URL.createObjectURL(file);
-      
-      // Создаем документ
-      const document: ProjectDocument = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        projectId,
-        documentType,
-        fileName: file.name,
-        fileSize: file.size,
-        fileUrl,
-        mimeType: file.type,
-        uploadedBy: userId || 'anonymous',
-        uploadedAt: new Date()
+      // Генерируем уникальное имя файла
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${projectId}_${documentType}_${Date.now()}.${fileExt}`;
+      const filePath = `project-documents/${fileName}`;
+
+      // Загружаем файл в Supabase Storage
+      const { data: uploadData, error: uploadError } = await this.supabase.storage
+        .from('documents')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Ошибка загрузки файла в Storage:', uploadError);
+        throw new Error(`Ошибка загрузки файла: ${uploadError.message}`);
+      }
+
+      // Получаем публичный URL файла
+      const { data: urlData } = this.supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
+
+      // Сохраняем информацию о документе в базе данных
+      const { data: docData, error: docError } = await this.supabase
+        .from('project_documents')
+        .upsert({
+          project_id: projectId,
+          document_type: documentType,
+          file_name: file.name,
+          file_size: file.size,
+          file_url: urlData.publicUrl,
+          mime_type: file.type,
+          uploaded_by: userId || 'anonymous'
+        })
+        .select()
+        .single();
+
+      if (docError) {
+        console.error('Ошибка сохранения информации о документе:', docError);
+        throw new Error(`Ошибка сохранения документа: ${docError.message}`);
+      }
+
+      return {
+        id: docData.id,
+        projectId: docData.project_id,
+        documentType: docData.document_type,
+        fileName: docData.file_name,
+        fileSize: docData.file_size,
+        fileUrl: docData.file_url,
+        mimeType: docData.mime_type,
+        uploadedBy: docData.uploaded_by,
+        uploadedAt: new Date(docData.uploaded_at)
       };
-      
-      // Сохраняем в localStorage
-      const documents = this.getStoredDocuments();
-      documents[document.id] = {
-        ...document,
-        base64Content,
-        uploadedAt: document.uploadedAt.toISOString()
-      };
-      
-      // Удаляем старый документ того же типа для этого проекта
-      Object.keys(documents).forEach(key => {
-        const doc = documents[key];
-        if (doc.projectId === projectId && doc.documentType === documentType && doc.id !== document.id) {
-          // Освобождаем URL старого файла
-          if (doc.fileUrl && doc.fileUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(doc.fileUrl);
-          }
-          delete documents[key];
-        }
-      });
-      
-      this.saveDocuments(documents);
-      
-      return document;
     } catch (error) {
       console.error('Ошибка при загрузке документа:', error);
       throw error;
@@ -178,19 +157,46 @@ export class ProjectDocumentService {
 
   // Удаление документа
   async deleteDocument(documentId: string): Promise<void> {
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
+    }
+
     try {
-      const documents = this.getStoredDocuments();
-      const document = documents[documentId];
-      
-      if (document) {
-        // Освобождаем URL файла
-        if (document.fileUrl && document.fileUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(document.fileUrl);
+      // Сначала получаем информацию о документе для удаления файла из Storage
+      const { data: docData, error: getError } = await this.supabase
+        .from('project_documents')
+        .select('file_url')
+        .eq('id', documentId)
+        .single();
+
+      if (getError) {
+        console.error('Ошибка получения информации о документе:', getError);
+        throw new Error(`Ошибка получения документа: ${getError.message}`);
+      }
+
+      // Извлекаем путь файла из URL
+      const filePath = docData.file_url.split('/').pop();
+      if (filePath) {
+        // Удаляем файл из Storage
+        const { error: storageError } = await this.supabase.storage
+          .from('documents')
+          .remove([`project-documents/${filePath}`]);
+
+        if (storageError) {
+          console.warn('Ошибка удаления файла из Storage:', storageError);
+          // Не прерываем выполнение, так как запись в БД все равно нужно удалить
         }
-        
-        // Удаляем из хранилища
-        delete documents[documentId];
-        this.saveDocuments(documents);
+      }
+
+      // Удаляем запись из базы данных
+      const { error: deleteError } = await this.supabase
+        .from('project_documents')
+        .delete()
+        .eq('id', documentId);
+
+      if (deleteError) {
+        console.error('Ошибка удаления документа из БД:', deleteError);
+        throw new Error(`Ошибка удаления документа: ${deleteError.message}`);
       }
     } catch (error) {
       console.error('Ошибка при удалении документа:', error);
@@ -201,25 +207,13 @@ export class ProjectDocumentService {
   // Скачивание документа
   async downloadDocument(fileUrl: string): Promise<Blob> {
     try {
-      // Если это blob URL, получаем файл напрямую
-      if (fileUrl.startsWith('blob:')) {
-        const response = await fetch(fileUrl);
-        if (!response.ok) {
-          throw new Error('Ошибка загрузки файла');
-        }
-        return await response.blob();
+      const response = await fetch(fileUrl);
+      
+      if (!response.ok) {
+        throw new Error('Ошибка загрузки файла');
       }
-      
-      // Иначе ищем в localStorage по URL
-      const documents = this.getStoredDocuments();
-      const document = Object.values(documents).find((doc: any) => doc.fileUrl === fileUrl);
-      
-      if (!document) {
-        throw new Error('Документ не найден');
-      }
-      
-      // Конвертируем base64 обратно в Blob
-      return this.base64ToBlob(document.base64Content, document.mimeType);
+
+      return await response.blob();
     } catch (error) {
       console.error('Ошибка при скачивании документа:', error);
       throw error;
