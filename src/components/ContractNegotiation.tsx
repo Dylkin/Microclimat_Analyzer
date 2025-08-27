@@ -16,6 +16,27 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
   const [uploading, setUploading] = useState<{ [key: string]: boolean }>({});
   const [error, setError] = useState<string | null>(null);
 
+  // Безопасная проверка данных проекта
+  if (!project || !project.id) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onBack}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <FileText className="w-8 h-8 text-red-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки проекта</h1>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <p className="text-red-600">Данные проекта не найдены или повреждены</p>
+        </div>
+      </div>
+    );
+  }
+
   // Загрузка документов проекта
   const loadDocuments = async () => {
     if (!projectDocumentService.isAvailable()) {
@@ -161,11 +182,11 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Название проекта</label>
-            <p className="text-gray-900">{project.name}</p>
+            <p className="text-gray-900">{project.name || 'Не указано'}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Контрагент</label>
-            <p className="text-gray-900">{project.contractorName}</p>
+            <p className="text-gray-900">{project.contractorName || 'Не указан'}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Статус</label>
@@ -175,7 +196,9 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Дата создания</label>
-            <p className="text-gray-900">{project.createdAt.toLocaleDateString('ru-RU')}</p>
+            <p className="text-gray-900">
+              {project.createdAt ? new Date(project.createdAt).toLocaleDateString('ru-RU') : 'Не указана'}
+            </p>
           </div>
         </div>
         {project.description && (
@@ -206,7 +229,11 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
                   <p className="text-sm text-gray-600">Ответственный: Менеджер</p>
                   <p className="text-sm text-gray-500">Срок: 1 день с даты создания проекта</p>
                   <p className="text-sm text-gray-500">
-                    Плановая дата завершения: {new Date(project.createdAt.getTime() + 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU')}
+                    Плановая дата завершения: {
+                      project.createdAt 
+                        ? new Date(new Date(project.createdAt).getTime() + 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU')
+                        : 'Не определена'
+                    }
                   </p>
                 </div>
                 <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
