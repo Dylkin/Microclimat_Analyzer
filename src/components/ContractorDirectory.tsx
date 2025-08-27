@@ -394,6 +394,155 @@ export const ContractorDirectory: React.FC = () => {
     );
   }
 
+  // Функция для рендеринга формы (добавление/редактирование)
+  function renderContractorForm(isEdit: boolean) {
+    const formData = isEdit ? editContractor : newContractor;
+    const setFormData = isEdit ? setEditContractor : setNewContractor;
+    const title = isEdit ? 'Редактировать контрагента' : 'Добавить контрагента';
+    const submitText = isEdit ? (operationLoading ? 'Сохранение...' : 'Сохранить') : (operationLoading ? 'Добавление...' : 'Добавить');
+    const onSubmit = isEdit ? handleSaveEdit : handleAddContractor;
+    const onCancel = isEdit ? () => {
+      setShowEditForm(false);
+      setEditingContractorData(null);
+      setEditContractor({ name: '', address: '', contacts: [] });
+      setQualificationObjects([]);
+      setFilteredQualificationObjects([]);
+      setQualificationSearchTerm('');
+    } : () => setShowAddForm(false);
+
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <button
+            onClick={onCancel}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Основная информация */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Наименование *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Введите наименование контрагента"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Адрес
+              </label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Введите адрес (будет геокодирован автоматически)"
+              />
+            </div>
+          </div>
+
+          {/* Контакты */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Контакты
+              </label>
+              <button
+                onClick={() => addNewContact(isEdit)}
+                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Добавить контакт</span>
+              </button>
+            </div>
+
+            {formData.contacts.length === 0 ? (
+              <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                <p className="text-sm">Контакты не добавлены</p>
+                <p className="text-xs mt-1">Нажмите "Добавить контакт" для добавления</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {formData.contacts.map((contact, index) => (
+                  <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Сотрудник *</label>
+                        <input
+                          type="text"
+                          value={contact.employeeName}
+                          onChange={(e) => updateNewContact(index, 'employeeName', e.target.value, isEdit)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="ФИО сотрудника"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Телефон</label>
+                        <input
+                          type="tel"
+                          value={contact.phone}
+                          onChange={(e) => updateNewContact(index, 'phone', e.target.value, isEdit)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="+7 (999) 123-45-67"
+                        />
+                      </div>
+                      <div className="flex space-x-2">
+                        <div className="flex-1">
+                          <label className="block text-xs text-gray-500 mb-1">Комментарий</label>
+                          <input
+                            type="text"
+                            value={contact.comment}
+                            onChange={(e) => updateNewContact(index, 'comment', e.target.value, isEdit)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="Должность, примечания"
+                          />
+                        </div>
+                        <button
+                          onClick={() => removeNewContact(index, isEdit)}
+                          className="mt-5 text-red-600 hover:text-red-800"
+                          title="Удалить контакт"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3 mt-6">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={onSubmit}
+            disabled={operationLoading}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {submitText}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Индикатор загрузки */}
@@ -608,6 +757,8 @@ export const ContractorDirectory: React.FC = () => {
                           disabled={operationLoading}
                           className="text-red-600 hover:text-red-900"
                           title="Удалить"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -637,153 +788,4 @@ export const ContractorDirectory: React.FC = () => {
       )}
     </div>
   );
-
-  // Функция для рендеринга формы (добавление/редактирование)
-  function renderContractorForm(isEdit: boolean) {
-    const formData = isEdit ? editContractor : newContractor;
-    const setFormData = isEdit ? setEditContractor : setNewContractor;
-    const title = isEdit ? 'Редактировать контрагента' : 'Добавить контрагента';
-    const submitText = isEdit ? (operationLoading ? 'Сохранение...' : 'Сохранить') : (operationLoading ? 'Добавление...' : 'Добавить');
-    const onSubmit = isEdit ? handleSaveEdit : handleAddContractor;
-    const onCancel = isEdit ? () => {
-      setShowEditForm(false);
-      setEditingContractorData(null);
-      setEditContractor({ name: '', address: '', contacts: [] });
-      setQualificationObjects([]);
-      setFilteredQualificationObjects([]);
-      setQualificationSearchTerm('');
-    } : () => setShowAddForm(false);
-
-    return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-          <button
-            onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {/* Основная информация */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Наименование *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите наименование контрагента"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Адрес
-              </label>
-              <input
-                type="text"
-                value={formData.address}
-                onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите адрес (будет геокодирован автоматически)"
-              />
-            </div>
-          </div>
-
-          {/* Контакты */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Контакты
-              </label>
-              <button
-                onClick={() => addNewContact(isEdit)}
-                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Добавить контакт</span>
-              </button>
-            </div>
-
-            {formData.contacts.length === 0 ? (
-              <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                <p className="text-sm">Контакты не добавлены</p>
-                <p className="text-xs mt-1">Нажмите "Добавить контакт" для добавления</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {formData.contacts.map((contact, index) => (
-                  <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Сотрудник *</label>
-                        <input
-                          type="text"
-                          value={contact.employeeName}
-                          onChange={(e) => updateNewContact(index, 'employeeName', e.target.value, isEdit)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          placeholder="ФИО сотрудника"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Телефон</label>
-                        <input
-                          type="tel"
-                          value={contact.phone}
-                          onChange={(e) => updateNewContact(index, 'phone', e.target.value, isEdit)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          placeholder="+7 (999) 123-45-67"
-                        />
-                      </div>
-                      <div className="flex space-x-2">
-                        <div className="flex-1">
-                          <label className="block text-xs text-gray-500 mb-1">Комментарий</label>
-                          <input
-                            type="text"
-                            value={contact.comment}
-                            onChange={(e) => updateNewContact(index, 'comment', e.target.value, isEdit)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="Должность, примечания"
-                          />
-                        </div>
-                        <button
-                          onClick={() => removeNewContact(index, isEdit)}
-                          className="mt-5 text-red-600 hover:text-red-800"
-                          title="Удалить контакт"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex justify-end space-x-3 mt-6">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={onSubmit}
-            disabled={operationLoading}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {submitText}
-          </button>
-        </div>
-      </div>
-    );
-  }
 };
