@@ -32,14 +32,23 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      console.log('userService:', userService); // посмотрите что в объекте
+      console.log('getAll function:', userService.getAll); // проверьте существует ли функция
+      
       const [projectsData, contractorsData, usersData] = await Promise.all([
         projectService.getAllProjects(),
         contractorService.getAllContractors(),
-        userService.getAll()
+        typeof userService.getAll === 'function' 
+          ? userService.getAll()
+          : (() => {
+              console.error('userService.getAll is not a function');
+              return []; // Заглушка для продолжения работы
+            })()
       ]);
       setProjects(projectsData);
       setContractors(contractorsData);
-      setUsers(usersData);
+      setUsers(Array.isArray(usersData) ? usersData : usersData?.data || []);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
