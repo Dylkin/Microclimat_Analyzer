@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.55.0",
+    "@supabase/supabase-js": "^2.56.0",
     "@types/leaflet": "^1.9.20",
     "d3-array": "^3.2.4",
     "d3-scale": "^4.0.2",
