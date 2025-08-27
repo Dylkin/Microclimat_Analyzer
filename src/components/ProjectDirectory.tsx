@@ -5,7 +5,7 @@ import { contractorService } from '../utils/contractorService';
 import { userService } from '../utils/userService';
 import type { Project } from '../types/Project';
 import type { Contractor } from '../types/Contractor';
-import type { User } from '../types/User';
+import type { User as UserType } from '../types/User';
 
 interface ProjectDirectoryProps {
   onPageChange: (page: string, projectData?: any) => void;
@@ -14,7 +14,7 @@ interface ProjectDirectoryProps {
 export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserType[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
