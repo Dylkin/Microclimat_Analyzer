@@ -292,33 +292,6 @@ export const ContractorDirectory: React.FC = () => {
     setShowAddQualificationForm(true);
   };
 
-  // Сохранение изменений объекта квалификации
-  const handleSaveQualificationObject = async (objectData: CreateQualificationObjectData) => {
-    setOperationLoading(true);
-    try {
-      if (editingQualificationObject) {
-        // Обновляем существующий объект
-        const updatedObject = await qualificationObjectService.updateQualificationObject(
-          editingQualificationObject.id,
-          objectData
-        );
-        setQualificationObjects(prev => prev.map(obj => 
-          obj.id === editingQualificationObject.id ? updatedObject : obj
-        ));
-      } else {
-        // Добавляем новый объект
-        const addedObject = await qualificationObjectService.addQualificationObject(objectData);
-        setQualificationObjects(prev => [...prev, addedObject]);
-      }
-      setShowAddQualificationForm(false);
-      setEditingQualificationObject(null);
-    } catch (error) {
-      console.error('Ошибка сохранения объекта квалификации:', error);
-      alert(`Ошибка сохранения объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setOperationLoading(false);
-    }
-  };
   // Удаление объекта квалификации
   const handleDeleteQualificationObject = async (objectId: string) => {
     if (confirm('Вы уверены, что хотите удалить этот объект квалификации?')) {
@@ -513,7 +486,7 @@ export const ContractorDirectory: React.FC = () => {
               <div className="mb-6">
                 <QualificationObjectForm
                   contractorId={editingContractorData.id}
-                  onAdd={handleSaveQualificationObject}
+                  onAdd={handleAddQualificationObject}
                   onCancel={() => {
                     setShowAddQualificationForm(false);
                     setEditingQualificationObject(null);
@@ -552,6 +525,9 @@ export const ContractorDirectory: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Адрес
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Контакты
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
@@ -620,6 +596,11 @@ export const ContractorDirectory: React.FC = () => {
                             )}
                           </div>
                         ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-sm">Нет контактов</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
                       <button
