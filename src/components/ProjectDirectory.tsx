@@ -33,7 +33,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     try {
       setLoading(true);
       const [projectsData, contractorsData, usersData] = await Promise.all([
-        projectService.getAll(),
+        projectService.getAllProjects(),
         contractorService.getAll(),
         userService.getAll()
       ]);
