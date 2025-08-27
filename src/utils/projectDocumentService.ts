@@ -98,33 +98,40 @@ export class ProjectDocumentService {
     }
 
     try {
-      // Проверяем существование bucket 'documents'
-      const { data: buckets, error: bucketsError } = await this.supabase.storage.listBuckets();
-      
-      if (bucketsError) {
-        console.error('Ошибка получения списка buckets:', bucketsError);
-        throw new Error(`Ошибка доступа к Storage: ${bucketsError.message}`);
-      }
-      
-      const documentsBucket = buckets?.find(bucket => bucket.name === 'documents');
-      if (!documentsBucket) {
-        throw new Error('Bucket "documents" не найден в Supabase Storage. Убедитесь, что миграция 20250827170518_lucky_shadow.sql была применена.');
-      }
-      
       // Генерируем уникальное имя файла
       const fileExt = file.name.split('.').pop();
       const fileName = `${projectId}_${documentType}_${Date.now()}.${fileExt}`;
       const filePath = `project-documents/${fileName}`;
 
+      console.log('Загружаем файл в Storage:', { fileName, filePath, fileSize: file.size });
+
       // Загружаем файл в Supabase Storage
       const { data: uploadData, error: uploadError } = await this.supabase.storage
         .from('documents')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
 
       if (uploadError) {
         console.error('Ошибка загрузки файла в Storage:', uploadError);
-        throw new Error(`Ошибка загрузки файла в bucket 'documents': ${uploadError.message}. Проверьте настройки Storage и политики доступа.`);
+        console.error('Детали ошибки Storage:', {
+          code: uploadError.statusCode,
+          message: uploadError.message,
+          error: uploadError.error
+        });
+        
+        // Более детальная диагностика ошибки
+        if (uploadError.message?.includes('not found') || uploadError.message?.includes('does not exist')) {
+          throw new Error(`Bucket 'documents' не найден или недоступен. Проверьте настройки Storage в Supabase Dashboard.`);
+        } else if (uploadError.message?.includes('permission') || uploadError.message?.includes('policy')) {
+          throw new Error(`Недостаточно прав для загрузки в bucket 'documents'. Проверьте RLS политики Storage.`);
+        } else {
+          throw new Error(`Ошибка загрузки файла: ${uploadError.message}`);
+        }
       }
+
+      console.log('Файл успешно загружен в Storage:', uploadData);
 
       // Получаем публичный URL файла
       const { data: urlData } = this.supabase.storage
@@ -134,6 +141,8 @@ export class ProjectDocumentService {
       if (!urlData?.publicUrl) {
         throw new Error('Не удалось получить публичный URL файла');
       }
+
+      console.log('Получен публичный URL:', urlData.publicUrl);
 
       // Сохраняем информацию о документе в базе данных
       const { data: docData, error: docError } = await this.supabase
@@ -154,6 +163,8 @@ export class ProjectDocumentService {
         console.error('Ошибка сохранения информации о документе:', docError);
         throw new Error(`Ошибка сохранения документа: ${docError.message}`);
       }
+
+      console.log('Информация о документе сохранена в БД:', docData);
 
       return {
         id: docData.id,
