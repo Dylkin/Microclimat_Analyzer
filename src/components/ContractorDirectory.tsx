@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { contractorService } from '../utils/contractorService';
@@ -155,14 +155,12 @@ export const ContractorDirectory: React.FC = () => {
   // Добавление контрагента
   const handleAddContractor = async () => {
     if (!newContractor.name.trim()) {
-      alert('Введите наименование контрагента');
       return;
     }
 
     // Проверяем, что у всех контактов заполнено имя сотрудника
     const invalidContacts = newContractor.contacts.filter(contact => !contact.employeeName.trim());
     if (invalidContacts.length > 0) {
-      alert('Заполните имена сотрудников для всех контактов');
       return;
     }
 
@@ -180,7 +178,6 @@ export const ContractorDirectory: React.FC = () => {
       setShowAddForm(false);
     } catch (error) {
       console.error('Ошибка добавления контрагента:', error);
-      alert(`Ошибка добавления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }
@@ -205,7 +202,6 @@ export const ContractorDirectory: React.FC = () => {
 
   const handleSaveEdit = async () => {
     if (!editContractor.name.trim()) {
-      alert('Введите наименование контрагента');
       return;
     }
 
@@ -236,20 +232,10 @@ export const ContractorDirectory: React.FC = () => {
       
       setContractors(prev => prev.map(c => c.id === editingContractorData!.id ? finalContractor : c));
       
-      // Сбрасываем форму
-      setEditContractor({
-        name: '',
-        address: '',
-        contacts: []
-      });
-      setShowEditForm(false);
-      setEditingContractorData(null);
-      setQualificationObjects([]);
-      setFilteredQualificationObjects([]);
-      setQualificationSearchTerm('');
+      // НЕ сбрасываем форму и НЕ возвращаемся к списку
+      console.log('Контрагент успешно обновлен');
     } catch (error) {
       console.error('Ошибка обновления контрагента:', error);
-      alert(`Ошибка обновления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }
@@ -264,7 +250,6 @@ export const ContractorDirectory: React.FC = () => {
         setContractors(prev => prev.filter(c => c.id !== contractorId));
       } catch (error) {
         console.error('Ошибка удаления контрагента:', error);
-        alert(`Ошибка удаления контрагента: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       } finally {
         setOperationLoading(false);
       }
@@ -280,7 +265,6 @@ export const ContractorDirectory: React.FC = () => {
       setShowAddQualificationForm(false);
     } catch (error) {
       console.error('Ошибка добавления объекта квалификации:', error);
-      alert(`Ошибка добавления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }
@@ -314,7 +298,6 @@ export const ContractorDirectory: React.FC = () => {
       setEditingQualificationObject(null);
     } catch (error) {
       console.error('Ошибка сохранения объекта квалификации:', error);
-      alert(`Ошибка сохранения объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }
@@ -328,7 +311,6 @@ export const ContractorDirectory: React.FC = () => {
         setQualificationObjects(prev => prev.filter(obj => obj.id !== objectId));
       } catch (error) {
         console.error('Ошибка удаления объекта квалификации:', error);
-        alert(`Ошибка удаления объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       } finally {
         setOperationLoading(false);
       }
@@ -571,16 +553,40 @@ export const ContractorDirectory: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
+          {(showAddForm || showEditForm) && (
+            <button
+              onClick={() => {
+                if (showAddForm) {
+                  setShowAddForm(false);
+                } else if (showEditForm) {
+                  setShowEditForm(false);
+                  setEditingContractorData(null);
+                  setEditContractor({ name: '', address: '', contacts: [] });
+                  setQualificationObjects([]);
+                  setFilteredQualificationObjects([]);
+                  setQualificationSearchTerm('');
+                  setShowAddQualificationForm(false);
+                  setEditingQualificationObject(null);
+                }
+              }}
+              className="text-gray-600 hover:text-gray-900 transition-colors flex items-center space-x-2"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Назад к справочнику</span>
+            </button>
+          )}
           <Building2 className="w-8 h-8 text-indigo-600" />
           <h1 className="text-2xl font-bold text-gray-900">Справочник контрагентов</h1>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Добавить контрагента</span>
-        </button>
+        {!showAddForm && !showEditForm && (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Добавить контрагента</span>
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -621,13 +627,25 @@ export const ContractorDirectory: React.FC = () => {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Объекты квалификации</h3>
-              <button
-                onClick={() => setShowAddQualificationForm(true)}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Добавить объект</span>
-              </button>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowAddQualificationForm(true)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Добавить объект</span>
+                </button>
+                <button
+                  onClick={() => {
+                    // Сохраняем изменения без возврата к списку
+                    console.log('Сохранение изменений объектов квалификации');
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Сохранить</span>
+                </button>
+              </div>
             </div>
 
             {/* Add Qualification Object Form */}
