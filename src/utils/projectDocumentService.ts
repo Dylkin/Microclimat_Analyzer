@@ -154,7 +154,7 @@ export class ProjectDocumentService {
           file_size: file.size,
           file_url: urlData.publicUrl,
           mime_type: file.type,
-          uploaded_by: userId || 'anonymous'
+          uploaded_by: null // Временно устанавливаем null, так как uploaded_by ссылается на auth.users
         })
         .select()
         .single();
