@@ -1,213 +1,141 @@
 import React, { useState } from 'react';
-import { Plus, X, Upload, MapPin, FileImage } from 'lucide-react';
+import { Plus, X, Upload, MapPin, FileImage, FileText } from 'lucide-react';
 import { 
   QualificationObjectType, 
   QualificationObjectTypeLabels,
-  CreateQualificationObjectData 
-} from '../types/QualificationObject';
+  QualificationObject,
+  qualificationObjectService
+} from '../../utils/qualificationObjectService';
 
 interface QualificationObjectFormProps {
   contractorId: string;
-  onAdd: (objectData: CreateQualificationObjectData) => void;
-  onCancel: () => void;
-  loading?: boolean;
+  contractorName: string;
   editingObject?: QualificationObject | null;
+  onSubmit: (data: Partial<QualificationObject> & { planFile?: File; testDataFile?: File }) => void;
+  onCancel: () => void;
 }
 
 export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
   contractorId,
-  onAdd,
-  onCancel,
-  loading = false,
-  editingObject = null
+  contractorName,
+  editingObject,
+  onSubmit,
+  onCancel
 }) => {
-  const [objectData, setObjectData] = useState<CreateQualificationObjectData>(() => {
+  const [objectData, setObjectData] = useState<Partial<QualificationObject>>(() => {
     if (editingObject) {
       return {
-        contractorId,
         type: editingObject.type,
         name: editingObject.name,
         address: editingObject.address,
-        area: editingObject.area,
-        climateSystem: editingObject.climateSystem,
-        vin: editingObject.vin,
-        registrationNumber: editingObject.registrationNumber,
+        coordinates: editingObject.coordinates,
         bodyVolume: editingObject.bodyVolume,
         inventoryNumber: editingObject.inventoryNumber,
         chamberVolume: editingObject.chamberVolume,
-        serialNumber: editingObject.serialNumber
+        serialNumber: editingObject.serialNumber,
+        testDataFileUrl: editingObject.testDataFileUrl,
+        testDataFileName: editingObject.testDataFileName
       };
     }
+    
     return {
-      contractorId,
-      type: 'помещение'
+      type: QualificationObjectType.SEPTIC_TANK,
+      name: '',
+      address: '',
+      coordinates: '',
+      bodyVolume: 0,
+      inventoryNumber: '',
+      chamberVolume: 0,
+      serialNumber: ''
     };
   });
 
   const [planFile, setPlanFile] = useState<File | null>(null);
+  const [testDataFile, setTestDataFile] = useState<File | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Валидация обязательных полей в зависимости от типа
-    if (!validateRequiredFields()) {
+    if (!objectData.name?.trim()) {
+      alert('Введите название объекта');
+      return;
+    }
+    
+    if (!objectData.address?.trim()) {
+      alert('Введите адрес объекта');
       return;
     }
 
     const submitData = {
       ...objectData,
-      planFile: planFile || undefined
+      planFile: planFile || undefined,
+      testDataFile: testDataFile || undefined
     };
 
-    onAdd(submitData);
+    onSubmit(submitData);
   };
 
-  const validateRequiredFields = (): boolean => {
-    switch (objectData.type) {
-      case 'помещение':
-        if (!objectData.name) {
-          alert('Введите наименование помещения');
-          return false;
-        }
-        break;
-      case 'автомобиль':
-        if (!objectData.vin) {
-          alert('Введите VIN номер автомобиля');
-          return false;
-        }
-        break;
-      case 'холодильная_камера':
-        if (!objectData.name) {
-          alert('Введите наименование холодильной камеры');
-          return false;
-        }
-        break;
-      case 'холодильник':
-      case 'морозильник':
-        if (!objectData.serialNumber) {
-          alert('Введите серийный номер');
-          return false;
-        }
-        break;
-    }
-    return true;
+  const handleInputChange = (field: keyof QualificationObject, value: any) => {
+    setObjectData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type !== 'image/jpeg') {
-        alert('Можно загружать только файлы в формате JPG');
+      if (!['image/jpeg', 'image/png'].includes(file.type)) {
+        alert('Можно загружать только файлы в формате JPG или PNG');
         return;
       }
       setPlanFile(file);
     }
   };
 
+  const handleTestDataFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const allowedTypes = [
+        'image/jpeg',
+        'image/png', 
+        'application/pdf',
+        'image/tiff',
+        'image/bmp'
+      ];
+      
+      if (!allowedTypes.includes(file.type)) {
+        alert('Поддерживаются файлы: JPG, PNG, PDF, TIFF, BMP');
+        return;
+      }
+      
+      // Проверяем размер файла (максимум 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Размер файла не должен превышать 10MB');
+        return;
+      }
+      
+      setTestDataFile(file);
+    }
+  };
+
   const renderTypeSpecificFields = () => {
     switch (objectData.type) {
-      case 'помещение':
+      case QualificationObjectType.SEPTIC_TANK:
         return (
           <>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Наименование *
-              </label>
-              <input
-                type="text"
-                value={objectData.name || ''}
-                onChange={(e) => setObjectData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите наименование помещения"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Адрес
-              </label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={objectData.address || ''}
-                  onChange={(e) => setObjectData(prev => ({ ...prev, address: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Введите адрес (будет геокодирован автоматически)"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Площадь (м²)
+                Объем корпуса (м³) *
               </label>
               <input
                 type="number"
-                step="0.01"
-                value={objectData.area || ''}
-                onChange={(e) => setObjectData(prev => ({ ...prev, area: parseFloat(e.target.value) || undefined }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите площадь"
-              />
-            </div>
-          </>
-        );
-
-      case 'автомобиль':
-        return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                VIN номер *
-              </label>
-              <input
-                type="text"
-                value={objectData.vin || ''}
-                onChange={(e) => setObjectData(prev => ({ ...prev, vin: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите VIN номер"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Регистрационный номер
-              </label>
-              <input
-                type="text"
-                value={objectData.registrationNumber || ''}
-                onChange={(e) => setObjectData(prev => ({ ...prev, registrationNumber: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите регистрационный номер"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объем кузова (м³)
-              </label>
-              <input
-                type="number"
-                step="0.01"
+                step="0.1"
+                min="0"
                 value={objectData.bodyVolume || ''}
-                onChange={(e) => setObjectData(prev => ({ ...prev, bodyVolume: parseFloat(e.target.value) || undefined }))}
+                onChange={(e) => handleInputChange('bodyVolume', parseFloat(e.target.value) || 0)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите объем кузова"
-              />
-            </div>
-          </>
-        );
-
-      case 'холодильная_камера':
-        return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Наименование *
-              </label>
-              <input
-                type="text"
-                value={objectData.name || ''}
-                onChange={(e) => setObjectData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите наименование камеры"
+                required
               />
             </div>
             <div>
@@ -217,70 +145,57 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               <input
                 type="text"
                 value={objectData.inventoryNumber || ''}
-                onChange={(e) => setObjectData(prev => ({ ...prev, inventoryNumber: e.target.value }))}
+                onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите инвентарный номер"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объем камеры (м³)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={objectData.chamberVolume || ''}
-                onChange={(e) => setObjectData(prev => ({ ...prev, chamberVolume: parseFloat(e.target.value) || undefined }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите объем камеры"
               />
             </div>
           </>
         );
-
-      case 'холодильник':
-      case 'морозильник':
+      
+      case QualificationObjectType.PUMPING_STATION:
         return (
           <>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Серийный номер *
+                Объем камеры (м³) *
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={objectData.chamberVolume || ''}
+                onChange={(e) => handleInputChange('chamberVolume', parseFloat(e.target.value) || 0)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Серийный номер
               </label>
               <input
                 type="text"
                 value={objectData.serialNumber || ''}
-                onChange={(e) => setObjectData(prev => ({ ...prev, serialNumber: e.target.value }))}
+                onChange={(e) => handleInputChange('serialNumber', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите серийный номер"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Инвентарный номер
-              </label>
-              <input
-                type="text"
-                value={objectData.inventoryNumber || ''}
-                onChange={(e) => setObjectData(prev => ({ ...prev, inventoryNumber: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите инвентарный номер"
               />
             </div>
           </>
         );
-
+      
       default:
         return null;
     }
   };
 
-  const showClimateSystem = ['помещение', 'автомобиль', 'холодильная_камера'].includes(objectData.type);
-  const showPlanFile = ['помещение', 'холодильная_камера', 'холодильник', 'морозильник'].includes(objectData.type);
+  const showPlanFile = objectData.type === QualificationObjectType.SEPTIC_TANK;
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Добавить объект квалификации</h3>
+    <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-semibold text-gray-900">
+          {editingObject ? 'Редактировать объект' : 'Добавить объект квалификации'}
+        </h3>
         <button
           onClick={onCancel}
           className="text-gray-400 hover:text-gray-600"
@@ -290,61 +205,75 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Тип объекта */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Тип объекта *
           </label>
           <select
             value={objectData.type}
-            onChange={(e) => setObjectData(prev => ({ 
-              ...prev, 
-              type: e.target.value as QualificationObjectType,
-              // Сбрасываем поля при смене типа
-              name: undefined,
-              address: undefined,
-              area: undefined,
-              vin: undefined,
-              registrationNumber: undefined,
-              bodyVolume: undefined,
-              inventoryNumber: undefined,
-              chamberVolume: undefined,
-              serialNumber: undefined
-            }))}
+            onChange={(e) => handleInputChange('type', e.target.value as QualificationObjectType)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            required
           >
-            {Object.entries(QualificationObjectTypeLabels).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+            {Object.values(QualificationObjectType).map(type => (
+              <option key={type} value={type}>
+                {QualificationObjectTypeLabels[type]}
+              </option>
             ))}
           </select>
         </div>
 
-        {/* Поля в зависимости от типа */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {renderTypeSpecificFields()}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Название объекта *
+          </label>
+          <input
+            type="text"
+            value={objectData.name || ''}
+            onChange={(e) => handleInputChange('name', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Например: Септик №1"
+            required
+          />
         </div>
 
-        {/* Климатическая установка */}
-        {showClimateSystem && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Климатическая установка
-            </label>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Адрес *
+          </label>
+          <div className="relative">
+            <MapPin className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              value={objectData.climateSystem || ''}
-              onChange={(e) => setObjectData(prev => ({ ...prev, climateSystem: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Введите тип климатической установки"
+              value={objectData.address || ''}
+              onChange={(e) => handleInputChange('address', e.target.value)}
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Полный адрес объекта"
+              required
             />
           </div>
-        )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Координаты
+          </label>
+          <input
+            type="text"
+            value={objectData.coordinates || ''}
+            onChange={(e) => handleInputChange('coordinates', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Например: 55.7558, 37.6176"
+          />
+        </div>
+
+        {renderTypeSpecificFields()}
 
         {/* Загрузка файла плана */}
         {showPlanFile && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              План (JPG файл)
+              План (JPG/PNG файл)
             </label>
             <div className="flex items-center space-x-3">
               <label className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
@@ -352,7 +281,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                 <span className="text-sm text-gray-600">Выбрать файл</span>
                 <input
                   type="file"
-                  accept="image/jpeg"
+                  accept="image/jpeg,image/png"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -374,30 +303,57 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           </div>
         )}
 
+        {/* Загрузка данных по испытаниям */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Данные по испытаниям (изображения, PDF)
+          </label>
+          <div className="flex items-center space-x-3">
+            <label className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+              <Upload className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-600">Выбрать файл</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,application/pdf,image/tiff,image/bmp"
+                onChange={handleTestDataFileChange}
+                className="hidden"
+              />
+            </label>
+            {testDataFile && (
+              <div className="flex items-center space-x-2">
+                <FileText className="w-4 h-4 text-blue-600" />
+                <span className="text-sm text-gray-600">{testDataFile.name}</span>
+                <span className="text-xs text-gray-500">
+                  ({(testDataFile.size / 1024 / 1024).toFixed(1)} MB)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTestDataFile(null)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Поддерживаются: JPG, PNG, PDF, TIFF, BMP (максимум 10MB)
+          </p>
+        </div>
+
         <div className="flex justify-end space-x-3 pt-4">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
             Отмена
           </button>
           <button
             type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>{editingObject ? 'Сохранение...' : 'Добавление...'}</span>
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                <span>{editingObject ? 'Сохранить' : 'Добавить'}</span>
-              </>
-            )}
+            {editingObject ? 'Сохранить' : 'Добавить'}
           </button>
         </div>
       </form>
