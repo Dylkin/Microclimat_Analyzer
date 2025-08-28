@@ -1,362 +1,234 @@
-import React, { useState } from 'react';
-import { Plus, X, Upload, MapPin, FileImage, FileText } from 'lucide-react';
-import { 
-  QualificationObjectType, 
-  QualificationObjectTypeLabels,
-  QualificationObject,
-  qualificationObjectService
-} from '../../utils/qualificationObjectService';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, FileText, Upload, Download, Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, Plus, Edit2, Save, X, Building, Car, Refrigerator, Snowflake, MapPin } from 'lucide-react';
+import { Project } from '../types/Project';
+import { QualificationObject, QualificationObjectTypeLabels, CreateQualificationObjectData } from '../types/QualificationObject';
+import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
+import { qualificationObjectService } from '../utils/qualificationObjectService';
+import { QualificationObjectForm } from './QualificationObjectForm';
+import { NegotiationStages } from './contract/NegotiationStages';
+import { DocumentUpload } from './contract/DocumentUpload';
+import { StatusSummary } from './contract/StatusSummary';
+import { ContractInstructions } from './contract/ContractInstructions';
+import { useAuth } from '../contexts/AuthContext';
+import { ProjectInfo } from './contract/ProjectInfo';
+import { NegotiationStages } from './contract/NegotiationStages';
+import { QualificationObjectsCRUD } from './contract/QualificationObjectsCRUD';
+import { DocumentUpload } from './contract/DocumentUpload';
+import { StatusSummary } from './contract/StatusSummary';
+import { ContractInstructions } from './contract/ContractInstructions';
 
-interface QualificationObjectFormProps {
-  contractorId: string;
-  contractorName: string;
-  editingObject?: QualificationObject | null;
-  onSubmit: (data: Partial<QualificationObject> & { planFile?: File; testDataFile?: File }) => void;
-  onCancel: () => void;
+interface ContractNegotiationProps {
+  project: Project;
+  onBack: () => void;
 }
 
-export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
-  contractorId,
-  contractorName,
-  editingObject,
-  onSubmit,
-  onCancel
-}) => {
-  const [objectData, setObjectData] = useState<Partial<QualificationObject>>(() => {
-    if (editingObject) {
-      return {
-        type: editingObject.type,
-        name: editingObject.name,
-        address: editingObject.address,
-        coordinates: editingObject.coordinates,
-        bodyVolume: editingObject.bodyVolume,
-        inventoryNumber: editingObject.inventoryNumber,
-        chamberVolume: editingObject.chamberVolume,
-        serialNumber: editingObject.serialNumber,
-        testDataFileUrl: editingObject.testDataFileUrl,
-        testDataFileName: editingObject.testDataFileName
-      };
-    }
-    
-    return {
-      type: QualificationObjectType.SEPTIC_TANK,
-      name: '',
-      address: '',
-      coordinates: '',
-      bodyVolume: 0,
-      inventoryNumber: '',
-      chamberVolume: 0,
-      serialNumber: ''
-    };
-  });
+export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBack }) => {
+  const { user } = useAuth();
+  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState<{ [key: string]: boolean }>({});
+  const [error, setError] = useState<string | null>(null);
 
-  const [planFile, setPlanFile] = useState<File | null>(null);
-  const [testDataFile, setTestDataFile] = useState<File | null>(null);
+  // Безопасная проверка данных проекта
+  if (!project || !project.id) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onBack}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <FileText className="w-8 h-8 text-red-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки проекта</h1>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <p className="text-red-600">Данные проекта не найдены или повреждены</p>
+        </div>
+      </div>
+    );
+  }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!objectData.name?.trim()) {
-      alert('Введите название объекта');
-      return;
-    }
-    
-    if (!objectData.address?.trim()) {
-      alert('Введите адрес объекта');
+  // Загрузка документов проекта
+  const loadDocuments = async () => {
+    if (!projectDocumentService.isAvailable()) {
+      setError('Supabase не настроен для работы с документами');
       return;
     }
 
-    const submitData = {
-      ...objectData,
-      planFile: planFile || undefined,
-      testDataFile: testDataFile || undefined
-    };
+    setLoading(true);
+    setError(null);
 
-    onSubmit(submitData);
-  };
-
-  const handleInputChange = (field: keyof QualificationObject, value: any) => {
-    setObjectData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!['image/jpeg', 'image/png'].includes(file.type)) {
-        alert('Можно загружать только файлы в формате JPG или PNG');
-        return;
-      }
-      setPlanFile(file);
+    try {
+      const docs = await projectDocumentService.getProjectDocuments(project.id);
+      setDocuments(docs);
+    } catch (error) {
+      console.error('Ошибка загрузки документов:', error);
+      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleTestDataFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const allowedTypes = [
-        'image/jpeg',
-        'image/png', 
-        'application/pdf',
-        'image/tiff',
-        'image/bmp'
-      ];
+  useEffect(() => {
+    loadDocuments();
+  }, [project.id]);
+
+  // Загрузка документа
+  const handleFileUpload = async (documentType: 'commercial_offer' | 'contract', file: File) => {
+    if (!file) return;
+
+    // Проверяем тип файла
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Поддерживаются только файлы PDF, DOC и DOCX');
+      return;
+    }
+
+    setUploading(prev => ({ ...prev, [documentType]: true }));
+
+    try {
+      const uploadedDoc = await projectDocumentService.uploadDocument(project.id, documentType, file, user?.id);
       
-      if (!allowedTypes.includes(file.type)) {
-        alert('Поддерживаются файлы: JPG, PNG, PDF, TIFF, BMP');
-        return;
-      }
-      
-      // Проверяем размер файла (максимум 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        alert('Размер файла не должен превышать 10MB');
-        return;
-      }
-      
-      setTestDataFile(file);
+      // Обновляем список документов
+      setDocuments(prev => {
+        const filtered = prev.filter(doc => doc.documentType !== documentType);
+        return [...filtered, uploadedDoc];
+      });
+
+      alert('Документ успешно загружен');
+    } catch (error) {
+      console.error('Ошибка загрузки документа:', error);
+      alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setUploading(prev => ({ ...prev, [documentType]: false }));
     }
   };
 
-  const renderTypeSpecificFields = () => {
-    switch (objectData.type) {
-      case QualificationObjectType.SEPTIC_TANK:
-        return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объем корпуса (м³) *
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                value={objectData.bodyVolume || ''}
-                onChange={(e) => handleInputChange('bodyVolume', parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Инвентарный номер
-              </label>
-              <input
-                type="text"
-                value={objectData.inventoryNumber || ''}
-                onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-          </>
-        );
-      
-      case QualificationObjectType.PUMPING_STATION:
-        return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объем камеры (м³) *
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                value={objectData.chamberVolume || ''}
-                onChange={(e) => handleInputChange('chamberVolume', parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Серийный номер
-              </label>
-              <input
-                type="text"
-                value={objectData.serialNumber || ''}
-                onChange={(e) => handleInputChange('serialNumber', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-          </>
-        );
-      
-      default:
-        return null;
+  // Удаление документа
+  const handleDeleteDocument = async (documentId: string, documentType: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот документ?')) {
+      return;
+    }
+
+    try {
+      await projectDocumentService.deleteDocument(documentId);
+      setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+      alert('Документ успешно удален');
+    } catch (error) {
+      console.error('Ошибка удаления документа:', error);
+      alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   };
 
-  const showPlanFile = objectData.type === QualificationObjectType.SEPTIC_TANK;
+  // Скачивание документа
+  const handleDownloadDocument = async (document: ProjectDocument) => {
+    try {
+      const blob = await projectDocumentService.downloadDocument(document.fileUrl);
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = document.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Ошибка скачивания документа:', error);
+      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  };
+
+  // Просмотр документа
+  const handleViewDocument = (document: ProjectDocument) => {
+    window.open(document.fileUrl, '_blank');
+  };
+
+  // Get documents by type
+  const commercialOfferDoc = documents.find(doc => doc.documentType === 'commercial_offer');
+  const contractDoc = documents.find(doc => doc.documentType === 'contract');
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">
-          {editingObject ? 'Редактировать объект' : 'Добавить объект квалификации'}
-        </h3>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center space-x-3">
         <button
-          onClick={onCancel}
-          className="text-gray-400 hover:text-gray-600"
+          onClick={onBack}
+          className="text-gray-600 hover:text-gray-900 transition-colors"
         >
-          <X className="w-5 h-5" />
+          <ArrowLeft className="w-6 h-6" />
         </button>
+        <FileText className="w-8 h-8 text-indigo-600" />
+        <h1 className="text-2xl font-bold text-gray-900">Согласование договора</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Тип объекта *
-          </label>
-          <select
-            value={objectData.type}
-            onChange={(e) => handleInputChange('type', e.target.value as QualificationObjectType)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            required
-          >
-            {Object.values(QualificationObjectType).map(type => (
-              <option key={type} value={type}>
-                {QualificationObjectTypeLabels[type]}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* Project Info */}
+      <ProjectInfo project={project} />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Название объекта *
-          </label>
-          <input
-            type="text"
-            value={objectData.name || ''}
-            onChange={(e) => handleInputChange('name', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Например: Септик №1"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Адрес *
-          </label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={objectData.address || ''}
-              onChange={(e) => handleInputChange('address', e.target.value)}
-              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Полный адрес объекта"
-              required
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Координаты
-          </label>
-          <input
-            type="text"
-            value={objectData.coordinates || ''}
-            onChange={(e) => handleInputChange('coordinates', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Например: 55.7558, 37.6176"
-          />
-        </div>
-
-        {renderTypeSpecificFields()}
-
-        {/* Загрузка файла плана */}
-        {showPlanFile && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              План (JPG/PNG файл)
-            </label>
-            <div className="flex items-center space-x-3">
-              <label className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-                <Upload className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-gray-600">Выбрать файл</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
-              {planFile && (
-                <div className="flex items-center space-x-2">
-                  <FileImage className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-gray-600">{planFile.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => setPlanFile(null)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start space-x-2">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки документов</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
             </div>
           </div>
-        )}
-
-        {/* Загрузка данных по испытаниям */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Данные по испытаниям (изображения, PDF)
-          </label>
-          <div className="flex items-center space-x-3">
-            <label className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-              <Upload className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600">Выбрать файл</span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,application/pdf,image/tiff,image/bmp"
-                onChange={handleTestDataFileChange}
-                className="hidden"
-              />
-            </label>
-            {testDataFile && (
-              <div className="flex items-center space-x-2">
-                <FileText className="w-4 h-4 text-blue-600" />
-                <span className="text-sm text-gray-600">{testDataFile.name}</span>
-                <span className="text-xs text-gray-500">
-                  ({(testDataFile.size / 1024 / 1024).toFixed(1)} MB)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setTestDataFile(null)}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Поддерживаются: JPG, PNG, PDF, TIFF, BMP (максимум 10MB)
-          </p>
         </div>
+      )}
 
-        <div className="flex justify-end space-x-3 pt-4">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            Отмена
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            {editingObject ? 'Сохранить' : 'Добавить'}
-          </button>
-        </div>
-      </form>
+      {/* Qualification Objects CRUD - Этап согласования объемов */}
+      <QualificationObjectsCRUD 
+        contractorId={project.contractorId}
+        contractorName={project.contractorName || 'Неизвестный контрагент'}
+      />
+
+      {/* Negotiation Stages */}
+      <NegotiationStages 
+        project={project}
+        commercialOfferDoc={commercialOfferDoc}
+        contractDoc={contractDoc}
+      />
+
+      {/* Document Uploads */}
+      <div className="space-y-6">
+        <DocumentUpload
+          title="Коммерческое предложение"
+          documentType="commercial_offer"
+          document={commercialOfferDoc}
+          uploading={uploading.commercial_offer || false}
+          onUpload={(file) => handleFileUpload('commercial_offer', file)}
+          onDownload={handleDownloadDocument}
+          onView={handleViewDocument}
+          onDelete={handleDeleteDocument}
+        />
+
+        <DocumentUpload
+          title="Договор"
+          documentType="contract"
+          document={contractDoc}
+          uploading={uploading.contract || false}
+          onUpload={(file) => handleFileUpload('contract', file)}
+          onDownload={handleDownloadDocument}
+          onView={handleViewDocument}
+          onDelete={handleDeleteDocument}
+          disabled={!commercialOfferDoc}
+        />
+      </div>
+
+      {/* Status Summary */}
+      <StatusSummary 
+        documents={documents}
+        commercialOfferDoc={commercialOfferDoc}
+        contractDoc={contractDoc}
+      />
+
+      {/* Instructions */}
+      <ContractInstructions />
     </div>
   );
 };
