@@ -1,227 +1,238 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, AlertTriangle } from 'lucide-react';
-import { Project } from '../types/Project';
-import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
-import { useAuth } from '../contexts/AuthContext';
-import { ProjectInfo } from './contract/ProjectInfo';
-import { NegotiationStages } from './contract/NegotiationStages';
-import { QualificationObjectsCRUD } from './contract/QualificationObjectsCRUD';
-import { DocumentUpload } from './contract/DocumentUpload';
-import { StatusSummary } from './contract/StatusSummary';
-import { ContractInstructions } from './contract/ContractInstructions';
+import { supabase } from './database';
+import { QualificationObject, QualificationObjectType, CreateQualificationObjectData } from '../types/QualificationObject';
 
-interface ContractNegotiationProps {
-  project: Project;
-  onBack: () => void;
-}
-
-export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBack }) => {
-  const { user } = useAuth();
-  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState<{ [key: string]: boolean }>({});
-  const [error, setError] = useState<string | null>(null);
-
-  // Безопасная проверка данных проекта
-  if (!project || !project.id) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <FileText className="w-8 h-8 text-red-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки проекта</h1>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <p className="text-red-600">Данные проекта не найдены или повреждены</p>
-        </div>
-      </div>
-    );
+class QualificationObjectService {
+  isAvailable(): boolean {
+    return !!supabase;
   }
 
-  // Загрузка документов проекта
-  const loadDocuments = async () => {
-    if (!projectDocumentService.isAvailable()) {
-      setError('Supabase не настроен для работы с документами');
-      return;
+  async getByContractorId(contractorId: string): Promise<QualificationObject[]> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
     }
 
-    setLoading(true);
-    setError(null);
+    const { data, error } = await supabase
+      .from('qualification_objects')
+      .select('*')
+      .eq('contractor_id', contractorId)
+      .order('created_at', { ascending: false });
 
-    try {
-      const docs = await projectDocumentService.getProjectDocuments(project.id);
-      setDocuments(docs);
-    } catch (error) {
-      console.error('Ошибка загрузки документов:', error);
-      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDocuments();
-  }, [project.id]);
-
-  // Загрузка документа
-  const handleFileUpload = async (documentType: 'commercial_offer' | 'contract', file: File) => {
-    if (!file) return;
-
-    // Проверяем тип файла
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Поддерживаются только файлы PDF, DOC и DOCX');
-      return;
+    if (error) {
+      throw new Error(`Ошибка загрузки объектов квалификации: ${error.message}`);
     }
 
-    setUploading(prev => ({ ...prev, [documentType]: true }));
+    return data || [];
+  }
 
-    try {
-      const uploadedDoc = await projectDocumentService.uploadDocument(project.id, documentType, file, user?.id);
+  async create(objectData: CreateQualificationObjectData): Promise<QualificationObject> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
+    }
+
+    let planFileUrl: string | undefined;
+    let planFileName: string | undefined;
+    let testDataFileUrl: string | undefined;
+    let testDataFileName: string | undefined;
+
+    // Загрузка файла плана
+    if (objectData.planFile) {
+      const planFileExt = objectData.planFile.name.split('.').pop();
+      const planFilePath = `plans/${Date.now()}-${Math.random().toString(36).substring(2)}.${planFileExt}`;
       
-      // Обновляем список документов
-      setDocuments(prev => {
-        const filtered = prev.filter(doc => doc.documentType !== documentType);
-        return [...filtered, uploadedDoc];
-      });
+      const { error: planUploadError } = await supabase.storage
+        .from('qualification-objects')
+        .upload(planFilePath, objectData.planFile);
 
-      alert('Документ успешно загружен');
-    } catch (error) {
-      console.error('Ошибка загрузки документа:', error);
-      alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setUploading(prev => ({ ...prev, [documentType]: false }));
-    }
-  };
+      if (planUploadError) {
+        throw new Error(`Ошибка загрузки файла плана: ${planUploadError.message}`);
+      }
 
-  // Удаление документа
-  const handleDeleteDocument = async (documentId: string, documentType: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот документ?')) {
-      return;
+      const { data: planUrlData } = supabase.storage
+        .from('qualification-objects')
+        .getPublicUrl(planFilePath);
+
+      planFileUrl = planUrlData.publicUrl;
+      planFileName = objectData.planFile.name;
     }
 
-    try {
-      await projectDocumentService.deleteDocument(documentId);
-      setDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      alert('Документ успешно удален');
-    } catch (error) {
-      console.error('Ошибка удаления документа:', error);
-      alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
-  };
-
-  // Скачивание документа
-  const handleDownloadDocument = async (document: ProjectDocument) => {
-    try {
-      const blob = await projectDocumentService.downloadDocument(document.fileUrl);
-      const url = URL.createObjectURL(blob);
+    // Загрузка файла данных испытаний
+    if (objectData.testDataFile) {
+      const testFileExt = objectData.testDataFile.name.split('.').pop();
+      const testFilePath = `test-data/${Date.now()}-${Math.random().toString(36).substring(2)}.${testFileExt}`;
       
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = document.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Ошибка скачивания документа:', error);
-      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      const { error: testUploadError } = await supabase.storage
+        .from('qualification-objects')
+        .upload(testFilePath, objectData.testDataFile);
+
+      if (testUploadError) {
+        throw new Error(`Ошибка загрузки файла данных испытаний: ${testUploadError.message}`);
+      }
+
+      const { data: testUrlData } = supabase.storage
+        .from('qualification-objects')
+        .getPublicUrl(testFilePath);
+
+      testDataFileUrl = testUrlData.publicUrl;
+      testDataFileName = objectData.testDataFile.name;
     }
-  };
 
-  // Просмотр документа
-  const handleViewDocument = (document: ProjectDocument) => {
-    window.open(document.fileUrl, '_blank');
-  };
+    const { data, error } = await supabase
+      .from('qualification_objects')
+      .insert({
+        contractor_id: objectData.contractorId,
+        type: objectData.type,
+        name: objectData.name,
+        climate_system: objectData.climateSystem,
+        plan_file_url: planFileUrl,
+        plan_file_name: planFileName,
+        address: objectData.address,
+        latitude: objectData.latitude,
+        longitude: objectData.longitude,
+        area: objectData.area,
+        vin: objectData.vin,
+        registration_number: objectData.registrationNumber,
+        body_volume: objectData.bodyVolume,
+        inventory_number: objectData.inventoryNumber,
+        chamber_volume: objectData.chamberVolume,
+        serial_number: objectData.serialNumber,
+        test_data_file_url: testDataFileUrl,
+        test_data_file_name: testDataFileName
+      })
+      .select()
+      .single();
 
-  // Get documents by type
-  const commercialOfferDoc = documents.find(doc => doc.documentType === 'commercial_offer');
-  const contractDoc = documents.find(doc => doc.documentType === 'contract');
+    if (error) {
+      throw new Error(`Ошибка создания объекта квалификации: ${error.message}`);
+    }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center space-x-3">
-        <button
-          onClick={onBack}
-          className="text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        <FileText className="w-8 h-8 text-indigo-600" />
-        <h1 className="text-2xl font-bold text-gray-900">Согласование договора</h1>
-      </div>
+    return data;
+  }
 
-      {/* Project Info */}
-      <ProjectInfo project={project} />
+  async update(id: string, objectData: Partial<CreateQualificationObjectData>): Promise<QualificationObject> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
+    }
 
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start space-x-2">
-            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки документов</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
+    let planFileUrl: string | undefined;
+    let planFileName: string | undefined;
+    let testDataFileUrl: string | undefined;
+    let testDataFileName: string | undefined;
 
-      {/* Qualification Objects CRUD - Этап согласования объемов */}
-      <QualificationObjectsCRUD 
-        contractorId={project.contractorId}
-        contractorName={project.contractorName || 'Неизвестный контрагент'}
-      />
+    // Загрузка нового файла плана
+    if (objectData.planFile) {
+      const planFileExt = objectData.planFile.name.split('.').pop();
+      const planFilePath = `plans/${Date.now()}-${Math.random().toString(36).substring(2)}.${planFileExt}`;
+      
+      const { error: planUploadError } = await supabase.storage
+        .from('qualification-objects')
+        .upload(planFilePath, objectData.planFile);
 
-      {/* Negotiation Stages */}
-      <NegotiationStages 
-        project={project}
-        commercialOfferDoc={commercialOfferDoc}
-        contractDoc={contractDoc}
-      />
+      if (planUploadError) {
+        throw new Error(`Ошибка загрузки файла плана: ${planUploadError.message}`);
+      }
 
-      {/* Document Uploads */}
-      <div className="space-y-6">
-        <DocumentUpload
-          title="Коммерческое предложение"
-          documentType="commercial_offer"
-          document={commercialOfferDoc}
-          uploading={uploading.commercial_offer || false}
-          onUpload={(file) => handleFileUpload('commercial_offer', file)}
-          onDownload={handleDownloadDocument}
-          onView={handleViewDocument}
-          onDelete={handleDeleteDocument}
-        />
+      const { data: planUrlData } = supabase.storage
+        .from('qualification-objects')
+        .getPublicUrl(planFilePath);
 
-        <DocumentUpload
-          title="Договор"
-          documentType="contract"
-          document={contractDoc}
-          uploading={uploading.contract || false}
-          onUpload={(file) => handleFileUpload('contract', file)}
-          onDownload={handleDownloadDocument}
-          onView={handleViewDocument}
-          onDelete={handleDeleteDocument}
-          disabled={!commercialOfferDoc}
-        />
-      </div>
+      planFileUrl = planUrlData.publicUrl;
+      planFileName = objectData.planFile.name;
+    }
 
-      {/* Status Summary */}
-      <StatusSummary 
-        documents={documents}
-        commercialOfferDoc={commercialOfferDoc}
-        contractDoc={contractDoc}
-      />
+    // Загрузка нового файла данных испытаний
+    if (objectData.testDataFile) {
+      const testFileExt = objectData.testDataFile.name.split('.').pop();
+      const testFilePath = `test-data/${Date.now()}-${Math.random().toString(36).substring(2)}.${testFileExt}`;
+      
+      const { error: testUploadError } = await supabase.storage
+        .from('qualification-objects')
+        .upload(testFilePath, objectData.testDataFile);
 
-      {/* Instructions */}
-      <ContractInstructions />
-    </div>
-  );
-};
+      if (testUploadError) {
+        throw new Error(`Ошибка загрузки файла данных испытаний: ${testUploadError.message}`);
+      }
+
+      const { data: testUrlData } = supabase.storage
+        .from('qualification-objects')
+        .getPublicUrl(testFilePath);
+
+      testDataFileUrl = testUrlData.publicUrl;
+      testDataFileName = objectData.testDataFile.name;
+    }
+
+    const updateData: any = {};
+    
+    if (objectData.type !== undefined) updateData.type = objectData.type;
+    if (objectData.name !== undefined) updateData.name = objectData.name;
+    if (objectData.climateSystem !== undefined) updateData.climate_system = objectData.climateSystem;
+    if (planFileUrl !== undefined) {
+      updateData.plan_file_url = planFileUrl;
+      updateData.plan_file_name = planFileName;
+    }
+    if (objectData.address !== undefined) updateData.address = objectData.address;
+    if (objectData.latitude !== undefined) updateData.latitude = objectData.latitude;
+    if (objectData.longitude !== undefined) updateData.longitude = objectData.longitude;
+    if (objectData.area !== undefined) updateData.area = objectData.area;
+    if (objectData.vin !== undefined) updateData.vin = objectData.vin;
+    if (objectData.registrationNumber !== undefined) updateData.registration_number = objectData.registrationNumber;
+    if (objectData.bodyVolume !== undefined) updateData.body_volume = objectData.bodyVolume;
+    if (objectData.inventoryNumber !== undefined) updateData.inventory_number = objectData.inventoryNumber;
+    if (objectData.chamberVolume !== undefined) updateData.chamber_volume = objectData.chamberVolume;
+    if (objectData.serialNumber !== undefined) updateData.serial_number = objectData.serialNumber;
+    if (testDataFileUrl !== undefined) {
+      updateData.test_data_file_url = testDataFileUrl;
+      updateData.test_data_file_name = testDataFileName;
+    }
+
+    const { data, error } = await supabase
+      .from('qualification_objects')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Ошибка обновления объекта квалификации: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async delete(id: string): Promise<void> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
+    }
+
+    const { error } = await supabase
+      .from('qualification_objects')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Ошибка удаления объекта квалификации: ${error.message}`);
+    }
+  }
+
+  async getById(id: string): Promise<QualificationObject | null> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
+    }
+
+    const { data, error } = await supabase
+      .from('qualification_objects')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw new Error(`Ошибка загрузки объекта квалификации: ${error.message}`);
+    }
+
+    return data;
+  }
+}
+
+export const qualificationObjectService = new QualificationObjectService();
