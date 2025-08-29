@@ -1,70 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, Upload, Download, Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, Plus, Edit2, Save, X, Building, Car, Refrigerator, Snowflake, MapPin } from 'lucide-react';
-import { Project } from '../types/Project';
-import { QualificationObject, QualificationObjectTypeLabels, CreateQualificationObjectData } from '../types/QualificationObject';
-import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
-import { qualificationObjectService } from '../utils/qualificationObjectService';
-import { QualificationObjectForm } from './QualificationObjectForm';
-import { NegotiationStages } from './contract/NegotiationStages';
-import { DocumentUpload } from './contract/DocumentUpload';
-import { StatusSummary } from './contract/StatusSummary';
-import { ContractInstructions } from './contract/ContractInstructions';
-import { useAuth } from '../contexts/AuthContext';
-import { ProjectInfo } from './contract/ProjectInfo';
-import { NegotiationStages } from './contract/NegotiationStages';
-import { QualificationObjectsCRUD } from './contract/QualificationObjectsCRUD';
-import { DocumentUpload } from './contract/DocumentUpload';
-import { StatusSummary } from './contract/StatusSummary';
-import { ContractInstructions } from './contract/ContractInstructions';
+import { Plus, Edit2, Save, X, Building, Car, Refrigerator, Snowflake, MapPin, Trash2 } from 'lucide-react';
+import { QualificationObject, QualificationObjectTypeLabels, CreateQualificationObjectData } from '../../types/QualificationObject';
+import { qualificationObjectService } from '../../utils/qualificationObjectService';
+import { QualificationObjectForm } from '../QualificationObjectForm';
 
-interface ContractNegotiationProps {
-  project: Project;
-  onBack: () => void;
+interface QualificationObjectsCRUDProps {
+  contractorId: string;
+  contractorName: string;
 }
 
-export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBack }) => {
-  const { user } = useAuth();
-  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
+export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> = ({ 
+  contractorId, 
+  contractorName 
+}) => {
+  const [objects, setObjects] = useState<QualificationObject[]>([]);
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState<{ [key: string]: boolean }>({});
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editingObject, setEditingObject] = useState<QualificationObject | null>(null);
 
-  // Безопасная проверка данных проекта
-  if (!project || !project.id) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <FileText className="w-8 h-8 text-red-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки проекта</h1>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <p className="text-red-600">Данные проекта не найдены или повреждены</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Загрузка документов проекта
-  const loadDocuments = async () => {
-    if (!projectDocumentService.isAvailable()) {
-      setError('Supabase не настроен для работы с документами');
-      return;
-    }
-
+  // Загрузка объектов квалификации
+  const loadObjects = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const docs = await projectDocumentService.getProjectDocuments(project.id);
-      setDocuments(docs);
+      const data = await qualificationObjectService.getQualificationObjectsByContractor(contractorId);
+      setObjects(data);
     } catch (error) {
-      console.error('Ошибка загрузки документов:', error);
+      console.error('Ошибка загрузки объектов:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
     } finally {
       setLoading(false);
@@ -72,163 +36,244 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
   };
 
   useEffect(() => {
-    loadDocuments();
-  }, [project.id]);
+    loadObjects();
+  }, [contractorId]);
 
-  // Загрузка документа
-  const handleFileUpload = async (documentType: 'commercial_offer' | 'contract', file: File) => {
-    if (!file) return;
-
-    // Проверяем тип файла
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Поддерживаются только файлы PDF, DOC и DOCX');
-      return;
-    }
-
-    setUploading(prev => ({ ...prev, [documentType]: true }));
-
+  // Создание нового объекта
+  const handleCreate = async (data: CreateQualificationObjectData) => {
     try {
-      const uploadedDoc = await projectDocumentService.uploadDocument(project.id, documentType, file, user?.id);
-      
-      // Обновляем список документов
-      setDocuments(prev => {
-        const filtered = prev.filter(doc => doc.documentType !== documentType);
-        return [...filtered, uploadedDoc];
+      const newObject = await qualificationObjectService.createQualificationObject({
+        ...data,
+        contractorId
       });
-
-      alert('Документ успешно загружен');
+      setObjects(prev => [newObject, ...prev]);
+      setShowForm(false);
     } catch (error) {
-      console.error('Ошибка загрузки документа:', error);
-      alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setUploading(prev => ({ ...prev, [documentType]: false }));
+      console.error('Ошибка создания объекта:', error);
+      alert(`Ошибка создания объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   };
 
-  // Удаление документа
-  const handleDeleteDocument = async (documentId: string, documentType: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот документ?')) {
+  // Обновление объекта
+  const handleUpdate = async (id: string, data: Partial<CreateQualificationObjectData>) => {
+    try {
+      const updatedObject = await qualificationObjectService.updateQualificationObject(id, data);
+      setObjects(prev => prev.map(obj => obj.id === id ? updatedObject : obj));
+      setEditingObject(null);
+    } catch (error) {
+      console.error('Ошибка обновления объекта:', error);
+      alert(`Ошибка обновления объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  };
+
+  // Удаление объекта
+  const handleDelete = async (id: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот объект квалификации?')) {
       return;
     }
 
     try {
-      await projectDocumentService.deleteDocument(documentId);
-      setDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      alert('Документ успешно удален');
+      await qualificationObjectService.deleteQualificationObject(id);
+      setObjects(prev => prev.filter(obj => obj.id !== id));
     } catch (error) {
-      console.error('Ошибка удаления документа:', error);
-      alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      console.error('Ошибка удаления объекта:', error);
+      alert(`Ошибка удаления объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   };
 
-  // Скачивание документа
-  const handleDownloadDocument = async (document: ProjectDocument) => {
-    try {
-      const blob = await projectDocumentService.downloadDocument(document.fileUrl);
-      const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = document.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Ошибка скачивания документа:', error);
-      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+  // Получение иконки для типа объекта
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'помещение':
+        return <Building className="w-5 h-5" />;
+      case 'автомобиль':
+        return <Car className="w-5 h-5" />;
+      case 'холодильная_камера':
+        return <Refrigerator className="w-5 h-5" />;
+      case 'холодильник':
+      case 'морозильник':
+        return <Snowflake className="w-5 h-5" />;
+      default:
+        return <Building className="w-5 h-5" />;
     }
   };
-
-  // Просмотр документа
-  const handleViewDocument = (document: ProjectDocument) => {
-    window.open(document.fileUrl, '_blank');
-  };
-
-  // Get documents by type
-  const commercialOfferDoc = documents.find(doc => doc.documentType === 'commercial_offer');
-  const contractDoc = documents.find(doc => doc.documentType === 'contract');
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center space-x-3">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">Объекты квалификации</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Контрагент: <span className="font-medium">{contractorName}</span>
+          </p>
+        </div>
         <button
-          onClick={onBack}
-          className="text-gray-600 hover:text-gray-900 transition-colors"
+          onClick={() => setShowForm(true)}
+          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
         >
-          <ArrowLeft className="w-6 h-6" />
+          <Plus className="w-4 h-4" />
+          <span>Добавить объект</span>
         </button>
-        <FileText className="w-8 h-8 text-indigo-600" />
-        <h1 className="text-2xl font-bold text-gray-900">Согласование договора</h1>
       </div>
-
-      {/* Project Info */}
-      <ProjectInfo project={project} />
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start space-x-2">
-            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки документов</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="text-gray-600 mt-2">Загрузка объектов...</p>
+        </div>
+      )}
+
+      {/* Objects List */}
+      {!loading && objects.length === 0 && (
+        <div className="text-center py-8">
+          <Building className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">Объекты квалификации не найдены</p>
+          <p className="text-sm text-gray-500 mt-1">Добавьте первый объект для начала работы</p>
+        </div>
+      )}
+
+      {!loading && objects.length > 0 && (
+        <div className="space-y-4">
+          {objects.map((object) => (
+            <div key={object.id} className="border border-gray-200 rounded-lg p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-3">
+                  <div className="text-indigo-600 mt-1">
+                    {getTypeIcon(object.type)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <h3 className="font-medium text-gray-900">
+                        {object.name || QualificationObjectTypeLabels[object.type]}
+                      </h3>
+                      <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                        {QualificationObjectTypeLabels[object.type]}
+                      </span>
+                    </div>
+                    
+                    {object.address && (
+                      <div className="flex items-center space-x-1 mt-1">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-600">{object.address}</span>
+                      </div>
+                    )}
+
+                    {/* Дополнительная информация в зависимости от типа */}
+                    <div className="mt-2 space-y-1">
+                      {object.area && (
+                        <p className="text-sm text-gray-600">
+                          Площадь: <span className="font-medium">{object.area} м²</span>
+                        </p>
+                      )}
+                      {object.vin && (
+                        <p className="text-sm text-gray-600">
+                          VIN: <span className="font-medium">{object.vin}</span>
+                        </p>
+                      )}
+                      {object.registrationNumber && (
+                        <p className="text-sm text-gray-600">
+                          Гос. номер: <span className="font-medium">{object.registrationNumber}</span>
+                        </p>
+                      )}
+                      {object.bodyVolume && (
+                        <p className="text-sm text-gray-600">
+                          Объем кузова: <span className="font-medium">{object.bodyVolume} м³</span>
+                        </p>
+                      )}
+                      {object.inventoryNumber && (
+                        <p className="text-sm text-gray-600">
+                          Инвентарный номер: <span className="font-medium">{object.inventoryNumber}</span>
+                        </p>
+                      )}
+                      {object.chamberVolume && (
+                        <p className="text-sm text-gray-600">
+                          Объем камеры: <span className="font-medium">{object.chamberVolume} л</span>
+                        </p>
+                      )}
+                      {object.serialNumber && (
+                        <p className="text-sm text-gray-600">
+                          Серийный номер: <span className="font-medium">{object.serialNumber}</span>
+                        </p>
+                      )}
+                      {object.climateSystem && (
+                        <p className="text-sm text-gray-600">
+                          Климатическая система: <span className="font-medium">{object.climateSystem}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setEditingObject(object)}
+                    className="text-gray-600 hover:text-indigo-600 transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(object.id)}
+                    className="text-gray-600 hover:text-red-600 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Добавить объект квалификации</h3>
+              <button
+                onClick={() => setShowForm(false)}
+                className="text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <QualificationObjectForm
+              onSubmit={handleCreate}
+              onCancel={() => setShowForm(false)}
+            />
           </div>
         </div>
       )}
 
-      {/* Qualification Objects CRUD - Этап согласования объемов */}
-      <QualificationObjectsCRUD 
-        contractorId={project.contractorId}
-        contractorName={project.contractorName || 'Неизвестный контрагент'}
-      />
-
-      {/* Negotiation Stages */}
-      <NegotiationStages 
-        project={project}
-        commercialOfferDoc={commercialOfferDoc}
-        contractDoc={contractDoc}
-      />
-
-      {/* Document Uploads */}
-      <div className="space-y-6">
-        <DocumentUpload
-          title="Коммерческое предложение"
-          documentType="commercial_offer"
-          document={commercialOfferDoc}
-          uploading={uploading.commercial_offer || false}
-          onUpload={(file) => handleFileUpload('commercial_offer', file)}
-          onDownload={handleDownloadDocument}
-          onView={handleViewDocument}
-          onDelete={handleDeleteDocument}
-        />
-
-        <DocumentUpload
-          title="Договор"
-          documentType="contract"
-          document={contractDoc}
-          uploading={uploading.contract || false}
-          onUpload={(file) => handleFileUpload('contract', file)}
-          onDownload={handleDownloadDocument}
-          onView={handleViewDocument}
-          onDelete={handleDeleteDocument}
-          disabled={!commercialOfferDoc}
-        />
-      </div>
-
-      {/* Status Summary */}
-      <StatusSummary 
-        documents={documents}
-        commercialOfferDoc={commercialOfferDoc}
-        contractDoc={contractDoc}
-      />
-
-      {/* Instructions */}
-      <ContractInstructions />
+      {/* Edit Form Modal */}
+      {editingObject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Редактировать объект квалификации</h3>
+              <button
+                onClick={() => setEditingObject(null)}
+                className="text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <QualificationObjectForm
+              initialData={editingObject}
+              onSubmit={(data) => handleUpdate(editingObject.id, data)}
+              onCancel={() => setEditingObject(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
