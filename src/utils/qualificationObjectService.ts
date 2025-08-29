@@ -1,234 +1,223 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, Upload, Download, Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, Plus, Edit2, Save, X, Building, Car, Refrigerator, Snowflake, MapPin } from 'lucide-react';
-import { Project } from '../types/Project';
-import { QualificationObject, QualificationObjectTypeLabels, CreateQualificationObjectData } from '../types/QualificationObject';
-import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
-import { qualificationObjectService } from '../utils/qualificationObjectService';
-import { QualificationObjectForm } from './QualificationObjectForm';
-import { NegotiationStages } from './contract/NegotiationStages';
-import { DocumentUpload } from './contract/DocumentUpload';
-import { StatusSummary } from './contract/StatusSummary';
-import { ContractInstructions } from './contract/ContractInstructions';
-import { useAuth } from '../contexts/AuthContext';
-import { ProjectInfo } from './contract/ProjectInfo';
-import { NegotiationStages } from './contract/NegotiationStages';
-import { QualificationObjectsCRUD } from './contract/QualificationObjectsCRUD';
-import { DocumentUpload } from './contract/DocumentUpload';
-import { StatusSummary } from './contract/StatusSummary';
-import { ContractInstructions } from './contract/ContractInstructions';
+import { supabase } from './database';
+import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 
-interface ContractNegotiationProps {
-  project: Project;
-  onBack: () => void;
-}
-
-export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBack }) => {
-  const { user } = useAuth();
-  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState<{ [key: string]: boolean }>({});
-  const [error, setError] = useState<string | null>(null);
-
-  // Безопасная проверка данных проекта
-  if (!project || !project.id) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <FileText className="w-8 h-8 text-red-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки проекта</h1>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <p className="text-red-600">Данные проекта не найдены или повреждены</p>
-        </div>
-      </div>
-    );
+class QualificationObjectService {
+  // Проверка доступности Supabase
+  isAvailable(): boolean {
+    return !!supabase;
   }
 
-  // Загрузка документов проекта
-  const loadDocuments = async () => {
-    if (!projectDocumentService.isAvailable()) {
-      setError('Supabase не настроен для работы с документами');
-      return;
+  // Получение всех объектов квалификации
+  async getAllQualificationObjects(): Promise<QualificationObject[]> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
     }
 
-    setLoading(true);
-    setError(null);
+    const { data, error } = await supabase
+      .from('qualification_objects')
+      .select(`
+        *,
+        contractor:contractors(name)
+      `)
+      .order('created_at', { ascending: false });
 
-    try {
-      const docs = await projectDocumentService.getProjectDocuments(project.id);
-      setDocuments(docs);
-    } catch (error) {
-      console.error('Ошибка загрузки документов:', error);
-      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDocuments();
-  }, [project.id]);
-
-  // Загрузка документа
-  const handleFileUpload = async (documentType: 'commercial_offer' | 'contract', file: File) => {
-    if (!file) return;
-
-    // Проверяем тип файла
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Поддерживаются только файлы PDF, DOC и DOCX');
-      return;
+    if (error) {
+      throw new Error(`Ошибка загрузки объектов квалификации: ${error.message}`);
     }
 
-    setUploading(prev => ({ ...prev, [documentType]: true }));
+    return data.map(this.mapFromDatabase);
+  }
 
-    try {
-      const uploadedDoc = await projectDocumentService.uploadDocument(project.id, documentType, file, user?.id);
-      
-      // Обновляем список документов
-      setDocuments(prev => {
-        const filtered = prev.filter(doc => doc.documentType !== documentType);
-        return [...filtered, uploadedDoc];
-      });
-
-      alert('Документ успешно загружен');
-    } catch (error) {
-      console.error('Ошибка загрузки документа:', error);
-      alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setUploading(prev => ({ ...prev, [documentType]: false }));
-    }
-  };
-
-  // Удаление документа
-  const handleDeleteDocument = async (documentId: string, documentType: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот документ?')) {
-      return;
+  // Получение объектов квалификации по контрагенту
+  async getQualificationObjectsByContractor(contractorId: string): Promise<QualificationObject[]> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
     }
 
-    try {
-      await projectDocumentService.deleteDocument(documentId);
-      setDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      alert('Документ успешно удален');
-    } catch (error) {
-      console.error('Ошибка удаления документа:', error);
-      alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    const { data, error } = await supabase
+      .from('qualification_objects')
+      .select('*')
+      .eq('contractor_id', contractorId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Ошибка загрузки объектов квалификации: ${error.message}`);
     }
-  };
 
-  // Скачивание документа
-  const handleDownloadDocument = async (document: ProjectDocument) => {
-    try {
-      const blob = await projectDocumentService.downloadDocument(document.fileUrl);
-      const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = document.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Ошибка скачивания документа:', error);
-      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    return data.map(this.mapFromDatabase);
+  }
+
+  // Создание нового объекта квалификации
+  async createQualificationObject(data: CreateQualificationObjectData): Promise<QualificationObject> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
     }
-  };
 
-  // Просмотр документа
-  const handleViewDocument = (document: ProjectDocument) => {
-    window.open(document.fileUrl, '_blank');
-  };
+    const dbData = this.mapToDatabase(data);
 
-  // Get documents by type
-  const commercialOfferDoc = documents.find(doc => doc.documentType === 'commercial_offer');
-  const contractDoc = documents.find(doc => doc.documentType === 'contract');
+    const { data: result, error } = await supabase
+      .from('qualification_objects')
+      .insert(dbData)
+      .select()
+      .single();
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center space-x-3">
-        <button
-          onClick={onBack}
-          className="text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        <FileText className="w-8 h-8 text-indigo-600" />
-        <h1 className="text-2xl font-bold text-gray-900">Согласование договора</h1>
-      </div>
+    if (error) {
+      throw new Error(`Ошибка создания объекта квалификации: ${error.message}`);
+    }
 
-      {/* Project Info */}
-      <ProjectInfo project={project} />
+    return this.mapFromDatabase(result);
+  }
 
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start space-x-2">
-            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки документов</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
+  // Обновление объекта квалификации
+  async updateQualificationObject(id: string, data: Partial<CreateQualificationObjectData>): Promise<QualificationObject> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
+    }
 
-      {/* Qualification Objects CRUD - Этап согласования объемов */}
-      <QualificationObjectsCRUD 
-        contractorId={project.contractorId}
-        contractorName={project.contractorName || 'Неизвестный контрагент'}
-      />
+    const dbData = this.mapToDatabase(data);
 
-      {/* Negotiation Stages */}
-      <NegotiationStages 
-        project={project}
-        commercialOfferDoc={commercialOfferDoc}
-        contractDoc={contractDoc}
-      />
+    const { data: result, error } = await supabase
+      .from('qualification_objects')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
 
-      {/* Document Uploads */}
-      <div className="space-y-6">
-        <DocumentUpload
-          title="Коммерческое предложение"
-          documentType="commercial_offer"
-          document={commercialOfferDoc}
-          uploading={uploading.commercial_offer || false}
-          onUpload={(file) => handleFileUpload('commercial_offer', file)}
-          onDownload={handleDownloadDocument}
-          onView={handleViewDocument}
-          onDelete={handleDeleteDocument}
-        />
+    if (error) {
+      throw new Error(`Ошибка обновления объекта квалификации: ${error.message}`);
+    }
 
-        <DocumentUpload
-          title="Договор"
-          documentType="contract"
-          document={contractDoc}
-          uploading={uploading.contract || false}
-          onUpload={(file) => handleFileUpload('contract', file)}
-          onDownload={handleDownloadDocument}
-          onView={handleViewDocument}
-          onDelete={handleDeleteDocument}
-          disabled={!commercialOfferDoc}
-        />
-      </div>
+    return this.mapFromDatabase(result);
+  }
 
-      {/* Status Summary */}
-      <StatusSummary 
-        documents={documents}
-        commercialOfferDoc={commercialOfferDoc}
-        contractDoc={contractDoc}
-      />
+  // Удаление объекта квалификации
+  async deleteQualificationObject(id: string): Promise<void> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
+    }
 
-      {/* Instructions */}
-      <ContractInstructions />
-    </div>
-  );
-};
+    const { error } = await supabase
+      .from('qualification_objects')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Ошибка удаления объекта квалификации: ${error.message}`);
+    }
+  }
+
+  // Загрузка файла плана
+  async uploadPlanFile(objectId: string, file: File): Promise<string> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
+    }
+
+    const fileName = `plans/${objectId}/${Date.now()}-${file.name}`;
+
+    const { data, error } = await supabase.storage
+      .from('qualification-objects')
+      .upload(fileName, file);
+
+    if (error) {
+      throw new Error(`Ошибка загрузки файла плана: ${error.message}`);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('qualification-objects')
+      .getPublicUrl(fileName);
+
+    // Обновляем объект с URL файла
+    await this.updateQualificationObject(objectId, {
+      planFileUrl: urlData.publicUrl,
+      planFileName: file.name
+    });
+
+    return urlData.publicUrl;
+  }
+
+  // Загрузка файла данных испытаний
+  async uploadTestDataFile(objectId: string, file: File): Promise<string> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
+    }
+
+    const fileName = `test-data/${objectId}/${Date.now()}-${file.name}`;
+
+    const { data, error } = await supabase.storage
+      .from('qualification-objects')
+      .upload(fileName, file);
+
+    if (error) {
+      throw new Error(`Ошибка загрузки файла данных испытаний: ${error.message}`);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('qualification-objects')
+      .getPublicUrl(fileName);
+
+    // Обновляем объект с URL файла
+    await this.updateQualificationObject(objectId, {
+      testDataFileUrl: urlData.publicUrl,
+      testDataFileName: file.name
+    });
+
+    return urlData.publicUrl;
+  }
+
+  // Маппинг из базы данных в TypeScript объект
+  private mapFromDatabase(dbObject: any): QualificationObject {
+    return {
+      id: dbObject.id,
+      contractorId: dbObject.contractor_id,
+      type: dbObject.type,
+      name: dbObject.name,
+      climateSystem: dbObject.climate_system,
+      planFileUrl: dbObject.plan_file_url,
+      planFileName: dbObject.plan_file_name,
+      address: dbObject.address,
+      latitude: dbObject.latitude ? parseFloat(dbObject.latitude) : undefined,
+      longitude: dbObject.longitude ? parseFloat(dbObject.longitude) : undefined,
+      geocodedAt: dbObject.geocoded_at,
+      area: dbObject.area ? parseFloat(dbObject.area) : undefined,
+      vin: dbObject.vin,
+      registrationNumber: dbObject.registration_number,
+      bodyVolume: dbObject.body_volume ? parseFloat(dbObject.body_volume) : undefined,
+      inventoryNumber: dbObject.inventory_number,
+      chamberVolume: dbObject.chamber_volume ? parseFloat(dbObject.chamber_volume) : undefined,
+      serialNumber: dbObject.serial_number,
+      testDataFileUrl: dbObject.test_data_file_url,
+      testDataFileName: dbObject.test_data_file_name,
+      createdAt: dbObject.created_at,
+      updatedAt: dbObject.updated_at
+    };
+  }
+
+  // Маппинг из TypeScript объекта в формат базы данных
+  private mapToDatabase(object: Partial<CreateQualificationObjectData>): any {
+    const dbObject: any = {};
+
+    if (object.contractorId !== undefined) dbObject.contractor_id = object.contractorId;
+    if (object.type !== undefined) dbObject.type = object.type;
+    if (object.name !== undefined) dbObject.name = object.name;
+    if (object.climateSystem !== undefined) dbObject.climate_system = object.climateSystem;
+    if (object.planFileUrl !== undefined) dbObject.plan_file_url = object.planFileUrl;
+    if (object.planFileName !== undefined) dbObject.plan_file_name = object.planFileName;
+    if (object.address !== undefined) dbObject.address = object.address;
+    if (object.latitude !== undefined) dbObject.latitude = object.latitude;
+    if (object.longitude !== undefined) dbObject.longitude = object.longitude;
+    if (object.geocodedAt !== undefined) dbObject.geocoded_at = object.geocodedAt;
+    if (object.area !== undefined) dbObject.area = object.area;
+    if (object.vin !== undefined) dbObject.vin = object.vin;
+    if (object.registrationNumber !== undefined) dbObject.registration_number = object.registrationNumber;
+    if (object.bodyVolume !== undefined) dbObject.body_volume = object.bodyVolume;
+    if (object.inventoryNumber !== undefined) dbObject.inventory_number = object.inventoryNumber;
+    if (object.chamberVolume !== undefined) dbObject.chamber_volume = object.chamberVolume;
+    if (object.serialNumber !== undefined) dbObject.serial_number = object.serialNumber;
+    if (object.testDataFileUrl !== undefined) dbObject.test_data_file_url = object.testDataFileUrl;
+    if (object.testDataFileName !== undefined) dbObject.test_data_file_name = object.testDataFileName;
+
+    return dbObject;
+  }
+}
+
+export const qualificationObjectService = new QualificationObjectService();
