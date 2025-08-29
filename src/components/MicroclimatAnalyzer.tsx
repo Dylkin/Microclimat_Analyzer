@@ -193,7 +193,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       }
 
       return {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         name: file.name,
         uploadDate: new Date().toLocaleString('ru-RU'),
         parsingStatus: 'processing' as const,
