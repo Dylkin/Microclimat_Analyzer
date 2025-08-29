@@ -120,7 +120,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       }
       
       try {
-        const data = await qualificationObjectService.getQualificationObjects(selectedContractor);
+        const data = await qualificationObjectService.getQualificationObjectsByContractor(selectedContractor);
         
         // Если есть выбранный проект, фильтруем объекты квалификации
         if (selectedProject) {
