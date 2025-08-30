@@ -317,6 +317,12 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           page: 'contract_negotiation',
           icon: FileText
         };
+      case 'protocol_preparation':
+        return {
+          label: 'Подготовка протокола',
+          page: 'protocol_preparation',
+          icon: FileText
+        };
       case 'testing_execution':
         return {
           label: 'Перейти к испытаниям',
