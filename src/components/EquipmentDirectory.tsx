@@ -272,17 +272,10 @@ export const EquipmentDirectory: React.FC = () => {
       verificationFileName: undefined
     };
 
-    if (isEdit) {
-      setEditEquipment(prev => ({
-        ...prev,
-        verifications: [...prev.verifications, newVerification]
-      }));
-    } else {
-      setNewEquipment(prev => ({
-        ...prev,
-        verifications: [...(prev.verifications || []), newVerification]
-      }));
-    }
+    setNewEquipment(prev => ({
+      ...prev,
+      verifications: [...(prev.verifications || []), newVerification]
+    }));
   };
 
   const updateVerification = (index: number, field: keyof EquipmentVerification, value: any, isEdit = false) => {
