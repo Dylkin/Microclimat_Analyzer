@@ -661,6 +661,7 @@ export const ContractorDirectory: React.FC = () => {
               <div className="mb-6">
                 <QualificationObjectForm
                   contractorId={editingContractorData.id}
+                  contractorAddress={editingContractorData.address}
                   onAdd={handleAddQualificationObject}
                   onCancel={() => {
                     setShowAddQualificationForm(false);

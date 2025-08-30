@@ -10,6 +10,7 @@ import { qualificationObjectService } from '../utils/qualificationObjectService'
 
 interface QualificationObjectFormProps {
   contractorId: string;
+  contractorAddress?: string;
   initialData?: QualificationObject;
   onSubmit: (object: QualificationObject) => void;
   onCancel: () => void;
@@ -34,6 +35,7 @@ const getTypeIcon = (type: QualificationObjectType) => {
 
 export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
   contractorId,
+  contractorAddress,
   initialData,
   onSubmit,
   onCancel,
@@ -43,8 +45,9 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     contractorId,
     type: initialData?.type || 'помещение',
     name: initialData?.name || '',
+    manufacturer: initialData?.manufacturer || '',
     climateSystem: initialData?.climateSystem || '',
-    address: initialData?.address || '',
+    address: initialData?.address || contractorAddress || '',
     area: initialData?.area || undefined,
     vin: initialData?.vin || '',
     registrationNumber: initialData?.registrationNumber || '',
@@ -202,6 +205,20 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       case 'холодильная_камера':
         return (
           <div className="space-y-4">
+            {/* Производитель */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Производитель
+              </label>
+              <input
+                type="text"
+                value={formData.manufacturer || ''}
+                onChange={(e) => handleInputChange('manufacturer', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Введите производителя"
+              />
+            </div>
+
             {/* Инвентарный номер */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -237,6 +254,20 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       case 'морозильник':
         return (
           <div className="space-y-4">
+            {/* Производитель */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Производитель
+              </label>
+              <input
+                type="text"
+                value={formData.manufacturer || ''}
+                onChange={(e) => handleInputChange('manufacturer', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Введите производителя"
+              />
+            </div>
+
             {/* Серийный номер */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -505,18 +536,20 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       </div>
 
       {/* Адрес */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Адрес
-        </label>
-        <input
-          type="text"
-          value={formData.address}
-          onChange={(e) => handleInputChange('address', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="Введите адрес"
-        />
-      </div>
+      {formData.type !== 'автомобиль' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Адрес
+          </label>
+          <input
+            type="text"
+            value={formData.address}
+            onChange={(e) => handleInputChange('address', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Введите адрес"
+          />
+        </div>
+      )}
 
       {/* Специфичные для типа поля */}
       {renderTypeSpecificFields()}

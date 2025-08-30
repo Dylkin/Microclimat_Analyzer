@@ -18,6 +18,7 @@ export interface QualificationObject {
   contractorId: string;
   type: QualificationObjectType;
   name?: string;
+  manufacturer?: string;
   climateSystem?: string;
   planFileUrl?: string;
   planFileName?: string;
@@ -42,6 +43,7 @@ export interface CreateQualificationObjectData {
   contractorId: string;
   type: QualificationObjectType;
   name?: string;
+  manufacturer?: string;
   climateSystem?: string;
   planFile?: File;
   address?: string;

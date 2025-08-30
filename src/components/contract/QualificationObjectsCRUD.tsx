@@ -181,6 +181,11 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                           Серийный номер: <span className="font-medium">{object.serialNumber}</span>
                         </p>
                       )}
+                      {object.manufacturer && (
+                        <p className="text-sm text-gray-600">
+                          Производитель: <span className="font-medium">{object.manufacturer}</span>
+                        </p>
+                      )}
                       {object.climateSystem && (
                         <p className="text-sm text-gray-600">
                           Климатическая система: <span className="font-medium">{object.climateSystem}</span>
@@ -221,6 +226,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
           </div>
           <QualificationObjectForm
             initialData={editingObject}
+            contractorAddress={editingObject?.address}
             onSubmit={handleUpdate}
             onCancel={() => setEditingObject(null)}
             hideTypeSelection={true}

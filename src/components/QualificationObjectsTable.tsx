@@ -45,6 +45,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
           <div className="text-sm text-gray-600">
             {obj.address && <div>📍 {obj.address}</div>}
             {obj.area && <div>📐 {obj.area} м²</div>}
+            {obj.manufacturer && <div>🏭 {obj.manufacturer}</div>}
             {obj.climateSystem && <div>❄️ {obj.climateSystem}</div>}
           </div>
         );
@@ -62,6 +63,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
           <div className="text-sm text-gray-600">
             {obj.inventoryNumber && <div>📋 Инв. №: {obj.inventoryNumber}</div>}
             {obj.chamberVolume && <div>📦 {obj.chamberVolume} м³</div>}
+            {obj.manufacturer && <div>🏭 {obj.manufacturer}</div>}
             {obj.climateSystem && <div>❄️ {obj.climateSystem}</div>}
           </div>
         );
@@ -71,6 +73,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
           <div className="text-sm text-gray-600">
             {obj.serialNumber && <div>🔢 S/N: {obj.serialNumber}</div>}
             {obj.inventoryNumber && <div>📋 Инв. №: {obj.inventoryNumber}</div>}
+            {obj.manufacturer && <div>🏭 {obj.manufacturer}</div>}
           </div>
         );
       default:

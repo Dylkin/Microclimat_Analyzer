@@ -191,6 +191,7 @@ export class QualificationObjectService {
       contractorName: data.contractor?.name || '',
       type: data.type,
       name: data.name || '',
+      manufacturer: data.manufacturer || '',
       climateSystem: data.climate_system || '',
       planFileUrl: data.plan_file_url || '',
       planFileName: data.plan_file_name || '',
@@ -218,6 +219,7 @@ export class QualificationObjectService {
     if (data.contractorId !== undefined) dbData.contractor_id = data.contractorId;
     if (data.type !== undefined) dbData.type = data.type;
     if (data.name !== undefined) dbData.name = data.name;
+    if (data.manufacturer !== undefined) dbData.manufacturer = data.manufacturer;
     if (data.climateSystem !== undefined) dbData.climate_system = data.climateSystem;
     if (data.planFileUrl !== undefined) dbData.plan_file_url = data.planFileUrl;
     if (data.planFileName !== undefined) dbData.plan_file_name = data.planFileName;
