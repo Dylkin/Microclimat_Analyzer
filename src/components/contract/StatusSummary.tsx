@@ -7,18 +7,13 @@ interface StatusSummaryProps {
   commercialOfferDoc?: ProjectDocument;
   contractDoc?: ProjectDocument;
   approvedDocuments?: Set<string>;
-  documentStatuses?: {
-    commercialOffer: 'В работе' | 'Согласование' | 'Согласовано';
-    contract: 'В работе' | 'Согласование' | 'Согласован';
-  };
 }
 
 export const StatusSummary: React.FC<StatusSummaryProps> = ({
   documents,
   commercialOfferDoc,
   contractDoc,
-  approvedDocuments = new Set(),
-  documentStatuses
+  approvedDocuments = new Set()
 }) => {
   const getStatusIcon = (hasDocument: boolean) => {
     return hasDocument ? (
@@ -26,6 +21,20 @@ export const StatusSummary: React.FC<StatusSummaryProps> = ({
     ) : (
       <Clock className="w-5 h-5 text-yellow-500" />
     );
+  };
+
+  // Функция для получения статуса коммерческого предложения
+  const getCommercialOfferStatus = () => {
+    if (!commercialOfferDoc) return 'В работе';
+    if (approvedDocuments.has(commercialOfferDoc.id)) return 'Согласовано';
+    return 'Согласование';
+  };
+
+  // Функция для получения статуса договора
+  const getContractStatus = () => {
+    if (!contractDoc) return 'В работе';
+    if (approvedDocuments.has(contractDoc.id)) return 'Согласован';
+    return 'Согласование';
   };
 
   return (
@@ -82,15 +91,12 @@ export const StatusSummary: React.FC<StatusSummaryProps> = ({
             style={{ width: `${(documents.length / 2) * 100}%` }}
           ></div>
         </div>
-      </div>
-
-      {/* Next steps */}
-      {documents.length === 2 && contractDoc && approvedDocuments.has(contractDoc.id) && (
-        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span className="text-green-800 font-medium">
-              Все документы согласованы! Проект готов к переходу на следующий этап.
+            <span className={`text-sm px-2 py-1 rounded-full ${
+              getCommercialOfferStatus() === 'Согласовано' ? 'bg-green-100 text-green-800' :
+              getCommercialOfferStatus() === 'Согласование' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              {getCommercialOfferStatus()}
             </span>
           </div>
         </div>
@@ -98,3 +104,9 @@ export const StatusSummary: React.FC<StatusSummaryProps> = ({
     </div>
   );
 };
+            <span className={`text-sm px-2 py-1 rounded-full ${
+              getContractStatus() === 'Согласован' ? 'bg-green-100 text-green-800' :
+              getContractStatus() === 'Согласование' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              {getContractStatus()}

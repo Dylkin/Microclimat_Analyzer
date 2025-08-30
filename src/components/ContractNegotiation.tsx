@@ -105,13 +105,6 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         const filtered = prev.filter(doc => doc.documentType !== documentType);
         return [...filtered, uploadedDoc];
       });
-
-      // Обновляем статус документа на "Согласование"
-      if (documentType === 'commercial_offer') {
-        setDocumentStatuses(prev => ({ ...prev, commercialOffer: 'Согласование' }));
-      } else if (documentType === 'contract') {
-        setDocumentStatuses(prev => ({ ...prev, contract: 'Согласование' }));
-      }
     } catch (error) {
       console.error('Ошибка загрузки документа:', error);
       alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -164,13 +157,6 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
   // Согласование документа
   const handleApproveDocument = (document: ProjectDocument) => {
     setApprovedDocuments(prev => new Set([...prev, document.id]));
-    
-    // Обновляем статус документа на "Согласовано"/"Согласован"
-    if (document.documentType === 'commercial_offer') {
-      setDocumentStatuses(prev => ({ ...prev, commercialOffer: 'Согласовано' }));
-    } else if (document.documentType === 'contract') {
-      setDocumentStatuses(prev => ({ ...prev, contract: 'Согласован' }));
-    }
   };
 
   // Get documents by type
@@ -242,7 +228,6 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           onApprove={handleApproveDocument}
           showApprovalButton={true}
           isApproved={contractDoc ? approvedDocuments.has(contractDoc.id) : false}
-          disabled={!commercialOfferDoc || !approvedDocuments.has(commercialOfferDoc?.id || '')}
           userRole={user?.role}
         />
       </div>
