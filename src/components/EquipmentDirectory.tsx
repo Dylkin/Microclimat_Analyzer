@@ -20,7 +20,7 @@ export const EquipmentDirectory: React.FC = () => {
   
   // UI state
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingEquipment, setEditingEquipment] = useState<string | null>(null);
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [viewingEquipment, setViewingEquipment] = useState<Equipment | null>(null);
   
   // Statistics
@@ -153,7 +153,7 @@ export const EquipmentDirectory: React.FC = () => {
 
   // Редактирование оборудования
   const handleEditEquipment = (equipment: Equipment) => {
-    setEditEquipment({
+    setNewEquipment({
       type: equipment.type,
       name: equipment.name,
       serialNumber: equipment.serialNumber,
@@ -164,29 +164,38 @@ export const EquipmentDirectory: React.FC = () => {
         verificationFileName: v.verificationFileName
       }))
     });
-    setEditingEquipment(equipment.id);
+    setEditingEquipment(equipment);
+    setShowAddForm(true);
   };
 
   const handleSaveEdit = async () => {
-    if (!editEquipment.name || !editEquipment.serialNumber) {
+    if (!newEquipment.name || !newEquipment.serialNumber) {
       alert('Заполните все поля');
       return;
     }
 
-    if (!validateName(editEquipment.name)) {
+    if (!validateName(newEquipment.name)) {
       alert('Наименование должно быть в формате DL-XXX (например, DL-001)');
       return;
     }
 
     setOperationLoading(true);
     try {
-      await equipmentService.updateEquipment(editingEquipment!, editEquipment);
+      await equipmentService.updateEquipment(editingEquipment!.id, newEquipment);
       
       // Перезагружаем данные
       await loadEquipment(currentPage, searchTerm);
       await loadStats();
       
+      // Сбрасываем форму
+      setNewEquipment({
+        type: '-',
+        name: '',
+        serialNumber: '',
+        verifications: []
+      });
       setEditingEquipment(null);
+      setShowAddForm(false);
       alert('Оборудование успешно обновлено');
     } catch (error) {
       console.error('Ошибка обновления оборудования:', error);
@@ -277,35 +286,19 @@ export const EquipmentDirectory: React.FC = () => {
   };
 
   const updateVerification = (index: number, field: keyof EquipmentVerification, value: any, isEdit = false) => {
-    if (isEdit) {
-      setEditEquipment(prev => ({
-        ...prev,
-        verifications: prev.verifications.map((verification, i) => 
-          i === index ? { ...verification, [field]: value } : verification
-        )
-      }));
-    } else {
-      setNewEquipment(prev => ({
-        ...prev,
-        verifications: (prev.verifications || []).map((verification, i) => 
-          i === index ? { ...verification, [field]: value } : verification
-        )
-      }));
-    }
+    setNewEquipment(prev => ({
+      ...prev,
+      verifications: (prev.verifications || []).map((verification, i) => 
+        i === index ? { ...verification, [field]: value } : verification
+      )
+    }));
   };
 
   const removeVerification = (index: number, isEdit = false) => {
-    if (isEdit) {
-      setEditEquipment(prev => ({
-        ...prev,
-        verifications: prev.verifications.filter((_, i) => i !== index)
-      }));
-    } else {
-      setNewEquipment(prev => ({
-        ...prev,
-        verifications: (prev.verifications || []).filter((_, i) => i !== index)
-      }));
-    }
+    setNewEquipment(prev => ({
+      ...prev,
+      verifications: (prev.verifications || []).filter((_, i) => i !== index)
+    }));
   };
 
   const handleVerificationFileUpload = async (index: number, file: File, isEdit = false) => {
@@ -318,12 +311,12 @@ export const EquipmentDirectory: React.FC = () => {
     // Создаем URL для предварительного просмотра
     const fileUrl = URL.createObjectURL(file);
     
-    updateVerification(index, 'verificationFileUrl', fileUrl, isEdit);
-    updateVerification(index, 'verificationFileName', file.name, isEdit);
+    updateVerification(index, 'verificationFileUrl', fileUrl, false);
+    updateVerification(index, 'verificationFileName', file.name, false);
   };
 
   // Функция для рендеринга блока аттестаций
-  const renderVerificationsBlock = (verifications: any[], isEdit = false) => (
+  const renderVerificationsBlock = (verifications: any[]) => (
     <div>
       <div className="flex items-center justify-between mb-3">
         <label className="block text-sm font-medium text-gray-700">
@@ -331,7 +324,7 @@ export const EquipmentDirectory: React.FC = () => {
         </label>
         <button
           type="button"
-          onClick={() => addNewVerification(isEdit)}
+          onClick={() => addNewVerification(false)}
           className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
         >
           <Plus className="w-3 h-3" />
@@ -357,7 +350,7 @@ export const EquipmentDirectory: React.FC = () => {
                       ? verification.verificationStartDate.toISOString().split('T')[0]
                       : verification.verificationStartDate
                     }
-                    onChange={(e) => updateVerification(index, 'verificationStartDate', new Date(e.target.value), isEdit)}
+                    onChange={(e) => updateVerification(index, 'verificationStartDate', new Date(e.target.value), false)}
                     className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
                   />
@@ -370,7 +363,7 @@ export const EquipmentDirectory: React.FC = () => {
                       ? verification.verificationEndDate.toISOString().split('T')[0]
                       : verification.verificationEndDate
                     }
-                    onChange={(e) => updateVerification(index, 'verificationEndDate', new Date(e.target.value), isEdit)}
+                    onChange={(e) => updateVerification(index, 'verificationEndDate', new Date(e.target.value), false)}
                     className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
                   />
@@ -400,8 +393,8 @@ export const EquipmentDirectory: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          updateVerification(index, 'verificationFileUrl', undefined, isEdit);
-                          updateVerification(index, 'verificationFileName', undefined, isEdit);
+                          updateVerification(index, 'verificationFileUrl', undefined, false);
+                          updateVerification(index, 'verificationFileName', undefined, false);
                         }}
                         className="text-red-600 hover:text-red-800"
                         title="Удалить файл"
@@ -418,14 +411,14 @@ export const EquipmentDirectory: React.FC = () => {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          handleVerificationFileUpload(index, file, isEdit);
+                          handleVerificationFileUpload(index, file, false);
                         }
                       }}
                       className="hidden"
-                      id={`verification-file-${index}-${isEdit ? 'edit' : 'new'}`}
+                      id={`verification-file-${index}-new`}
                     />
                     <label
-                      htmlFor={`verification-file-${index}-${isEdit ? 'edit' : 'new'}`}
+                      htmlFor={`verification-file-${index}-new`}
                       className="cursor-pointer flex flex-col items-center space-y-1"
                     >
                       <Upload className="w-5 h-5 text-gray-400" />
@@ -438,7 +431,7 @@ export const EquipmentDirectory: React.FC = () => {
               <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={() => removeVerification(index, isEdit)}
+                  onClick={() => removeVerification(index, false)}
                   className="text-red-600 hover:text-red-800 text-sm flex items-center space-x-1"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -515,9 +508,20 @@ export const EquipmentDirectory: React.FC = () => {
       {showAddForm && (
         <div className="bg-white rounded-lg shadow p-6 max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Добавить оборудование</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {editingEquipment ? 'Редактировать оборудование' : 'Добавить оборудование'}
+            </h2>
             <button
-              onClick={() => setShowAddForm(false)}
+              onClick={() => {
+                setShowAddForm(false);
+                setEditingEquipment(null);
+                setNewEquipment({
+                  type: '-',
+                  name: '',
+                  serialNumber: '',
+                  verifications: []
+                });
+              }}
               className="text-gray-400 hover:text-gray-600"
             >
               <X className="w-5 h-5" />
@@ -587,22 +591,34 @@ export const EquipmentDirectory: React.FC = () => {
 
           {/* Блок метрологической аттестации */}
           <div className="mt-6">
-            {renderVerificationsBlock(newEquipment.verifications || [], false)}
+            {renderVerificationsBlock(newEquipment.verifications || [])}
           </div>
 
           <div className="flex justify-end space-x-3 mt-6">
             <button
-              onClick={() => setShowAddForm(false)}
+              onClick={() => {
+                setShowAddForm(false);
+                setEditingEquipment(null);
+                setNewEquipment({
+                  type: '-',
+                  name: '',
+                  serialNumber: '',
+                  verifications: []
+                });
+              }}
               className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
             >
               Отмена
             </button>
             <button
-              onClick={handleAddEquipment}
+              onClick={editingEquipment ? handleSaveEdit : handleAddEquipment}
               disabled={operationLoading}
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {operationLoading ? 'Добавление...' : 'Добавить'}
+              {operationLoading ? 
+                (editingEquipment ? 'Сохранение...' : 'Добавление...') : 
+                (editingEquipment ? 'Сохранить' : 'Добавить')
+              }
             </button>
           </div>
         </div>
