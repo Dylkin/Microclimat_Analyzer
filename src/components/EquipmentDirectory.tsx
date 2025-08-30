@@ -800,7 +800,7 @@ export const EquipmentDirectory: React.FC = () => {
 
       {/* View Equipment Modal */}
       {viewingEquipment && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-6 mt-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Просмотр оборудования</h2>
             <button
@@ -811,7 +811,7 @@ export const EquipmentDirectory: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-3">Основная информация</h3>
               <div className="space-y-3">
@@ -831,28 +831,95 @@ export const EquipmentDirectory: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
 
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Системная информация</h3>
+          {/* Метрологическая аттестация */}
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Метрологическая аттестация</h3>
+            {viewingEquipment.verifications && viewingEquipment.verifications.length > 0 ? (
               <div className="space-y-3">
-                <div>
-                  <label className="block text-xs text-gray-500">Дата создания</label>
-                  <p className="text-sm text-gray-900">
-                    {viewingEquipment.createdAt.toLocaleString('ru-RU')}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500">Последнее обновление</label>
-                  <p className="text-sm text-gray-900">
-                    {viewingEquipment.updatedAt.toLocaleString('ru-RU')}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500">ID в системе</label>
-                  <p className="text-xs text-gray-500 font-mono">{viewingEquipment.id}</p>
-                </div>
+                {viewingEquipment.verifications.map((verification) => (
+                  <div key={verification.id} className="bg-gray-50 p-4 rounded-lg border">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Дата начала</label>
+                        <p className="text-sm text-gray-900">
+                          {verification.verificationStartDate.toLocaleDateString('ru-RU')}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Дата окончания</label>
+                        <p className="text-sm text-gray-900">
+                          {verification.verificationEndDate.toLocaleDateString('ru-RU')}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {verification.verificationFileUrl && (
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-2">Свидетельство о поверке</label>
+                        <div className="flex items-center justify-between bg-white p-3 border border-gray-200 rounded">
+                          <div className="flex items-center space-x-2">
+                            <FileImage className="w-4 h-4 text-green-600" />
+                            <span className="text-sm text-gray-700">
+                              {verification.verificationFileName || 'Файл свидетельства'}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => window.open(verification.verificationFileUrl, '_blank')}
+                              className="text-blue-600 hover:text-blue-800 transition-colors"
+                              title="Открыть файл"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = verification.verificationFileUrl!;
+                                link.download = verification.verificationFileName || 'verification.jpg';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="text-green-600 hover:text-green-800 transition-colors"
+                              title="Скачать файл"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Статус аттестации */}
+                    <div className="mt-3">
+                      <div className="flex items-center space-x-2">
+                        {verification.verificationEndDate > new Date() ? (
+                          <>
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                            <span className="text-sm text-green-700 font-medium">Действительна</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                            <span className="text-sm text-red-700 font-medium">Просрочена</span>
+                          </>
+                        )}
+                        <span className="text-xs text-gray-500">
+                          (до {verification.verificationEndDate.toLocaleDateString('ru-RU')})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                <Calendar className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">Аттестации не добавлены</p>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end mt-6">
