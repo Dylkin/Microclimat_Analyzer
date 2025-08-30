@@ -183,12 +183,6 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
         </div>
       )}
 
-      {/* Qualification Objects */}
-      <QualificationObjectsCRUD 
-        contractorId={project.contractorId}
-        contractorName={project.contractorName || 'Неизвестный контрагент'}
-      />
-
       {/* Contract Link */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Договор</h3>
@@ -236,6 +230,12 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
           </div>
         )}
       </div>
+
+      {/* Qualification Objects */}
+      <QualificationObjectsCRUD 
+        contractorId={project.contractorId}
+        contractorName={project.contractorName || 'Неизвестный контрагент'}
+      />
 
       {/* Protocol Upload */}
       <div className="bg-white rounded-lg shadow p-6">
