@@ -118,7 +118,7 @@ export const ContractorDirectory: React.FC = () => {
 
     setLoading(true);
     try {
-      const objects = await qualificationObjectService.getQualificationObjects(contractorId);
+      const objects = await qualificationObjectService.getQualificationObjectsByContractor(contractorId);
       setQualificationObjects(objects);
       setFilteredQualificationObjects(objects);
     } catch (error) {
