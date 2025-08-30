@@ -233,7 +233,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
         return;
       }
       
-      const createdProject = await projectService.createProject(projectData);
       const createdProject = await projectService.addProject(projectData, user?.id);
       setProjects(prev => [...prev, createdProject]);
       setNewProject({
