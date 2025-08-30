@@ -52,10 +52,13 @@ export const StatusSummary: React.FC<StatusSummaryProps> = ({
           </div>
           <span className={`text-sm px-2 py-1 rounded-full ${
             contractDoc 
-              ? 'bg-green-100 text-green-800' 
+              ? (approvedDocuments.has(contractDoc.id) ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')
               : 'bg-yellow-100 text-yellow-800'
           }`}>
-            {contractDoc ? 'Загружено' : 'Ожидает загрузки'}
+            {contractDoc 
+              ? (approvedDocuments.has(contractDoc.id) ? 'Согласовано' : 'Ожидает согласования')
+              : 'Ожидает загрузки'
+            }
           </span>
         </div>
       </div>
@@ -77,12 +80,12 @@ export const StatusSummary: React.FC<StatusSummaryProps> = ({
       </div>
 
       {/* Next steps */}
-      {documents.length === 2 && (
+      {documents.length === 2 && contractDoc && approvedDocuments.has(contractDoc.id) && (
         <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center space-x-2">
             <CheckCircle className="w-5 h-5 text-green-600" />
             <span className="text-green-800 font-medium">
-              Все документы загружены! Проект готов к переходу на следующий этап.
+              Все документы согласованы! Проект готов к переходу на следующий этап.
             </span>
           </div>
         </div>

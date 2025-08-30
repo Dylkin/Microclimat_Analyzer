@@ -221,6 +221,9 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           onDownload={handleDownloadDocument}
           onView={handleViewDocument}
           onDelete={handleDeleteDocument}
+          onApprove={handleApproveDocument}
+          showApprovalButton={true}
+          isApproved={contractDoc ? approvedDocuments.has(contractDoc.id) : false}
           disabled={!commercialOfferDoc || !approvedDocuments.has(commercialOfferDoc?.id || '')}
         />
       </div>
