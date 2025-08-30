@@ -238,6 +238,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
             initialData={editingObject}
             onSubmit={(data) => handleUpdate(editingObject.id, data)}
             onCancel={() => setEditingObject(null)}
+            hideTypeSelection={true}
           />
         </div>
       )}

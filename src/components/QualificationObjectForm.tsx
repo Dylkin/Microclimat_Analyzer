@@ -34,23 +34,24 @@ const getTypeIcon = (type: QualificationObjectType) => {
 
 export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = ({
   contractorId,
-  object,
-  onSave,
-  onCancel
+  initialData,
+  onSubmit,
+  onCancel,
+  hideTypeSelection = false
 }) => {
   const [formData, setFormData] = useState<CreateQualificationObjectData>({
     contractorId,
-    type: object?.type || 'помещение',
-    name: object?.name || '',
-    climateSystem: object?.climateSystem || '',
-    address: object?.address || '',
-    area: object?.area || undefined,
-    vin: object?.vin || '',
-    registrationNumber: object?.registrationNumber || '',
-    bodyVolume: object?.bodyVolume || undefined,
-    inventoryNumber: object?.inventoryNumber || '',
-    chamberVolume: object?.chamberVolume || undefined,
-    serialNumber: object?.serialNumber || ''
+    type: initialData?.type || 'помещение',
+    name: initialData?.name || '',
+    climateSystem: initialData?.climateSystem || '',
+    address: initialData?.address || '',
+    area: initialData?.area || undefined,
+    vin: initialData?.vin || '',
+    registrationNumber: initialData?.registrationNumber || '',
+    bodyVolume: initialData?.bodyVolume || undefined,
+    inventoryNumber: initialData?.inventoryNumber || '',
+    chamberVolume: initialData?.chamberVolume || undefined,
+    serialNumber: initialData?.serialNumber || ''
   });
 
   const [planFile, setPlanFile] = useState<File | null>(null);
@@ -350,8 +351,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       )}
 
       {/* Тип объекта */}
-      {!hideTypeSelection && (
-        <div>
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Тип объекта *
         </label>
@@ -373,7 +373,6 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           ))}
         </div>
       </div>
-      )}
 
       {/* Основные поля */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -457,6 +456,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
           )}
           <span>{object ? 'Сохранить' : 'Создать'}</span>
+          <span>{initialData ? 'Сохранить' : 'Создать'}</span>
         </button>
       </div>
     </form>
