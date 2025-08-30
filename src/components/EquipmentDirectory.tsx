@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Wrench, Plus, Edit2, Trash2, Save, X, Search, Eye, AlertTriangle, Loader, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Equipment, EquipmentType, EquipmentTypeLabels, EquipmentTypeColors, CreateEquipmentData } from '../types/Equipment';
+import { Wrench, Plus, Edit2, Trash2, Save, X, Search, Eye, AlertTriangle, Loader, ChevronLeft, ChevronRight, Upload, Download, Calendar, FileImage } from 'lucide-react';
+import { Equipment, EquipmentType, EquipmentTypeLabels, EquipmentTypeColors, CreateEquipmentData, EquipmentVerification } from '../types/Equipment';
 import { equipmentService } from '../utils/equipmentService';
 
 export const EquipmentDirectory: React.FC = () => {
@@ -36,17 +36,20 @@ export const EquipmentDirectory: React.FC = () => {
   const [newEquipment, setNewEquipment] = useState<CreateEquipmentData>({
     type: '-',
     name: '',
-    serialNumber: ''
+    serialNumber: '',
+    verifications: []
   });
 
   const [editEquipment, setEditEquipment] = useState<{
     type: EquipmentType;
     name: string;
     serialNumber: string;
+    verifications: Omit<EquipmentVerification, 'id' | 'equipmentId' | 'createdAt'>[];
   }>({
     type: '-',
     name: '',
-    serialNumber: ''
+    serialNumber: '',
+    verifications: []
   });
 
   // Загрузка оборудования
@@ -135,7 +138,8 @@ export const EquipmentDirectory: React.FC = () => {
       setNewEquipment({
         type: '-',
         name: '',
-        serialNumber: ''
+        serialNumber: '',
+        verifications: []
       });
       setShowAddForm(false);
       alert('Оборудование успешно добавлено');
@@ -152,7 +156,13 @@ export const EquipmentDirectory: React.FC = () => {
     setEditEquipment({
       type: equipment.type,
       name: equipment.name,
-      serialNumber: equipment.serialNumber
+      serialNumber: equipment.serialNumber,
+      verifications: equipment.verifications.map(v => ({
+        verificationStartDate: v.verificationStartDate,
+        verificationEndDate: v.verificationEndDate,
+        verificationFileUrl: v.verificationFileUrl,
+        verificationFileName: v.verificationFileName
+      }))
     });
     setEditingEquipment(equipment.id);
   };
@@ -239,6 +249,204 @@ export const EquipmentDirectory: React.FC = () => {
     const formattedNumber = nextNumber.toString().padStart(3, '0');
     setNewEquipment(prev => ({ ...prev, name: `DL-${formattedNumber}` }));
   };
+
+  // Управление аттестациями в форме добавления
+  const addNewVerification = (isEdit = false) => {
+    const newVerification = {
+      verificationStartDate: new Date(),
+      verificationEndDate: new Date(),
+      verificationFileUrl: undefined,
+      verificationFileName: undefined
+    };
+
+    if (isEdit) {
+      setEditEquipment(prev => ({
+        ...prev,
+        verifications: [...prev.verifications, newVerification]
+      }));
+    } else {
+      setNewEquipment(prev => ({
+        ...prev,
+        verifications: [...(prev.verifications || []), newVerification]
+      }));
+    }
+  };
+
+  const updateVerification = (index: number, field: keyof EquipmentVerification, value: any, isEdit = false) => {
+    if (isEdit) {
+      setEditEquipment(prev => ({
+        ...prev,
+        verifications: prev.verifications.map((verification, i) => 
+          i === index ? { ...verification, [field]: value } : verification
+        )
+      }));
+    } else {
+      setNewEquipment(prev => ({
+        ...prev,
+        verifications: (prev.verifications || []).map((verification, i) => 
+          i === index ? { ...verification, [field]: value } : verification
+        )
+      }));
+    }
+  };
+
+  const removeVerification = (index: number, isEdit = false) => {
+    if (isEdit) {
+      setEditEquipment(prev => ({
+        ...prev,
+        verifications: prev.verifications.filter((_, i) => i !== index)
+      }));
+    } else {
+      setNewEquipment(prev => ({
+        ...prev,
+        verifications: (prev.verifications || []).filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  const handleVerificationFileUpload = async (index: number, file: File, isEdit = false) => {
+    // Проверяем тип файла
+    if (!file.type.startsWith('image/')) {
+      alert('Поддерживаются только изображения');
+      return;
+    }
+
+    // Создаем URL для предварительного просмотра
+    const fileUrl = URL.createObjectURL(file);
+    
+    updateVerification(index, 'verificationFileUrl', fileUrl, isEdit);
+    updateVerification(index, 'verificationFileName', file.name, isEdit);
+  };
+
+  // Функция для рендеринга блока аттестаций
+  const renderVerificationsBlock = (verifications: any[], isEdit = false) => (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <label className="block text-sm font-medium text-gray-700">
+          Метрологическая аттестация
+        </label>
+        <button
+          type="button"
+          onClick={() => addNewVerification(isEdit)}
+          className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
+        >
+          <Plus className="w-3 h-3" />
+          <span>Добавить период</span>
+        </button>
+      </div>
+
+      {verifications.length === 0 ? (
+        <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+          <p className="text-sm">Периоды аттестации не добавлены</p>
+          <p className="text-xs mt-1">Нажмите "Добавить период" для добавления</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {verifications.map((verification, index) => (
+            <div key={index} className="bg-gray-50 p-4 rounded-lg border">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Дата начала *</label>
+                  <input
+                    type="date"
+                    value={verification.verificationStartDate instanceof Date 
+                      ? verification.verificationStartDate.toISOString().split('T')[0]
+                      : verification.verificationStartDate
+                    }
+                    onChange={(e) => updateVerification(index, 'verificationStartDate', new Date(e.target.value), isEdit)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Дата окончания *</label>
+                  <input
+                    type="date"
+                    value={verification.verificationEndDate instanceof Date 
+                      ? verification.verificationEndDate.toISOString().split('T')[0]
+                      : verification.verificationEndDate
+                    }
+                    onChange={(e) => updateVerification(index, 'verificationEndDate', new Date(e.target.value), isEdit)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Загрузка файла свидетельства */}
+              <div className="mb-3">
+                <label className="block text-xs text-gray-500 mb-1">Свидетельство о поверке</label>
+                {verification.verificationFileUrl ? (
+                  <div className="flex items-center justify-between bg-white p-2 border border-gray-300 rounded">
+                    <div className="flex items-center space-x-2">
+                      <FileImage className="w-4 h-4 text-green-600" />
+                      <span className="text-sm text-gray-700">
+                        {verification.verificationFileName || 'Файл загружен'}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => window.open(verification.verificationFileUrl, '_blank')}
+                        className="text-blue-600 hover:text-blue-800"
+                        title="Просмотреть"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateVerification(index, 'verificationFileUrl', undefined, isEdit);
+                          updateVerification(index, 'verificationFileName', undefined, isEdit);
+                        }}
+                        className="text-red-600 hover:text-red-800"
+                        title="Удалить файл"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded p-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleVerificationFileUpload(index, file, isEdit);
+                        }
+                      }}
+                      className="hidden"
+                      id={`verification-file-${index}-${isEdit ? 'edit' : 'new'}`}
+                    />
+                    <label
+                      htmlFor={`verification-file-${index}-${isEdit ? 'edit' : 'new'}`}
+                      className="cursor-pointer flex flex-col items-center space-y-1"
+                    >
+                      <Upload className="w-5 h-5 text-gray-400" />
+                      <span className="text-xs text-gray-600">Загрузить изображение</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => removeVerification(index, isEdit)}
+                  className="text-red-600 hover:text-red-800 text-sm flex items-center space-x-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Удалить период</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -342,6 +550,7 @@ export const EquipmentDirectory: React.FC = () => {
                   pattern="DL-\d{3}"
                 />
                 <button
+                  type="button"
                   onClick={generateNextName}
                   className="bg-gray-500 text-white px-3 py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm"
                   title="Сгенерировать следующий номер"
@@ -363,6 +572,11 @@ export const EquipmentDirectory: React.FC = () => {
                 placeholder="Введите серийный номер"
               />
             </div>
+          </div>
+
+          {/* Блок метрологической аттестации */}
+          <div className="mt-6">
+            {renderVerificationsBlock(newEquipment.verifications || [], false)}
           </div>
 
           <div className="flex justify-end space-x-3 mt-6">
