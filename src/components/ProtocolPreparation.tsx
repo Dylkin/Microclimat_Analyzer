@@ -4,7 +4,7 @@ import { Project } from '../types/Project';
 import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
 import { useAuth } from '../contexts/AuthContext';
 import { ProjectInfo } from './contract/ProjectInfo';
-import { QualificationObjectsCRUD } from './contract/QualificationObjectsCRUD';
+import { QualificationObjectsDisplay } from './contract/QualificationObjectsDisplay';
 
 interface ProtocolPreparationProps {
   project: Project;
@@ -232,9 +232,10 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       </div>
 
       {/* Qualification Objects */}
-      <QualificationObjectsCRUD 
+      <QualificationObjectsDisplay 
         contractorId={project.contractorId}
         contractorName={project.contractorName || 'Неизвестный контрагент'}
+        selectedObjectIds={project.qualificationObjects.map(obj => obj.qualificationObjectId)}
       />
 
       {/* Protocol Upload */}
