@@ -15,6 +15,7 @@ export const EquipmentDirectory: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const itemsPerPage = 10;
   
   // UI state
@@ -49,7 +50,7 @@ export const EquipmentDirectory: React.FC = () => {
   });
 
   // Загрузка оборудования
-  const loadEquipment = async (page: number = 1, search?: string) => {
+  const loadEquipment = async (page: number = 1, search?: string, sort: 'asc' | 'desc' = 'asc') => {
     if (!equipmentService.isAvailable()) {
       setError('Supabase не настроен. Проверьте переменные окружения.');
       return;
@@ -59,12 +60,13 @@ export const EquipmentDirectory: React.FC = () => {
     setError(null);
 
     try {
-      const result = await equipmentService.getAllEquipment(page, itemsPerPage, search);
+      const result = await equipmentService.getAllEquipment(page, itemsPerPage, search, sort);
       setEquipment(result.equipment);
       setFilteredEquipment(result.equipment);
       setTotalPages(result.totalPages);
       setTotalItems(result.total);
       setCurrentPage(page);
+      setSortOrder(sort);
       
       console.log('Оборудование загружено:', result.equipment.length);
     } catch (error) {
@@ -96,12 +98,12 @@ export const EquipmentDirectory: React.FC = () => {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchTerm !== undefined) {
-        loadEquipment(1, searchTerm);
+        loadEquipment(1, searchTerm, sortOrder);
       }
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+  }, [searchTerm, sortOrder]);
 
   // Валидация наименования (формат DL-XXX)
   const validateName = (name: string): boolean => {
@@ -388,10 +390,19 @@ export const EquipmentDirectory: React.FC = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Тип
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Наименование
+                  <button
+                    onClick={() => {
+                      const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+                      setSortOrder(newOrder);
+                      loadEquipment(currentPage, searchTerm, newOrder);
+                    }}
+                    className="flex items-center space-x-1 hover:text-gray-700"
+                  >
+                    <span>Наименование</span>
+                    <span className="text-xs">
+                      {sortOrder === 'asc' ? '↑' : '↓'}
+                    </span>
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Серийный №
@@ -406,23 +417,6 @@ export const EquipmentDirectory: React.FC = () => {
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingEquipment === item.id ? (
-                      <select
-                        value={editEquipment.type}
-                        onChange={(e) => setEditEquipment(prev => ({ ...prev, type: e.target.value as EquipmentType }))}
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      >
-                        <option value="-">Не указано</option>
-                        <option value="Testo 174T">Testo 174T</option>
-                        <option value="Testo 174H">Testo 174H</option>
-                      </select>
-                    ) : (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${EquipmentTypeColors[item.type]}`}>
-                        {EquipmentTypeLabels[item.type]}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingEquipment === item.id ? (
                       <input
                         type="text"
                         value={editEquipment.name}
@@ -434,9 +428,6 @@ export const EquipmentDirectory: React.FC = () => {
                     ) : (
                       <div>
                         <div className="text-sm font-medium text-gray-900 font-mono">{item.name}</div>
-                        <div className="text-xs text-gray-500">
-                          Создан: {item.createdAt.toLocaleDateString('ru-RU')}
-                        </div>
                       </div>
                     )}
                   </td>
