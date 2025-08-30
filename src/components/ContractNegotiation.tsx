@@ -143,10 +143,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
 
   // Согласование документа
   const handleApproveDocument = (document: ProjectDocument) => {
-    if (confirm(`Вы уверены, что хотите согласовать документ "${document.fileName}"?`)) {
-      setApprovedDocuments(prev => new Set([...prev, document.id]));
-      alert('Документ успешно согласован');
-    }
+    setApprovedDocuments(prev => new Set([...prev, document.id]));
   };
 
   // Get documents by type
