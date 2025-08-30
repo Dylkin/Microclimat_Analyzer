@@ -41,8 +41,8 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   };
 
   const handleDownload = () => {
-    if (document?.file_url) {
-      window.open(document.file_url, '_blank');
+    if (document?.fileUrl) {
+      window.open(document.fileUrl, '_blank');
     }
   };
 
@@ -86,9 +86,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 <CheckCircle className="w-5 h-5 text-indigo-600" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">{document.file_name}</p>
+                <p className="font-medium text-gray-900">{document.fileName}</p>
                 <p className="text-sm text-gray-500">
-                  {formatFileSize(document.file_size)} • Загружен {new Date(document.uploaded_at).toLocaleDateString('ru-RU')}
+                  {formatFileSize(document.fileSize)} • Загружен {document.uploadedAt.toLocaleDateString('ru-RU')}
                 </p>
               </div>
             </div>
