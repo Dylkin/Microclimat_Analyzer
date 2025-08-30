@@ -7,13 +7,18 @@ interface StatusSummaryProps {
   commercialOfferDoc?: ProjectDocument;
   contractDoc?: ProjectDocument;
   approvedDocuments?: Set<string>;
+  documentStatuses?: {
+    commercialOffer: 'В работе' | 'Согласование' | 'Согласовано';
+    contract: 'В работе' | 'Согласование' | 'Согласован';
+  };
 }
 
 export const StatusSummary: React.FC<StatusSummaryProps> = ({
   documents,
   commercialOfferDoc,
   contractDoc,
-  approvedDocuments = new Set()
+  approvedDocuments = new Set(),
+  documentStatuses
 }) => {
   const getStatusIcon = (hasDocument: boolean) => {
     return hasDocument ? (

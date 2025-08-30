@@ -4,7 +4,6 @@ import { Project } from '../types/Project';
 import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
 import { useAuth } from '../contexts/AuthContext';
 import { ProjectInfo } from './contract/ProjectInfo';
-import { NegotiationStages } from './contract/NegotiationStages';
 import { QualificationObjectsCRUD } from './contract/QualificationObjectsCRUD';
 import { DocumentUpload } from './contract/DocumentUpload';
 import { StatusSummary } from './contract/StatusSummary';
@@ -22,6 +21,13 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
   const [uploading, setUploading] = useState<{ [key: string]: boolean }>({});
   const [error, setError] = useState<string | null>(null);
   const [approvedDocuments, setApprovedDocuments] = useState<Set<string>>(new Set());
+  const [documentStatuses, setDocumentStatuses] = useState<{
+    commercialOffer: 'В работе' | 'Согласование' | 'Согласовано';
+    contract: 'В работе' | 'Согласование' | 'Согласован';
+  }>({
+    commercialOffer: 'В работе',
+    contract: 'В работе'
+  });
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -67,6 +73,15 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
 
   useEffect(() => {
     loadDocuments();
+    
+    // Инициализируем статусы при загрузке
+    const commercialOfferDoc = documents.find(doc => doc.documentType === 'commercial_offer');
+    const contractDoc = documents.find(doc => doc.documentType === 'contract');
+    
+    setDocumentStatuses({
+      commercialOffer: commercialOfferDoc ? 'Согласование' : 'В работе',
+      contract: contractDoc ? 'Согласование' : 'В работе'
+    });
   }, [project.id]);
 
   // Загрузка документа
@@ -91,7 +106,12 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         return [...filtered, uploadedDoc];
       });
 
-      alert('Документ успешно загружен');
+      // Обновляем статус документа на "Согласование"
+      if (documentType === 'commercial_offer') {
+        setDocumentStatuses(prev => ({ ...prev, commercialOffer: 'Согласование' }));
+      } else if (documentType === 'contract') {
+        setDocumentStatuses(prev => ({ ...prev, contract: 'Согласование' }));
+      }
     } catch (error) {
       console.error('Ошибка загрузки документа:', error);
       alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -144,6 +164,13 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
   // Согласование документа
   const handleApproveDocument = (document: ProjectDocument) => {
     setApprovedDocuments(prev => new Set([...prev, document.id]));
+    
+    // Обновляем статус документа на "Согласовано"/"Согласован"
+    if (document.documentType === 'commercial_offer') {
+      setDocumentStatuses(prev => ({ ...prev, commercialOffer: 'Согласовано' }));
+    } else if (document.documentType === 'contract') {
+      setDocumentStatuses(prev => ({ ...prev, contract: 'Согласован' }));
+    }
   };
 
   // Get documents by type
@@ -184,13 +211,6 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
       <QualificationObjectsCRUD 
         contractorId={project.contractorId}
         contractorName={project.contractorName || 'Неизвестный контрагент'}
-      />
-
-      {/* Negotiation Stages */}
-      <NegotiationStages 
-        project={project}
-        commercialOfferDoc={commercialOfferDoc}
-        contractDoc={contractDoc}
       />
 
       {/* Document Uploads */}

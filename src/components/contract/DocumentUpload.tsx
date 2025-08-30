@@ -108,14 +108,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 <button
                   onClick={() => onApprove(document)}
                   className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
-                  title="Согласовать документ"
+                  title={documentType === 'contract' ? "Согласовать договор" : "Согласовать документ"}
                 >
-                  Согласовано
+                  {documentType === 'contract' ? 'Согласован' : 'Согласовано'}
                 </button>
               )}
               {isApproved && (
                 <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                  ✓ Согласовано
+                  ✓ {documentType === 'contract' ? 'Согласован' : 'Согласовано'}
                 </span>
               )}
               {(!isApproved || userRole === 'administrator') && (
