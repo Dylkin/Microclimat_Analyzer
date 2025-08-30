@@ -21,6 +21,11 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
   const [uploading, setUploading] = useState<{ [key: string]: boolean }>({});
   const [error, setError] = useState<string | null>(null);
   const [approvedDocuments, setApprovedDocuments] = useState<Set<string>>(new Set());
+  const [documentApprovals, setDocumentApprovals] = useState<Map<string, {
+    approvedAt: Date;
+    approvedBy: string;
+    approvedByRole: string;
+  }>>(new Map());
   const [documentStatuses, setDocumentStatuses] = useState<{
     commercialOffer: 'В работе' | 'Согласование' | 'Согласовано';
     contract: 'В работе' | 'Согласование' | 'Согласован';
