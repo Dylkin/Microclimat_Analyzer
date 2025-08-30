@@ -12,6 +12,9 @@ interface DocumentUploadProps {
   onView: (document: ProjectDocument) => void;
   onDelete: (documentId: string, documentType: string) => void;
   disabled?: boolean;
+  onApprove?: (document: ProjectDocument) => void;
+  showApprovalButton?: boolean;
+  isApproved?: boolean;
 }
 
 export const DocumentUpload: React.FC<DocumentUploadProps> = ({
@@ -23,7 +26,10 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   onDownload,
   onView,
   onDelete,
-  disabled = false
+  disabled = false,
+  onApprove,
+  showApprovalButton = false,
+  isApproved = false
 }) => {
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -96,6 +102,20 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
               >
                 <Download className="w-5 h-5" />
               </button>
+              {showApprovalButton && onApprove && !isApproved && (
+                <button
+                  onClick={() => onApprove(document)}
+                  className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
+                  title="Согласовать документ"
+                >
+                  Согласовано
+                </button>
+              )}
+              {isApproved && (
+                <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                  ✓ Согласовано
+                </span>
+              )}
               <button
                 onClick={() => onDelete(document.id, documentType)}
                 className="text-red-600 hover:text-red-800 transition-colors"

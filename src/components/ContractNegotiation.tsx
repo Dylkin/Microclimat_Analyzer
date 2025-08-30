@@ -21,6 +21,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState<{ [key: string]: boolean }>({});
   const [error, setError] = useState<string | null>(null);
+  const [approvedDocuments, setApprovedDocuments] = useState<Set<string>>(new Set());
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -140,6 +141,14 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
     window.open(document.fileUrl, '_blank');
   };
 
+  // Согласование документа
+  const handleApproveDocument = (document: ProjectDocument) => {
+    if (confirm(`Вы уверены, что хотите согласовать документ "${document.fileName}"?`)) {
+      setApprovedDocuments(prev => new Set([...prev, document.id]));
+      alert('Документ успешно согласован');
+    }
+  };
+
   // Get documents by type
   const commercialOfferDoc = documents.find(doc => doc.documentType === 'commercial_offer');
   const contractDoc = documents.find(doc => doc.documentType === 'contract');
@@ -198,6 +207,9 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           onDownload={handleDownloadDocument}
           onView={handleViewDocument}
           onDelete={handleDeleteDocument}
+          onApprove={handleApproveDocument}
+          showApprovalButton={true}
+          isApproved={commercialOfferDoc ? approvedDocuments.has(commercialOfferDoc.id) : false}
         />
 
         <DocumentUpload
@@ -209,7 +221,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           onDownload={handleDownloadDocument}
           onView={handleViewDocument}
           onDelete={handleDeleteDocument}
-          disabled={!commercialOfferDoc}
+          disabled={!commercialOfferDoc || !approvedDocuments.has(commercialOfferDoc?.id || '')}
         />
       </div>
 
@@ -218,6 +230,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
         documents={documents}
         commercialOfferDoc={commercialOfferDoc}
         contractDoc={contractDoc}
+        approvedDocuments={approvedDocuments}
       />
 
       {/* Instructions */}

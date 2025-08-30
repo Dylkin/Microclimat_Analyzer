@@ -6,12 +6,14 @@ interface StatusSummaryProps {
   documents: ProjectDocument[];
   commercialOfferDoc?: ProjectDocument;
   contractDoc?: ProjectDocument;
+  approvedDocuments?: Set<string>;
 }
 
 export const StatusSummary: React.FC<StatusSummaryProps> = ({
   documents,
   commercialOfferDoc,
-  contractDoc
+  contractDoc,
+  approvedDocuments = new Set()
 }) => {
   const getStatusIcon = (hasDocument: boolean) => {
     return hasDocument ? (
@@ -33,10 +35,13 @@ export const StatusSummary: React.FC<StatusSummaryProps> = ({
           </div>
           <span className={`text-sm px-2 py-1 rounded-full ${
             commercialOfferDoc 
-              ? 'bg-green-100 text-green-800' 
+              ? (approvedDocuments.has(commercialOfferDoc.id) ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')
               : 'bg-yellow-100 text-yellow-800'
           }`}>
-            {commercialOfferDoc ? 'Загружено' : 'Ожидает загрузки'}
+            {commercialOfferDoc 
+              ? (approvedDocuments.has(commercialOfferDoc.id) ? 'Согласовано' : 'Ожидает согласования')
+              : 'Ожидает загрузки'
+            }
           </span>
         </div>
 
