@@ -522,19 +522,12 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       {renderTypeSpecificFields()}
 
       {/* Файлы */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <FileUploadField
           title="План объекта"
           file={planFile}
           onChange={(file) => handleFileChange('plan', file)}
           type="plan"
-        />
-
-        <FileUploadField
-          title="Данные по испытаниям"
-          file={testDataFile}
-          onChange={(file) => handleFileChange('testData', file)}
-          type="testData"
         />
       </div>
 
