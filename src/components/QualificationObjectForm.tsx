@@ -10,9 +10,10 @@ import { qualificationObjectService } from '../utils/qualificationObjectService'
 
 interface QualificationObjectFormProps {
   contractorId: string;
-  object?: QualificationObject;
-  onSave: (object: QualificationObject) => void;
+  initialData?: QualificationObject;
+  onSubmit: (data: CreateQualificationObjectData) => void;
   onCancel: () => void;
+  hideTypeSelection?: boolean;
 }
 
 const getTypeIcon = (type: QualificationObjectType) => {
@@ -349,7 +350,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       )}
 
       {/* Тип объекта */}
-      <div>
+      {!hideTypeSelection && (
+        <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Тип объекта *
         </label>
@@ -371,6 +373,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           ))}
         </div>
       </div>
+      )}
 
       {/* Основные поля */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
