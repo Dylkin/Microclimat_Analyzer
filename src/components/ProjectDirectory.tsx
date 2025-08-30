@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play, FileText } from 'lucide-react';
 import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, CreateProjectData } from '../types/Project';
 import { Contractor } from '../types/Contractor';
-import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
+import { QualificationObject, QualificationObjectTypeLabels, CreateQualificationObjectData } from '../types/QualificationObject';
 import { User as UserType } from '../types/User';
 import { projectService } from '../utils/projectService';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { useAuth } from '../contexts/AuthContext';
+import { QualificationObjectForm } from './QualificationObjectForm';
 
 // UUID validation function
 function isValidUUID(uuid: string): boolean {
