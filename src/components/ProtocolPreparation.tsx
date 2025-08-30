@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle } from 'lucide-react';
+import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle, Edit2, X } from 'lucide-react';
 import { Project } from '../types/Project';
+import { QualificationObject } from '../types/QualificationObject';
 import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
+import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { useAuth } from '../contexts/AuthContext';
 import { ProjectInfo } from './contract/ProjectInfo';
-import { QualificationObjectsCRUD } from './contract/QualificationObjectsCRUD';
+import { QualificationObjectForm } from './QualificationObjectForm';
 
 interface ProtocolPreparationProps {
   project: Project;
@@ -18,6 +20,10 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
+  const [editingObject, setEditingObject] = useState<QualificationObject | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [operationLoading, setOperationLoading] = useState(false);
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -57,11 +63,44 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       // Фильтруем протоколы (пока используем тип layout_scheme для протоколов)
       const protocols = docs.filter(doc => doc.documentType === 'layout_scheme');
       setProtocolDocuments(protocols);
+      
+      // Загружаем выбранные объекты квалификации
+      await loadSelectedQualificationObjects();
     } catch (error) {
       console.error('Ошибка загрузки документов:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Загрузка выбранных объектов квалификации
+  const loadSelectedQualificationObjects = async () => {
+    if (!qualificationObjectService.isAvailable()) {
+      setError('Supabase не настроен для работы с объектами квалификации');
+      return;
+    }
+
+    try {
+      // Получаем ID выбранных объектов из проекта
+      const selectedObjectIds = project.qualificationObjects.map(obj => obj.qualificationObjectId);
+      
+      if (selectedObjectIds.length === 0) {
+        setQualificationObjects([]);
+        return;
+      }
+
+      // Загружаем все объекты контрагента
+      const allObjects = await qualificationObjectService.getQualificationObjectsByContractor(project.contractorId);
+      
+      // Фильтруем только выбранные объекты
+      const selectedObjects = allObjects.filter(obj => selectedObjectIds.includes(obj.id));
+      
+      setQualificationObjects(selectedObjects);
+      console.log('Загружены выбранные объекты квалификации для протокола:', selectedObjects.length);
+    } catch (error) {
+      console.error('Ошибка загрузки объектов квалификации:', error);
+      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
     }
   };
 
@@ -139,6 +178,65 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
   // Просмотр протокола
   const handleViewProtocol = (document: ProjectDocument) => {
     window.open(document.fileUrl, '_blank');
+  };
+
+  // Обновление объекта квалификации
+  const handleUpdateQualificationObject = async (updatedObject: QualificationObject) => {
+    setOperationLoading(true);
+    try {
+      const updated = await qualificationObjectService.updateQualificationObject(
+        updatedObject.id,
+        updatedObject
+      );
+      
+      setQualificationObjects(prev => prev.map(obj => 
+        obj.id === updatedObject.id ? updated : obj
+      ));
+      
+      setEditingObject(null);
+      alert('Объект квалификации успешно обновлен');
+    } catch (error) {
+      console.error('Ошибка обновления объекта квалификации:', error);
+      alert(`Ошибка обновления объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // Получение иконки для типа объекта
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'помещение':
+        return '🏢';
+      case 'автомобиль':
+        return '🚗';
+      case 'холодильная_камера':
+        return '🧊';
+      case 'холодильник':
+        return '❄️';
+      case 'морозильник':
+        return '🥶';
+      default:
+        return '🏢';
+    }
+  };
+
+  // Рендер деталей объекта
+  const renderObjectDetails = (obj: QualificationObject) => {
+    const details = [];
+
+    if (obj.address) details.push(`📍 ${obj.address}`);
+    if (obj.area) details.push(`📐 ${obj.area} м²`);
+    if (obj.vin) details.push(`🔢 VIN: ${obj.vin}`);
+    if (obj.registrationNumber) details.push(`🚗 ${obj.registrationNumber}`);
+    if (obj.bodyVolume) details.push(`📦 ${obj.bodyVolume} м³`);
+    if (obj.inventoryNumber) details.push(`📋 Инв. №: ${obj.inventoryNumber}`);
+    if (obj.chamberVolume) details.push(`📦 ${obj.chamberVolume} л`);
+    if (obj.serialNumber) details.push(`🔢 S/N: ${obj.serialNumber}`);
+    if (obj.manufacturer) details.push(`🏭 ${obj.manufacturer}`);
+    if (obj.climateSystem) details.push(`❄️ ${obj.climateSystem}`);
+
+    return details;
   };
 
   // Форматирование размера файла
@@ -232,10 +330,153 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       </div>
 
       {/* Qualification Objects */}
-      <QualificationObjectsCRUD 
-        contractorId={project.contractorId}
-        contractorName={project.contractorName || 'Неизвестный контрагент'}
-      />
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Объекты квалификации</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Контрагент: <span className="font-medium">{project.contractorName || 'Неизвестный контрагент'}</span>
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Отображаются только объекты, выбранные на этапе согласования договора
+            </p>
+          </div>
+        </div>
+
+        {/* Edit Form */}
+        {editingObject && (
+          <div className="mb-6 border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Редактировать объект квалификации</h3>
+              <button
+                onClick={() => setEditingObject(null)}
+                className="text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <QualificationObjectForm
+              contractorId={project.contractorId}
+              contractorAddress={editingObject.address}
+              initialData={editingObject}
+              onSubmit={handleUpdateQualificationObject}
+              onCancel={() => setEditingObject(null)}
+              hideTypeSelection={true}
+            />
+          </div>
+        )}
+
+        {/* Objects List */}
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Загрузка объектов квалификации...</p>
+          </div>
+        ) : qualificationObjects.length === 0 ? (
+          <div className="text-center py-8">
+            <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+            <p className="text-gray-600">Объекты квалификации не выбраны</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Вернитесь на этап согласования договора для выбора объектов
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="text-sm text-gray-600 mb-4">
+              Выбрано объектов: <span className="font-medium">{qualificationObjects.length}</span>
+            </div>
+            
+            {qualificationObjects.map((object) => (
+              <div key={object.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-3">
+                    <div className="text-2xl mt-1">
+                      {getTypeIcon(object.type)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <h3 className="font-medium text-gray-900">
+                          {object.name || object.vin || object.serialNumber || 'Без названия'}
+                        </h3>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                          {object.type}
+                        </span>
+                      </div>
+                      
+                      {/* Детали объекта */}
+                      <div className="space-y-1">
+                        {renderObjectDetails(object).map((detail, index) => (
+                          <div key={index} className="text-sm text-gray-600">
+                            {detail}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Файлы объекта */}
+                      {(object.planFileUrl || object.testDataFileUrl) && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <div className="text-xs text-gray-500 mb-2">Прикрепленные файлы:</div>
+                          <div className="flex items-center space-x-3">
+                            {object.planFileUrl && (
+                              <a
+                                href={object.planFileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 text-xs flex items-center space-x-1"
+                              >
+                                <span>📋 План объекта</span>
+                              </a>
+                            )}
+                            {object.testDataFileUrl && (
+                              <a
+                                href={object.testDataFileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-600 hover:text-green-800 text-xs flex items-center space-x-1"
+                              >
+                                <span>📊 Данные испытаний</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setEditingObject(object)}
+                      disabled={operationLoading}
+                      className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                      title="Редактировать"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Summary */}
+        {!loading && qualificationObjects.length > 0 && (
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="text-sm font-medium text-blue-900 mb-2">Сводка по выбранным объектам:</h4>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+              {['помещение', 'автомобиль', 'холодильная_камера', 'холодильник', 'морозильник'].map((type) => {
+                const count = qualificationObjects.filter(obj => obj.type === type).length;
+                return count > 0 ? (
+                  <div key={type} className="flex items-center space-x-2">
+                    <span className="text-lg">{getTypeIcon(type)}</span>
+                    <span className="text-blue-800">{type}: {count}</span>
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Protocol Upload */}
       <div className="bg-white rounded-lg shadow p-6">
@@ -426,7 +667,7 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
         <h4 className="text-sm font-medium text-blue-900 mb-2">Инструкции по подготовке протокола:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• <strong>Проверьте договор:</strong> Убедитесь, что договор загружен и доступен</li>
-          <li>• <strong>Просмотрите объекты квалификации:</strong> Проверьте корректность данных</li>
+          <li>• <strong>Отредактируйте объекты квалификации:</strong> Проверьте и при необходимости обновите данные выбранных объектов</li>
           <li>• <strong>Загрузите протокол:</strong> Подготовьте и загрузите протокол в формате DOCX</li>
           <li>• <strong>Проверьте документы:</strong> Используйте кнопки просмотра для проверки</li>
           <li>• <strong>Замена протокола:</strong> При необходимости можно загрузить новую версию</li>
