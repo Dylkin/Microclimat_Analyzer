@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft, Eye } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { contractorService } from '../utils/contractorService';
@@ -23,6 +23,7 @@ export const ContractorDirectory: React.FC = () => {
   const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingContractorData, setEditingContractorData] = useState<Contractor | null>(null);
+  const [viewingContractor, setViewingContractor] = useState<Contractor | null>(null);
   
   // Qualification objects state
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
@@ -315,6 +316,13 @@ export const ContractorDirectory: React.FC = () => {
         setOperationLoading(false);
       }
     }
+  };
+
+  // Просмотр контрагента
+  const handleViewContractor = (contractor: Contractor) => {
+    setViewingContractor(contractor);
+    // Загружаем объекты квалификации для просматриваемого контрагента
+    loadQualificationObjects(contractor.id);
   };
 
   // Управление контактами в форме добавления
@@ -763,6 +771,14 @@ export const ContractorDirectory: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
                         <button
+                          onClick={() => handleViewContractor(contractor)}
+                          disabled={operationLoading}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Просмотр"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleEditContractor(contractor)}
                           disabled={operationLoading}
                           className="text-indigo-600 hover:text-indigo-900"
@@ -802,6 +818,117 @@ export const ContractorDirectory: React.FC = () => {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* View Contractor Modal */}
+      {viewingContractor && (
+        <div className="bg-white rounded-lg shadow p-6 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Просмотр контрагента</h2>
+            <button
+              onClick={() => {
+                setViewingContractor(null);
+                setQualificationObjects([]);
+                setFilteredQualificationObjects([]);
+                setQualificationSearchTerm('');
+              }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Основная информация контрагента */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Основная информация</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-500">Наименование</label>
+                  <p className="text-sm font-medium text-gray-900">{viewingContractor.name}</p>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500">Адрес</label>
+                  <p className="text-sm text-gray-900">
+                    {viewingContractor.address || 'Не указан'}
+                  </p>
+                  {viewingContractor.latitude && viewingContractor.longitude && (
+                    <div className="flex items-center space-x-1 mt-1">
+                      <MapPin className="w-3 h-3 text-green-600" />
+                      <span className="text-xs text-green-600">
+                        Координаты: {viewingContractor.latitude.toFixed(6)}, {viewingContractor.longitude.toFixed(6)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Контакты</h3>
+              {viewingContractor.contacts.length > 0 ? (
+                <div className="space-y-3">
+                  {viewingContractor.contacts.map((contact) => (
+                    <div key={contact.id} className="bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <User className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium text-gray-900">{contact.employeeName}</span>
+                      </div>
+                      {contact.phone && (
+                        <div className="flex items-center space-x-2 mb-1">
+                          <Phone className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-600">{contact.phone}</span>
+                        </div>
+                      )}
+                      {contact.comment && (
+                        <div className="flex items-center space-x-2">
+                          <MessageSquare className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-500 text-sm">{contact.comment}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                  <User className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">Контакты не добавлены</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Объекты квалификации для просматриваемого контрагента */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Объекты квалификации</h3>
+            
+            <QualificationObjectsTable
+              objects={filteredQualificationObjects}
+              onAdd={() => {}} // Отключаем добавление в режиме просмотра
+              onEdit={() => {}} // Отключаем редактирование в режиме просмотра
+              onDelete={() => {}} // Отключаем удаление в режиме просмотра
+              onShowOnMap={(obj) => {
+                console.log('Show on map:', obj);
+              }}
+              loading={loading}
+              hideAddButton={true}
+            />
+          </div>
+
+          <div className="flex justify-end mt-6">
+            <button
+              onClick={() => {
+                setViewingContractor(null);
+                setQualificationObjects([]);
+                setFilteredQualificationObjects([]);
+                setQualificationSearchTerm('');
+              }}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Закрыть
+            </button>
+          </div>
         </div>
       )}
     </div>
