@@ -217,36 +217,34 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
       <div className="space-y-6">
         <DocumentUpload
           title="Коммерческое предложение"
-          documentType="commercial_offer"
           document={commercialOfferDoc}
-          uploading={uploading.commercial_offer || false}
           onUpload={(file) => handleFileUpload('commercial_offer', file)}
-          onDownload={handleDownloadDocument}
-          onView={handleViewDocument}
           onDelete={handleDeleteDocument}
           onApprove={handleApproveDocument}
           onUnapprove={handleUnapproveDocument}
           showApprovalButton={true}
           approvalInfo={commercialOfferDoc ? {
             isApproved: approvedDocuments.has(commercialOfferDoc.id),
+            approvedAt: documentApprovals.get(commercialOfferDoc.id)?.approvedAt,
+            approvedBy: documentApprovals.get(commercialOfferDoc.id)?.approvedBy,
+            approvedByRole: documentApprovals.get(commercialOfferDoc.id)?.approvedByRole,
           } : undefined}
           userRole={user?.role}
         />
 
         <DocumentUpload
           title="Договор"
-          documentType="contract"
           document={contractDoc}
-          uploading={uploading.contract || false}
           onUpload={(file) => handleFileUpload('contract', file)}
-          onDownload={handleDownloadDocument}
-          onView={handleViewDocument}
           onDelete={handleDeleteDocument}
           onApprove={handleApproveDocument}
           onUnapprove={handleUnapproveDocument}
           showApprovalButton={true}
           approvalInfo={contractDoc ? {
             isApproved: approvedDocuments.has(contractDoc.id),
+            approvedAt: documentApprovals.get(contractDoc.id)?.approvedAt,
+            approvedBy: documentApprovals.get(contractDoc.id)?.approvedBy,
+            approvedByRole: documentApprovals.get(contractDoc.id)?.approvedByRole,
           } : undefined}
           userRole={user?.role}
         />
