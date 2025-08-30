@@ -40,30 +40,15 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   }, [contractorId]);
 
   // Создание нового объекта
-  const handleCreate = async (data: CreateQualificationObjectData) => {
-    try {
-      const newObject = await qualificationObjectService.createQualificationObject({
-        ...data,
-        contractorId
-      });
-      setObjects(prev => [newObject, ...prev]);
-      setShowForm(false);
-    } catch (error) {
-      console.error('Ошибка создания объекта:', error);
-      alert(`Ошибка создания объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
+  const handleCreate = async (object: QualificationObject) => {
+    setObjects(prev => [object, ...prev]);
+    setShowForm(false);
   };
 
   // Обновление объекта
-  const handleUpdate = async (id: string, data: Partial<CreateQualificationObjectData>) => {
-    try {
-      const updatedObject = await qualificationObjectService.updateQualificationObject(id, data);
-      setObjects(prev => prev.map(obj => obj.id === id ? updatedObject : obj));
-      setEditingObject(null);
-    } catch (error) {
-      console.error('Ошибка обновления объекта:', error);
-      alert(`Ошибка обновления объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
+  const handleUpdate = async (object: QualificationObject) => {
+    setObjects(prev => prev.map(obj => obj.id === object.id ? object : obj));
+    setEditingObject(null);
   };
 
   // Удаление объекта
@@ -236,7 +221,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
           </div>
           <QualificationObjectForm
             initialData={editingObject}
-            onSubmit={(data) => handleUpdate(editingObject.id, data)}
+            onSubmit={handleUpdate}
             onCancel={() => setEditingObject(null)}
             hideTypeSelection={true}
           />

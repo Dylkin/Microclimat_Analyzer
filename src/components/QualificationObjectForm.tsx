@@ -11,7 +11,7 @@ import { qualificationObjectService } from '../utils/qualificationObjectService'
 interface QualificationObjectFormProps {
   contractorId: string;
   initialData?: QualificationObject;
-  onSubmit: (data: CreateQualificationObjectData) => void;
+  onSubmit: (object: QualificationObject) => void;
   onCancel: () => void;
   hideTypeSelection?: boolean;
 }
@@ -118,26 +118,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         }
       }
 
-      let savedObject: QualificationObject;
-
-      if (object) {
-        // Обновление существующего объекта
-        savedObject = await qualificationObjectService.updateQualificationObject(
-          object.id,
-          formData,
-          planFile,
-          testDataFile
-        );
-      } else {
-        // Создание нового объекта
-        savedObject = await qualificationObjectService.createQualificationObject(
-          formData,
-          planFile,
-          testDataFile
-        );
-      }
-
-      onSave(savedObject);
+      // Вызываем onSubmit с данными формы
+      onSubmit(formData as any);
     } catch (error) {
       console.error('Ошибка сохранения объекта:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
@@ -146,137 +128,111 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     }
   };
 
-  const renderTypeSpecificFields = () => {
-    switch (formData.type) {
-      case 'помещение':
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Площадь (м²)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.area || ''}
-                onChange={(e) => handleInputChange('area', e.target.value ? parseFloat(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Введите площадь"
-              />
-            </div>
-          </div>
-        );
+  // Отображаем все поля для всех типов объектов
+  const renderAllFields = () => (
+    <div className="space-y-4">
+      {/* Площадь */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Площадь (м²)
+        </label>
+        <input
+          type="number"
+          step="0.01"
+          value={formData.area || ''}
+          onChange={(e) => handleInputChange('area', e.target.value ? parseFloat(e.target.value) : undefined)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Введите площадь"
+        />
+      </div>
 
-      case 'автомобиль':
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                VIN номер
-              </label>
-              <input
-                type="text"
-                value={formData.vin || ''}
-                onChange={(e) => handleInputChange('vin', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Введите VIN номер"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Регистрационный номер
-              </label>
-              <input
-                type="text"
-                value={formData.registrationNumber || ''}
-                onChange={(e) => handleInputChange('registrationNumber', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Введите регистрационный номер"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объем кузова (м³)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.bodyVolume || ''}
-                onChange={(e) => handleInputChange('bodyVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Введите объем кузова"
-              />
-            </div>
-          </div>
-        );
+      {/* VIN номер */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          VIN номер
+        </label>
+        <input
+          type="text"
+          value={formData.vin || ''}
+          onChange={(e) => handleInputChange('vin', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Введите VIN номер"
+        />
+      </div>
 
-      case 'холодильная_камера':
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Инвентарный номер
-              </label>
-              <input
-                type="text"
-                value={formData.inventoryNumber || ''}
-                onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Введите инвентарный номер"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объем камеры (м³)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.chamberVolume || ''}
-                onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Введите объем камеры"
-              />
-            </div>
-          </div>
-        );
+      {/* Регистрационный номер */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Регистрационный номер
+        </label>
+        <input
+          type="text"
+          value={formData.registrationNumber || ''}
+          onChange={(e) => handleInputChange('registrationNumber', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Введите регистрационный номер"
+        />
+      </div>
 
-      case 'холодильник':
-      case 'морозильник':
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Серийный номер
-              </label>
-              <input
-                type="text"
-                value={formData.serialNumber || ''}
-                onChange={(e) => handleInputChange('serialNumber', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Введите серийный номер"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объем камеры (л)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.chamberVolume || ''}
-                onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Введите объем камеры"
-              />
-            </div>
-          </div>
-        );
+      {/* Объем кузова */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Объем кузова (м³)
+        </label>
+        <input
+          type="number"
+          step="0.01"
+          value={formData.bodyVolume || ''}
+          onChange={(e) => handleInputChange('bodyVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Введите объем кузова"
+        />
+      </div>
 
-      default:
-        return null;
-    }
-  };
+      {/* Инвентарный номер */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Инвентарный номер
+        </label>
+        <input
+          type="text"
+          value={formData.inventoryNumber || ''}
+          onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Введите инвентарный номер"
+        />
+      </div>
+
+      {/* Объем камеры */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Объем камеры (м³/л)
+        </label>
+        <input
+          type="number"
+          step="0.01"
+          value={formData.chamberVolume || ''}
+          onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Введите объем камеры"
+        />
+      </div>
+
+      {/* Серийный номер */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Серийный номер
+        </label>
+        <input
+          type="text"
+          value={formData.serialNumber || ''}
+          onChange={(e) => handleInputChange('serialNumber', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Введите серийный номер"
+        />
+      </div>
+    </div>
+  );
 
   const FileUploadField = ({ 
     title, 
@@ -351,7 +307,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       )}
 
       {/* Тип объекта */}
-      <div>
+      {!hideTypeSelection && (
+        <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Тип объекта *
         </label>
@@ -372,7 +329,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             </button>
           ))}
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Основные поля */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -418,7 +376,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       </div>
 
       {/* Специфичные для типа поля */}
-      {renderTypeSpecificFields()}
+      {renderAllFields()}
 
       {/* Файлы */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -455,7 +413,6 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           {loading && (
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
           )}
-          <span>{object ? 'Сохранить' : 'Создать'}</span>
           <span>{initialData ? 'Сохранить' : 'Создать'}</span>
         </button>
       </div>
