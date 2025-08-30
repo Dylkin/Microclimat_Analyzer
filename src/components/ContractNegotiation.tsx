@@ -207,6 +207,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           onApprove={handleApproveDocument}
           showApprovalButton={true}
           isApproved={commercialOfferDoc ? approvedDocuments.has(commercialOfferDoc.id) : false}
+          userRole={user?.role}
         />
 
         <DocumentUpload
@@ -222,6 +223,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           showApprovalButton={true}
           isApproved={contractDoc ? approvedDocuments.has(contractDoc.id) : false}
           disabled={!commercialOfferDoc || !approvedDocuments.has(commercialOfferDoc?.id || '')}
+          userRole={user?.role}
         />
       </div>
 

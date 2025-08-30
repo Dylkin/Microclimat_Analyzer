@@ -15,6 +15,7 @@ interface DocumentUploadProps {
   onApprove?: (document: ProjectDocument) => void;
   showApprovalButton?: boolean;
   isApproved?: boolean;
+  userRole?: string;
 }
 
 export const DocumentUpload: React.FC<DocumentUploadProps> = ({
@@ -30,6 +31,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   onApprove,
   showApprovalButton = false,
   isApproved = false
+  userRole
 }) => {
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -116,13 +118,15 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                   ✓ Согласовано
                 </span>
               )}
-              <button
-                onClick={() => onDelete(document.id, documentType)}
-                className="text-red-600 hover:text-red-800 transition-colors"
-                title="Удалить документ"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
+              {(!isApproved || userRole === 'administrator') && (
+                <button
+                  onClick={() => onDelete(document.id, documentType)}
+                  className="text-red-600 hover:text-red-800 transition-colors"
+                  title="Удалить документ"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
         </div>
