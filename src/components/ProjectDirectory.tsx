@@ -32,11 +32,9 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
   const [operationLoading, setOperationLoading] = useState(false);
   
   // UI state
-  const [showAddForm, setShowAddForm] = useState(false);
   const [editingProject, setEditingProject] = useState<string | null>(null);
   
   // Form state
-  const [newProject, setNewProject] = useState<CreateProjectData>({
     description: '',
     contractorId: '',
     qualificationObjectIds: []
@@ -224,30 +222,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       }
       
       // Validate all qualification object IDs one more time
-      if (!projectData.qualificationObjectIds.every(id => isValidUUID(id))) {
-        console.error('CRITICAL: Invalid qualification object UUID detected:', projectData.qualificationObjectIds);
-        alert('Критическая ошибка: некорректный ID объекта квалификации. Обратитесь к администратору.');
-        return;
-      }
-      
-      const addedProject = await projectService.addProject(projectData, user?.id);
-      setProjects(prev => [addedProject, ...prev]);
-      
-      // Сбрасываем форму
-      setNewProject({
-        contractorId: '',
-        qualificationObjectIds: []
-      });
-      setShowAddForm(false);
-      alert('Проект успешно создан');
-    } catch (error) {
-      console.error('Ошибка добавления проекта:', error);
-      alert(`Ошибка создания проекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setOperationLoading(false);
-    }
-  };
-
   // Редактирование проекта
   const handleEditProject = (project: Project) => {
     setEditProject({
@@ -413,8 +387,8 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
             </button>
           </div>
 
-          <div className="space-y-4">
-            <div>
+              disabled={operationLoading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Контрагент *
               </label>
@@ -424,19 +398,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                   ...prev, 
                   contractorId: e.target.value,
                   qualificationObjectIds: [] // Сбрасываем выбранные объекты
-                }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">Выберите контрагента</option>
-                {contractors.map((contractor) => (
-                  <option key={contractor.id} value={contractor.id}>
-                    {contractor.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Описание
               </label>
@@ -454,18 +415,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Объекты квалификации *
               </label>
-              {newProject.contractorId ? (
-                <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                  {getQualificationObjectsForContractor(newProject.contractorId).map((obj) => {
-                    const objectName = obj.name || obj.vin || obj.serialNumber || 'Без названия';
-                    return (
-                      <label key={obj.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded">
-                        <input
-                          type="checkbox"
-                          checked={newProject.qualificationObjectIds.includes(obj.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setNewProject(prev => ({
                                 ...prev,
                                 qualificationObjectIds: [...prev.qualificationObjectIds, obj.id]
                               }));
@@ -504,36 +453,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                   </p>
                 </div>
               )}
-              {newProject.contractorId && newProject.qualificationObjectIds.length > 0 && (
-                <div className="mt-2 text-sm text-green-600">
-                  Выбрано объектов: {newProject.qualificationObjectIds.length}
-                </div>
-              )}
             </div>
-          </div>
-
-          <div className="flex justify-end space-x-3 mt-6">
-            <button
-              onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Отмена
-            </button>
-            <button
-              onClick={handleAddProject}
-              disabled={operationLoading}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {operationLoading ? 'Создание...' : 'Создать проект'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Projects Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
             <p className="text-gray-500">Загрузка проектов...</p>
           </div>
