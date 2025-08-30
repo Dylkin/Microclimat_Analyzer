@@ -168,7 +168,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       return;
     }
     
-    if (selectedContractor) {
+    const createdProject = await projectService.addProject(projectData, user?.id);
       console.log('ID найденного контрагента:', selectedContractor.id);
       console.log('Тип ID найденного контрагента:', typeof selectedContractor.id);
     }
