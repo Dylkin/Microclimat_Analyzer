@@ -238,27 +238,6 @@ export const EquipmentDirectory: React.FC = () => {
     }
   };
 
-  // Генерация следующего наименования
-  const generateNextName = () => {
-    const existingNumbers = equipment
-      .map(eq => eq.name.match(/^DL-(\d{3})$/)?.[1])
-      .filter(Boolean)
-      .map(num => parseInt(num!))
-      .sort((a, b) => a - b);
-
-    let nextNumber = 1;
-    for (const num of existingNumbers) {
-      if (num === nextNumber) {
-        nextNumber++;
-      } else {
-        break;
-      }
-    }
-
-    const formattedNumber = nextNumber.toString().padStart(3, '0');
-    setNewEquipment(prev => ({ ...prev, name: `DL-${formattedNumber}` }));
-  };
-
   // Управление аттестациями в форме добавления
   const addNewVerification = (isEdit = false) => {
     const startDate = new Date();
@@ -541,24 +520,14 @@ export const EquipmentDirectory: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Наименование (формат DL-XXX)
               </label>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={newEquipment.name}
-                  onChange={(e) => setNewEquipment(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="DL-001"
-                  pattern="DL-\d{3}"
-                />
-                <button
-                  type="button"
-                  onClick={generateNextName}
-                  className="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
-                  title="Сгенерировать следующее наименование"
-                >
-                  Авто
-                </button>
-              </div>
+              <input
+                type="text"
+                value={newEquipment.name}
+                onChange={(e) => setNewEquipment(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="DL-001"
+                pattern="DL-\d{3}"
+              />
             </div>
 
             <div>
