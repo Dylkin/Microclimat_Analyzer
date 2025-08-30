@@ -509,7 +509,7 @@ export const EquipmentDirectory: React.FC = () => {
 
       {/* Add Equipment Form */}
       {showAddForm && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-6 max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Добавить оборудование</h2>
             <button
@@ -572,6 +572,11 @@ export const EquipmentDirectory: React.FC = () => {
                 placeholder="Введите серийный номер"
               />
             </div>
+          </div>
+
+          {/* Блок метрологической аттестации для редактирования */}
+          <div className="mt-6">
+            {renderVerificationsBlock(editEquipment.verifications || [], true)}
           </div>
 
           {/* Блок метрологической аттестации */}
