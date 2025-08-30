@@ -30,7 +30,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   disabled = false,
   onApprove,
   showApprovalButton = false,
-  isApproved = false
+  isApproved = false,
   userRole
 }) => {
   const formatFileSize = (bytes: number) => {
