@@ -7,8 +7,8 @@ interface DocumentUploadProps {
   document?: ProjectDocument;
   onUpload: (file: File) => void;
   onDelete: (documentId: string) => void;
-  onApprove?: (document: ProjectDocument) => void;
-  onUnapprove?: (document: ProjectDocument) => void;
+  onApprove?: (documentId: string) => void;
+  onUnapprove?: (documentId: string) => void;
   showApprovalButton?: boolean;
   approvalInfo?: {
     isApproved: boolean;
@@ -70,14 +70,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
     // Администраторы могут удалять любые документы
     if (userRole === 'administrator') return true;
     // Остальные роли не могут удалять согласованные документы
-    return !isApproved;
+    return !approvalInfo?.isApproved;
   };
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        {isApproved && (
+        {approvalInfo?.isApproved && (
           <div className="flex items-center space-x-2 text-green-600">
             <CheckCircle className="w-5 h-5" />
             <span className="text-sm font-medium">Согласовано</span>

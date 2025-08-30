@@ -215,7 +215,6 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           showApprovalButton={true}
           approvalInfo={commercialOfferDoc ? {
             isApproved: approvedDocuments.has(commercialOfferDoc.id),
-            ...approvedDocuments.get(commercialOfferDoc.id)
           } : undefined}
           userRole={user?.role}
         />
@@ -234,7 +233,6 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           showApprovalButton={true}
           approvalInfo={contractDoc ? {
             isApproved: approvedDocuments.has(contractDoc.id),
-            ...approvedDocuments.get(contractDoc.id)
           } : undefined}
           userRole={user?.role}
         />
