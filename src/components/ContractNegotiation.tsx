@@ -159,6 +159,15 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
     setApprovedDocuments(prev => new Set([...prev, document.id]));
   };
 
+  // Отмена согласования документа
+  const handleUnapproveDocument = (documentId: string) => {
+    setApprovedDocuments(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(documentId);
+      return newSet;
+    });
+  };
+
   // Get documents by type
   const commercialOfferDoc = documents.find(doc => doc.documentType === 'commercial_offer');
   const contractDoc = documents.find(doc => doc.documentType === 'contract');
