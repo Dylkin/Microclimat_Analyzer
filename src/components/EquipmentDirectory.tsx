@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wrench, Plus, Edit2, Trash2, Save, X, Search, Eye, AlertTriangle, Loader, ChevronLeft, ChevronRight, Upload, Download, Calendar, FileImage } from 'lucide-react';
+import { Wrench, Plus, Edit2, Trash2, Save, X, Search, Eye, AlertTriangle, Loader, ChevronLeft, ChevronRight, Upload, Download, Calendar, FileImage, CheckCircle } from 'lucide-react';
 import { Equipment, EquipmentType, EquipmentTypeLabels, EquipmentTypeColors, CreateEquipmentData, EquipmentVerification } from '../types/Equipment';
 import { equipmentService } from '../utils/equipmentService';
 
