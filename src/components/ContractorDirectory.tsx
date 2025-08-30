@@ -662,7 +662,7 @@ export const ContractorDirectory: React.FC = () => {
                 <QualificationObjectForm
                   contractorId={editingContractorData.id}
                   contractorAddress={editingContractorData.address}
-                  onAdd={handleAddQualificationObject}
+                  onSubmit={handleSaveQualificationObject}
                   onCancel={() => {
                     setShowAddQualificationForm(false);
                     setEditingQualificationObject(null);
