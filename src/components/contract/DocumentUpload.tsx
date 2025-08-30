@@ -61,7 +61,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
   const handleApprove = () => {
     if (document && onApprove) {
-      onApprove(document.id);
+      onApprove(document);
+    }
+  };
+
+  const handleUnapprove = () => {
+    if (document && onUnapprove) {
+      onUnapprove(document.id);
     }
   };
 
@@ -133,7 +139,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
           {showApprovalButton && (
             <button
-              onClick={handleApprove}
+              onClick={approvalInfo?.isApproved ? handleUnapprove : handleApprove}
               className={`w-full py-2 px-4 rounded-lg transition-colors font-medium flex items-center justify-center space-x-2 ${
                 approvalInfo?.isApproved
                   ? 'bg-red-600 text-white hover:bg-red-700'
