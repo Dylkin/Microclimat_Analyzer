@@ -292,7 +292,7 @@ export const ContractorDirectory: React.FC = () => {
         ));
       } else {
         // Добавляем новый объект
-        const addedObject = await qualificationObjectService.addQualificationObject(objectData);
+        const addedObject = await qualificationObjectService.createQualificationObject(objectData);
         setQualificationObjects(prev => [...prev, addedObject]);
       }
       setShowAddQualificationForm(false);
