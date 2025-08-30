@@ -107,13 +107,6 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
             Контрагент: <span className="font-medium">{contractorName}</span>
           </p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Добавить объект</span>
-        </button>
       </div>
 
       {/* Error Display */}
@@ -219,12 +212,6 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => handleDelete(object.id)}
-                    className="text-gray-600 hover:text-red-600 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
             </div>
@@ -233,45 +220,25 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
       )}
 
       {/* Create Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Добавить объект квалификации</h3>
-              <button
-                onClick={() => setShowForm(false)}
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <QualificationObjectForm
-              onSubmit={handleCreate}
-              onCancel={() => setShowForm(false)}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Edit Form Modal */}
+      {/* Edit Form - не в модальном окне */}
       {editingObject && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Редактировать объект квалификации</h3>
-              <button
-                onClick={() => setEditingObject(null)}
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <QualificationObjectForm
-              initialData={editingObject}
-              onSubmit={(data) => handleUpdate(editingObject.id, data)}
-              onCancel={() => setEditingObject(null)}
-            />
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Редактировать объект квалификации</h3>
+            <button
+              onClick={() => setEditingObject(null)}
+              className="text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
+          <QualificationObjectForm
+            initialData={editingObject}
+            onSubmit={(data) => handleUpdate(editingObject.id, data)}
+            onCancel={() => setEditingObject(null)}
+          />
         </div>
       )}
     </div>
