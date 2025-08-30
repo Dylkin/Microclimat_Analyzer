@@ -1,5 +1,5 @@
 import React from 'react';
-import { Upload, Download, Trash2, CheckCircle, Clock } from 'lucide-react';
+import { Upload, Download, Trash2, CheckCircle, Clock, X } from 'lucide-react';
 import { ProjectDocument } from '../../utils/projectDocumentService';
 
 interface DocumentUploadProps {
@@ -7,9 +7,15 @@ interface DocumentUploadProps {
   document?: ProjectDocument;
   onUpload: (file: File) => void;
   onDelete: (documentId: string) => void;
-  onApprove?: (documentId: string) => void;
+  onApprove?: (document: ProjectDocument) => void;
+  onUnapprove?: (document: ProjectDocument) => void;
   showApprovalButton?: boolean;
-  isApproved?: boolean;
+  approvalInfo?: {
+    isApproved: boolean;
+    approvedAt?: Date;
+    approvedBy?: string;
+    approvedByRole?: string;
+  };
   userRole?: string;
 }
 
@@ -19,8 +25,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   onUpload,
   onDelete,
   onApprove,
+  onUnapprove,
   showApprovalButton = false,
-  isApproved = false,
+  approvalInfo,
   userRole
 }) => {
   const formatFileSize = (bytes: number) => {
@@ -112,12 +119,38 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             </div>
           </div>
 
-          {showApprovalButton && !isApproved && (
+          {/* Информация о согласовании */}
+          {approvalInfo?.isApproved && approvalInfo.approvedAt && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="text-sm text-green-800">
+                <div className="font-medium">Согласовано:</div>
+                <div className="text-xs mt-1">
+                  {approvalInfo.approvedAt.toLocaleString('ru-RU')} • {approvalInfo.approvedBy} • {approvalInfo.approvedByRole}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showApprovalButton && (
             <button
               onClick={handleApprove}
-              className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium"
+              className={`w-full py-2 px-4 rounded-lg transition-colors font-medium flex items-center justify-center space-x-2 ${
+                approvalInfo?.isApproved
+                  ? 'bg-red-600 text-white hover:bg-red-700'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
             >
-              {title.includes('Договор') ? 'Согласован' : 'Согласовано'}
+              {approvalInfo?.isApproved ? (
+                <>
+                  <X className="w-4 h-4" />
+                  <span>Отменить согласование</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4" />
+                  <span>{title.includes('Договор') ? 'Согласовать' : 'Согласовать'}</span>
+                </>
+              )}
             </button>
           )}
         </div>
