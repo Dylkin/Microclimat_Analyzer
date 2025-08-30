@@ -74,7 +74,7 @@ export class EquipmentService {
       // Применяем поиск если указан
       if (searchTerm && searchTerm.trim()) {
         const searchLower = searchTerm.toLowerCase();
-        query = query.or(`name.ilike.%${searchLower}%,serial_number.ilike.%${searchLower}%,type.ilike.%${searchLower}%`);
+        query = query.or(`name.ilike.%${searchLower}%,serial_number.ilike.%${searchLower}%,(type::text).ilike.%${searchLower}%`);
       }
 
       // Применяем пагинацию
