@@ -211,8 +211,12 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           onView={handleViewDocument}
           onDelete={handleDeleteDocument}
           onApprove={handleApproveDocument}
+          onUnapprove={handleUnapproveDocument}
           showApprovalButton={true}
-          isApproved={commercialOfferDoc ? approvedDocuments.has(commercialOfferDoc.id) : false}
+          approvalInfo={commercialOfferDoc ? {
+            isApproved: approvedDocuments.has(commercialOfferDoc.id),
+            ...approvedDocuments.get(commercialOfferDoc.id)
+          } : undefined}
           userRole={user?.role}
         />
 
@@ -226,8 +230,12 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
           onView={handleViewDocument}
           onDelete={handleDeleteDocument}
           onApprove={handleApproveDocument}
+          onUnapprove={handleUnapproveDocument}
           showApprovalButton={true}
-          isApproved={contractDoc ? approvedDocuments.has(contractDoc.id) : false}
+          approvalInfo={contractDoc ? {
+            isApproved: approvedDocuments.has(contractDoc.id),
+            ...approvedDocuments.get(contractDoc.id)
+          } : undefined}
           userRole={user?.role}
         />
       </div>
