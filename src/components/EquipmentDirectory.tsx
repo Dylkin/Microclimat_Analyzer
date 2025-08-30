@@ -215,7 +215,7 @@ export const EquipmentDirectory: React.FC = () => {
   // Пагинация
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
-      loadEquipment(page, searchTerm);
+      loadEquipment(page, searchTerm, sortOrder);
     }
   };
 

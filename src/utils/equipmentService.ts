@@ -37,7 +37,7 @@ export class EquipmentService {
   }
 
   // Получение всего оборудования с пагинацией
-  async getAllEquipment(page: number = 1, limit: number = 10, searchTerm?: string): Promise<{
+  async getAllEquipment(page: number = 1, limit: number = 10, searchTerm?: string, sortOrder: 'asc' | 'desc' = 'asc'): Promise<{
     equipment: Equipment[];
     total: number;
     totalPages: number;
@@ -62,7 +62,7 @@ export class EquipmentService {
       const to = from + limit - 1;
       
       const { data, error, count } = await query
-        .order('created_at', { ascending: false })
+        .order('name', { ascending: sortOrder === 'asc' })
         .range(from, to);
 
       if (error) {
