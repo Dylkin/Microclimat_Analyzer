@@ -92,23 +92,25 @@ export const StatusSummary: React.FC<StatusSummaryProps> = ({
           ></div>
         </div>
         <div>
-            <span className={`text-sm px-2 py-1 rounded-full ${
-              getCommercialOfferStatus() === 'Согласовано' ? 'bg-green-100 text-green-800' :
-              getCommercialOfferStatus() === 'Согласование' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
-              {getCommercialOfferStatus()}
-            </span>
-          </div>
+          <span className={`text-sm px-2 py-1 rounded-full ${
+            getCommercialOfferStatus() === 'Согласовано' ? 'bg-green-100 text-green-800' :
+            getCommercialOfferStatus() === 'Согласование' ? 'bg-yellow-100 text-yellow-800' :
+            'bg-gray-100 text-gray-800'
+          }`}>
+            {getCommercialOfferStatus()}
+          </span>
+        </div>
+        
+        <div>
+          <span className={`text-sm px-2 py-1 rounded-full ${
+            getContractStatus() === 'Согласован' ? 'bg-green-100 text-green-800' :
+            getContractStatus() === 'Согласование' ? 'bg-yellow-100 text-yellow-800' :
+            'bg-gray-100 text-gray-800'
+          }`}>
+            {getContractStatus()}
+          </span>
         </div>
       </div>
     </div>
   );
-            <span className={`text-sm px-2 py-1 rounded-full ${
-              getContractStatus() === 'Согласован' ? 'bg-green-100 text-green-800' :
-              getContractStatus() === 'Согласование' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
-              {getContractStatus()}
-            </span>
 };
