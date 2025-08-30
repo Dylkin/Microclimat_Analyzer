@@ -552,9 +552,11 @@ export const EquipmentDirectory: React.FC = () => {
           )}
 
           {/* Блок метрологической аттестации */}
-          <div className="mt-6">
-            {renderVerificationsBlock(newEquipment.verifications || [])}
-          </div>
+          {!editingEquipment && (
+            <div className="mt-6">
+              {renderVerificationsBlock(newEquipment.verifications || [])}
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3 mt-6">
             <button
