@@ -250,12 +250,20 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       const currentPlacements = prev[objectId] || { zones: [] };
       const maxZoneNumber = Math.max(0, ...currentPlacements.zones.map(z => z.zoneNumber));
       
+      // Получаем уровни из предыдущей зоны для копирования
+      const previousZone = currentPlacements.zones[currentPlacements.zones.length - 1];
+      const levelsFromPrevious = previousZone ? previousZone.levels.map(level => ({
+        levelValue: level.levelValue,
+        equipmentId: '',
+        equipmentName: ''
+      })) : [];
+      
       return {
         ...prev,
         [objectId]: {
           zones: [
             ...currentPlacements.zones,
-            { zoneNumber: maxZoneNumber + 1, levels: [] }
+            { zoneNumber: maxZoneNumber + 1, levels: levelsFromPrevious }
           ]
         }
       };
@@ -519,16 +527,7 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
               
               {/* Блок размещения измерительного оборудования */}
               <div className="border-t border-gray-200 pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-semibold text-gray-900">Размещение измерительного оборудования</h4>
-                  <button
-                    onClick={() => addZone(editingObject.id)}
-                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Добавить зону</span>
-                  </button>
-                </div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Размещение измерительного оборудования</h4>
                 
                 {equipmentPlacements[editingObject.id]?.zones.length === 0 ? (
                   <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
@@ -653,7 +652,6 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                                                     className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
                                                   >
                                                     <div className="font-medium text-gray-900">{eq.name}</div>
-                                                    <div className="text-sm text-gray-500">S/N: {eq.serialNumber}</div>
                                                   </div>
                                                 ))
                                               ) : (
@@ -684,6 +682,17 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                     ))}
                   </div>
                 )}
+                
+                {/* Кнопка добавления зоны под списком зон */}
+                <div className="mt-4 flex justify-center">
+                  <button
+                    onClick={() => addZone(editingObject.id)}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Добавить зону</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
