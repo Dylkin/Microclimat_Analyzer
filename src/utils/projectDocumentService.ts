@@ -108,20 +108,19 @@ export class ProjectDocumentService {
       }
 
       // Проверяем существование пользователя в таблице users
-      const { data: existingUser, error: checkError } = await this.supabase
+      const { data: existing, error: checkError } = await this.supabase
         .from('users')
         .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
+        .eq('email', user.email);
 
       if (checkError) {
         console.error('Ошибка проверки существования пользователя:', checkError);
         // Продолжаем выполнение, так как это не критическая ошибка
       }
 
-      // Если пользователь не существует, создаем его
-      if (!existingUser) {
-        const { error: insertError } = await this.supabase
+      // Если пользователь с таким email не существует, создаем его
+      if (!existing || existing.length === 0) {
+        const { data: insertData, error: insertError } = await this.supabase
           .from('users')
           .insert({
             id: user.id,
@@ -129,13 +128,23 @@ export class ProjectDocumentService {
             full_name: user.user_metadata?.full_name || user.email,
             password: 'auth_user',
             role: 'specialist'
-          });
+          })
+          .select();
 
-        // Игнорируем ошибку дублирования, так как пользователь мог быть создан параллельно
-        if (insertError && insertError.code !== '23505') {
+        if (insertError) {
           console.error('Ошибка создания пользователя:', insertError);
-          // Не прерываем выполнение, так как это не критично для загрузки документа
+          // Игнорируем ошибку дублирования email, так как пользователь уже существует
+          if (insertError.code === '23505') {
+            console.log('Пользователь с таким email уже существует, продолжаем выполнение');
+          } else {
+            // Не прерываем выполнение, так как это не критично для загрузки документа
+            console.warn('Не удалось создать пользователя, но продолжаем загрузку документа');
+          }
+        } else {
+          console.log('Пользователь успешно создан:', insertData);
         }
+      } else {
+        console.log('Пользователь с таким email уже существует');
       }
 
       // Генерируем уникальное имя файла

@@ -172,7 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Ошибка добавления в БД:', error);
           
           // Если ошибка связана с дублированием email, выбрасываем специфичную ошибку
-          if (error instanceof Error && (error.message.includes('duplicate key value violates unique constraint "users_email_key"') || error.message.includes('23505'))) {
+          if (error instanceof Error && error.message.includes('23505')) {
             throw new Error('DUPLICATE_EMAIL');
           }
           
