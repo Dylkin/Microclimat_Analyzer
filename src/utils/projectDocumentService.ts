@@ -153,16 +153,11 @@ export class ProjectDocumentService {
 
       // Сохраняем информацию о документе в базе данных
       // Для test_data разрешаем множественные файлы, для остальных типов - один файл
-      let docData, docError;
-      
       if (documentType === 'test_data') {
-        // Для test_data добавляем новый документ с уникальным идентификатором
-        // Генерируем валидный UUID v4
-        const uniqueId = crypto.randomUUID();
-        const { data, error } = await this.supabase
+        // Для test_data всегда добавляем новый документ (множественные файлы разрешены)
+        const { data: docData, error: docError } = await this.supabase
           .from('project_documents')
           .insert({
-            id: uniqueId,
             project_id: projectId,
             qualification_object_id: qualificationObjectId || null,
             document_type: documentType,
@@ -174,12 +169,29 @@ export class ProjectDocumentService {
           })
           .select()
           .single();
-        
-        docData = data;
-        docError = error;
+
+        if (docError) {
+          console.error('Ошибка сохранения информации о документе:', docError);
+          throw new Error(`Ошибка сохранения документа: ${docError.message}`);
+        }
+
+        console.log('Информация о документе сохранена в БД:', docData);
+
+        return {
+          id: docData.id,
+          projectId: docData.project_id,
+          qualificationObjectId: docData.qualification_object_id || undefined,
+          documentType: docData.document_type,
+          fileName: docData.file_name,
+          fileSize: docData.file_size,
+          fileUrl: docData.file_url,
+          mimeType: docData.mime_type,
+          uploadedBy: docData.uploaded_by,
+          uploadedAt: new Date(docData.uploaded_at)
+        };
       } else {
         // Для остальных типов используем upsert для замены существующего файла
-        const { data, error } = await this.supabase
+        const { data: docData, error: docError } = await this.supabase
           .from('project_documents')
           .upsert({
             project_id: projectId,
@@ -195,30 +207,27 @@ export class ProjectDocumentService {
           })
           .select()
           .single();
-        
-        docData = data;
-        docError = error;
+
+        if (docError) {
+          console.error('Ошибка сохранения информации о документе:', docError);
+          throw new Error(`Ошибка сохранения документа: ${docError.message}`);
+        }
+
+        console.log('Информация о документе сохранена в БД:', docData);
+
+        return {
+          id: docData.id,
+          projectId: docData.project_id,
+          qualificationObjectId: docData.qualification_object_id || undefined,
+          documentType: docData.document_type,
+          fileName: docData.file_name,
+          fileSize: docData.file_size,
+          fileUrl: docData.file_url,
+          mimeType: docData.mime_type,
+          uploadedBy: docData.uploaded_by,
+          uploadedAt: new Date(docData.uploaded_at)
+        };
       }
-
-      if (docError) {
-        console.error('Ошибка сохранения информации о документе:', docError);
-        throw new Error(`Ошибка сохранения документа: ${docError.message}`);
-      }
-
-      console.log('Информация о документе сохранена в БД:', docData);
-
-      return {
-        id: docData.id,
-        projectId: docData.project_id,
-        qualificationObjectId: docData.qualification_object_id || undefined,
-        documentType: docData.document_type,
-        fileName: docData.file_name,
-        fileSize: docData.file_size,
-        fileUrl: docData.file_url,
-        mimeType: docData.mime_type,
-        uploadedBy: docData.uploaded_by,
-        uploadedAt: new Date(docData.uploaded_at)
-      };
     } catch (error) {
       console.error('Ошибка при загрузке документа:', error);
       throw error;
