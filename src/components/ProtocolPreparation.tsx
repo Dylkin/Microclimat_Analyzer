@@ -544,13 +544,6 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                           </h5>
                           <div className="flex items-center space-x-2">
                             <button
-                              onClick={() => addLevel(editingObject.id, zoneIndex)}
-                              className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center space-x-1"
-                            >
-                              <Plus className="w-3 h-3" />
-                              <span>Добавить уровень</span>
-                            </button>
-                            <button
                               onClick={() => removeZone(editingObject.id, zoneIndex)}
                               className="text-red-600 hover:text-red-800 transition-colors"
                               title="Удалить зону"
@@ -678,6 +671,17 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                             })}
                           </div>
                         )}
+                        
+                        {/* Кнопка добавления уровня под зоной */}
+                        <div className="mt-3 flex justify-center">
+                          <button
+                            onClick={() => addLevel(editingObject.id, zoneIndex)}
+                            className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Добавить уровень</span>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
