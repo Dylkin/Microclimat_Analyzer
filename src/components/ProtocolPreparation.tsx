@@ -753,8 +753,8 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                   </div>
                 )}
                 
-                {/* Кнопка добавления зоны под списком зон */}
-                <div className="mt-4 flex justify-center">
+                {/* Кнопки управления зонами и сохранения размещения */}
+                <div className="mt-4 flex justify-center space-x-4">
                   <button
                     onClick={() => addZone(editingObject.id)}
                     className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
@@ -762,10 +762,6 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                     <Plus className="w-4 h-4" />
                     <span>Добавить зону</span>
                   </button>
-                </div>
-                
-                {/* Кнопка сохранения размещения оборудования */}
-                <div className="mt-6 flex justify-center">
                   <button
                     onClick={() => handleSaveEquipmentPlacement(editingObject.id)}
                     disabled={operationLoading}
