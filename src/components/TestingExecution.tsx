@@ -457,18 +457,6 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
             const placement = equipmentPlacements.get(obj.id) || { zones: [] };
             const isEditing = editingPlacement === obj.id;
             
-            console.log('=== ОТЛАДКА ИНФОРМАЦИИ ОБ ИСПЫТАНИЯХ ===');
-            console.log('Объект квалификации ID:', obj.id);
-            
-            const testDataDocs = documents.filter(doc => {
-              const typeMatch = doc.documentType === 'test_data';
-              const objectMatch = doc.qualificationObjectId === obj.id;
-              console.log(`Документ ${doc.fileName}: type=${typeMatch}, object=${objectMatch}, objectId=${doc.qualificationObjectId}`);
-              return typeMatch && objectMatch;
-            });
-            
-            console.log('Найдено документов испытаний:', testDataDocs.length);
-            
             return (
               <div key={obj.id} className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center justify-between mb-6">
