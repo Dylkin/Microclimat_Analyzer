@@ -366,14 +366,6 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
     return null;
   };
 
-  // Просмотр файла данных испытаний
-  const handleViewTestDataFile = (objectId: string) => {
-    const fileUrl = testDataFileUrls[objectId];
-    if (fileUrl) {
-      window.open(fileUrl, '_blank');
-    }
-  };
-
   // Управление размещением оборудования
   const addZone = (objectId: string) => {
     setEquipmentPlacements(prev => {
