@@ -1357,6 +1357,20 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
           <li>• <strong>Проведите испытания:</strong> Выполните необходимые измерения согласно протоколу</li>
           <li>• <strong>Переход к отчету:</strong> После завершения испытаний проект готов к подготовке отчета</li>
         </ul>
+        
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => {
+              // TODO: Реализовать логику сохранения данных испытаний
+              alert('Функция сохранения будет реализована');
+            }}
+            disabled={operationLoading}
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            <Save className="w-5 h-5" />
+            <span>Сохранить</span>
+          </button>
+        </div>
       </div>
     </div>
   );
