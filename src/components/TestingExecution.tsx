@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle, Edit2, X, Plus, FileImage } from 'lucide-react';
 import { Project } from '../types/Project';
+import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
 import { QualificationObject } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
 import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
@@ -18,6 +19,7 @@ interface TestingExecutionProps {
 
 export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onBack }) => {
   const { user } = useAuth();
+  const [protocolDocuments, setProtocolDocuments] = useState<ProjectDocument[]>([]);
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [testDataDocuments, setTestDataDocuments] = useState<ProjectDocument[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,6 +67,34 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
       </div>
     );
   }
+
+  // Загрузка документов проекта
+  const loadDocuments = async () => {
+    if (!projectDocumentService.isAvailable()) {
+      setError('Supabase не настроен для работы с документами');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const docs = await projectDocumentService.getProjectDocuments(project.id);
+      
+      // Фильтруем протоколы (используем тип layout_scheme для протоколов)
+      const protocols = docs.filter(doc => doc.documentType === 'layout_scheme');
+      setProtocolDocuments(protocols);
+    } catch (error) {
+      console.error('Ошибка загрузки документов:', error);
+      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDocuments();
+  }, [project.id]);
 
   // Загрузка документов проекта
   const loadDocuments = async () => {
