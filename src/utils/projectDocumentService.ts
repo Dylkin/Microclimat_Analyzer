@@ -169,6 +169,7 @@ export class ProjectDocumentService {
       return {
         id: docData.id,
         projectId: docData.project_id,
+        qualificationObjectId: docData.qualification_object_id || undefined,
         documentType: docData.document_type,
         fileName: docData.file_name,
         fileSize: docData.file_size,

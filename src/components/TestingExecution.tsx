@@ -220,6 +220,92 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     window.open(document.fileUrl, '_blank');
   };
 
+  // Получение документов испытаний для конкретного объекта квалификации
+  const getObjectTestDocuments = (qualificationObjectId: string) => {
+    return objectTestDocuments.filter(doc => doc.qualificationObjectId === qualificationObjectId);
+  };
+
+  // Загрузка документа испытания для объекта квалификации
+  const handleTestDocumentUpload = async (qualificationObjectId: string, file: File) => {
+    if (!file) return;
+
+    // Проверяем тип файла
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Поддерживаются только изображения (JPG, PNG, GIF, WebP) и PDF файлы');
+      return;
+    }
+
+    // Проверяем размер файла (максимум 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert('Размер файла не должен превышать 10MB');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const uploadedDoc = await projectDocumentService.uploadDocument(
+        project.id, 
+        'test_data', // Используем test_data для документов испытаний
+        file, 
+        user?.id,
+        qualificationObjectId // Передаем ID объекта квалификации
+      );
+      
+      // Обновляем список документов испытаний для объектов
+      setObjectTestDocuments(prev => [...prev, uploadedDoc]);
+      alert('Документ испытания успешно загружен');
+    } catch (error) {
+      console.error('Ошибка загрузки документа испытания:', error);
+      alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Удаление документа испытания
+  const handleDeleteTestDocument = async (documentId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот документ испытания?')) {
+      return;
+    }
+
+    try {
+      await projectDocumentService.deleteDocument(documentId);
+      setObjectTestDocuments(prev => prev.filter(doc => doc.id !== documentId));
+      alert('Документ испытания успешно удален');
+    } catch (error) {
+      console.error('Ошибка удаления документа испытания:', error);
+      alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  };
+
+  // Скачивание документа испытания
+  const handleDownloadTestDocument = async (document: ProjectDocument) => {
+    try {
+      const blob = await projectDocumentService.downloadDocument(document.fileUrl);
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = document.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Ошибка скачивания документа испытания:', error);
+      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  };
+
+  // Просмотр документа испытания
+  const handleViewTestDocument = (document: ProjectDocument) => {
+    window.open(document.fileUrl, '_blank');
+  };
+
   // Обновление объекта квалификации
   const handleUpdateQualificationObject = async (updatedObject: QualificationObject) => {
     setOperationLoading(true);
