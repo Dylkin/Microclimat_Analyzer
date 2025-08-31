@@ -108,7 +108,7 @@ export class ProjectDocumentService {
       }
 
       // Создаем или обновляем запись пользователя с использованием upsert
-      await this.supabase
+      const { error: upsertError } = await this.supabase
         .from('users')
         .upsert({ 
           id: user.id, 
@@ -117,9 +117,14 @@ export class ProjectDocumentService {
           password: 'auth_user', // Пароль для пользователей из auth
           role: 'specialist'
         }, {
-          onConflict: 'id',
-          ignoreDuplicates: true
+          onConflict: 'id'
         });
+
+      // Игнорируем ошибку дублирования email, так как пользователь уже существует
+      if (upsertError && upsertError.code !== '23505') {
+        console.error('Ошибка создания/обновления пользователя:', upsertError);
+        throw new Error(`Ошибка создания пользователя: ${upsertError.message}`);
+      }
 
       // Генерируем уникальное имя файла
       const fileExt = file.name.split('.').pop();
