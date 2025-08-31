@@ -1115,116 +1115,6 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
         )}
       </div>
 
-      {/* Test Data Upload */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Данные испытаний</h3>
-          {testDataDocuments.length === 0 && (
-            <label className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center space-x-2">
-              {uploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Загрузка...</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4" />
-                  <span>Загрузить данные испытаний</span>
-                </>
-              )}
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx,.csv,.xls,.xlsx"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    handleTestDataUpload(file);
-                  }
-                }}
-                className="hidden"
-                disabled={uploading}
-              />
-            </label>
-          )}
-        </div>
-
-        {testDataDocuments.length > 0 ? (
-          <div className="space-y-4">
-            {testDataDocuments.map((testData) => (
-              <div key={testData.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <FileText className="w-8 h-8 text-blue-600" />
-                    <div>
-                      <h4 className="font-medium text-gray-900">
-                        {testData.fileName}
-                      </h4>
-                      <p className="text-sm text-gray-500">
-                        {formatFileSize(testData.fileSize)} • 
-                        Загружен {testData.uploadedAt.toLocaleDateString('ru-RU')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleViewTestData(testData)}
-                      className="text-blue-600 hover:text-blue-800 transition-colors"
-                      title="Просмотреть данные испытаний"
-                    >
-                      <Eye className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDownloadTestData(testData)}
-                      className="text-green-600 hover:text-green-800 transition-colors"
-                      title="Скачать данные испытаний"
-                    >
-                      <Download className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteTestData(testData.id)}
-                      className="text-red-600 hover:text-red-800 transition-colors"
-                      title="Удалить данные испытаний"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {/* Кнопка для загрузки дополнительных данных испытаний */}
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-              <label className="cursor-pointer flex flex-col items-center space-y-2">
-                <Upload className="w-8 h-8 text-gray-400" />
-                <span className="text-sm text-gray-600">
-                  Загрузить дополнительные данные испытаний
-                </span>
-                <span className="text-xs text-gray-500">
-                  Поддерживаются файлы PDF, DOC, DOCX, CSV, XLS, XLSX
-                </span>
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.csv,.xls,.xlsx"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      handleTestDataUpload(file);
-                    }
-                  }}
-                  className="hidden"
-                  disabled={uploading}
-                />
-              </label>
-            </div>
-          </div>
-        ) : (
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 mb-2">Данные испытаний не загружены</p>
-            <p className="text-sm text-gray-400">Поддерживаются файлы PDF, DOC, DOCX, CSV, XLS, XLSX</p>
-          </div>
-        )}
-      </div>
 
       {/* Status Summary */}
       <div className="bg-white rounded-lg shadow p-6">
@@ -1249,23 +1139,6 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
             </span>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center space-x-3">
-              {testDataDocuments.length > 0 ? (
-                <CheckCircle className="w-5 h-5 text-green-500" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 text-yellow-500" />
-              )}
-              <span className="font-medium text-gray-900">Данные испытаний</span>
-            </div>
-            <span className={`text-sm px-2 py-1 rounded-full ${
-              testDataDocuments.length > 0 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-yellow-100 text-yellow-800'
-            }`}>
-              {testDataDocuments.length > 0 ? `Загружено (${testDataDocuments.length})` : 'Ожидает загрузки'}
-            </span>
-          </div>
         </div>
 
         {/* Progress indicator */}
@@ -1273,26 +1146,26 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Прогресс проведения испытаний</span>
             <span className="text-sm text-gray-500">
-              {(protocolDoc ? 1 : 0) + (testDataDocuments.length > 0 ? 1 : 0)} из 2 этапов
+              {protocolDocuments.length > 0 ? 1 : 0} из 1 этапа
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
               className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
               style={{ 
-                width: `${((protocolDoc ? 1 : 0) + (testDataDocuments.length > 0 ? 1 : 0)) / 2 * 100}%` 
+                width: `${(protocolDocuments.length > 0 ? 1 : 0) / 1 * 100}%` 
               }}
             ></div>
           </div>
         </div>
 
         {/* Completion status */}
-        {protocolDoc && testDataDocuments.length > 0 && (
+        {protocolDocuments.length > 0 && (
           <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center space-x-2">
               <CheckCircle className="w-5 h-5 text-green-600" />
               <span className="text-green-800 font-medium">
-                Испытания проведены! Проект готов к переходу на этап подготовки отчета.
+                Протокол доступен! Проект готов к переходу на этап подготовки отчета.
               </span>
             </div>
           </div>
@@ -1306,10 +1179,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
           <li>• <strong>Проверьте протокол:</strong> Убедитесь, что протокол загружен и доступен</li>
           <li>• <strong>Отредактируйте объекты квалификации:</strong> Проверьте и при необходимости обновите данные выбранных объектов</li>
           <li>• <strong>Настройте размещение оборудования:</strong> Определите зоны и уровни измерения для каждого объекта</li>
-          <li>• <strong>Загрузите данные испытаний:</strong> Подготовьте и загрузите результаты испытаний</li>
-          <li>• <strong>Проверьте документы:</strong> Используйте кнопки просмотра для проверки</li>
-          <li>• <strong>Замена данных:</strong> При необходимости можно загрузить новые версии данных</li>
-          <li>• <strong>Переход к отчету:</strong> После загрузки данных проект готов к подготовке отчета</li>
+          <li>• <strong>Переход к отчету:</strong> После проведения испытаний проект готов к подготовке отчета</li>
         </ul>
       </div>
     </div>
