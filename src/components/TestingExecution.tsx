@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, AlertTriangle, CheckCircle, Edit2, X, Plus, Trash2, Upload, Eye, Download, FileImage } from 'lucide-react';
+import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle, Edit2, X, Plus } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
-import { ProjectDocument } from '../types/ProjectDocument';
+import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { equipmentService } from '../utils/equipmentService';
 import { equipmentAssignmentService } from '../utils/equipmentAssignmentService';
-import { projectDocumentService } from '../utils/projectDocumentService';
 import { useAuth } from '../contexts/AuthContext';
 import { ProjectInfo } from './contract/ProjectInfo';
 import { QualificationObjectForm } from './QualificationObjectForm';
@@ -19,9 +18,11 @@ interface TestingExecutionProps {
 
 export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onBack }) => {
   const { user } = useAuth();
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
+  const [protocolDocuments, setProtocolDocuments] = useState<ProjectDocument[]>([]);
+  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
   const [editingObject, setEditingObject] = useState<QualificationObject | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -41,9 +42,6 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
   }>({});
   const [equipmentSearch, setEquipmentSearch] = useState<{ [key: string]: string }>({});
   const [showEquipmentDropdown, setShowEquipmentDropdown] = useState<{ [key: string]: boolean }>({});
-  const [objectTestDocuments, setObjectTestDocuments] = useState<ProjectDocument[]>([]);
-  const [testDocumentUploading, setTestDocumentUploading] = useState<{ [key: string]: boolean }>({});
-  const [testDataDocuments, setTestDataDocuments] = useState<ProjectDocument[]>([]);
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -73,13 +71,24 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
       return;
     }
 
+    setLoading(true);
+    setError(null);
+
     try {
-      const documents = await projectDocumentService.getProjectDocuments(project.id);
-      setTestDataDocuments(documents.filter(doc => doc.documentType === 'test_data'));
-      setObjectTestDocuments(documents.filter(doc => doc.documentType === 'test_document'));
+      const docs = await projectDocumentService.getProjectDocuments(project.id);
+      setDocuments(docs);
+      
+      // Фильтруем протоколы (пока используем тип layout_scheme для протоколов)
+      const protocols = docs.filter(doc => doc.documentType === 'layout_scheme');
+      setProtocolDocuments(protocols);
+      
+      // Загружаем выбранные объекты квалификации
+      await loadSelectedQualificationObjects();
     } catch (error) {
       console.error('Ошибка загрузки документов:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -110,97 +119,21 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
       
       // Инициализируем размещения оборудования для каждого объекта
       const initialPlacements: typeof equipmentPlacements = {};
-      for (const obj of selectedObjects) {
-        await loadEquipmentPlacement(obj.id);
-      }
+      selectedObjects.forEach(obj => {
+        initialPlacements[obj.id] = {
+          zones: [{ zoneNumber: 1, levels: [] }]
+        };
+      });
+      setEquipmentPlacements(initialPlacements);
     } catch (error) {
       console.error('Ошибка загрузки объектов квалификации:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Загрузка размещения оборудования
-  const loadEquipmentPlacement = async (objectId: string) => {
-    try {
-      const assignments = await equipmentAssignmentService.getAssignmentsByObject(objectId);
-      
-      // Группируем по зонам и уровням
-      const zones: { [zoneNumber: number]: { levelValue: number; equipmentId: string; equipmentName?: string }[] } = {};
-      
-      assignments.forEach(assignment => {
-        if (!zones[assignment.zoneNumber]) {
-          zones[assignment.zoneNumber] = [];
-        }
-        
-        const equipmentItem = equipment.find(eq => eq.id === assignment.equipmentId);
-        zones[assignment.zoneNumber].push({
-          levelValue: assignment.levelValue,
-          equipmentId: assignment.equipmentId,
-          equipmentName: equipmentItem?.name
-        });
-      });
-      
-      // Преобразуем в нужный формат
-      const zonesArray = Object.keys(zones).map(zoneNumber => ({
-        zoneNumber: parseInt(zoneNumber),
-        levels: zones[parseInt(zoneNumber)]
-      }));
-      
-      setEquipmentPlacements(prev => ({
-        ...prev,
-        [objectId]: { zones: zonesArray }
-      }));
-    } catch (error) {
-      console.error('Ошибка загрузки размещения оборудования:', error);
-      // Инициализируем пустым массивом в случае ошибки
-      setEquipmentPlacements(prev => ({
-        ...prev,
-        [objectId]: { zones: [] }
-      }));
-    }
-  };
-
-  // Сохранение размещения оборудования
-  const handleSaveEquipmentPlacement = async (objectId: string) => {
-    setOperationLoading(true);
-    try {
-      const placement = equipmentPlacements[objectId];
-      if (!placement) return;
-
-      // Удаляем старые назначения
-      await equipmentAssignmentService.deleteAssignmentsByObject(objectId);
-
-      // Создаем новые назначения
-      for (const zone of placement.zones) {
-        for (const level of zone.levels) {
-          if (level.equipmentId) {
-            await equipmentAssignmentService.createAssignment({
-              qualificationObjectId: objectId,
-              equipmentId: level.equipmentId,
-              zoneNumber: zone.zoneNumber,
-              levelValue: level.levelValue,
-              assignedBy: user?.id || '',
-              assignedAt: new Date()
-            });
-          }
-        }
-      }
-
-      alert('Размещение оборудования успешно сохранено');
-    } catch (error) {
-      console.error('Ошибка сохранения размещения оборудования:', error);
-      alert(`Ошибка сохранения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setOperationLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSelectedQualificationObjects();
-    loadEquipment();
     loadDocuments();
+    loadEquipment();
   }, [project.id]);
 
   // Загрузка оборудования
@@ -217,14 +150,13 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     }
   };
 
-  // Загрузка данных испытаний
-  const handleTestDataUpload = async (file: File) => {
+  // Загрузка протокола
+  const handleProtocolUpload = async (file: File) => {
     if (!file) return;
 
     // Проверяем тип файла
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Поддерживаются файлы: PDF, DOC, DOCX, CSV, XLS, XLSX');
+    if (!file.name.toLowerCase().endsWith('.docx')) {
+      alert('Поддерживаются только файлы DOCX');
       return;
     }
 
@@ -233,40 +165,40 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     try {
       const uploadedDoc = await projectDocumentService.uploadDocument(
         project.id, 
-        'test_data', // Используем test_data для данных испытаний
+        'layout_scheme', // Используем layout_scheme для протоколов
         file, 
         user?.id
       );
       
-      // Обновляем список данных испытаний
-      setTestDataDocuments(prev => [...prev, uploadedDoc]);
-      alert('Данные испытаний успешно загружены');
+      // Обновляем список протоколов
+      setProtocolDocuments(prev => [...prev, uploadedDoc]);
+      alert('Протокол успешно загружен');
     } catch (error) {
-      console.error('Ошибка загрузки данных испытаний:', error);
-      alert(`Ошибка загрузки данных испытаний: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      console.error('Ошибка загрузки протокола:', error);
+      alert(`Ошибка загрузки протокола: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setUploading(false);
     }
   };
 
-  // Удаление данных испытаний
-  const handleDeleteTestData = async (documentId: string) => {
-    if (!confirm('Вы уверены, что хотите удалить эти данные испытаний?')) {
+  // Удаление протокола
+  const handleDeleteProtocol = async (documentId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот протокол?')) {
       return;
     }
 
     try {
       await projectDocumentService.deleteDocument(documentId);
-      setTestDataDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      alert('Данные испытаний успешно удалены');
+      setProtocolDocuments(prev => prev.filter(doc => doc.id !== documentId));
+      alert('Протокол успешно удален');
     } catch (error) {
-      console.error('Ошибка удаления данных испытаний:', error);
-      alert(`Ошибка удаления данных испытаний: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      console.error('Ошибка удаления протокола:', error);
+      alert(`Ошибка удаления протокола: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   };
 
-  // Скачивание данных испытаний
-  const handleDownloadTestData = async (document: ProjectDocument) => {
+  // Скачивание протокола
+  const handleDownloadProtocol = async (document: ProjectDocument) => {
     try {
       const blob = await projectDocumentService.downloadDocument(document.fileUrl);
       const url = URL.createObjectURL(blob);
@@ -280,102 +212,14 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
       
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Ошибка скачивания данных испытаний:', error);
-      alert(`Ошибка скачивания данных испытаний: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      console.error('Ошибка скачивания протокола:', error);
+      alert(`Ошибка скачивания протокола: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   };
 
-  // Просмотр данных испытаний
-  const handleViewTestData = (document: ProjectDocument) => {
+  // Просмотр протокола
+  const handleViewProtocol = (document: ProjectDocument) => {
     window.open(document.fileUrl, '_blank');
-  };
-
-  // Получение документов испытаний для конкретного объекта квалификации
-  const getObjectTestDocuments = (qualificationObjectId: string) => {
-    return objectTestDocuments.filter(doc => doc.qualificationObjectId === qualificationObjectId);
-  };
-
-  // Загрузка документа испытания для объекта квалификации
-  const handleTestDocumentUpload = async (qualificationObjectId: string, file: File) => {
-    if (!file) return;
-
-    // Проверяем тип файла - только JPG
-    const allowedTypes = ['image/jpeg', 'image/jpg'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Поддерживаются только файлы JPG');
-      return;
-    }
-
-    const uploadKey = `${qualificationObjectId}-upload`;
-    setTestDocumentUploading(prev => ({ ...prev, [uploadKey]: true }));
-
-    try {
-      const uploadedDoc = await projectDocumentService.uploadDocument(
-        project.id,
-        'test_document',
-        file,
-        user?.id,
-        qualificationObjectId
-      );
-      
-      setObjectTestDocuments(prev => [...prev, uploadedDoc]);
-      alert('Документ испытания успешно загружен');
-    } catch (error) {
-      console.error('Ошибка загрузки документа испытания:', error);
-      alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setTestDocumentUploading(prev => ({ ...prev, [uploadKey]: false }));
-    }
-  };
-
-  // Удаление документа испытания
-  const handleDeleteTestDocument = async (documentId: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот документ испытания?')) {
-      return;
-    }
-
-    try {
-      await projectDocumentService.deleteDocument(documentId);
-      setObjectTestDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      alert('Документ испытания успешно удален');
-    } catch (error) {
-      console.error('Ошибка удаления документа испытания:', error);
-      alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
-  };
-
-  // Скачивание документа испытания
-  const handleDownloadTestDocument = async (document: ProjectDocument) => {
-    try {
-      const blob = await projectDocumentService.downloadDocument(document.fileUrl);
-      const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = document.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Ошибка скачивания документа испытания:', error);
-      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
-  };
-
-  // Просмотр документа испытания
-  const handleViewTestDocument = (document: ProjectDocument) => {
-    window.open(document.fileUrl, '_blank');
-  };
-
-  // Форматирование размера файла
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   // Обновление объекта квалификации
@@ -515,7 +359,8 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     if (!searchTerm.trim()) return equipment;
     
     return equipment.filter(eq =>
-      eq.name.toLowerCase().includes(searchTerm.toLowerCase())
+      eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      eq.serialNumber.toLowerCase().includes(searchTerm.toLowerCase())
     );
   };
 
@@ -554,29 +399,104 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     if (obj.bodyVolume) details.push(`📦 ${obj.bodyVolume} м³`);
     if (obj.inventoryNumber) details.push(`📋 Инв. №: ${obj.inventoryNumber}`);
     if (obj.chamberVolume) details.push(`📦 ${obj.chamberVolume} л`);
+    if (obj.serialNumber) details.push(`🔢 S/N: ${obj.serialNumber}`);
+    if (obj.manufacturer) details.push(`🏭 ${obj.manufacturer}`);
+    if (obj.climateSystem) details.push(`❄️ ${obj.climateSystem}`);
 
     return details;
   };
 
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <FileText className="w-8 h-8 text-red-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Проведение испытаний</h1>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <p className="text-red-600">{error}</p>
-        </div>
-      </div>
-    );
-  }
+  // Форматирование размера файла
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Сохранение размещения оборудования
+  const handleSaveEquipmentPlacement = async (objectId: string) => {
+    if (!equipmentAssignmentService.isAvailable()) {
+      alert('Supabase не настроен для сохранения размещения оборудования');
+      return;
+    }
+
+    const placement = equipmentPlacements[objectId];
+    if (!placement || placement.zones.length === 0) {
+      alert('Нет данных для сохранения');
+      return;
+    }
+
+    setOperationLoading(true);
+    try {
+      await equipmentAssignmentService.saveEquipmentPlacement(
+        project.id,
+        objectId,
+        placement
+      );
+      
+      // После успешного сохранения перезагружаем размещение из базы данных
+      await loadEquipmentPlacement(objectId);
+      
+      alert('Размещение оборудования успешно сохранено');
+    } catch (error) {
+      console.error('Ошибка сохранения размещения оборудования:', error);
+      alert(`Ошибка сохранения размещения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // Загрузка размещения оборудования при редактировании объекта
+  const loadEquipmentPlacement = async (objectId: string) => {
+    if (!equipmentAssignmentService.isAvailable()) {
+      // Инициализируем пустое размещение если Supabase недоступен
+      setEquipmentPlacements(prev => ({
+        ...prev,
+        [objectId]: {
+          zones: [{ zoneNumber: 1, levels: [] }]
+        }
+      }));
+      return;
+    }
+
+    try {
+      console.log('Загружаем размещение оборудования для объекта:', objectId);
+      const placement = await equipmentAssignmentService.getEquipmentPlacement(project.id, objectId);
+      
+      console.log('Загружено зон из БД:', placement.zones.length);
+      console.log('Детали загруженных зон:', placement.zones.map(zone => ({
+        zoneNumber: zone.zoneNumber,
+        levelsCount: zone.levels.length,
+        levels: zone.levels.map(level => ({
+          levelValue: level.levelValue,
+          equipmentName: level.equipmentName
+        }))
+      })));
+      
+      // Всегда устанавливаем загруженные данные, даже если зон нет
+      setEquipmentPlacements(prev => ({
+        ...prev,
+        [objectId]: placement.zones.length > 0 ? placement : {
+          zones: [{ zoneNumber: 1, levels: [] }]
+        }
+      }));
+    } catch (error) {
+      console.error('Ошибка загрузки размещения оборудования:', error);
+      console.log('Инициализируем пустое размещение из-за ошибки');
+      // Инициализируем пустое размещение при ошибке
+      setEquipmentPlacements(prev => ({
+        ...prev,
+        [objectId]: {
+          zones: [{ zoneNumber: 1, levels: [] }]
+        }
+      }));
+    }
+  };
+
+  // Получение договора из документов
+  const contractDoc = documents.find(doc => doc.documentType === 'contract');
 
   return (
     <div className="space-y-6">
@@ -594,6 +514,60 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
 
       {/* Project Info */}
       <ProjectInfo project={project} />
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start space-x-2">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки документов</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contract Link */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Договор</h3>
+        
+        {contractDoc ? (
+          <div className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <FileText className="w-8 h-8 text-green-600" />
+                <div>
+                  <h4 className="font-medium text-gray-900">
+                    {contractDoc.fileName}
+                  </h4>
+                  <p className="text-sm text-gray-500">
+                    {formatFileSize(contractDoc.fileSize)} • 
+                    Загружен {contractDoc.uploadedAt.toLocaleDateString('ru-RU')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleViewProtocol(contractDoc)}
+                  className="text-blue-600 hover:text-blue-800 transition-colors"
+                  title="Просмотреть договор"
+                >
+                  <Eye className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500 mb-2">Договор не найден</p>
+            <p className="text-sm text-gray-400">
+              Договор должен быть загружен на этапе согласования
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Qualification Objects */}
       <div className="bg-white rounded-lg shadow p-6">
@@ -636,14 +610,14 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
               <div className="border-t border-gray-200 pt-6">
                 <h4 className="text-lg font-semibold text-gray-900 mb-4">Размещение измерительного оборудования</h4>
                 
-                {equipmentPlacements[editingObject.id]?.zones.length === 0 ? (
+                {!equipmentPlacements[editingObject.id] || equipmentPlacements[editingObject.id]?.zones.length === 0 ? (
                   <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
                     <p className="text-sm">Зоны измерения не добавлены</p>
                     <p className="text-xs mt-1">Нажмите "Добавить зону" для создания первой зоны</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {equipmentPlacements[editingObject.id]?.zones.map((zone, zoneIndex) => (
+                    {equipmentPlacements[editingObject.id]?.zones?.map((zone, zoneIndex) => (
                       <div key={zoneIndex} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-4">
                           <h5 className="font-medium text-gray-900">
@@ -794,8 +768,8 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                   </div>
                 )}
                 
-                {/* Кнопка добавления зоны под списком зон */}
-                <div className="mt-4 flex justify-center">
+                {/* Кнопки управления зонами и сохранения размещения */}
+                <div className="mt-4 flex justify-center items-center space-x-4">
                   <button
                     onClick={() => addZone(editingObject.id)}
                     className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
@@ -803,10 +777,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                     <Plus className="w-4 h-4" />
                     <span>Добавить зону</span>
                   </button>
-                </div>
-                
-                {/* Кнопка сохранения размещения оборудования */}
-                <div className="mt-6 flex justify-center">
+                  
                   <button
                     onClick={() => handleSaveEquipmentPlacement(editingObject.id)}
                     disabled={operationLoading}
@@ -823,119 +794,6 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                         <span>Сохранить размещение</span>
                       </>
                     )}
-                  </button>
-                </div>
-              </div>
-              
-              {/* Блок загрузки документов о проведенных испытаниях */}
-              <div className="border-t border-gray-200 pt-6">
-                <h4 className="text-lg font-semibold text-gray-900 mb-4">Документы о проведенных испытаниях</h4>
-                
-                {/* Загрузка нового документа */}
-                <div className="mb-6">
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          handleTestDocumentUpload(editingObject.id, file);
-                        }
-                      }}
-                      className="hidden"
-                      id={`test-document-upload-${editingObject.id}`}
-                    />
-                    <label
-                      htmlFor={`test-document-upload-${editingObject.id}`}
-                      className="cursor-pointer flex flex-col items-center space-y-2"
-                    >
-                      <Upload className="w-8 h-8 text-gray-400" />
-                      <span className="text-sm text-gray-600">
-                        Загрузить JPG документ испытания
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        Поддерживаются только JPG файлы до 10MB
-                      </span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Список загруженных документов */}
-                <div>
-                  {getObjectTestDocuments(editingObject.id).length > 0 ? (
-                    <div className="space-y-3">
-                      {getObjectTestDocuments(editingObject.id).map((document) => (
-                        <div key={document.id} className="bg-white border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              {document.mimeType.startsWith('image/') ? (
-                                <FileImage className="w-6 h-6 text-blue-600" />
-                              ) : (
-                                <FileText className="w-6 h-6 text-red-600" />
-                              )}
-                              <div>
-                                <h5 className="font-medium text-gray-900">
-                                  {document.fileName}
-                                </h5>
-                                <p className="text-sm text-gray-500">
-                                  {formatFileSize(document.fileSize)} • 
-                                  Загружен {document.uploadedAt.toLocaleDateString('ru-RU')}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => handleViewTestDocument(document)}
-                                className="text-blue-600 hover:text-blue-800 transition-colors"
-                                title="Просмотреть документ"
-                              >
-                                <Eye className="w-5 h-5" />
-                              </button>
-                              <button
-                                onClick={() => handleDownloadTestDocument(document)}
-                                className="text-green-600 hover:text-green-800 transition-colors"
-                                title="Скачать документ"
-                              >
-                                <Download className="w-5 h-5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTestDocument(document.id)}
-                                className="text-red-600 hover:text-red-800 transition-colors"
-                                title="Удалить документ"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
-                      <FileText className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                      <p className="text-sm">Документы испытаний не загружены</p>
-                      <p className="text-xs mt-1">Загрузите изображения или PDF файлы с результатами испытаний</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Кнопки управления формой в конце блока */}
-              <div className="border-t border-gray-200 pt-6">
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => setEditingObject(null)}
-                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    onClick={() => handleUpdateQualificationObject(editingObject)}
-                    disabled={operationLoading}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                  >
-                    {operationLoading ? 'Сохранение...' : 'Сохранить'}
                   </button>
                 </div>
               </div>
@@ -1047,8 +905,9 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
               {['помещение', 'автомобиль', 'холодильная_камера', 'холодильник', 'морозильник'].map((type) => {
                 const count = qualificationObjects.filter(obj => obj.type === type).length;
                 return count > 0 ? (
-                  <div key={type} className="text-blue-700">
-                    <span className="font-medium">{count}</span> {type}
+                  <div key={type} className="flex items-center space-x-2">
+                    <span className="text-lg">{getTypeIcon(type)}</span>
+                    <span className="text-blue-800">{type}: {count}</span>
                   </div>
                 ) : null;
               })}
@@ -1057,24 +916,199 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
         )}
       </div>
 
-      {/* Status */}
-      {!loading && qualificationObjects.length > 0 && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span className="text-green-800 font-medium">
-              Этап проведения испытаний готов к выполнению
+      {/* Protocol Upload */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Протокол</h3>
+          {protocolDocuments.length === 0 && (
+            <label className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer flex items-center space-x-2">
+              {uploading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Загрузка...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  <span>Загрузить протокол</span>
+                </>
+              )}
+              <input
+                type="file"
+                accept=".docx"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleProtocolUpload(file);
+                  }
+                }}
+                className="hidden"
+                disabled={uploading}
+              />
+            </label>
+          )}
+        </div>
+
+        {protocolDocuments.length > 0 ? (
+          <div className="space-y-4">
+            {protocolDocuments.map((protocol) => (
+              <div key={protocol.id} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="w-8 h-8 text-blue-600" />
+                    <div>
+                      <h4 className="font-medium text-gray-900">
+                        {protocol.fileName}
+                      </h4>
+                      <p className="text-sm text-gray-500">
+                        {formatFileSize(protocol.fileSize)} • 
+                        Загружен {protocol.uploadedAt.toLocaleDateString('ru-RU')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleViewProtocol(protocol)}
+                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                      title="Просмотреть протокол"
+                    >
+                      <Eye className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDownloadProtocol(protocol)}
+                      className="text-green-600 hover:text-green-800 transition-colors"
+                      title="Скачать протокол"
+                    >
+                      <Download className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProtocol(protocol.id)}
+                      className="text-red-600 hover:text-red-800 transition-colors"
+                      title="Удалить протокол"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {/* Кнопка для загрузки дополнительного протокола */}
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <label className="cursor-pointer flex flex-col items-center space-y-2">
+                <Upload className="w-8 h-8 text-gray-400" />
+                <span className="text-sm text-gray-600">
+                  Загрузить дополнительный протокол
+                </span>
+                <span className="text-xs text-gray-500">
+                  Поддерживаются файлы DOCX
+                </span>
+                <input
+                  type="file"
+                  accept=".docx"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleProtocolUpload(file);
+                    }
+                  }}
+                  className="hidden"
+                  disabled={uploading}
+                />
+              </label>
+            </div>
+          </div>
+        ) : (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500 mb-2">Протокол не загружен</p>
+            <p className="text-sm text-gray-400">Поддерживаются файлы DOCX</p>
+          </div>
+        )}
+      </div>
+
+      {/* Status Summary */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Статус проведения испытаний</h3>
+        
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center space-x-3">
+              {contractDoc ? (
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              )}
+              <span className="font-medium text-gray-900">Договор</span>
+            </div>
+            <span className={`text-sm px-2 py-1 rounded-full ${
+              contractDoc 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-red-100 text-red-800'
+            }`}>
+              {contractDoc ? 'Доступен' : 'Не найден'}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center space-x-3">
+              {protocolDocuments.length > 0 ? (
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-yellow-500" />
+              )}
+              <span className="font-medium text-gray-900">Протокол</span>
+            </div>
+            <span className={`text-sm px-2 py-1 rounded-full ${
+              protocolDocuments.length > 0 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              {protocolDocuments.length > 0 ? `Загружено (${protocolDocuments.length})` : 'Ожидает загрузки'}
             </span>
           </div>
         </div>
-      )}
+
+        {/* Progress indicator */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-700">Прогресс проведения испытаний</span>
+            <span className="text-sm text-gray-500">
+              {(contractDoc ? 1 : 0) + (protocolDocuments.length > 0 ? 1 : 0)} из 2 этапов
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+              style={{ 
+                width: `${((contractDoc ? 1 : 0) + (protocolDocuments.length > 0 ? 1 : 0)) / 2 * 100}%` 
+              }}
+            ></div>
+          </div>
+        </div>
+
+        {/* Completion status */}
+        {contractDoc && protocolDocuments.length > 0 && (
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span className="text-green-800 font-medium">
+                Испытания готовы к проведению! Проект готов к переходу на этап подготовки отчета.
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Instructions */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h4 className="text-sm font-medium text-blue-900 mb-2">Инструкции по проведению испытаний:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
+          <li>• <strong>Проверьте договор:</strong> Убедитесь, что договор загружен и доступен</li>
           <li>• <strong>Отредактируйте объекты квалификации:</strong> Проверьте и при необходимости обновите данные выбранных объектов</li>
           <li>• <strong>Настройте размещение оборудования:</strong> Укажите зоны измерения и уровни для каждого объекта</li>
+          <li>• <strong>Загрузите протокол:</strong> Подготовьте и загрузите протокол в формате DOCX</li>
+          <li>• <strong>Проверьте документы:</strong> Используйте кнопки просмотра для проверки</li>
           <li>• <strong>Проведите испытания:</strong> Выполните необходимые измерения согласно протоколу</li>
           <li>• <strong>Переход к отчету:</strong> После завершения испытаний проект готов к подготовке отчета</li>
         </ul>
