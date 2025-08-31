@@ -102,13 +102,16 @@ export class ProjectDocumentService {
       // Генерируем уникальное имя файла
       const fileExt = file.name.split('.').pop();
       const fileName = `${projectId}_${documentType}_${Date.now()}.${fileExt}`;
-      const filePath = `project-documents/${fileName}`;
+      
+      // Используем разные buckets для разных типов документов
+      const bucketName = documentType === 'test_data' ? 'test-documents' : 'documents';
+      const filePath = documentType === 'test_data' ? `test-data/${fileName}` : `project-documents/${fileName}`;
 
-      console.log('Загружаем файл в Storage:', { fileName, filePath, fileSize: file.size });
+      console.log('Загружаем файл в Storage:', { bucketName, fileName, filePath, fileSize: file.size });
 
       // Загружаем файл в Supabase Storage
       const { data: uploadData, error: uploadError } = await this.supabase.storage
-        .from('documents')
+        .from(bucketName)
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: true
@@ -124,9 +127,9 @@ export class ProjectDocumentService {
         
         // Более детальная диагностика ошибки
         if (uploadError.message?.includes('not found') || uploadError.message?.includes('does not exist')) {
-          throw new Error(`Bucket 'documents' не найден или недоступен. Проверьте настройки Storage в Supabase Dashboard.`);
+          throw new Error(`Bucket '${bucketName}' не найден или недоступен. Проверьте настройки Storage в Supabase Dashboard.`);
         } else if (uploadError.message?.includes('permission') || uploadError.message?.includes('policy')) {
-          throw new Error(`Недостаточно прав для загрузки в bucket 'documents'. Проверьте RLS политики Storage.`);
+          throw new Error(`Недостаточно прав для загрузки в bucket '${bucketName}'. Проверьте RLS политики Storage.`);
         } else {
           throw new Error(`Ошибка загрузки файла: ${uploadError.message}`);
         }
@@ -136,7 +139,7 @@ export class ProjectDocumentService {
 
       // Получаем публичный URL файла
       const { data: urlData } = this.supabase.storage
-        .from('documents')
+        .from(bucketName)
         .getPublicUrl(filePath);
 
       if (!urlData?.publicUrl) {
@@ -195,7 +198,7 @@ export class ProjectDocumentService {
       // Сначала получаем информацию о документе для удаления файла из Storage
       const { data: docData, error: getError } = await this.supabase
         .from('project_documents')
-        .select('file_url')
+        .select('file_url, document_type')
         .eq('id', documentId)
         .single();
 
@@ -207,10 +210,14 @@ export class ProjectDocumentService {
       // Извлекаем путь файла из URL
       const filePath = docData.file_url.split('/').pop();
       if (filePath) {
+        // Определяем bucket и путь в зависимости от типа документа
+        const bucketName = docData.document_type === 'test_data' ? 'test-documents' : 'documents';
+        const fullPath = docData.document_type === 'test_data' ? `test-data/${filePath}` : `project-documents/${filePath}`;
+        
         // Удаляем файл из Storage
         const { error: storageError } = await this.supabase.storage
-          .from('documents')
-          .remove([`project-documents/${filePath}`]);
+          .from(bucketName)
+          .remove([fullPath]);
 
         if (storageError) {
           console.warn('Ошибка удаления файла из Storage:', storageError);
