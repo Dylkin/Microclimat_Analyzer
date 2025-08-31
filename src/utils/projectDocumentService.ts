@@ -193,7 +193,7 @@ export class ProjectDocumentService {
         // Для остальных типов используем upsert для замены существующего файла
         const { data: docData, error: docError } = await this.supabase
           .from('project_documents')
-          .upsert({
+          .insert({
             project_id: projectId,
             qualification_object_id: qualificationObjectId || null,
             document_type: documentType,
@@ -202,13 +202,47 @@ export class ProjectDocumentService {
             file_url: urlData.publicUrl,
             mime_type: file.type,
             uploaded_by: null
-          }, {
-            onConflict: 'project_id,qualification_object_id,document_type'
           })
           .select()
           .single();
 
         if (docError) {
+          // Если документ уже существует, обновляем его
+          if (docError.code === '23505') {
+            const { data: updateData, error: updateError } = await this.supabase
+              .from('project_documents')
+              .update({
+                file_name: file.name,
+                file_size: file.size,
+                file_url: urlData.publicUrl,
+                mime_type: file.type,
+                uploaded_by: null
+              })
+              .eq('project_id', projectId)
+              .eq('qualification_object_id', qualificationObjectId || null)
+              .eq('document_type', documentType)
+              .select()
+              .single();
+
+            if (updateError) {
+              console.error('Ошибка обновления информации о документе:', updateError);
+              throw new Error(`Ошибка обновления документа: ${updateError.message}`);
+            }
+
+            return {
+              id: updateData.id,
+              projectId: updateData.project_id,
+              qualificationObjectId: updateData.qualification_object_id || undefined,
+              documentType: updateData.document_type,
+              fileName: updateData.file_name,
+              fileSize: updateData.file_size,
+              fileUrl: updateData.file_url,
+              mimeType: updateData.mime_type,
+              uploadedBy: updateData.uploaded_by,
+              uploadedAt: new Date(updateData.uploaded_at)
+            };
+          }
+
           console.error('Ошибка сохранения информации о документе:', docError);
           throw new Error(`Ошибка сохранения документа: ${docError.message}`);
         }
