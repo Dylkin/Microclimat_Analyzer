@@ -114,8 +114,7 @@ export class ProjectDocumentService {
         .from(bucketName)
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: true,
-          contentType: file.type
+          upsert: true
         });
 
       if (uploadError) {
