@@ -203,7 +203,7 @@ export class ProjectDocumentService {
             mime_type: file.type,
             uploaded_by: userId || null
           }, {
-            onConflict: 'project_id_qualification_object_id_document_type_unique'
+            onConflict: 'project_documents_unique_per_object_type'
           })
           .select()
           .single();
