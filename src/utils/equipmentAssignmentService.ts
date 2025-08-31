@@ -95,10 +95,19 @@ export class EquipmentAssignmentService {
 
       // Подготавливаем данные для вставки
       const assignmentsToInsert: any[] = [];
+      const usedEquipmentIds = new Set<string>(); // Отслеживаем уже использованное оборудование
 
       placement.zones.forEach(zone => {
         zone.levels.forEach(level => {
           if (level.equipmentId && level.equipmentId.trim()) {
+            // Проверяем, что оборудование не используется дважды в одном объекте
+            if (usedEquipmentIds.has(level.equipmentId)) {
+              console.warn(`Оборудование ${level.equipmentId} уже используется в другой зоне/уровне этого объекта`);
+              return; // Пропускаем дублирующееся оборудование
+            }
+            
+            usedEquipmentIds.add(level.equipmentId);
+            
             assignmentsToInsert.push({
               project_id: projectId,
               qualification_object_id: qualificationObjectId,
@@ -114,12 +123,15 @@ export class EquipmentAssignmentService {
 
       // Вставляем новые назначения если есть что вставлять
       if (assignmentsToInsert.length > 0) {
+        console.log(`Подготовлено ${assignmentsToInsert.length} уникальных назначений для вставки`);
+        
         const { error: insertError } = await this.supabase
           .from('project_equipment_assignments')
           .insert(assignmentsToInsert);
 
         if (insertError) {
           console.error('Ошибка вставки назначений:', insertError);
+          console.error('Данные для вставки:', assignmentsToInsert);
           throw new Error(`Ошибка сохранения назначений: ${insertError.message}`);
         }
 
