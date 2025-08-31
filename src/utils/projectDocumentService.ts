@@ -180,7 +180,6 @@ export class ProjectDocumentService {
         return {
           id: docData.id,
           projectId: docData.project_id,
-          qualificationObjectId: docData.qualification_object_id || undefined,
           documentType: docData.document_type,
           fileName: docData.file_name,
           fileSize: docData.file_size,
@@ -226,7 +225,6 @@ export class ProjectDocumentService {
               file_size: file.size,
               file_url: urlData.publicUrl,
               mime_type: file.type,
-              uploaded_by: userId || null,
               uploaded_at: new Date().toISOString()
             })
             .eq('id', existingDoc.id)
@@ -251,7 +249,7 @@ export class ProjectDocumentService {
               file_size: file.size,
               file_url: urlData.publicUrl,
               mime_type: file.type,
-              uploaded_by: userId || null
+              uploaded_by: null
             })
             .select()
             .single();
@@ -268,7 +266,6 @@ export class ProjectDocumentService {
         return {
           id: docData.id,
           projectId: docData.project_id,
-          qualificationObjectId: docData.qualification_object_id || undefined,
           documentType: docData.document_type,
           fileName: docData.file_name,
           fileSize: docData.file_size,
