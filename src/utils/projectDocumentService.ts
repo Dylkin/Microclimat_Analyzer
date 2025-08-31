@@ -156,10 +156,12 @@ export class ProjectDocumentService {
       let docData, docError;
       
       if (documentType === 'test_data') {
-        // Для test_data просто добавляем новый документ
+        // Для test_data добавляем новый документ с уникальным идентификатором
+        const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const { data, error } = await this.supabase
           .from('project_documents')
           .insert({
+            id: uniqueId,
             project_id: projectId,
             qualification_object_id: qualificationObjectId || null,
             document_type: documentType,
