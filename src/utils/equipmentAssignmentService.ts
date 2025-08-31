@@ -207,14 +207,13 @@ export class EquipmentAssignmentService {
         zone.levels.sort((a, b) => a.levelValue - b.levelValue);
       });
       
-      console.log('Загруженные зоны с уровнями:', zones.map(zone => ({
-        zoneNumber: zone.zoneNumber,
-        levelsCount: zone.levels.length,
-        levels: zone.levels.map(level => ({
-          levelValue: level.levelValue,
-          equipmentName: level.equipmentName
-        }))
-      })));
+      console.log('Загруженные зоны с уровнями:', zones.length, 'зон');
+      zones.forEach(zone => {
+        console.log(`Зона ${zone.zoneNumber}: ${zone.levels.length} уровней`);
+        zone.levels.forEach(level => {
+          console.log(`  - Уровень ${level.levelValue}м: ${level.equipmentName || 'без оборудования'}`);
+        });
+      });
 
       return { zones };
     } catch (error) {

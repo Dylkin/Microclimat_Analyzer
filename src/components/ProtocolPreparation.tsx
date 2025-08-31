@@ -879,7 +879,8 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    <button
+                        // Загружаем размещение оборудования при открытии формы редактирования
+                        setTimeout(() => loadEquipmentPlacement(object.id), 100);
                       onClick={() => setEditingObject(object)}
                       disabled={operationLoading}
                       className="text-indigo-600 hover:text-indigo-900 transition-colors"
