@@ -639,77 +639,88 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                   <h4 className="text-md font-medium text-gray-900 mb-3">Схема размещения</h4>
                   
                   {(() => {
-                    const layoutDocs = getDocumentsByTypeAndObject('layout_scheme', obj.id);
+                    const layoutDocs = documents.filter(doc => 
+                      doc.documentType === 'layout_scheme' && 
+                      doc.qualificationObjectId === obj.id
+                    );
                     
-                    return layoutDocs.length > 0 ? (
-                      <div className="space-y-2">
-                        {layoutDocs.map(doc => (
-                          <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <FileText className="w-5 h-5 text-blue-600" />
-                              <div>
-                                <p className="font-medium text-gray-900">{doc.fileName}</p>
-                                <p className="text-sm text-gray-500">
-                                  Загружен {doc.uploadedAt.toLocaleDateString('ru-RU')}
-                                </p>
+                    return (
+                      <div className="space-y-4">
+                        {/* Отображение загруженных документов */}
+                        {layoutDocs.length > 0 && (
+                          <div className="space-y-2">
+                            {layoutDocs.map(doc => (
+                              <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                  <FileText className="w-5 h-5 text-blue-600" />
+                                  <div>
+                                    <p className="font-medium text-gray-900">{doc.fileName}</p>
+                                    <p className="text-sm text-gray-500">
+                                      Загружен {doc.uploadedAt.toLocaleDateString('ru-RU')}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => window.open(doc.fileUrl, '_blank')}
+                                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                                    title="Просмотреть"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const link = document.createElement('a');
+                                      link.href = doc.fileUrl;
+                                      link.download = doc.fileName;
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                    }}
+                                    className="text-green-600 hover:text-green-800 transition-colors"
+                                    title="Скачать"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteDocument(doc.id)}
+                                    className="text-red-600 hover:text-red-800 transition-colors"
+                                    title="Удалить"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => window.open(doc.fileUrl, '_blank')}
-                                className="text-blue-600 hover:text-blue-800 transition-colors"
-                                title="Просмотреть"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const link = document.createElement('a');
-                                  link.href = doc.fileUrl;
-                                  link.download = doc.fileName;
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                }}
-                                className="text-green-600 hover:text-green-800 transition-colors"
-                                title="Скачать"
-                              >
-                                <Download className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteDocument(doc.id)}
-                                className="text-red-600 hover:text-red-800 transition-colors"
-                                title="Удалить"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-600 mb-3">Загрузите схему размещения оборудования</p>
-                        <input
-                          type="file"
-                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              handleFileUpload('layout_scheme', file, obj.id);
-                            }
-                          }}
-                          className="hidden"
-                          id={`layout-upload-${obj.id}`}
-                        />
-                        <label
-                          htmlFor={`layout-upload-${obj.id}`}
-                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-                        >
-                          <Upload className="w-4 h-4 mr-2" />
-                          Выбрать файл
-                        </label>
+                        )}
+                        
+                        {/* Область загрузки новых файлов */}
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                          <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                          <p className="text-gray-600 mb-3">
+                            {layoutDocs.length > 0 ? 'Заменить схему размещения' : 'Загрузите схему размещения оборудования'}
+                          </p>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleFileUpload('layout_scheme', file, obj.id);
+                              }
+                            }}
+                            className="hidden"
+                            id={`layout-upload-${obj.id}`}
+                          />
+                          <label
+                            htmlFor={`layout-upload-${obj.id}`}
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            {layoutDocs.length > 0 ? 'Заменить файл' : 'Выбрать файл'}
+                          </label>
+                        </div>
                       </div>
                     );
                   })()}
@@ -720,10 +731,14 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                   <h4 className="text-md font-medium text-gray-900 mb-3">Информация об испытаниях</h4>
                   
                   {(() => {
-                    const testDataDocs = getDocumentsByTypeAndObject('test_data', obj.id);
+                    const testDataDocs = documents.filter(doc => 
+                      doc.documentType === 'test_data' && 
+                      doc.qualificationObjectId === obj.id
+                    );
                     
                     return (
                       <div className="space-y-4">
+                        {/* Отображение загруженных документов */}
                         {testDataDocs.length > 0 && (
                           <div className="space-y-2">
                             {testDataDocs.map(doc => (
@@ -773,41 +788,39 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                         )}
                         
                         {/* Область загрузки новых файлов */}
-                        <div className="space-y-2">
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                            <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                            <p className="text-gray-600 mb-3">
-                              {testDataDocs.length > 0 ? 'Добавить еще файлы' : 'Загрузите информацию об испытаниях'}
-                            </p>
-                            <input
-                              type="file"
-                              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff"
-                              multiple
-                              onChange={(e) => {
-                                const files = e.target.files;
-                                if (files && files.length > 0) {
-                                  // Загружаем все выбранные файлы
-                                  Array.from(files).forEach(file => {
-                                    handleFileUpload('test_data', file, obj.id);
-                                  });
-                                  // Очищаем input для возможности повторной загрузки
-                                  e.target.value = '';
-                                }
-                              }}
-                              className="hidden"
-                              id={`test-data-upload-${obj.id}`}
-                            />
-                            <label
-                              htmlFor={`test-data-upload-${obj.id}`}
-                              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
-                            >
-                              <Upload className="w-4 h-4 mr-2" />
-                              {testDataDocs.length > 0 ? 'Добавить файлы' : 'Выбрать файлы'}
-                            </label>
-                            <p className="text-xs text-gray-500 mt-2">
-                              Можно выбрать несколько файлов одновременно
-                            </p>
-                          </div>
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                          <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                          <p className="text-gray-600 mb-3">
+                            {testDataDocs.length > 0 ? 'Добавить еще файлы' : 'Загрузите информацию об испытаниях'}
+                          </p>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff"
+                            multiple
+                            onChange={(e) => {
+                              const files = e.target.files;
+                              if (files && files.length > 0) {
+                                // Загружаем все выбранные файлы
+                                Array.from(files).forEach(file => {
+                                  handleFileUpload('test_data', file, obj.id);
+                                });
+                                // Очищаем input для возможности повторной загрузки
+                                e.target.value = '';
+                              }
+                            }}
+                            className="hidden"
+                            id={`test-data-upload-${obj.id}`}
+                          />
+                          <label
+                            htmlFor={`test-data-upload-${obj.id}`}
+                            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            {testDataDocs.length > 0 ? 'Добавить файлы' : 'Выбрать файлы'}
+                          </label>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Можно выбрать несколько файлов одновременно
+                          </p>
                         </div>
                       </div>
                     );
