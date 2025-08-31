@@ -42,6 +42,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   hideTypeSelection = false
 }) => {
   const [formData, setFormData] = useState<CreateQualificationObjectData>({
+    id: initialData?.id || '',
     contractorId,
     type: initialData?.type || 'помещение',
     name: initialData?.name || '',
