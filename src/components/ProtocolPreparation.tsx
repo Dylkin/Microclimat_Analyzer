@@ -776,8 +776,8 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                     <Plus className="w-4 h-4" />
                     <span>Добавить зону</span>
                   </button>
-                      // Загружаем размещение оборудования при открытии формы редактирования
-                      setTimeout(() => loadEquipmentPlacement(object.id), 100);
+                  
+                  <button
                     onClick={() => handleSaveEquipmentPlacement(editingObject.id)}
                     disabled={operationLoading}
                     className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
