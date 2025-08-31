@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle, Edit2, X } from 'lucide-react';
+import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle, Edit2, X, Plus } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
@@ -506,14 +506,186 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <QualificationObjectForm
-              contractorId={project.contractorId}
-              contractorAddress={editingObject.address}
-              initialData={editingObject}
-              onSubmit={handleUpdateQualificationObject}
-              onCancel={() => setEditingObject(null)}
-              hideTypeSelection={true}
-            />
+            <div className="space-y-6">
+              {/* Основная форма объекта квалификации */}
+              <QualificationObjectForm
+                contractorId={project.contractorId}
+                contractorAddress={editingObject.address}
+                initialData={editingObject}
+                onSubmit={handleUpdateQualificationObject}
+                onCancel={() => setEditingObject(null)}
+                hideTypeSelection={true}
+              />
+              
+              {/* Блок размещения измерительного оборудования */}
+              <div className="border-t border-gray-200 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-lg font-semibold text-gray-900">Размещение измерительного оборудования</h4>
+                  <button
+                    onClick={() => addZone(editingObject.id)}
+                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Добавить зону</span>
+                  </button>
+                </div>
+                
+                {equipmentPlacements[editingObject.id]?.zones.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
+                    <p className="text-sm">Зоны измерения не добавлены</p>
+                    <p className="text-xs mt-1">Нажмите "Добавить зону" для создания первой зоны</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {equipmentPlacements[editingObject.id]?.zones.map((zone, zoneIndex) => (
+                      <div key={zoneIndex} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h5 className="font-medium text-gray-900">
+                            Зона измерения № {zone.zoneNumber}
+                          </h5>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => addLevel(editingObject.id, zoneIndex)}
+                              className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Добавить уровень</span>
+                            </button>
+                            <button
+                              onClick={() => removeZone(editingObject.id, zoneIndex)}
+                              className="text-red-600 hover:text-red-800 transition-colors"
+                              title="Удалить зону"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {zone.levels.length === 0 ? (
+                          <div className="text-center py-4 text-gray-500 bg-white rounded border border-gray-200">
+                            <p className="text-sm">Уровни измерения не добавлены</p>
+                            <p className="text-xs mt-1">Нажмите "Добавить уровень" для создания первого уровня</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {zone.levels.map((level, levelIndex) => {
+                              const searchKey = `${editingObject.id}-${zoneIndex}-${levelIndex}`;
+                              const filteredEquipment = getFilteredEquipment(equipmentSearch[searchKey] || '');
+                              
+                              return (
+                                <div key={levelIndex} className="bg-white border border-gray-200 rounded p-3">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs text-gray-500 mb-1">
+                                        Уровень измерения (м)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        step="0.1"
+                                        value={level.levelValue}
+                                        onChange={(e) => updateLevel(
+                                          editingObject.id, 
+                                          zoneIndex, 
+                                          levelIndex, 
+                                          'levelValue', 
+                                          parseFloat(e.target.value) || 0
+                                        )}
+                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                        placeholder="0.0"
+                                      />
+                                    </div>
+                                    
+                                    <div className="relative">
+                                      <label className="block text-xs text-gray-500 mb-1">
+                                        Оборудование
+                                      </label>
+                                      <div className="flex items-center space-x-2">
+                                        <div className="relative flex-1">
+                                          <input
+                                            type="text"
+                                            value={level.equipmentId ? getEquipmentName(level.equipmentId) : (equipmentSearch[searchKey] || '')}
+                                            onChange={(e) => {
+                                              setEquipmentSearch(prev => ({
+                                                ...prev,
+                                                [searchKey]: e.target.value
+                                              }));
+                                              if (!level.equipmentId) {
+                                                setShowEquipmentDropdown(prev => ({
+                                                  ...prev,
+                                                  [searchKey]: true
+                                                }));
+                                              }
+                                            }}
+                                            onFocus={() => {
+                                              setShowEquipmentDropdown(prev => ({
+                                                ...prev,
+                                                [searchKey]: true
+                                              }));
+                                              if (level.equipmentId) {
+                                                setEquipmentSearch(prev => ({
+                                                  ...prev,
+                                                  [searchKey]: ''
+                                                }));
+                                                updateLevel(editingObject.id, zoneIndex, levelIndex, 'equipmentId', '');
+                                              }
+                                            }}
+                                            className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                            placeholder="Поиск оборудования..."
+                                          />
+                                          
+                                          {showEquipmentDropdown[searchKey] && (
+                                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                              {filteredEquipment.length > 0 ? (
+                                                filteredEquipment.map((eq) => (
+                                                  <div
+                                                    key={eq.id}
+                                                    onClick={() => {
+                                                      updateLevel(editingObject.id, zoneIndex, levelIndex, 'equipmentId', eq.id);
+                                                      setEquipmentSearch(prev => ({
+                                                        ...prev,
+                                                        [searchKey]: ''
+                                                      }));
+                                                      setShowEquipmentDropdown(prev => ({
+                                                        ...prev,
+                                                        [searchKey]: false
+                                                      }));
+                                                    }}
+                                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                                  >
+                                                    <div className="font-medium text-gray-900">{eq.name}</div>
+                                                    <div className="text-sm text-gray-500">S/N: {eq.serialNumber}</div>
+                                                  </div>
+                                                ))
+                                              ) : (
+                                                <div className="px-3 py-2 text-gray-500 text-sm">
+                                                  Оборудование не найдено
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                        
+                                        <button
+                                          onClick={() => removeLevel(editingObject.id, zoneIndex, levelIndex)}
+                                          className="text-red-600 hover:text-red-800 transition-colors"
+                                          title="Удалить уровень"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -650,187 +822,14 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                 type="file"
                 accept=".docx"
                 onChange={(e) => {
-              
-              <div className="space-y-6">
-                {/* Основная форма объекта квалификации */}
-                <QualificationObjectForm
-                  contractorId={project.contractorId}
-                  contractorAddress={editingObject.address}
-                  initialData={editingObject}
-                  onSubmit={handleUpdateQualificationObject}
-                  onCancel={() => setEditingObject(null)}
-                  hideTypeSelection={true}
-                />
-                
-                {/* Блок размещения измерительного оборудования */}
-                <div className="border-t border-gray-200 pt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-gray-900">Размещение измерительного оборудования</h4>
-                    <button
-                      onClick={() => addZone(editingObject.id)}
-                      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Добавить зону</span>
-                    </button>
-                  </div>
-                  
-                  {equipmentPlacements[editingObject.id]?.zones.length === 0 ? (
-                    <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
-                      <p className="text-sm">Зоны измерения не добавлены</p>
-                      <p className="text-xs mt-1">Нажмите "Добавить зону" для создания первой зоны</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {equipmentPlacements[editingObject.id]?.zones.map((zone, zoneIndex) => (
-                        <div key={zoneIndex} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <h5 className="font-medium text-gray-900">
-                              Зона измерения № {zone.zoneNumber}
-                            </h5>
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => addLevel(editingObject.id, zoneIndex)}
-                                className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center space-x-1"
-                              >
-                                <Plus className="w-3 h-3" />
-                                <span>Добавить уровень</span>
-                              </button>
-                              <button
-                                onClick={() => removeZone(editingObject.id, zoneIndex)}
-                                className="text-red-600 hover:text-red-800 transition-colors"
-                                title="Удалить зону"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                          
-                          {zone.levels.length === 0 ? (
-                            <div className="text-center py-4 text-gray-500 bg-white rounded border border-gray-200">
-                              <p className="text-sm">Уровни измерения не добавлены</p>
-                              <p className="text-xs mt-1">Нажмите "Добавить уровень" для создания первого уровня</p>
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
-                              {zone.levels.map((level, levelIndex) => {
-                                const searchKey = `${editingObject.id}-${zoneIndex}-${levelIndex}`;
-                                const filteredEquipment = getFilteredEquipment(equipmentSearch[searchKey] || '');
-                                
-                                return (
-                                  <div key={levelIndex} className="bg-white border border-gray-200 rounded p-3">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                      <div>
-                                        <label className="block text-xs text-gray-500 mb-1">
-                                          Уровень измерения (м)
-                                        </label>
-                                        <input
-                                          type="number"
-                                          step="0.1"
-                                          value={level.levelValue}
-                                          onChange={(e) => updateLevel(
-                                            editingObject.id, 
-                                            zoneIndex, 
-                                            levelIndex, 
-                                            'levelValue', 
-                                            parseFloat(e.target.value) || 0
-                                          )}
-                                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                          placeholder="0.0"
-                                        />
-                                      </div>
-                                      
-                                      <div className="relative">
-                                        <label className="block text-xs text-gray-500 mb-1">
-                                          Оборудование
-                                        </label>
-                                        <div className="flex items-center space-x-2">
-                                          <div className="relative flex-1">
-                                            <input
-                                              type="text"
-                                              value={level.equipmentId ? getEquipmentName(level.equipmentId) : (equipmentSearch[searchKey] || '')}
-                                              onChange={(e) => {
-                                                setEquipmentSearch(prev => ({
-                                                  ...prev,
-                                                  [searchKey]: e.target.value
-                                                }));
-                                                if (!level.equipmentId) {
-                                                  setShowEquipmentDropdown(prev => ({
-                                                    ...prev,
-                                                    [searchKey]: true
-                                                  }));
-                                                }
-                                              }}
-                                              onFocus={() => {
-                                                setShowEquipmentDropdown(prev => ({
-                                                  ...prev,
-                                                  [searchKey]: true
-                                                }));
-                                                if (level.equipmentId) {
-                                                  setEquipmentSearch(prev => ({
-                                                    ...prev,
-                                                    [searchKey]: ''
-                                                  }));
-                                                  updateLevel(editingObject.id, zoneIndex, levelIndex, 'equipmentId', '');
-                                                }
-                                              }}
-                                              className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                              placeholder="Поиск оборудования..."
-                                            />
-                                            
-                                            {showEquipmentDropdown[searchKey] && (
-                                              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                                                {filteredEquipment.length > 0 ? (
-                                                  filteredEquipment.map((eq) => (
-                                                    <div
-                                                      key={eq.id}
-                                                      onClick={() => {
-                                                        updateLevel(editingObject.id, zoneIndex, levelIndex, 'equipmentId', eq.id);
-                                                        setEquipmentSearch(prev => ({
-                                                          ...prev,
-                                                          [searchKey]: ''
-                                                        }));
-                                                        setShowEquipmentDropdown(prev => ({
-                                                          ...prev,
-                                                          [searchKey]: false
-                                                        }));
-                                                      }}
-                                                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                                                    >
-                                                      <div className="font-medium text-gray-900">{eq.name}</div>
-                                                      <div className="text-sm text-gray-500">S/N: {eq.serialNumber}</div>
-                                                    </div>
-                                                  ))
-                                                ) : (
-                                                  <div className="px-3 py-2 text-gray-500 text-sm">
-                                                    Оборудование не найдено
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                          
-                                          <button
-                                            onClick={() => removeLevel(editingObject.id, zoneIndex, levelIndex)}
-                                            className="text-red-600 hover:text-red-800 transition-colors"
-                                            title="Удалить уровень"
-                                          >
-                                            <Trash2 className="w-4 h-4" />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleProtocolUpload(file);
+                  }
+                }}
+                className="hidden"
+                disabled={uploading}
+              />
             </label>
           )}
         </div>
