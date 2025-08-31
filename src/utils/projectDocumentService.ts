@@ -92,7 +92,8 @@ export class ProjectDocumentService {
     projectId: string, 
     documentType: 'commercial_offer' | 'contract' | 'layout_scheme' | 'test_data', 
     file: File,
-    userId?: string
+    userId?: string,
+    qualificationObjectId?: string
   ): Promise<ProjectDocument> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
@@ -153,6 +154,7 @@ export class ProjectDocumentService {
         .from('project_documents')
         .upsert({
           project_id: projectId,
+          qualification_object_id: qualificationObjectId || null,
           document_type: documentType,
           file_name: file.name,
           file_size: file.size,

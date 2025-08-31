@@ -293,6 +293,24 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
   const handleFileUpload = async (documentType: 'layout_scheme' | 'test_data', file: File, qualificationObjectId?: string) => {
     if (!file) return;
 
+    // Проверяем тип файла - разрешаем изображения, PDF и документы
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg', 
+      'image/png',
+      'image/gif',
+      'image/bmp',
+      'image/tiff',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      alert('Поддерживаются только файлы: JPG, PNG, GIF, BMP, TIFF, PDF, DOC, DOCX');
+      return;
+    }
+
     setOperationLoading(true);
     try {
       const uploadedDoc = await projectDocumentService.uploadDocument(project.id, documentType, file, user?.id, qualificationObjectId);
