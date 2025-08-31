@@ -17,7 +17,7 @@ const initSupabase = () => {
 export interface ProjectDocument {
   id: string;
   projectId: string;
-  documentType: 'commercial_offer' | 'contract';
+  documentType: 'commercial_offer' | 'contract' | 'layout_scheme' | 'test_data';
   fileName: string;
   fileSize: number;
   fileUrl: string;
@@ -30,7 +30,7 @@ export interface DatabaseProjectDocument {
   id: string;
   project_id: string;
   qualification_object_id: string | null;
-  document_type: 'commercial_offer' | 'contract';
+  document_type: 'commercial_offer' | 'contract' | 'layout_scheme' | 'test_data';
   file_name: string;
   file_size: number;
   file_url: string;
@@ -90,7 +90,7 @@ export class ProjectDocumentService {
   // Загрузка документа
   async uploadDocument(
     projectId: string, 
-    documentType: 'commercial_offer' | 'contract', 
+    documentType: 'commercial_offer' | 'contract' | 'layout_scheme' | 'test_data', 
     file: File,
     userId?: string
   ): Promise<ProjectDocument> {
