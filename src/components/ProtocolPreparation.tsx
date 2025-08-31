@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle, Edit2, X } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject } from '../types/QualificationObject';
+import { Equipment } from '../types/Equipment';
 import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
+import { equipmentService } from '../utils/equipmentService';
 import { useAuth } from '../contexts/AuthContext';
 import { ProjectInfo } from './contract/ProjectInfo';
 import { QualificationObjectForm } from './QualificationObjectForm';
@@ -24,6 +26,21 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
   const [editingObject, setEditingObject] = useState<QualificationObject | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [operationLoading, setOperationLoading] = useState(false);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [equipmentPlacements, setEquipmentPlacements] = useState<{
+    [objectId: string]: {
+      zones: {
+        zoneNumber: number;
+        levels: {
+          levelValue: number;
+          equipmentId: string;
+          equipmentName?: string;
+        }[];
+      }[];
+    };
+  }>({});
+  const [equipmentSearch, setEquipmentSearch] = useState<{ [key: string]: string }>({});
+  const [showEquipmentDropdown, setShowEquipmentDropdown] = useState<{ [key: string]: boolean }>({});
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -98,6 +115,15 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       
       setQualificationObjects(selectedObjects);
       console.log('Загружены выбранные объекты квалификации для протокола:', selectedObjects.length);
+      
+      // Инициализируем размещения оборудования для каждого объекта
+      const initialPlacements: typeof equipmentPlacements = {};
+      selectedObjects.forEach(obj => {
+        initialPlacements[obj.id] = {
+          zones: [{ zoneNumber: 1, levels: [] }]
+        };
+      });
+      setEquipmentPlacements(initialPlacements);
     } catch (error) {
       console.error('Ошибка загрузки объектов квалификации:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
@@ -106,7 +132,22 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
 
   useEffect(() => {
     loadDocuments();
+    loadEquipment();
   }, [project.id]);
+
+  // Загрузка оборудования
+  const loadEquipment = async () => {
+    if (!equipmentService.isAvailable()) {
+      return;
+    }
+
+    try {
+      const result = await equipmentService.getAllEquipment(1, 1000); // Загружаем все оборудование
+      setEquipment(result.equipment);
+    } catch (error) {
+      console.error('Ошибка загрузки оборудования:', error);
+    }
+  };
 
   // Загрузка протокола
   const handleProtocolUpload = async (file: File) => {
@@ -201,6 +242,123 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
     } finally {
       setOperationLoading(false);
     }
+  };
+
+  // Управление размещением оборудования
+  const addZone = (objectId: string) => {
+    setEquipmentPlacements(prev => {
+      const currentPlacements = prev[objectId] || { zones: [] };
+      const maxZoneNumber = Math.max(0, ...currentPlacements.zones.map(z => z.zoneNumber));
+      
+      return {
+        ...prev,
+        [objectId]: {
+          zones: [
+            ...currentPlacements.zones,
+            { zoneNumber: maxZoneNumber + 1, levels: [] }
+          ]
+        }
+      };
+    });
+  };
+
+  const removeZone = (objectId: string, zoneIndex: number) => {
+    setEquipmentPlacements(prev => ({
+      ...prev,
+      [objectId]: {
+        zones: prev[objectId]?.zones.filter((_, index) => index !== zoneIndex) || []
+      }
+    }));
+  };
+
+  const addLevel = (objectId: string, zoneIndex: number) => {
+    setEquipmentPlacements(prev => {
+      const currentPlacements = prev[objectId] || { zones: [] };
+      const updatedZones = [...currentPlacements.zones];
+      
+      if (updatedZones[zoneIndex]) {
+        updatedZones[zoneIndex] = {
+          ...updatedZones[zoneIndex],
+          levels: [
+            ...updatedZones[zoneIndex].levels,
+            { levelValue: 0, equipmentId: '', equipmentName: '' }
+          ]
+        };
+      }
+      
+      return {
+        ...prev,
+        [objectId]: { zones: updatedZones }
+      };
+    });
+  };
+
+  const removeLevel = (objectId: string, zoneIndex: number, levelIndex: number) => {
+    setEquipmentPlacements(prev => {
+      const currentPlacements = prev[objectId] || { zones: [] };
+      const updatedZones = [...currentPlacements.zones];
+      
+      if (updatedZones[zoneIndex]) {
+        updatedZones[zoneIndex] = {
+          ...updatedZones[zoneIndex],
+          levels: updatedZones[zoneIndex].levels.filter((_, index) => index !== levelIndex)
+        };
+      }
+      
+      return {
+        ...prev,
+        [objectId]: { zones: updatedZones }
+      };
+    });
+  };
+
+  const updateLevel = (objectId: string, zoneIndex: number, levelIndex: number, field: 'levelValue' | 'equipmentId', value: any) => {
+    setEquipmentPlacements(prev => {
+      const currentPlacements = prev[objectId] || { zones: [] };
+      const updatedZones = [...currentPlacements.zones];
+      
+      if (updatedZones[zoneIndex] && updatedZones[zoneIndex].levels[levelIndex]) {
+        const updatedLevels = [...updatedZones[zoneIndex].levels];
+        updatedLevels[levelIndex] = {
+          ...updatedLevels[levelIndex],
+          [field]: value
+        };
+        
+        // Если выбрано оборудование, сохраняем его название
+        if (field === 'equipmentId' && value) {
+          const selectedEquipment = equipment.find(eq => eq.id === value);
+          if (selectedEquipment) {
+            updatedLevels[levelIndex].equipmentName = selectedEquipment.name;
+          }
+        }
+        
+        updatedZones[zoneIndex] = {
+          ...updatedZones[zoneIndex],
+          levels: updatedLevels
+        };
+      }
+      
+      return {
+        ...prev,
+        [objectId]: { zones: updatedZones }
+      };
+    });
+  };
+
+  // Фильтрация оборудования по поиску
+  const getFilteredEquipment = (searchTerm: string) => {
+    if (!searchTerm.trim()) return equipment;
+    
+    return equipment.filter(eq =>
+      eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      eq.serialNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
+  // Получение названия оборудования по ID
+  const getEquipmentName = (equipmentId: string) => {
+    const eq = equipment.find(e => e.id === equipmentId);
+    return eq ? eq.name : 'Выберите оборудование';
   };
 
   // Получение иконки для типа объекта
@@ -492,14 +650,187 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                 type="file"
                 accept=".docx"
                 onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    handleProtocolUpload(file);
-                  }
-                }}
-                className="hidden"
-                disabled={uploading}
-              />
+              
+              <div className="space-y-6">
+                {/* Основная форма объекта квалификации */}
+                <QualificationObjectForm
+                  contractorId={project.contractorId}
+                  contractorAddress={editingObject.address}
+                  initialData={editingObject}
+                  onSubmit={handleUpdateQualificationObject}
+                  onCancel={() => setEditingObject(null)}
+                  hideTypeSelection={true}
+                />
+                
+                {/* Блок размещения измерительного оборудования */}
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-gray-900">Размещение измерительного оборудования</h4>
+                    <button
+                      onClick={() => addZone(editingObject.id)}
+                      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Добавить зону</span>
+                    </button>
+                  </div>
+                  
+                  {equipmentPlacements[editingObject.id]?.zones.length === 0 ? (
+                    <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
+                      <p className="text-sm">Зоны измерения не добавлены</p>
+                      <p className="text-xs mt-1">Нажмите "Добавить зону" для создания первой зоны</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {equipmentPlacements[editingObject.id]?.zones.map((zone, zoneIndex) => (
+                        <div key={zoneIndex} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h5 className="font-medium text-gray-900">
+                              Зона измерения № {zone.zoneNumber}
+                            </h5>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => addLevel(editingObject.id, zoneIndex)}
+                                className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>Добавить уровень</span>
+                              </button>
+                              <button
+                                onClick={() => removeZone(editingObject.id, zoneIndex)}
+                                className="text-red-600 hover:text-red-800 transition-colors"
+                                title="Удалить зону"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {zone.levels.length === 0 ? (
+                            <div className="text-center py-4 text-gray-500 bg-white rounded border border-gray-200">
+                              <p className="text-sm">Уровни измерения не добавлены</p>
+                              <p className="text-xs mt-1">Нажмите "Добавить уровень" для создания первого уровня</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {zone.levels.map((level, levelIndex) => {
+                                const searchKey = `${editingObject.id}-${zoneIndex}-${levelIndex}`;
+                                const filteredEquipment = getFilteredEquipment(equipmentSearch[searchKey] || '');
+                                
+                                return (
+                                  <div key={levelIndex} className="bg-white border border-gray-200 rounded p-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                      <div>
+                                        <label className="block text-xs text-gray-500 mb-1">
+                                          Уровень измерения (м)
+                                        </label>
+                                        <input
+                                          type="number"
+                                          step="0.1"
+                                          value={level.levelValue}
+                                          onChange={(e) => updateLevel(
+                                            editingObject.id, 
+                                            zoneIndex, 
+                                            levelIndex, 
+                                            'levelValue', 
+                                            parseFloat(e.target.value) || 0
+                                          )}
+                                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                          placeholder="0.0"
+                                        />
+                                      </div>
+                                      
+                                      <div className="relative">
+                                        <label className="block text-xs text-gray-500 mb-1">
+                                          Оборудование
+                                        </label>
+                                        <div className="flex items-center space-x-2">
+                                          <div className="relative flex-1">
+                                            <input
+                                              type="text"
+                                              value={level.equipmentId ? getEquipmentName(level.equipmentId) : (equipmentSearch[searchKey] || '')}
+                                              onChange={(e) => {
+                                                setEquipmentSearch(prev => ({
+                                                  ...prev,
+                                                  [searchKey]: e.target.value
+                                                }));
+                                                if (!level.equipmentId) {
+                                                  setShowEquipmentDropdown(prev => ({
+                                                    ...prev,
+                                                    [searchKey]: true
+                                                  }));
+                                                }
+                                              }}
+                                              onFocus={() => {
+                                                setShowEquipmentDropdown(prev => ({
+                                                  ...prev,
+                                                  [searchKey]: true
+                                                }));
+                                                if (level.equipmentId) {
+                                                  setEquipmentSearch(prev => ({
+                                                    ...prev,
+                                                    [searchKey]: ''
+                                                  }));
+                                                  updateLevel(editingObject.id, zoneIndex, levelIndex, 'equipmentId', '');
+                                                }
+                                              }}
+                                              className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                              placeholder="Поиск оборудования..."
+                                            />
+                                            
+                                            {showEquipmentDropdown[searchKey] && (
+                                              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                                {filteredEquipment.length > 0 ? (
+                                                  filteredEquipment.map((eq) => (
+                                                    <div
+                                                      key={eq.id}
+                                                      onClick={() => {
+                                                        updateLevel(editingObject.id, zoneIndex, levelIndex, 'equipmentId', eq.id);
+                                                        setEquipmentSearch(prev => ({
+                                                          ...prev,
+                                                          [searchKey]: ''
+                                                        }));
+                                                        setShowEquipmentDropdown(prev => ({
+                                                          ...prev,
+                                                          [searchKey]: false
+                                                        }));
+                                                      }}
+                                                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                                    >
+                                                      <div className="font-medium text-gray-900">{eq.name}</div>
+                                                      <div className="text-sm text-gray-500">S/N: {eq.serialNumber}</div>
+                                                    </div>
+                                                  ))
+                                                ) : (
+                                                  <div className="px-3 py-2 text-gray-500 text-sm">
+                                                    Оборудование не найдено
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                          
+                                          <button
+                                            onClick={() => removeLevel(editingObject.id, zoneIndex, levelIndex)}
+                                            className="text-red-600 hover:text-red-800 transition-colors"
+                                            title="Удалить уровень"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </label>
           )}
         </div>
