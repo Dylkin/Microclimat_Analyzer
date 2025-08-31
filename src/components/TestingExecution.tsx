@@ -235,10 +235,10 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
   const handleTestDocumentUpload = async (qualificationObjectId: string, file: File) => {
     if (!file) return;
 
-    // Проверяем тип файла
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    // Проверяем тип файла - только JPG
+    const allowedTypes = ['image/jpeg', 'image/jpg'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Поддерживаются только изображения (JPG, PNG, GIF, WebP) и PDF файлы');
+      alert('Поддерживаются только файлы JPG');
       return;
     }
 
@@ -262,7 +262,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
       
       // Обновляем список документов испытаний для объектов
       setObjectTestDocuments(prev => [...prev, uploadedDoc]);
-      alert('Документ испытания успешно загружен');
+      alert('JPG документ испытания успешно загружен в базу данных');
     } catch (error) {
       console.error('Ошибка загрузки документа испытания:', error);
       alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -280,7 +280,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     try {
       await projectDocumentService.deleteDocument(documentId);
       setObjectTestDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      alert('Документ испытания успешно удален');
+      alert('JPG документ успешно удален из базы данных');
     } catch (error) {
       console.error('Ошибка удаления документа испытания:', error);
       alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -497,12 +497,10 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
 
   // Получение иконки для типа файла
   const getFileTypeIcon = (mimeType: string) => {
-    if (mimeType.startsWith('image/')) {
+    if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
       return <FileImage className="w-5 h-5 text-blue-600" />;
-    } else if (mimeType === 'application/pdf') {
-      return <FileText className="w-5 h-5 text-red-600" />;
     } else {
-      return <FileText className="w-5 h-5 text-gray-600" />;
+      return <FileImage className="w-5 h-5 text-gray-600" />;
     }
   };
 
@@ -895,7 +893,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
                     <input
                       type="file"
-                      accept="image/*,.pdf"
+                      accept=".jpg,.jpeg"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
@@ -911,10 +909,10 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                     >
                       <Upload className="w-8 h-8 text-gray-400" />
                       <span className="text-sm text-gray-600">
-                        Загрузить документ испытания
+                        Загрузить JPG документ испытания
                       </span>
                       <span className="text-xs text-gray-500">
-                        Поддерживаются изображения (JPG, PNG) и PDF файлы
+                        Поддерживаются только JPG файлы до 10MB
                       </span>
                     </label>
                   </div>
