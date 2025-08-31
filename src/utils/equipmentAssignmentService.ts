@@ -201,6 +201,20 @@ export class EquipmentAssignmentService {
 
       // Преобразуем в массив и сортируем по номеру зоны
       const zones = Array.from(zonesMap.values()).sort((a, b) => a.zoneNumber - b.zoneNumber);
+      
+      // Сортируем уровни внутри каждой зоны по значению уровня
+      zones.forEach(zone => {
+        zone.levels.sort((a, b) => a.levelValue - b.levelValue);
+      });
+      
+      console.log('Загруженные зоны с уровнями:', zones.map(zone => ({
+        zoneNumber: zone.zoneNumber,
+        levelsCount: zone.levels.length,
+        levels: zone.levels.map(level => ({
+          levelValue: level.levelValue,
+          equipmentName: level.equipmentName
+        }))
+      })));
 
       return { zones };
     } catch (error) {
