@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, AlertTriangle, CheckCircle, Edit2, X, Plus } from 'lucide-react';
+import { ArrowLeft, FileText, AlertTriangle, CheckCircle, Edit2, X, Plus, Trash2, Upload, Eye, Download, FileImage } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
+import { ProjectDocument } from '../types/ProjectDocument';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { equipmentService } from '../utils/equipmentService';
 import { equipmentAssignmentService } from '../utils/equipmentAssignmentService';
+import { projectDocumentService } from '../utils/projectDocumentService';
 import { useAuth } from '../contexts/AuthContext';
 import { ProjectInfo } from './contract/ProjectInfo';
 import { QualificationObjectForm } from './QualificationObjectForm';
@@ -18,6 +20,8 @@ interface TestingExecutionProps {
 export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onBack }) => {
   const { user } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
   const [editingObject, setEditingObject] = useState<QualificationObject | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -39,6 +43,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
   const [showEquipmentDropdown, setShowEquipmentDropdown] = useState<{ [key: string]: boolean }>({});
   const [objectTestDocuments, setObjectTestDocuments] = useState<ProjectDocument[]>([]);
   const [testDocumentUploading, setTestDocumentUploading] = useState<{ [key: string]: boolean }>({});
+  const [testDataDocuments, setTestDataDocuments] = useState<ProjectDocument[]>([]);
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -65,6 +70,19 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
   const loadDocuments = async () => {
     if (!projectDocumentService.isAvailable()) {
       setError('Supabase не настроен для работы с документами');
+      return;
+    }
+
+    try {
+      const documents = await projectDocumentService.getProjectDocuments(project.id);
+      setTestDataDocuments(documents.filter(doc => doc.documentType === 'test_data'));
+      setObjectTestDocuments(documents.filter(doc => doc.documentType === 'test_document'));
+    } catch (error) {
+      console.error('Ошибка загрузки документов:', error);
+      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+    }
+  };
+
   // Загрузка выбранных объектов квалификации
   const loadSelectedQualificationObjects = async () => {
     if (!qualificationObjectService.isAvailable()) {
@@ -98,12 +116,91 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     } catch (error) {
       console.error('Ошибка загрузки объектов квалификации:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Загрузка размещения оборудования
+  const loadEquipmentPlacement = async (objectId: string) => {
+    try {
+      const assignments = await equipmentAssignmentService.getAssignmentsByObject(objectId);
+      
+      // Группируем по зонам и уровням
+      const zones: { [zoneNumber: number]: { levelValue: number; equipmentId: string; equipmentName?: string }[] } = {};
+      
+      assignments.forEach(assignment => {
+        if (!zones[assignment.zoneNumber]) {
+          zones[assignment.zoneNumber] = [];
+        }
+        
+        const equipmentItem = equipment.find(eq => eq.id === assignment.equipmentId);
+        zones[assignment.zoneNumber].push({
+          levelValue: assignment.levelValue,
+          equipmentId: assignment.equipmentId,
+          equipmentName: equipmentItem?.name
+        });
+      });
+      
+      // Преобразуем в нужный формат
+      const zonesArray = Object.keys(zones).map(zoneNumber => ({
+        zoneNumber: parseInt(zoneNumber),
+        levels: zones[parseInt(zoneNumber)]
+      }));
+      
+      setEquipmentPlacements(prev => ({
+        ...prev,
+        [objectId]: { zones: zonesArray }
+      }));
+    } catch (error) {
+      console.error('Ошибка загрузки размещения оборудования:', error);
+      // Инициализируем пустым массивом в случае ошибки
+      setEquipmentPlacements(prev => ({
+        ...prev,
+        [objectId]: { zones: [] }
+      }));
+    }
+  };
+
+  // Сохранение размещения оборудования
+  const handleSaveEquipmentPlacement = async (objectId: string) => {
+    setOperationLoading(true);
+    try {
+      const placement = equipmentPlacements[objectId];
+      if (!placement) return;
+
+      // Удаляем старые назначения
+      await equipmentAssignmentService.deleteAssignmentsByObject(objectId);
+
+      // Создаем новые назначения
+      for (const zone of placement.zones) {
+        for (const level of zone.levels) {
+          if (level.equipmentId) {
+            await equipmentAssignmentService.createAssignment({
+              qualificationObjectId: objectId,
+              equipmentId: level.equipmentId,
+              zoneNumber: zone.zoneNumber,
+              levelValue: level.levelValue,
+              assignedBy: user?.id || '',
+              assignedAt: new Date()
+            });
+          }
+        }
+      }
+
+      alert('Размещение оборудования успешно сохранено');
+    } catch (error) {
+      console.error('Ошибка сохранения размещения оборудования:', error);
+      alert(`Ошибка сохранения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
     }
   };
 
   useEffect(() => {
     loadSelectedQualificationObjects();
     loadEquipment();
+    loadDocuments();
   }, [project.id]);
 
   // Загрузка оборудования
@@ -207,6 +304,80 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     if (!allowedTypes.includes(file.type)) {
       alert('Поддерживаются только файлы JPG');
       return;
+    }
+
+    const uploadKey = `${qualificationObjectId}-upload`;
+    setTestDocumentUploading(prev => ({ ...prev, [uploadKey]: true }));
+
+    try {
+      const uploadedDoc = await projectDocumentService.uploadDocument(
+        project.id,
+        'test_document',
+        file,
+        user?.id,
+        qualificationObjectId
+      );
+      
+      setObjectTestDocuments(prev => [...prev, uploadedDoc]);
+      alert('Документ испытания успешно загружен');
+    } catch (error) {
+      console.error('Ошибка загрузки документа испытания:', error);
+      alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setTestDocumentUploading(prev => ({ ...prev, [uploadKey]: false }));
+    }
+  };
+
+  // Удаление документа испытания
+  const handleDeleteTestDocument = async (documentId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот документ испытания?')) {
+      return;
+    }
+
+    try {
+      await projectDocumentService.deleteDocument(documentId);
+      setObjectTestDocuments(prev => prev.filter(doc => doc.id !== documentId));
+      alert('Документ испытания успешно удален');
+    } catch (error) {
+      console.error('Ошибка удаления документа испытания:', error);
+      alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  };
+
+  // Скачивание документа испытания
+  const handleDownloadTestDocument = async (document: ProjectDocument) => {
+    try {
+      const blob = await projectDocumentService.downloadDocument(document.fileUrl);
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = document.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Ошибка скачивания документа испытания:', error);
+      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  };
+
+  // Просмотр документа испытания
+  const handleViewTestDocument = (document: ProjectDocument) => {
+    window.open(document.fileUrl, '_blank');
+  };
+
+  // Форматирование размера файла
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   // Обновление объекта квалификации
   const handleUpdateQualificationObject = async (updatedObject: QualificationObject) => {
     setOperationLoading(true);
@@ -383,6 +554,47 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     if (obj.bodyVolume) details.push(`📦 ${obj.bodyVolume} м³`);
     if (obj.inventoryNumber) details.push(`📋 Инв. №: ${obj.inventoryNumber}`);
     if (obj.chamberVolume) details.push(`📦 ${obj.chamberVolume} л`);
+
+    return details;
+  };
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onBack}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <FileText className="w-8 h-8 text-red-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Проведение испытаний</h1>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <p className="text-red-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center space-x-3">
+        <button
+          onClick={onBack}
+          className="text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+        <FileText className="w-8 h-8 text-indigo-600" />
+        <h1 className="text-2xl font-bold text-gray-900">Проведение испытаний</h1>
+      </div>
+
+      {/* Project Info */}
+      <ProjectInfo project={project} />
+
       {/* Qualification Objects */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-6">
@@ -834,6 +1046,19 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
               {['помещение', 'автомобиль', 'холодильная_камера', 'холодильник', 'морозильник'].map((type) => {
                 const count = qualificationObjects.filter(obj => obj.type === type).length;
+                return count > 0 ? (
+                  <div key={type} className="text-blue-700">
+                    <span className="font-medium">{count}</span> {type}
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Status */}
+      {!loading && qualificationObjects.length > 0 && (
         <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center space-x-2">
             <CheckCircle className="w-5 h-5 text-green-600" />
@@ -842,7 +1067,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
             </span>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Instructions */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
@@ -852,6 +1077,8 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
           <li>• <strong>Настройте размещение оборудования:</strong> Укажите зоны измерения и уровни для каждого объекта</li>
           <li>• <strong>Проведите испытания:</strong> Выполните необходимые измерения согласно протоколу</li>
           <li>• <strong>Переход к отчету:</strong> После завершения испытаний проект готов к подготовке отчета</li>
+        </ul>
+      </div>
     </div>
   );
 };
