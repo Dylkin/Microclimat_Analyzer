@@ -64,6 +64,71 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   });
   const [projectFilesLoaded, setProjectFilesLoaded] = React.useState(false);
 
+  // Обработчик загрузки файла для конкретной строки
+  const handleFileUploadForRow = async (fileId: string, uploadedFile: File) => {
+    // Проверяем расширение файла
+    if (!uploadedFile.name.toLowerCase().endsWith('.vi2')) {
+      alert(`Файл "${uploadedFile.name}" имеет неподдерживаемый формат. Поддерживаются только файлы .vi2`);
+      return;
+    }
+
+    // Обновляем статус файла на "обработка"
+    setUploadedFiles(prev => prev.map(f => 
+      f.id === fileId ? { 
+        ...f, 
+        parsingStatus: 'processing' as const,
+        actualFileName: uploadedFile.name,
+        uploadDate: new Date().toLocaleString('ru-RU')
+      } : f
+    ));
+
+    try {
+      // Реальный парсинг файла
+      console.log(`Парсинг файла для строки: ${uploadedFile.name}`);
+      
+      // Читаем файл как ArrayBuffer
+      const arrayBuffer = await uploadedFile.arrayBuffer();
+      
+      // Используем универсальный парсер VI2
+      const parsingService = new VI2ParsingService();
+      const parsedData = await parsingService.parseFile(uploadedFile);
+      
+      // Сохраняем в базу данных
+      await databaseService.saveParsedFileData(parsedData, fileId);
+      
+      setUploadedFiles(prev => prev.map(f => {
+        if (f.id === fileId) {
+          const period = `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`;
+          return {
+            ...f,
+            parsingStatus: 'completed' as const, 
+            parsedData,
+            recordCount: parsedData.recordCount,
+            period,
+            actualFileName: uploadedFile.name
+          };
+        }
+        return f;
+      }));
+      
+    } catch (error) {
+      console.error('Ошибка парсинга файла:', error);
+      
+      // Обновляем статус на ошибку
+      setUploadedFiles(prev => prev.map(f => {
+        if (f.id === fileId) {
+          return {
+            ...f,
+            parsingStatus: 'error' as const,
+            errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка',
+            actualFileName: uploadedFile.name
+          };
+        }
+        return f;
+      }));
+    }
+  };
+
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
     { label: 'Влажность', value: '65%', icon: Droplets, color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -809,13 +874,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     Порядок
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Имя файла
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Период данных
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Количество записей
+                    Оборудование
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     № зоны измерения
@@ -824,7 +883,13 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     Уровень измерения (м.)
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Оборудование
+                    Имя файла
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Период данных
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Количество записей
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Статус
@@ -856,35 +921,43 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{file.name}</div>
-                        <div className="text-xs text-gray-500">{file.uploadDate}</div>
-                        {file.parsedData && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            {file.parsedData.deviceMetadata.deviceModel} (S/N: {file.parsedData.deviceMetadata.serialNumber})
-                          </div>
-                        )}
-                        {file.contractorId && (
-                          <div className="text-xs text-blue-600 mt-1">
-                            📋 {getContractorName(file.contractorId)}
-                          </div>
-                        )}
-                        {file.qualificationObjectId && (
-                          <div className="text-xs text-green-600 mt-1">
-                            🏢 {getQualificationObjectName(file.qualificationObjectId)}
-                          </div>
-                        )}
+                      <div className="text-sm text-gray-900">
+                        {(() => {
+                          // Сначала пытаемся найти оборудование по назначению
+                          const assignment = equipmentAssignments.find(a => 
+                            a.zoneNumber === file.zoneNumber && 
+                            a.measurementLevel.toString() === file.measurementLevel
+                          );
+                          
+                          if (assignment && assignment.equipmentName) {
+                            return assignment.equipmentName;
+                          }
+                          
+                          // Если не найдено по назначению, ищем по серийному номеру из файла
+                          if (file.parsedData?.deviceMetadata?.serialNumber) {
+                            return getEquipmentName(file.parsedData.deviceMetadata.serialNumber);
+                          }
+                          
+                          return '-';
+                        })()
+                        }
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {file.period || '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {file.recordCount ? file.recordCount.toLocaleString('ru-RU') : '-'}
-                      </div>
+                      {(() => {
+                        const assignment = equipmentAssignments.find(a => 
+                          a.zoneNumber === file.zoneNumber && 
+                          a.measurementLevel.toString() === file.measurementLevel
+                        );
+                        
+                        const serialNumber = assignment ? 
+                          equipment.find(eq => eq.id === assignment.equipmentId)?.serialNumber :
+                          file.parsedData?.deviceMetadata?.serialNumber;
+                        
+                        return serialNumber ? (
+                          <div className="text-xs text-gray-500">
+                            S/N: {serialNumber}
+                          </div>
+                        ) : null;
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {editingField?.fileId === file.id && editingField?.field === 'zoneNumber' ? (
@@ -929,43 +1002,43 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {(() => {
-                          // Сначала пытаемся найти оборудование по назначению
-                          const assignment = equipmentAssignments.find(a => 
-                            a.zoneNumber === file.zoneNumber && 
-                            a.measurementLevel.toString() === file.measurementLevel
-                          );
-                          
-                          if (assignment && assignment.equipmentName) {
-                            return assignment.equipmentName;
-                          }
-                          
-                          // Если не найдено по назначению, ищем по серийному номеру из файла
-                          if (file.parsedData?.deviceMetadata?.serialNumber) {
-                            return getEquipmentName(file.parsedData.deviceMetadata.serialNumber);
-                          }
-                          
-                          return '-';
-                        })()
-                        }
-                      </div>
-                      {(() => {
-                        const assignment = equipmentAssignments.find(a => 
-                          a.zoneNumber === file.zoneNumber && 
-                          a.measurementLevel.toString() === file.measurementLevel
-                        );
-                        
-                        const serialNumber = assignment ? 
-                          equipment.find(eq => eq.id === assignment.equipmentId)?.serialNumber :
-                          file.parsedData?.deviceMetadata?.serialNumber;
-                        
-                        return serialNumber ? (
-                          <div className="text-xs text-gray-500">
-                            S/N: {serialNumber}
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <div className="text-sm font-medium text-gray-900">
+                            {file.actualFileName || file.name}
                           </div>
-                        ) : null;
-                      })()}
+                          <input
+                            type="file"
+                            accept=".vi2"
+                            onChange={(e) => {
+                              const uploadedFile = e.target.files?.[0];
+                              if (uploadedFile) {
+                                handleFileUploadForRow(file.id, uploadedFile);
+                              }
+                            }}
+                            className="hidden"
+                            id={`file-upload-${file.id}`}
+                          />
+                          <label
+                            htmlFor={`file-upload-${file.id}`}
+                            className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors cursor-pointer flex items-center space-x-1"
+                          >
+                            <Upload className="w-3 h-3" />
+                            <span>Загрузить</span>
+                          </label>
+                        </div>
+                        <div className="text-xs text-gray-500">{file.uploadDate}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {file.period || '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {file.recordCount ? file.recordCount.toLocaleString('ru-RU') : '-'}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">

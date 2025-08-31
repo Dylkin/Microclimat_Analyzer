@@ -41,4 +41,5 @@ export interface UploadedFile {
   qualificationObjectId?: string;
   qualificationObjectName?: string;
   contractorName?: string;
+  actualFileName?: string;
 }
