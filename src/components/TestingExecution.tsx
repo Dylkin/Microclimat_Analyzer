@@ -158,9 +158,9 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     if (!file) return;
 
     // Проверяем тип файла
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg'];
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Поддерживаются только файлы PDF и JPG');
+      alert('Поддерживаются файлы: PDF, DOC, DOCX, CSV, XLS, XLSX');
       return;
     }
 
@@ -1136,7 +1136,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
               )}
               <input
                 type="file"
-                accept=".pdf,.jpg,.jpeg"
+                accept=".pdf,.doc,.docx,.csv,.xls,.xlsx"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -1202,11 +1202,11 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                   Загрузить дополнительные данные испытаний
                 </span>
                 <span className="text-xs text-gray-500">
-                  Поддерживаются файлы PDF и JPG
+                  Поддерживаются файлы PDF, DOC, DOCX, CSV, XLS, XLSX
                 </span>
                 <input
                   type="file"
-                  accept=".pdf,.jpg,.jpeg"
+                  accept=".pdf,.doc,.docx,.csv,.xls,.xlsx"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
@@ -1223,7 +1223,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500 mb-2">Данные испытаний не загружены</p>
-            <p className="text-sm text-gray-400">Поддерживаются файлы PDF и JPG</p>
+            <p className="text-sm text-gray-400">Поддерживаются файлы PDF, DOC, DOCX, CSV, XLS, XLSX</p>
           </div>
         )}
       </div>
