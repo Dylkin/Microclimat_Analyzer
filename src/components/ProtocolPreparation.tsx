@@ -42,8 +42,8 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
   }>({});
   const [equipmentSearch, setEquipmentSearch] = useState<{ [key: string]: string }>({});
   const [showEquipmentDropdown, setShowEquipmentDropdown] = useState<{ [key: string]: boolean }>({});
-  const [testDataFiles, setTestDataFiles] = useState<{ [objectId: string]: File | null }>({});
-  const [testDataFileUrls, setTestDataFileUrls] = useState<{ [objectId: string]: string | null }>({});
+  const [testDataFiles, setTestDataFiles] = useState<{ [objectId: string]: File[] }>({});
+  const [testDataFileUrls, setTestDataFileUrls] = useState<{ [objectId: string]: string[] }>({});
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -229,13 +229,21 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
     setOperationLoading(true);
     try {
       // Обрабатываем загрузку файла данных испытаний если он есть
-      const testDataFile = testDataFiles[updatedObject.id];
-      if (testDataFile) {
+      const testDataFilesList = testDataFiles[updatedObject.id];
+      if (testDataFilesList && testDataFilesList.length > 0) {
         try {
-          const testDataUrl = await qualificationObjectService.uploadTestDataFile(updatedObject.id, testDataFile);
+          // Загружаем первый файл в основные поля объекта (для совместимости)
+          const firstFile = testDataFilesList[0];
+          const testDataUrl = await qualificationObjectService.uploadTestDataFile(updatedObject.id, firstFile);
           updatedObject.testDataFileUrl = testDataUrl;
-          updatedObject.testDataFileName = testDataFile.name;
-          console.log('Файл данных испытаний загружен:', testDataUrl);
+          updatedObject.testDataFileName = firstFile.name;
+          
+          // Загружаем остальные файлы (если есть) как дополнительные
+          for (let i = 1; i < testDataFilesList.length; i++) {
+            await qualificationObjectService.uploadTestDataFile(updatedObject.id, testDataFilesList[i]);
+          }
+          
+          console.log(`Загружено ${testDataFilesList.length} файлов данных испытаний`);
         } catch (error) {
           console.error('Ошибка загрузки файла данных испытаний:', error);
           alert(`Ошибка загрузки файла данных испытаний: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -254,10 +262,11 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       ));
       
       // Очищаем временные файлы после успешного сохранения
-      setTestDataFiles(prev => ({ ...prev, [updatedObject.id]: null }));
-      if (testDataFileUrls[updatedObject.id]) {
-        URL.revokeObjectURL(testDataFileUrls[updatedObject.id]!);
-        setTestDataFileUrls(prev => ({ ...prev, [updatedObject.id]: null }));
+      setTestDataFiles(prev => ({ ...prev, [updatedObject.id]: [] }));
+      const urls = testDataFileUrls[updatedObject.id];
+      if (urls && urls.length > 0) {
+        urls.forEach(url => URL.revokeObjectURL(url));
+        setTestDataFileUrls(prev => ({ ...prev, [updatedObject.id]: [] }));
       }
       
       setEditingObject(null);
@@ -271,20 +280,73 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
   };
 
   // Обработка загрузки файла данных испытаний
-  const handleTestDataFileChange = (objectId: string, file: File | null) => {
-    // Очищаем предыдущий URL если он есть
-    if (testDataFileUrls[objectId]) {
-      URL.revokeObjectURL(testDataFileUrls[objectId]!);
+  const handleTestDataFileChange = (objectId: string, files: FileList | null) => {
+    if (!files || files.length === 0) {
+      // Очищаем все файлы
+      const urls = testDataFileUrls[objectId];
+      if (urls && urls.length > 0) {
+        urls.forEach(url => URL.revokeObjectURL(url));
+      }
+      setTestDataFiles(prev => ({ ...prev, [objectId]: [] }));
+      setTestDataFileUrls(prev => ({ ...prev, [objectId]: [] }));
+      return;
     }
 
-    if (file) {
-      // Создаем временный URL для предварительного просмотра
-      const fileUrl = URL.createObjectURL(file);
-      setTestDataFileUrls(prev => ({ ...prev, [objectId]: fileUrl }));
-      setTestDataFiles(prev => ({ ...prev, [objectId]: file }));
+    // Валидируем все файлы
+    const fileArray = Array.from(files);
+    for (const file of fileArray) {
+      const validationError = validateTestDataFile(file);
+      if (validationError) {
+        alert(`Ошибка в файле "${file.name}": ${validationError}`);
+        return;
+      }
+    }
+
+    // Очищаем предыдущие URLs
+    const oldUrls = testDataFileUrls[objectId];
+    if (oldUrls && oldUrls.length > 0) {
+      oldUrls.forEach(url => URL.revokeObjectURL(url));
+    }
+
+    // Создаем новые URLs для предварительного просмотра
+    const newUrls = fileArray.map(file => URL.createObjectURL(file));
+    
+    setTestDataFiles(prev => ({ ...prev, [objectId]: fileArray }));
+    setTestDataFileUrls(prev => ({ ...prev, [objectId]: newUrls }));
+  };
+
+  // Удаление конкретного файла данных испытаний
+  const handleRemoveTestDataFile = (objectId: string, fileIndex: number) => {
+    const currentFiles = testDataFiles[objectId] || [];
+    const currentUrls = testDataFileUrls[objectId] || [];
+    
+    // Освобождаем URL удаляемого файла
+    if (currentUrls[fileIndex]) {
+      URL.revokeObjectURL(currentUrls[fileIndex]);
+    }
+    
+    // Удаляем файл и URL из массивов
+    const newFiles = currentFiles.filter((_, index) => index !== fileIndex);
+    const newUrls = currentUrls.filter((_, index) => index !== fileIndex);
+    
+    setTestDataFiles(prev => ({ ...prev, [objectId]: newFiles }));
+    setTestDataFileUrls(prev => ({ ...prev, [objectId]: newUrls }));
+  };
+
+  // Просмотр конкретного файла данных испытаний
+  const handleViewTestDataFile = (objectId: string, fileIndex?: number) => {
+    if (fileIndex !== undefined) {
+      // Просмотр конкретного файла из списка загруженных
+      const urls = testDataFileUrls[objectId];
+      if (urls && urls[fileIndex]) {
+        window.open(urls[fileIndex], '_blank');
+      }
     } else {
-      setTestDataFiles(prev => ({ ...prev, [objectId]: null }));
-      setTestDataFileUrls(prev => ({ ...prev, [objectId]: null }));
+      // Просмотр сохраненного файла объекта
+      const object = qualificationObjects.find(obj => obj.id === objectId);
+      if (object?.testDataFileUrl) {
+        window.open(object.testDataFileUrl, '_blank');
+      }
     }
   };
 
@@ -873,73 +935,104 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Данные испытаний
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                    {testDataFiles[editingObject.id] || editingObject.testDataFileUrl ? (
+                  
+                  {/* Отображение уже сохраненного файла */}
+                  {editingObject.testDataFileUrl && (
+                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                          {(testDataFiles[editingObject.id]?.type || editingObject.testDataFileUrl?.includes('.pdf')) ? (
-                            <FileText className="w-5 h-5 text-red-600" />
-                          ) : (
-                            <Image className="w-5 h-5 text-blue-600" />
-                          )}
+                          <CheckCircle className="w-5 h-5 text-green-600" />
                           <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {testDataFiles[editingObject.id]?.name || editingObject.testDataFileName || 'Файл данных испытаний'}
+                            <p className="text-sm font-medium text-green-900">
+                              {editingObject.testDataFileName || 'Сохраненные данные испытаний'}
                             </p>
-                            {testDataFiles[editingObject.id] && (
-                              <p className="text-xs text-gray-500">
-                                {(testDataFiles[editingObject.id]!.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
-                            )}
+                            <p className="text-xs text-green-700">Файл сохранен в системе</p>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => handleViewTestDataFile(editingObject.id)}
-                            className="text-blue-600 hover:text-blue-800"
-                            title="Просмотреть"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleTestDataFileChange(editingObject.id, null)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleViewTestDataFile(editingObject.id)}
+                          className="text-green-600 hover:text-green-800"
+                          title="Просмотреть сохраненный файл"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                       </div>
-                    ) : (
-                      <label className="cursor-pointer block">
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const validationError = validateTestDataFile(file);
-                              if (validationError) {
-                                alert(validationError);
-                                return;
-                              }
-                              handleTestDataFileChange(editingObject.id, file);
-                            }
-                          }}
-                          className="hidden"
-                        />
-                        <div className="text-center">
-                          <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                          <p className="text-sm text-gray-600">
-                            Нажмите для выбора файла
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            JPG, PNG, PDF, TIFF, BMP до 10MB
-                          </p>
+                    </div>
+                  )}
+                  
+                  {/* Отображение загруженных файлов для сохранения */}
+                  {testDataFiles[editingObject.id] && testDataFiles[editingObject.id].length > 0 && (
+                    <div className="mb-4 space-y-2">
+                      <h5 className="text-sm font-medium text-gray-700">Файлы для загрузки:</h5>
+                      {testDataFiles[editingObject.id].map((file, index) => (
+                        <div key={index} className="flex items-center justify-between bg-blue-50 p-3 border border-blue-200 rounded-lg">
+                          <div className="flex items-center space-x-2">
+                            {file.type.startsWith('image/') ? (
+                              <Image className="w-5 h-5 text-blue-600" />
+                            ) : (
+                              <FileText className="w-5 h-5 text-red-600" />
+                            )}
+                            <div>
+                              <p className="text-sm font-medium text-blue-900">{file.name}</p>
+                              <p className="text-xs text-blue-700">
+                                {(file.size / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => handleViewTestDataFile(editingObject.id, index)}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="Просмотреть"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTestDataFile(editingObject.id, index)}
+                              className="text-red-600 hover:text-red-800"
+                              title="Удалить файл"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                      </label>
-                    )}
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Область загрузки новых файлов */}
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                    <label className="cursor-pointer block">
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        multiple
+                        onChange={(e) => {
+                          const files = e.target.files;
+                          if (files && files.length > 0) {
+                            handleTestDataFileChange(editingObject.id, files);
+                          }
+                          // Сбрасываем значение input для возможности повторной загрузки
+                          e.target.value = '';
+                        }}
+                        className="hidden"
+                      />
+                      <div className="text-center">
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">
+                          Нажмите для выбора файлов
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          JPG, PNG, PDF, TIFF, BMP до 10MB каждый
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Можно выбрать несколько файлов одновременно
+                        </p>
+                      </div>
+                    </label>
                   </div>
                 </div>
               </div>
