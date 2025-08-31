@@ -465,22 +465,23 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       console.log('Загружаем размещение оборудования для объекта:', objectId);
       const placement = await equipmentAssignmentService.getEquipmentPlacement(project.id, objectId);
       
-      if (placement.zones.length > 0) {
-        console.log('Загружено зон из БД:', placement.zones.length);
-        setEquipmentPlacements(prev => ({
-          ...prev,
-          [objectId]: placement
-        }));
-      } else {
-        console.log('Нет сохраненных зон, инициализируем пустое размещение');
-        // Инициализируем пустое размещение если нет сохраненных данных
-        setEquipmentPlacements(prev => ({
-          ...prev,
-          [objectId]: {
-            zones: [{ zoneNumber: 1, levels: [] }]
-          }
-        }));
-      }
+      console.log('Загружено зон из БД:', placement.zones.length);
+      console.log('Детали загруженных зон:', placement.zones.map(zone => ({
+        zoneNumber: zone.zoneNumber,
+        levelsCount: zone.levels.length,
+        levels: zone.levels.map(level => ({
+          levelValue: level.levelValue,
+          equipmentName: level.equipmentName
+        }))
+      })));
+      
+      // Всегда устанавливаем загруженные данные, даже если зон нет
+      setEquipmentPlacements(prev => ({
+        ...prev,
+        [objectId]: placement.zones.length > 0 ? placement : {
+          zones: [{ zoneNumber: 1, levels: [] }]
+        }
+      }));
     } catch (error) {
       console.error('Ошибка загрузки размещения оборудования:', error);
       console.log('Инициализируем пустое размещение из-за ошибки');
