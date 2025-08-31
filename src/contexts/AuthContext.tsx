@@ -32,7 +32,7 @@ export const useAuth = () => {
 };
 
 const defaultUser: User = {
-  id: '00000000-0000-0000-0000-000000000001',
+  id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
   fullName: 'Дылкин П.А.',
   email: 'pavel.dylkin@gmail.com',
   password: '00016346',
