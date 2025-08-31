@@ -29,6 +29,7 @@ export interface ProjectDocument {
 export interface DatabaseProjectDocument {
   id: string;
   project_id: string;
+  qualification_object_id: string | null;
   document_type: 'commercial_offer' | 'contract';
   file_name: string;
   file_size: number;
