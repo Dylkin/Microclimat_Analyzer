@@ -366,6 +366,30 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     }
   };
 
+  // Сохранение всех данных испытаний
+  const handleSaveTestingData = async () => {
+    setOperationLoading(true);
+    try {
+      // Сохраняем размещение оборудования для всех объектов
+      for (const obj of qualificationObjects) {
+        const placement = equipmentPlacements.get(obj.id);
+        if (placement && placement.zones.length > 0) {
+          await equipmentAssignmentService.saveEquipmentPlacement(project.id, obj.id, placement);
+        }
+      }
+      
+      // Все документы уже сохранены при загрузке через handleFileUpload
+      // Здесь можно добавить дополнительную логику сохранения если потребуется
+      
+      alert('Данные испытаний успешно сохранены');
+    } catch (error) {
+      console.error('Ошибка сохранения данных испытаний:', error);
+      alert(`Ошибка сохранения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
   // Получение документов по типу и объекту
   const getDocumentsByTypeAndObject = (documentType: 'layout_scheme' | 'test_data', qualificationObjectId?: string) => {
     console.log(`Поиск документов типа ${documentType} для объекта ${qualificationObjectId}`);
@@ -844,15 +868,12 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
         
         <div className="mt-6 flex justify-center">
           <button
-            onClick={() => {
-              // TODO: Реализовать логику сохранения данных испытаний
-              alert('Функция сохранения будет реализована');
-            }}
+            onClick={handleSaveTestingData}
             disabled={operationLoading}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             <Save className="w-5 h-5" />
-            <span>Сохранить</span>
+            <span>{operationLoading ? 'Сохранение...' : 'Сохранить данные испытаний'}</span>
           </button>
         </div>
       </div>
