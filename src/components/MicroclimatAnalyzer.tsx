@@ -5,10 +5,12 @@ import { UploadedFile } from '../types/FileData';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
+import { EquipmentAssignment } from '../utils/equipmentAssignmentService';
 import { ProjectStatusLabels, ProjectStatus } from '../types/Project';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { equipmentService } from '../utils/equipmentService';
+import { equipmentAssignmentService } from '../utils/equipmentAssignmentService';
 import { databaseService } from '../utils/database';
 import { uploadedFileService } from '../utils/uploadedFileService';
 import { VI2ParsingService } from '../utils/vi2Parser';
@@ -42,6 +44,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const [contractors, setContractors] = React.useState<Contractor[]>([]);
   const [qualificationObjects, setQualificationObjects] = React.useState<QualificationObject[]>([]);
   const [equipment, setEquipment] = React.useState<Equipment[]>([]);
+  const [equipmentAssignments, setEquipmentAssignments] = React.useState<EquipmentAssignment[]>([]);
   const [selectedContractor, setSelectedContractor] = React.useState<string>('');
   const [selectedQualificationObject, setSelectedQualificationObject] = React.useState<string>('');
   const [contractorSearch, setContractorSearch] = React.useState('');
@@ -98,6 +101,73 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
     loadInitialData();
   }, [selectedProject]);
+
+  // Загрузка назначений оборудования при выборе объекта квалификации
+  React.useEffect(() => {
+    const loadEquipmentAssignments = async () => {
+      if (!selectedQualificationObject || !selectedProject || !equipmentAssignmentService.isAvailable()) {
+        setEquipmentAssignments([]);
+        return;
+      }
+
+      try {
+        console.log('Загружаем назначения оборудования для объекта:', selectedQualificationObject);
+        const placement = await equipmentAssignmentService.getEquipmentPlacement(
+          selectedProject.id, 
+          selectedQualificationObject
+        );
+        
+        // Преобразуем размещение в список назначений
+        const assignments: EquipmentAssignment[] = [];
+        placement.zones.forEach(zone => {
+          zone.levels.forEach(level => {
+            if (level.equipmentId) {
+              const equipmentItem = equipment.find(eq => eq.id === level.equipmentId);
+              assignments.push({
+                id: `${zone.zoneNumber}-${level.levelValue}`,
+                projectId: selectedProject.id,
+                qualificationObjectId: selectedQualificationObject,
+                equipmentId: level.equipmentId,
+                equipmentName: level.equipmentName || equipmentItem?.name,
+                zoneNumber: zone.zoneNumber,
+                measurementLevel: level.levelValue,
+                assignedAt: new Date(),
+                createdAt: new Date()
+              });
+            }
+          });
+        });
+        
+        setEquipmentAssignments(assignments);
+        console.log('Загружено назначений оборудования:', assignments.length);
+        
+        // Создаем строки в таблице для каждого назначения оборудования
+        const newFiles: UploadedFile[] = assignments.map((assignment, index) => ({
+          id: crypto.randomUUID(),
+          name: `${assignment.equipmentName || 'Unknown'}_zone${assignment.zoneNumber}_level${assignment.measurementLevel}.vi2`,
+          uploadDate: new Date().toLocaleString('ru-RU'),
+          parsingStatus: 'pending' as const,
+          order: index,
+          zoneNumber: assignment.zoneNumber,
+          measurementLevel: assignment.measurementLevel.toString(),
+          contractorId: selectedContractor || undefined,
+          qualificationObjectId: selectedQualificationObject,
+          qualificationObjectName: getQualificationObjectName(selectedQualificationObject),
+          contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
+        }));
+        
+        // Заменяем текущие файлы на файлы из назначений оборудования
+        setUploadedFiles(newFiles);
+        console.log('Создано строк в таблице:', newFiles.length);
+        
+      } catch (error) {
+        console.error('Ошибка загрузки назначений оборудования:', error);
+        setEquipmentAssignments([]);
+      }
+    };
+
+    loadEquipmentAssignments();
+  }, [selectedQualificationObject, selectedProject, equipment]);
 
   // Загрузка ранее сохраненных файлов проекта
   React.useEffect(() => {
@@ -205,6 +275,12 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const getEquipmentName = (serialNumber: string) => {
     const eq = equipment.find(e => e.serialNumber === serialNumber);
     return eq ? eq.name : serialNumber;
+  };
+
+  // Получение названия оборудования по ID
+  const getEquipmentNameById = (equipmentId: string) => {
+    const eq = equipment.find(e => e.id === equipmentId);
+    return eq ? eq.name : 'Unknown';
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -854,12 +930,43 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {file.parsedData?.deviceMetadata?.serialNumber ? 
-                          getEquipmentName(file.parsedData.deviceMetadata.serialNumber) : 
-                          '-'
+                        {(() => {
+                          // Сначала пытаемся найти оборудование по назначению
+                          const assignment = equipmentAssignments.find(a => 
+                            a.zoneNumber === file.zoneNumber && 
+                            a.measurementLevel.toString() === file.measurementLevel
+                          );
+                          
+                          if (assignment && assignment.equipmentName) {
+                            return assignment.equipmentName;
+                          }
+                          
+                          // Если не найдено по назначению, ищем по серийному номеру из файла
+                          if (file.parsedData?.deviceMetadata?.serialNumber) {
+                            return getEquipmentName(file.parsedData.deviceMetadata.serialNumber);
+                          }
+                          
+                          return '-';
+                        })()
                         }
                       </div>
-                      {file.parsedData?.deviceMetadata?.serialNumber && (
+                      {(() => {
+                        const assignment = equipmentAssignments.find(a => 
+                          a.zoneNumber === file.zoneNumber && 
+                          a.measurementLevel.toString() === file.measurementLevel
+                        );
+                        
+                        const serialNumber = assignment ? 
+                          equipment.find(eq => eq.id === assignment.equipmentId)?.serialNumber :
+                          file.parsedData?.deviceMetadata?.serialNumber;
+                        
+                        return serialNumber ? (
+                          <div className="text-xs text-gray-500">
+                            S/N: {serialNumber}
+                          </div>
+                        ) : null;
+                      })()}
+                    </td>
                         <div className="text-xs text-gray-500">
                           S/N: {file.parsedData.deviceMetadata.serialNumber}
                         </div>
