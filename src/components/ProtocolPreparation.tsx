@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle, Edit2, X, Plus } from 'lucide-react';
+import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle, Edit2, X, Plus, Image } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
@@ -42,6 +42,8 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
   }>({});
   const [equipmentSearch, setEquipmentSearch] = useState<{ [key: string]: string }>({});
   const [showEquipmentDropdown, setShowEquipmentDropdown] = useState<{ [key: string]: boolean }>({});
+  const [testDataFiles, setTestDataFiles] = useState<{ [objectId: string]: File | null }>({});
+  const [testDataFileUrls, setTestDataFileUrls] = useState<{ [objectId: string]: string | null }>({});
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -226,6 +228,22 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
   const handleUpdateQualificationObject = async (updatedObject: QualificationObject) => {
     setOperationLoading(true);
     try {
+      // Обрабатываем загрузку файла данных испытаний если он есть
+      const testDataFile = testDataFiles[updatedObject.id];
+      if (testDataFile) {
+        try {
+          const testDataUrl = await qualificationObjectService.uploadTestDataFile(updatedObject.id, testDataFile);
+          updatedObject.testDataFileUrl = testDataUrl;
+          updatedObject.testDataFileName = testDataFile.name;
+          console.log('Файл данных испытаний загружен:', testDataUrl);
+        } catch (error) {
+          console.error('Ошибка загрузки файла данных испытаний:', error);
+          alert(`Ошибка загрузки файла данных испытаний: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+          setOperationLoading(false);
+          return;
+        }
+      }
+
       const updated = await qualificationObjectService.updateQualificationObject(
         updatedObject.id,
         updatedObject
@@ -235,6 +253,13 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
         obj.id === updatedObject.id ? updated : obj
       ));
       
+      // Очищаем временные файлы после успешного сохранения
+      setTestDataFiles(prev => ({ ...prev, [updatedObject.id]: null }));
+      if (testDataFileUrls[updatedObject.id]) {
+        URL.revokeObjectURL(testDataFileUrls[updatedObject.id]!);
+        setTestDataFileUrls(prev => ({ ...prev, [updatedObject.id]: null }));
+      }
+      
       setEditingObject(null);
       alert('Объект квалификации успешно обновлен');
     } catch (error) {
@@ -242,6 +267,48 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       alert(`Ошибка обновления объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
+    }
+  };
+
+  // Обработка загрузки файла данных испытаний
+  const handleTestDataFileChange = (objectId: string, file: File | null) => {
+    // Очищаем предыдущий URL если он есть
+    if (testDataFileUrls[objectId]) {
+      URL.revokeObjectURL(testDataFileUrls[objectId]!);
+    }
+
+    if (file) {
+      // Создаем временный URL для предварительного просмотра
+      const fileUrl = URL.createObjectURL(file);
+      setTestDataFileUrls(prev => ({ ...prev, [objectId]: fileUrl }));
+      setTestDataFiles(prev => ({ ...prev, [objectId]: file }));
+    } else {
+      setTestDataFiles(prev => ({ ...prev, [objectId]: null }));
+      setTestDataFileUrls(prev => ({ ...prev, [objectId]: null }));
+    }
+  };
+
+  // Валидация файла данных испытаний
+  const validateTestDataFile = (file: File): string | null => {
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    if (file.size > maxSize) {
+      return 'Размер файла не должен превышать 10MB';
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'image/tiff', 'image/bmp'];
+    if (!allowedTypes.includes(file.type)) {
+      return 'Поддерживаются только файлы: JPG, PNG, PDF, TIFF, BMP';
+    }
+
+    return null;
+  };
+
+  // Просмотр файла данных испытаний
+  const handleViewTestDataFile = (objectId: string) => {
+    const fileUrl = testDataFileUrls[objectId];
+    if (fileUrl) {
+      window.open(fileUrl, '_blank');
     }
   };
 
@@ -797,6 +864,85 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                   </button>
                 </div>
               </div>
+              
+              {/* Блок загрузки данных испытаний */}
+              <div className="border-t border-gray-200 pt-6">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Загрузка данных испытаний</h4>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Данные испытаний
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                    {testDataFiles[editingObject.id] || editingObject.testDataFileUrl ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          {(testDataFiles[editingObject.id]?.type || editingObject.testDataFileUrl?.includes('.pdf')) ? (
+                            <FileText className="w-5 h-5 text-red-600" />
+                          ) : (
+                            <Image className="w-5 h-5 text-blue-600" />
+                          )}
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {testDataFiles[editingObject.id]?.name || editingObject.testDataFileName || 'Файл данных испытаний'}
+                            </p>
+                            {testDataFiles[editingObject.id] && (
+                              <p className="text-xs text-gray-500">
+                                {(testDataFiles[editingObject.id]!.size / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewTestDataFile(editingObject.id)}
+                            className="text-blue-600 hover:text-blue-800"
+                            title="Просмотреть"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleTestDataFileChange(editingObject.id, null)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer block">
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const validationError = validateTestDataFile(file);
+                              if (validationError) {
+                                alert(validationError);
+                                return;
+                              }
+                              handleTestDataFileChange(editingObject.id, file);
+                            }
+                          }}
+                          className="hidden"
+                        />
+                        <div className="text-center">
+                          <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">
+                            Нажмите для выбора файла
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            JPG, PNG, PDF, TIFF, BMP до 10MB
+                          </p>
+                        </div>
+                      </label>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
             
             {/* Блок загрузки данных испытаний */}
@@ -1206,6 +1352,8 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• <strong>Проверьте договор:</strong> Убедитесь, что договор загружен и доступен</li>
           <li>• <strong>Отредактируйте объекты квалификации:</strong> Проверьте и при необходимости обновите данные выбранных объектов</li>
+          <li>• <strong>Настройте размещение оборудования:</strong> Укажите зоны измерения и уровни для каждого объекта</li>
+          <li>• <strong>Загрузите данные испытаний:</strong> Прикрепите файлы с результатами испытаний к каждому объекту</li>
           <li>• <strong>Загрузите протокол:</strong> Подготовьте и загрузите протокол в формате DOCX</li>
           <li>• <strong>Проверьте документы:</strong> Используйте кнопки просмотра для проверки</li>
           <li>• <strong>Замена протокола:</strong> При необходимости можно загрузить новую версию</li>
