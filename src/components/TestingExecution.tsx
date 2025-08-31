@@ -491,49 +491,6 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     if (obj.serialNumber) details.push(`🔢 S/N: ${obj.serialNumber}`);
     if (obj.manufacturer) details.push(`🏭 ${obj.manufacturer}`);
     if (obj.climateSystem) details.push(`❄️ ${obj.climateSystem}`);
-
-    return objectTestDocuments.filter(doc => doc.qualificationObjectId === objectId) || [];
-  };
-
-  // Загрузка документа испытания
-  const handleTestDocumentUpload = async (objectId: string, file: File) => {
-    if (!file) return;
-
-    // Проверяем тип файла
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Поддерживаются только изображения (JPG, PNG, GIF, WebP) и PDF файлы');
-      return;
-    }
-
-    // Проверяем размер файла (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Размер файла не должен превышать 10MB');
-      return;
-    }
-
-    setTestDocumentUploading(prev => ({ ...prev, [objectId]: true }));
-
-    try {
-      const uploadedDoc = await projectDocumentService.uploadDocument(
-        project.id, 
-        'test_data',
-        file, 
-        user?.id,
-        objectId
-      );
-      
-      // Обновляем список документов испытаний
-      setObjectTestDocuments(prev => [...prev, uploadedDoc]);
-      alert('Документ испытания успешно загружен');
-    } catch (error) {
-      console.error('Ошибка загрузки документа испытания:', error);
-      alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setTestDocumentUploading(prev => ({ ...prev, [objectId]: false }));
-    }
-  };
-
   // Удаление документа испытания
   const handleDeleteTestDocument = async (documentId: string) => {
     if (!confirm('Вы уверены, что хотите удалить этот документ?')) {
