@@ -6,6 +6,7 @@ import { Equipment } from '../types/Equipment';
 import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { equipmentService } from '../utils/equipmentService';
+import { equipmentAssignmentService } from '../utils/equipmentAssignmentService';
 import { useAuth } from '../contexts/AuthContext';
 import { ProjectInfo } from './contract/ProjectInfo';
 import { QualificationObjectForm } from './QualificationObjectForm';
@@ -479,13 +480,6 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
     }
   };
 
-  // Редактирование объекта квалификации
-  const handleEditQualificationObject = (obj: QualificationObject) => {
-    setEditingObject(obj);
-    // Загружаем размещение оборудования для редактируемого объекта
-    loadEquipmentPlacement(obj.id);
-  };
-
   // Получение договора из документов
   const contractDoc = documents.find(doc => doc.documentType === 'contract');
 
@@ -791,28 +785,6 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                   </button>
                 </div>
               </div>
-              
-              {/* Кнопки управления объектом в конце блока */}
-              <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setEditingObject(null)}
-                  disabled={operationLoading}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={() => handleUpdateQualificationObject(editingObject)}
-                  disabled={operationLoading}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
-                >
-                  {operationLoading && (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  )}
-                  <span>Сохранить</span>
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -896,7 +868,7 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
 
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => handleEditQualificationObject(object)}
+                      onClick={() => setEditingObject(object)}
                       disabled={operationLoading}
                       className="text-indigo-600 hover:text-indigo-900 transition-colors"
                       title="Редактировать"
