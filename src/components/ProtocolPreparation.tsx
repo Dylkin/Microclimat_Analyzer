@@ -414,6 +414,71 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // Сохранение размещения оборудования
+  const handleSaveEquipmentPlacement = async (objectId: string) => {
+    if (!equipmentAssignmentService.isAvailable()) {
+      alert('Supabase не настроен для сохранения размещения оборудования');
+      return;
+    }
+
+    const placement = equipmentPlacements[objectId];
+    if (!placement || placement.zones.length === 0) {
+      alert('Нет данных для сохранения');
+      return;
+    }
+
+    setOperationLoading(true);
+    try {
+      await equipmentAssignmentService.saveEquipmentPlacement(
+        project.id,
+        objectId,
+        placement
+      );
+      
+      alert('Размещение оборудования успешно сохранено');
+    } catch (error) {
+      console.error('Ошибка сохранения размещения оборудования:', error);
+      alert(`Ошибка сохранения размещения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // Загрузка размещения оборудования при редактировании объекта
+  const loadEquipmentPlacement = async (objectId: string) => {
+    if (!equipmentAssignmentService.isAvailable()) {
+      return;
+    }
+
+    try {
+      const placement = await equipmentAssignmentService.getEquipmentPlacement(project.id, objectId);
+      
+      if (placement.zones.length > 0) {
+        setEquipmentPlacements(prev => ({
+          ...prev,
+          [objectId]: placement
+        }));
+      } else {
+        // Инициализируем пустое размещение если нет сохраненных данных
+        setEquipmentPlacements(prev => ({
+          ...prev,
+          [objectId]: {
+            zones: [{ zoneNumber: 1, levels: [] }]
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки размещения оборудования:', error);
+      // Инициализируем пустое размещение при ошибке
+      setEquipmentPlacements(prev => ({
+        ...prev,
+        [objectId]: {
+          zones: [{ zoneNumber: 1, levels: [] }]
+        }
+      }));
+    }
+  };
+
   // Получение договора из документов
   const contractDoc = documents.find(doc => doc.documentType === 'contract');
 
@@ -645,7 +710,6 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                                                     className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
                                                   >
                                                     <div className="font-medium text-gray-900">{eq.name}</div>
-                                                  </div>
                                                 ))
                                               ) : (
                                                 <div className="px-3 py-2 text-gray-500 text-sm">
@@ -695,6 +759,27 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                   >
                     <Plus className="w-4 h-4" />
                     <span>Добавить зону</span>
+                  </button>
+                </div>
+                
+                {/* Кнопка сохранения размещения оборудования */}
+                <div className="mt-6 flex justify-center">
+                  <button
+                    onClick={() => handleSaveEquipmentPlacement(editingObject.id)}
+                    disabled={operationLoading}
+                    className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {operationLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Сохранение...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Сохранить размещение</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

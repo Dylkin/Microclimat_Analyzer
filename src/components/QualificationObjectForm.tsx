@@ -564,28 +564,6 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           type="plan"
         />
       </div>
-
-      {/* Кнопки */}
-      <div className="flex justify-end space-x-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={loading}
-          className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
-        >
-          Отмена
-        </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
-        >
-          {loading && (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          )}
-          <span>{initialData ? 'Сохранить' : 'Создать'}</span>
-        </button>
-      </div>
     </form>
   );
 };
