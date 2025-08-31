@@ -42,6 +42,8 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
   }>({});
   const [equipmentSearch, setEquipmentSearch] = useState<{ [key: string]: string }>({});
   const [showEquipmentDropdown, setShowEquipmentDropdown] = useState<{ [key: string]: boolean }>({});
+  const [testInfoFiles, setTestInfoFiles] = useState<{ [objectId: string]: File[] }>({});
+  const [testInfoFileUrls, setTestInfoFileUrls] = useState<{ [objectId: string]: string[] }>({});
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -226,6 +228,30 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
   const handleUpdateQualificationObject = async (updatedObject: QualificationObject) => {
     setOperationLoading(true);
     try {
+      // Обрабатываем загрузку файлов информации об испытаниях если они есть
+      const testInfoFilesList = testInfoFiles[updatedObject.id];
+      if (testInfoFilesList && testInfoFilesList.length > 0) {
+        try {
+          // Загружаем первый файл в основное поле (для совместимости)
+          const firstFile = testInfoFilesList[0];
+          const testInfoUrl = await qualificationObjectService.uploadTestDataFile(updatedObject.id, firstFile);
+          updatedObject.testDataFileUrl = testInfoUrl;
+          updatedObject.testDataFileName = firstFile.name;
+          
+          // Загружаем остальные файлы (если есть дополнительная логика для множественных файлов)
+          for (let i = 1; i < testInfoFilesList.length; i++) {
+            await qualificationObjectService.uploadTestDataFile(updatedObject.id, testInfoFilesList[i]);
+          }
+          
+          console.log('Файлы информации об испытаниях загружены:', testInfoFilesList.length);
+        } catch (error) {
+          console.error('Ошибка загрузки файлов информации об испытаниях:', error);
+          alert(`Ошибка загрузки файлов информации об испытаниях: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+          setOperationLoading(false);
+          return;
+        }
+      }
+
       const updated = await qualificationObjectService.updateQualificationObject(
         updatedObject.id,
         updatedObject
@@ -235,6 +261,13 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
         obj.id === updatedObject.id ? updated : obj
       ));
       
+      // Очищаем временные файлы после успешного сохранения
+      setTestInfoFiles(prev => ({ ...prev, [updatedObject.id]: [] }));
+      if (testInfoFileUrls[updatedObject.id]) {
+        testInfoFileUrls[updatedObject.id].forEach(url => URL.revokeObjectURL(url));
+        setTestInfoFileUrls(prev => ({ ...prev, [updatedObject.id]: [] }));
+      }
+      
       setEditingObject(null);
       alert('Объект квалификации успешно обновлен');
     } catch (error) {
@@ -243,6 +276,80 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     } finally {
       setOperationLoading(false);
     }
+  };
+
+  // Обработка загрузки файлов информации об испытаниях
+  const handleTestInfoFilesChange = (objectId: string, fileList: FileList | null) => {
+    // Очищаем предыдущие URL если они есть
+    if (testInfoFileUrls[objectId]) {
+      testInfoFileUrls[objectId].forEach(url => URL.revokeObjectURL(url));
+    }
+
+    if (fileList && fileList.length > 0) {
+      const files = Array.from(fileList);
+      const validFiles: File[] = [];
+      const fileUrls: string[] = [];
+
+      // Валидируем каждый файл
+      for (const file of files) {
+        const validationError = validateTestInfoFile(file);
+        if (validationError) {
+          alert(`Файл "${file.name}": ${validationError}`);
+          continue;
+        }
+        
+        validFiles.push(file);
+        fileUrls.push(URL.createObjectURL(file));
+      }
+
+      setTestInfoFiles(prev => ({ ...prev, [objectId]: validFiles }));
+      setTestInfoFileUrls(prev => ({ ...prev, [objectId]: fileUrls }));
+    } else {
+      setTestInfoFiles(prev => ({ ...prev, [objectId]: [] }));
+      setTestInfoFileUrls(prev => ({ ...prev, [objectId]: [] }));
+    }
+  };
+
+  // Валидация файла информации об испытаниях
+  const validateTestInfoFile = (file: File): string | null => {
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    if (file.size > maxSize) {
+      return 'Размер файла не должен превышать 10MB';
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'image/tiff', 'image/bmp'];
+    if (!allowedTypes.includes(file.type)) {
+      return 'Поддерживаются только файлы: JPG, PNG, PDF, TIFF, BMP';
+    }
+
+    return null;
+  };
+
+  // Просмотр файла информации об испытаниях
+  const handleViewTestInfoFile = (objectId: string, fileIndex: number) => {
+    const fileUrls = testInfoFileUrls[objectId];
+    if (fileUrls && fileUrls[fileIndex]) {
+      window.open(fileUrls[fileIndex], '_blank');
+    }
+  };
+
+  // Удаление конкретного файла информации об испытаниях
+  const handleRemoveTestInfoFile = (objectId: string, fileIndex: number) => {
+    const currentFiles = testInfoFiles[objectId] || [];
+    const currentUrls = testInfoFileUrls[objectId] || [];
+
+    // Освобождаем URL удаляемого файла
+    if (currentUrls[fileIndex]) {
+      URL.revokeObjectURL(currentUrls[fileIndex]);
+    }
+
+    // Удаляем файл и URL из массивов
+    const newFiles = currentFiles.filter((_, index) => index !== fileIndex);
+    const newUrls = currentUrls.filter((_, index) => index !== fileIndex);
+
+    setTestInfoFiles(prev => ({ ...prev, [objectId]: newFiles }));
+    setTestInfoFileUrls(prev => ({ ...prev, [objectId]: newUrls }));
   };
 
   // Управление размещением оборудования
@@ -797,6 +904,121 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                   </button>
                 </div>
               </div>
+              
+              {/* Блок информации об испытаниях */}
+              <div className="border-t border-gray-200 pt-6">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Информация об испытаниях</h4>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Файлы информации об испытаниях
+                  </label>
+                  
+                  {/* Отображение уже сохраненного файла */}
+                  {editingObject.testDataFileUrl && (
+                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          {editingObject.testDataFileUrl.includes('.pdf') ? (
+                            <FileText className="w-5 h-5 text-red-600" />
+                          ) : (
+                            <Image className="w-5 h-5 text-blue-600" />
+                          )}
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {editingObject.testDataFileName || 'Сохраненный файл'}
+                            </p>
+                            <p className="text-xs text-green-600">Сохранено в системе</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => window.open(editingObject.testDataFileUrl, '_blank')}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Просмотреть сохраненный файл"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Отображение загруженных файлов */}
+                  {testInfoFiles[editingObject.id] && testInfoFiles[editingObject.id].length > 0 && (
+                    <div className="mb-4 space-y-2">
+                      {testInfoFiles[editingObject.id].map((file, index) => (
+                        <div key={index} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {file.type.startsWith('image/') ? (
+                                <Image className="w-5 h-5 text-blue-600" />
+                              ) : (
+                                <FileText className="w-5 h-5 text-red-600" />
+                              )}
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => handleViewTestInfoFile(editingObject.id, index)}
+                                className="text-blue-600 hover:text-blue-800"
+                                title="Просмотреть"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveTestInfoFile(editingObject.id, index)}
+                                className="text-red-600 hover:text-red-800"
+                                title="Удалить файл"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Область загрузки файлов */}
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                    <label className="cursor-pointer block">
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        multiple
+                        onChange={(e) => {
+                          const fileList = e.target.files;
+                          if (fileList && fileList.length > 0) {
+                            handleTestInfoFilesChange(editingObject.id, fileList);
+                          }
+                          // Сбрасываем значение input для возможности повторной загрузки
+                          e.target.value = '';
+                        }}
+                        className="hidden"
+                      />
+                      <div className="text-center">
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">
+                          Нажмите для выбора файлов или перетащите сюда
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          JPG, PNG, PDF, TIFF, BMP до 10MB каждый
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Можно выбрать несколько файлов одновременно
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1107,6 +1329,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
           <li>• <strong>Проверьте договор:</strong> Убедитесь, что договор загружен и доступен</li>
           <li>• <strong>Отредактируйте объекты квалификации:</strong> Проверьте и при необходимости обновите данные выбранных объектов</li>
           <li>• <strong>Настройте размещение оборудования:</strong> Укажите зоны измерения и уровни для каждого объекта</li>
+          <li>• <strong>Загрузите информацию об испытаниях:</strong> Прикрепите файлы с информацией об испытаниях к каждому объекту</li>
           <li>• <strong>Загрузите протокол:</strong> Подготовьте и загрузите протокол в формате DOCX</li>
           <li>• <strong>Проверьте документы:</strong> Используйте кнопки просмотра для проверки</li>
           <li>• <strong>Проведите испытания:</strong> Выполните необходимые измерения согласно протоколу</li>
@@ -1116,3 +1339,5 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     </div>
   );
 };
+
+export { TestingExecution }
