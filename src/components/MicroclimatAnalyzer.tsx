@@ -4,9 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { UploadedFile } from '../types/FileData';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject } from '../types/QualificationObject';
+import { Equipment } from '../types/Equipment';
 import { ProjectStatusLabels, ProjectStatus } from '../types/Project';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
+import { equipmentService } from '../utils/equipmentService';
 import { databaseService } from '../utils/database';
 import { uploadedFileService } from '../utils/uploadedFileService';
 import { VI2ParsingService } from '../utils/vi2Parser';
@@ -39,6 +41,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const [contractors, setContractors] = React.useState<Contractor[]>([]);
   const [qualificationObjects, setQualificationObjects] = React.useState<QualificationObject[]>([]);
+  const [equipment, setEquipment] = React.useState<Equipment[]>([]);
   const [selectedContractor, setSelectedContractor] = React.useState<string>('');
   const [selectedQualificationObject, setSelectedQualificationObject] = React.useState<string>('');
   const [contractorSearch, setContractorSearch] = React.useState('');
@@ -67,7 +70,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
-    const loadContractors = async () => {
+    const loadInitialData = async () => {
       if (!contractorService.isAvailable()) return;
       
       try {
@@ -81,9 +84,19 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       } catch (error) {
         console.error('Ошибка загрузки контрагентов:', error);
       }
+      
+      // Загружаем оборудование
+      if (equipmentService.isAvailable()) {
+        try {
+          const equipmentResult = await equipmentService.getAllEquipment(1, 1000); // Загружаем все оборудование
+          setEquipment(equipmentResult.equipment);
+        } catch (error) {
+          console.error('Ошибка загрузки оборудования:', error);
+        }
+      }
     };
 
-    loadContractors();
+    loadInitialData();
   }, [selectedProject]);
 
   // Загрузка ранее сохраненных файлов проекта
@@ -186,6 +199,12 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     if (!obj) return 'Выберите объект квалификации';
     
     return obj.name || obj.vin || obj.serialNumber || `${obj.type} (без названия)`;
+  };
+
+  // Получение названия оборудования по серийному номеру
+  const getEquipmentName = (serialNumber: string) => {
+    const eq = equipment.find(e => e.serialNumber === serialNumber);
+    return eq ? eq.name : serialNumber;
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -729,6 +748,9 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     Уровень измерения (м.)
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Оборудование
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Статус
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -827,6 +849,19 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                           className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
                         >
                           {file.measurementLevel || 'Нажмите для ввода'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {file.parsedData?.deviceMetadata?.serialNumber ? 
+                          getEquipmentName(file.parsedData.deviceMetadata.serialNumber) : 
+                          '-'
+                        }
+                      </div>
+                      {file.parsedData?.deviceMetadata?.serialNumber && (
+                        <div className="text-xs text-gray-500">
+                          S/N: {file.parsedData.deviceMetadata.serialNumber}
                         </div>
                       )}
                     </td>
