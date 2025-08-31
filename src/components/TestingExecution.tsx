@@ -330,7 +330,9 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
         // Для других типов заменяем существующий документ
         setDocuments(prev => {
           const filtered = prev.filter(doc => 
-            !(doc.documentType === documentType && doc.qualificationObjectId === qualificationObjectId)
+            !(doc.documentType === documentType && 
+              ((qualificationObjectId && doc.qualificationObjectId === qualificationObjectId) ||
+               (!qualificationObjectId && !doc.qualificationObjectId)))
           );
           return [...filtered, uploadedDoc];
         });
@@ -366,10 +368,26 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
 
   // Получение документов по типу и объекту
   const getDocumentsByTypeAndObject = (documentType: 'layout_scheme' | 'test_data', qualificationObjectId?: string) => {
-    return documents.filter(doc => 
-      doc.documentType === documentType && 
-      doc.qualificationObjectId === qualificationObjectId
-    );
+    console.log(`Поиск документов типа ${documentType} для объекта ${qualificationObjectId}`);
+    console.log('Все документы:', documents.map(doc => ({
+      id: doc.id,
+      type: doc.documentType,
+      objectId: doc.qualificationObjectId,
+      fileName: doc.fileName
+    })));
+    
+    const filtered = documents.filter(doc => {
+      const typeMatch = doc.documentType === documentType;
+      const objectMatch = qualificationObjectId ? 
+        doc.qualificationObjectId === qualificationObjectId :
+        !doc.qualificationObjectId;
+      
+      console.log(`Документ ${doc.fileName}: type=${typeMatch}, object=${objectMatch}`);
+      return typeMatch && objectMatch;
+    });
+    
+    console.log(`Найдено документов: ${filtered.length}`);
+    return filtered;
   };
 
   return (
