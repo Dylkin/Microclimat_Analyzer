@@ -436,6 +436,9 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
         placement
       );
       
+      // После успешного сохранения перезагружаем размещение из базы данных
+      await loadEquipmentPlacement(objectId);
+      
       alert('Размещение оборудования успешно сохранено');
     } catch (error) {
       console.error('Ошибка сохранения размещения оборудования:', error);

@@ -125,9 +125,10 @@ export class EquipmentAssignmentService {
       if (assignmentsToInsert.length > 0) {
         console.log(`Подготовлено ${assignmentsToInsert.length} уникальных назначений для вставки`);
         
-        const { error: insertError } = await this.supabase
+        const { data: insertData, error: insertError } = await this.supabase
           .from('project_equipment_assignments')
-          .insert(assignmentsToInsert);
+          .insert(assignmentsToInsert)
+          .select();
 
         if (insertError) {
           console.error('Ошибка вставки назначений:', insertError);
@@ -135,7 +136,7 @@ export class EquipmentAssignmentService {
           throw new Error(`Ошибка сохранения назначений: ${insertError.message}`);
         }
 
-        console.log(`Сохранено ${assignmentsToInsert.length} назначений оборудования`);
+        console.log(`Сохранено ${insertData?.length || 0} назначений оборудования`);
       } else {
         console.log('Нет назначений для сохранения');
       }
