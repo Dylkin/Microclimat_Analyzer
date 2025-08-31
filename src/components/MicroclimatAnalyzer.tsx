@@ -967,11 +967,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                         ) : null;
                       })()}
                     </td>
-                        <div className="text-xs text-gray-500">
-                          S/N: {file.parsedData.deviceMetadata.serialNumber}
-                        </div>
-                      )}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
                         {getStatusIcon(file.parsingStatus)}
