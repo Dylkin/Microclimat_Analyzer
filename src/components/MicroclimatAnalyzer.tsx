@@ -26,12 +26,14 @@ interface MicroclimatAnalyzerProps {
     }>;
     status: string;
   } | null;
+  selectedQualificationObjectId?: string;
 }
 
 export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({ 
   showVisualization = false, 
   onShowVisualization,
-  selectedProject
+  selectedProject,
+  selectedQualificationObjectId
 }) => {
   const { user } = useAuth();
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
@@ -127,11 +129,19 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           const projectObjectIds = selectedProject.qualificationObjects.map(obj => obj.qualificationObjectId);
           const filteredData = data.filter(obj => projectObjectIds.includes(obj.id));
           setQualificationObjects(filteredData);
+          
+          // Если передан selectedQualificationObjectId, устанавливаем его
+          if (selectedQualificationObjectId && projectObjectIds.includes(selectedQualificationObjectId)) {
+            setSelectedQualificationObject(selectedQualificationObjectId);
+          }
         } else {
           setQualificationObjects(data);
         }
         
-        setSelectedQualificationObject(''); // Сбрасываем выбор объекта при смене контрагента
+        // Сбрасываем выбор объекта при смене контрагента только если не передан selectedQualificationObjectId
+        if (!selectedQualificationObjectId) {
+          setSelectedQualificationObject('');
+        }
       } catch (error) {
         console.error('Ошибка загрузки объектов квалификации:', error);
         setQualificationObjects([]);
@@ -139,7 +149,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     };
 
     loadQualificationObjects();
-  }, [selectedContractor, selectedProject]);
+  }, [selectedContractor, selectedProject, selectedQualificationObjectId]);
 
   // Фильтрация контрагентов по поиску
   const filteredContractors = React.useMemo(() => {
