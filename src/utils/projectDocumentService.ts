@@ -105,7 +105,7 @@ export class ProjectDocumentService {
       const fileName = `${projectId}_${documentType}_${Date.now()}.${fileExt}`;
       
       // Используем единый bucket 'documents' для всех типов документов
-      const bucketName = 'documents';
+      const bucketName = documentType === 'test_data' ? 'test-data' : 'project-documents';
       const filePath = documentType === 'test_data' ? `test-data/${fileName}` : `project-documents/${fileName}`;
 
       console.log('Загружаем файл в Storage:', { bucketName, fileName, filePath, fileSize: file.size });
@@ -131,6 +131,8 @@ export class ProjectDocumentService {
           throw new Error(`Bucket '${bucketName}' не найден или недоступен. Проверьте настройки Storage в Supabase Dashboard.`);
         } else if (uploadError.message?.includes('permission') || uploadError.message?.includes('policy')) {
           throw new Error(`Недостаточно прав для загрузки в bucket '${bucketName}'. Проверьте RLS политики Storage.`);
+        } else if (uploadError.message?.includes('mime type') && uploadError.message?.includes('not supported')) {
+          throw new Error(`MIME тип файла ${file.type} не поддерживается bucket '${bucketName}'. Проверьте настройки bucket в Supabase Dashboard или используйте другой формат файла.`);
         } else {
           throw new Error(`Ошибка загрузки файла: ${uploadError.message}`);
         }
@@ -212,8 +214,7 @@ export class ProjectDocumentService {
       // Извлекаем путь файла из URL
       const filePath = docData.file_url.split('/').pop();
       if (filePath) {
-        // Используем единый bucket 'documents' для всех типов документов
-        const bucketName = 'documents';
+        const bucketName = docData.document_type === 'test_data' ? 'test-data' : 'project-documents';
         const fullPath = docData.document_type === 'test_data' ? `test-data/${filePath}` : `project-documents/${filePath}`;
         
         // Удаляем файл из Storage
