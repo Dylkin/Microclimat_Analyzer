@@ -662,7 +662,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                         <p className="text-gray-600 mb-3">Загрузите схему размещения оборудования</p>
                         <input
                           type="file"
-                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
@@ -743,7 +743,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                         <p className="text-gray-600 mb-3">Загрузите информацию об испытаниях</p>
                         <input
                           type="file"
-                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
