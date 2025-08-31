@@ -452,10 +452,17 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
 
       {/* Qualification Objects and Equipment Placement */}
       {!loading && qualificationObjects.length > 0 && (
-        <div className="space-y-6">
-          {qualificationObjects.map((obj) => {
-            const placement = equipmentPlacements.get(obj.id) || { zones: [] };
-            const isEditing = editingPlacement === obj.id;
+            console.log('=== ОТЛАДКА ИНФОРМАЦИИ ОБ ИСПЫТАНИЯХ ===');
+            console.log('Объект квалификации ID:', obj.id);
+            
+            const testDataDocs = documents.filter(doc => {
+              const typeMatch = doc.documentType === 'test_data';
+              const objectMatch = doc.qualificationObjectId === obj.id;
+              console.log(`Документ ${doc.fileName}: type=${typeMatch}, object=${objectMatch}, objectId=${doc.qualificationObjectId}`);
+              return typeMatch && objectMatch;
+            });
+            
+            console.log('Найдено документов испытаний:', testDataDocs.length);
             
             return (
               <div key={obj.id} className="bg-white rounded-lg shadow p-6">
@@ -824,10 +831,23 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                         </div>
                       </div>
                     );
-                  })()}
-                </div>
-              </div>
-            );
+            console.log('=== ОТЛАДКА СХЕМЫ РАЗМЕЩЕНИЯ ===');
+            console.log('Объект квалификации ID:', obj.id);
+            console.log('Все документы:', documents.map(doc => ({
+              id: doc.id,
+              type: doc.documentType,
+              objectId: doc.qualificationObjectId,
+              fileName: doc.fileName
+            })));
+            
+            const layoutDocs = documents.filter(doc => {
+              const typeMatch = doc.documentType === 'layout_scheme';
+              const objectMatch = doc.qualificationObjectId === obj.id;
+              console.log(`Документ ${doc.fileName}: type=${typeMatch}, object=${objectMatch}, objectId=${doc.qualificationObjectId}`);
+              return typeMatch && objectMatch;
+            });
+            
+            console.log('Найдено схем размещения:', layoutDocs.length);
           })}
         </div>
       )}

@@ -73,6 +73,7 @@ export class ProjectDocumentService {
       return data.map((doc: DatabaseProjectDocument) => ({
         id: doc.id,
         projectId: doc.project_id,
+        qualificationObjectId: doc.qualification_object_id,
         documentType: doc.document_type,
         fileName: doc.file_name,
         fileSize: doc.file_size,
@@ -227,6 +228,7 @@ export class ProjectDocumentService {
         return {
           id: docData.id,
           projectId: docData.project_id,
+          qualificationObjectId: docData.qualification_object_id,
           documentType: docData.document_type,
           fileName: docData.file_name,
           fileSize: docData.file_size,
@@ -313,6 +315,7 @@ export class ProjectDocumentService {
         return {
           id: docData.id,
           projectId: docData.project_id,
+          qualificationObjectId: docData.qualification_object_id,
           documentType: docData.document_type,
           fileName: docData.file_name,
           fileSize: docData.file_size,
