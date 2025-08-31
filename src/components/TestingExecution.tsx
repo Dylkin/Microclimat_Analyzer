@@ -235,10 +235,10 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
   const handleTestDocumentUpload = async (qualificationObjectId: string, file: File) => {
     if (!file) return;
 
-    // Проверяем тип файла - только изображения JPG и PNG
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    // Проверяем тип файла - только JPG
+    const allowedTypes = ['image/jpeg', 'image/jpg'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Поддерживаются только файлы JPG и PNG');
+      alert('Поддерживаются только файлы JPG');
       return;
     }
 
@@ -893,7 +893,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
                     <input
                       type="file"
-                      accept=".jpg,.jpeg,.png"
+                      accept=".jpg,.jpeg"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
@@ -909,10 +909,10 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                     >
                       <Upload className="w-8 h-8 text-gray-400" />
                       <span className="text-sm text-gray-600">
-                        Загрузить JPG/PNG документ испытания
+                        Загрузить JPG документ испытания
                       </span>
                       <span className="text-xs text-gray-500">
-                        Поддерживаются только JPG и PNG файлы до 10MB
+                        Поддерживаются только JPG файлы до 10MB
                       </span>
                     </label>
                   </div>
@@ -1315,3 +1315,5 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     </div>
   );
 };
+
+export { TestingExecution }
