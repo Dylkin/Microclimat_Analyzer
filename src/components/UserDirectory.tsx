@@ -61,8 +61,16 @@ export const UserDirectory: React.FC = () => {
       alert('Пользователь успешно добавлен');
     } catch (error) {
       console.error('Ошибка в handleAddUser:', error);
+      
+      // Проверяем, является ли это ошибкой дублирования email
       const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-      alert(`Ошибка добавления пользователя: ${errorMessage}`);
+      if (errorMessage.includes('duplicate key value violates unique constraint "users_email_key"') || 
+          errorMessage.includes('23505')) {
+        alert('Пользователь с таким email уже существует. Используйте другой email адрес.');
+      } else {
+        alert(`Ошибка добавления пользователя: ${errorMessage}`);
+      }
+      
       setOperationLoading(false);
       return;
     }
