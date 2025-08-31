@@ -100,6 +100,33 @@ export class ProjectDocumentService {
     }
 
     try {
+      // Получаем текущего аутентифицированного пользователя
+      const { data: { user } } = await this.supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('Пользователь не аутентифицирован');
+      }
+
+      // Проверяем существование пользователя в таблице users
+      const { data: userExists } = await this.supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userExists) {
+        // Создаем запись пользователя если не существует
+        await this.supabase
+          .from('users')
+          .insert([{ 
+            id: user.id, 
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email,
+            password: 'auth_user', // Пароль для пользователей из auth
+            role: 'specialist'
+          }]);
+      }
+
       // Генерируем уникальное имя файла
       const fileExt = file.name.split('.').pop();
       const fileName = `${projectId}_${documentType}_${Date.now()}.${fileExt}`;
@@ -165,7 +192,7 @@ export class ProjectDocumentService {
             file_size: file.size,
             file_url: urlData.publicUrl,
             mime_type: file.type,
-            uploaded_by: userId || null
+            uploaded_by: user.id
           })
           .select()
           .single();
@@ -249,7 +276,7 @@ export class ProjectDocumentService {
               file_size: file.size,
               file_url: urlData.publicUrl,
               mime_type: file.type,
-              uploaded_by: null
+              uploaded_by: user.id
             })
             .select()
             .single();
