@@ -107,23 +107,35 @@ export class ProjectDocumentService {
         throw new Error('Пользователь не аутентифицирован');
       }
 
-      // Создаем или обновляем запись пользователя с использованием upsert
-      const { error: upsertError } = await this.supabase
+      // Проверяем существование пользователя в таблице users
+      const { data: existingUser, error: checkError } = await this.supabase
         .from('users')
-        .upsert({ 
-          id: user.id, 
-          email: user.email,
-          full_name: user.user_metadata?.full_name || user.email,
-          password: 'auth_user', // Пароль для пользователей из auth
-          role: 'specialist'
-        }, {
-          onConflict: 'id'
-        });
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
 
-      // Игнорируем ошибку дублирования email, так как пользователь уже существует
-      if (upsertError && upsertError.code !== '23505') {
-        console.error('Ошибка создания/обновления пользователя:', upsertError);
-        throw new Error(`Ошибка создания пользователя: ${upsertError.message}`);
+      if (checkError) {
+        console.error('Ошибка проверки существования пользователя:', checkError);
+        // Продолжаем выполнение, так как это не критическая ошибка
+      }
+
+      // Если пользователь не существует, создаем его
+      if (!existingUser) {
+        const { error: insertError } = await this.supabase
+          .from('users')
+          .insert({
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email,
+            password: 'auth_user',
+            role: 'specialist'
+          });
+
+        // Игнорируем ошибку дублирования, так как пользователь мог быть создан параллельно
+        if (insertError && insertError.code !== '23505') {
+          console.error('Ошибка создания пользователя:', insertError);
+          // Не прерываем выполнение, так как это не критично для загрузки документа
+        }
       }
 
       // Генерируем уникальное имя файла
