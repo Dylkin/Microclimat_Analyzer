@@ -11,6 +11,7 @@ import { ProjectDirectory } from './components/ProjectDirectory';
 import { EquipmentDirectory } from './components/EquipmentDirectory';
 import { ContractNegotiation } from './components/ContractNegotiation';
 import { ProtocolPreparation } from './components/ProtocolPreparation';
+import { TestingExecution } from './components/TestingExecution';
 import './index.css';
 
 const AppContent: React.FC = () => {
@@ -55,6 +56,13 @@ const AppContent: React.FC = () => {
       case 'protocol_preparation':
         return hasAccess('analyzer') && selectedProject ? (
           <ProtocolPreparation 
+            project={selectedProject}
+            onBack={() => handlePageChange('projects')}
+          />
+        ) : <div>Доступ запрещен или проект не выбран</div>;
+      case 'testing_execution':
+        return hasAccess('analyzer') && selectedProject ? (
+          <TestingExecution 
             project={selectedProject}
             onBack={() => handlePageChange('projects')}
           />
