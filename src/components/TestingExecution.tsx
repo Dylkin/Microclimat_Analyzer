@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle, Edit2, X, Plus } from 'lucide-react';
+import { ArrowLeft, FileText, AlertTriangle, Upload, Download, Eye, Trash2, CheckCircle, Edit2, X, Plus, Image as ImageIcon } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
@@ -922,7 +922,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                           {editingObject.testDataFileUrl.includes('.pdf') ? (
                             <FileText className="w-5 h-5 text-red-600" />
                           ) : (
-                            <Image className="w-5 h-5 text-blue-600" />
+                            <ImageIcon className="w-5 h-5 text-blue-600" />
                           )}
                           <div>
                             <p className="text-sm font-medium text-gray-900">
@@ -951,7 +951,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
                               {file.type.startsWith('image/') ? (
-                                <Image className="w-5 h-5 text-blue-600" />
+                                <ImageIcon className="w-5 h-5 text-blue-600" />
                               ) : (
                                 <FileText className="w-5 h-5 text-red-600" />
                               )}
