@@ -521,8 +521,10 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       return;
     }
 
-    if (uploadedFiles.length === 0) {
-      alert('Нет файлов для сохранения');
+    // Проверяем, есть ли файлы с загруженными данными
+    const filesWithData = uploadedFiles.filter(f => f.actualFileName && f.parsingStatus === 'completed');
+    if (filesWithData.length === 0) {
+      alert('Нет обработанных файлов для сохранения');
       return;
     }
 
@@ -544,12 +546,12 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       // Получаем userId из Supabase Auth
       const userId = await getUserIdOrThrow();
       
-      // Сохраняем файлы в базе данных с привязкой к проекту
+      // Сохраняем только файлы с загруженными данными в базе данных с привязкой к проекту
       await uploadedFileService.saveProjectFiles({
         projectId: selectedProject.id,
         qualificationObjectId: selectedQualificationObject,
         objectType: qualificationObject.type,
-        files: uploadedFiles
+        files: filesWithData
       }, userId);
       
       // Обновляем статус сохранения
@@ -564,9 +566,11 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         projectName: selectedProject.name,
         qualificationObjectId: selectedQualificationObject,
         objectType: qualificationObject.type,
-        filesCount: uploadedFiles.length,
-        completedFiles: uploadedFiles.filter(f => f.parsingStatus === 'completed').length
+        filesCount: filesWithData.length,
+        completedFiles: filesWithData.length
       });
+
+      alert(`Успешно сохранено ${filesWithData.length} файлов для проекта`);
 
     } catch (error) {
       console.error('Ошибка сохранения данных проекта:', error);
