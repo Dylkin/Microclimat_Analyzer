@@ -191,6 +191,15 @@ export class ProjectDocumentService {
         };
       } else {
         // Для остальных типов используем upsert для замены существующего файла
+        // Определяем правильные колонки для onConflict в зависимости от типа документа
+        let onConflictColumns: string;
+        if (documentType === 'layout_scheme') {
+          onConflictColumns = 'project_id,qualification_object_id,document_type';
+        } else {
+          // Для commercial_offer и contract
+          onConflictColumns = 'project_id,document_type';
+        }
+
         const { data: docData, error: docError } = await this.supabase
           .from('project_documents')
           .upsert({
@@ -203,7 +212,7 @@ export class ProjectDocumentService {
             mime_type: file.type,
             uploaded_by: userId || null
           }, {
-            onConflict: 'project_documents_unique_per_object_type'
+            onConflict: onConflictColumns
           })
           .select()
           .single();
