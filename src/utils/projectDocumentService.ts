@@ -103,8 +103,8 @@ export class ProjectDocumentService {
       const fileExt = file.name.split('.').pop();
       const fileName = `${projectId}_${documentType}_${Date.now()}.${fileExt}`;
       
-      // Используем разные buckets для разных типов документов
-      const bucketName = documentType === 'test_data' ? 'test-documents' : 'documents';
+      // Используем единый bucket 'documents' для всех типов документов
+      const bucketName = 'documents';
       const filePath = documentType === 'test_data' ? `test-data/${fileName}` : `project-documents/${fileName}`;
 
       console.log('Загружаем файл в Storage:', { bucketName, fileName, filePath, fileSize: file.size });
@@ -210,8 +210,8 @@ export class ProjectDocumentService {
       // Извлекаем путь файла из URL
       const filePath = docData.file_url.split('/').pop();
       if (filePath) {
-        // Определяем bucket и путь в зависимости от типа документа
-        const bucketName = docData.document_type === 'test_data' ? 'test-documents' : 'documents';
+        // Используем единый bucket 'documents' для всех типов документов
+        const bucketName = 'documents';
         const fullPath = docData.document_type === 'test_data' ? `test-data/${filePath}` : `project-documents/${filePath}`;
         
         // Удаляем файл из Storage
