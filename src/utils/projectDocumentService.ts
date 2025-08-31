@@ -152,22 +152,50 @@ export class ProjectDocumentService {
       console.log('Получен публичный URL:', urlData.publicUrl);
 
       // Сохраняем информацию о документе в базе данных
-      const { data: docData, error: docError } = await this.supabase
-        .from('project_documents')
-        .upsert({
-          project_id: projectId,
-          qualification_object_id: qualificationObjectId || null,
-          document_type: documentType,
-          file_name: file.name,
-          file_size: file.size,
-          file_url: urlData.publicUrl,
-          mime_type: file.type,
-          uploaded_by: null // Временно устанавливаем null, так как uploaded_by ссылается на auth.users
-        }, {
-          onConflict: 'project_id,qualification_object_id,document_type'
-        })
-        .select()
-        .single();
+      // Для test_data разрешаем множественные файлы, для остальных типов - один файл
+      let docData, docError;
+      
+      if (documentType === 'test_data') {
+        // Для test_data просто добавляем новый документ
+        const { data, error } = await this.supabase
+          .from('project_documents')
+          .insert({
+            project_id: projectId,
+            qualification_object_id: qualificationObjectId || null,
+            document_type: documentType,
+            file_name: file.name,
+            file_size: file.size,
+            file_url: urlData.publicUrl,
+            mime_type: file.type,
+            uploaded_by: null
+          })
+          .select()
+          .single();
+        
+        docData = data;
+        docError = error;
+      } else {
+        // Для остальных типов используем upsert для замены существующего файла
+        const { data, error } = await this.supabase
+          .from('project_documents')
+          .upsert({
+            project_id: projectId,
+            qualification_object_id: qualificationObjectId || null,
+            document_type: documentType,
+            file_name: file.name,
+            file_size: file.size,
+            file_url: urlData.publicUrl,
+            mime_type: file.type,
+            uploaded_by: null
+          }, {
+            onConflict: 'project_id,qualification_object_id,document_type'
+          })
+          .select()
+          .single();
+        
+        docData = data;
+        docError = error;
+      }
 
       if (docError) {
         console.error('Ошибка сохранения информации о документе:', docError);

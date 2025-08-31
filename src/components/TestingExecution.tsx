@@ -316,12 +316,18 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
       const uploadedDoc = await projectDocumentService.uploadDocument(project.id, documentType, file, user?.id, qualificationObjectId);
       
       // Обновляем список документов
-      setDocuments(prev => {
-        const filtered = prev.filter(doc => 
-          !(doc.documentType === documentType && doc.qualificationObjectId === qualificationObjectId)
-        );
-        return [...filtered, uploadedDoc];
-      });
+      if (documentType === 'test_data') {
+        // Для test_data добавляем новый документ к существующим
+        setDocuments(prev => [...prev, uploadedDoc]);
+      } else {
+        // Для других типов заменяем существующий документ
+        setDocuments(prev => {
+          const filtered = prev.filter(doc => 
+            !(doc.documentType === documentType && doc.qualificationObjectId === qualificationObjectId)
+          );
+          return [...filtered, uploadedDoc];
+        });
+      }
       
       alert('Документ успешно загружен');
     } catch (error) {
