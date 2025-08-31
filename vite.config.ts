@@ -6,6 +6,7 @@ export default defineConfig({
   define: {
     global: 'globalThis',
     'process.env': {},
+    inWebWorker: 'typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope',
   },
   optimizeDeps: {
     include: [
