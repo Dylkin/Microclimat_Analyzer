@@ -768,7 +768,7 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                 )}
                 
                 {/* Кнопки управления зонами и сохранения размещения */}
-                <div className="mt-4 flex justify-center space-x-4">
+                <div className="mt-4 flex justify-center items-center space-x-4">
                   <button
                     onClick={() => addZone(editingObject.id)}
                     className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
