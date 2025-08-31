@@ -43,6 +43,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
   const [equipmentSearch, setEquipmentSearch] = useState<{ [key: string]: string }>({});
   const [showEquipmentDropdown, setShowEquipmentDropdown] = useState<{ [key: string]: boolean }>({});
   const [objectTestDocuments, setObjectTestDocuments] = useState<ProjectDocument[]>([]);
+  const [testDocumentUploading, setTestDocumentUploading] = useState<{ [key: string]: boolean }>({});
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -82,6 +83,10 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
       // Фильтруем данные испытаний (используем тип test_data для данных испытаний)
       const testData = docs.filter(doc => doc.documentType === 'test_data');
       setTestDataDocuments(testData);
+      
+      // Фильтруем документы испытаний
+      const testDocs = docs.filter(doc => doc.documentType === 'test_data');
+      setObjectTestDocuments(testDocs);
       
       // Загружаем выбранные объекты квалификации
       await loadSelectedQualificationObjects();
@@ -487,7 +492,98 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     if (obj.manufacturer) details.push(`🏭 ${obj.manufacturer}`);
     if (obj.climateSystem) details.push(`❄️ ${obj.climateSystem}`);
 
-    return details;
+    return objectTestDocuments.filter(doc => doc.qualificationObjectId === objectId) || [];
+  };
+
+  // Загрузка документа испытания
+  const handleTestDocumentUpload = async (objectId: string, file: File) => {
+    if (!file) return;
+
+    // Проверяем тип файла
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Поддерживаются только изображения (JPG, PNG, GIF, WebP) и PDF файлы');
+      return;
+    }
+
+    // Проверяем размер файла (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Размер файла не должен превышать 10MB');
+      return;
+    }
+
+    setTestDocumentUploading(prev => ({ ...prev, [objectId]: true }));
+
+    try {
+      const uploadedDoc = await projectDocumentService.uploadDocument(
+        project.id, 
+        'test_data',
+        file, 
+        user?.id,
+        objectId
+      );
+      
+      // Обновляем список документов испытаний
+      setObjectTestDocuments(prev => [...prev, uploadedDoc]);
+      alert('Документ испытания успешно загружен');
+    } catch (error) {
+      console.error('Ошибка загрузки документа испытания:', error);
+      alert(`Ошибка загрузки документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setTestDocumentUploading(prev => ({ ...prev, [objectId]: false }));
+    }
+  };
+
+  // Удаление документа испытания
+  const handleDeleteTestDocument = async (documentId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот документ?')) {
+      return;
+    }
+
+    try {
+      await projectDocumentService.deleteDocument(documentId);
+      setObjectTestDocuments(prev => prev.filter(doc => doc.id !== documentId));
+      alert('Документ испытания успешно удален');
+    } catch (error) {
+      console.error('Ошибка удаления документа испытания:', error);
+      alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  };
+
+  // Скачивание документа испытания
+  const handleDownloadTestDocument = async (document: ProjectDocument) => {
+    try {
+      const blob = await projectDocumentService.downloadDocument(document.fileUrl);
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = document.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Ошибка скачивания документа испытания:', error);
+      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  };
+
+  // Просмотр документа испытания
+  const handleViewTestDocument = (document: ProjectDocument) => {
+    window.open(document.fileUrl, '_blank');
+  };
+
+  // Получение иконки для типа файла
+  const getFileTypeIcon = (mimeType: string) => {
+    if (mimeType.startsWith('image/')) {
+      return <FileImage className="w-5 h-5 text-blue-600" />;
+    } else if (mimeType === 'application/pdf') {
+      return <FileText className="w-5 h-5 text-red-600" />;
+    } else {
+      return <FileText className="w-5 h-5 text-gray-600" />;
+    }
   };
 
   // Форматирование размера файла
