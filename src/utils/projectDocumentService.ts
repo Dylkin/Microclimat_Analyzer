@@ -107,25 +107,19 @@ export class ProjectDocumentService {
         throw new Error('Пользователь не аутентифицирован');
       }
 
-      // Проверяем существование пользователя в таблице users
-      const { data: userExists } = await this.supabase
+      // Создаем или обновляем запись пользователя с использованием upsert
+      await this.supabase
         .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .single();
-
-      if (!userExists) {
-        // Создаем запись пользователя если не существует
-        await this.supabase
-          .from('users')
-          .insert([{ 
-            id: user.id, 
-            email: user.email,
-            full_name: user.user_metadata?.full_name || user.email,
-            password: 'auth_user', // Пароль для пользователей из auth
-            role: 'specialist'
-          }]);
-      }
+        .upsert({ 
+          id: user.id, 
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.email,
+          password: 'auth_user', // Пароль для пользователей из auth
+          role: 'specialist'
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: true
+        });
 
       // Генерируем уникальное имя файла
       const fileExt = file.name.split('.').pop();
