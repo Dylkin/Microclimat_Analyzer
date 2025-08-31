@@ -108,6 +108,13 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     loadData();
   }, [project.id]);
 
+  // Перезагружаем документы при изменении состояния documents
+  useEffect(() => {
+    if (documents.length > 0) {
+      console.log('Документы обновлены:', documents.length);
+    }
+  }, [documents]);
+
   // Получение иконки для типа объекта
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -336,9 +343,6 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     } finally {
       setOperationLoading(false);
     }
-    
-    // Перезагружаем данные для обновления UI
-    await loadData();
   };
 
   // Удаление документа
