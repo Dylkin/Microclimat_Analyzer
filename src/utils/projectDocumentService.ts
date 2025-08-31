@@ -157,7 +157,8 @@ export class ProjectDocumentService {
       
       if (documentType === 'test_data') {
         // Для test_data добавляем новый документ с уникальным идентификатором
-        const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        // Генерируем валидный UUID v4
+        const uniqueId = crypto.randomUUID();
         const { data, error } = await this.supabase
           .from('project_documents')
           .insert({
