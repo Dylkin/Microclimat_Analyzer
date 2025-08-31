@@ -61,17 +61,25 @@ export class UploadedFileService {
   }
 
   // Сохранение файлов в связке с проектом
-  async saveProjectFiles(saveData: SaveFileData, userId: string | null): Promise<void> {
+  async saveProjectFiles(saveData: SaveFileData, userId: string): Promise<void> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
     }
 
-    if (!userId || !isValidUUID(userId)) {
-      throw new Error('Невалидный ID пользователя');
+    // Мягкая валидация с логированием
+    if (!userId) {
+      console.error('Отсутствует ID пользователя');
+      throw new Error('ID пользователя не предоставлен');
+    }
+    
+    if (!isValidUUID(userId)) {
+      console.error('Невалидный UUID пользователя:', userId);
+      throw new Error('Невалидный формат ID пользователя');
     }
 
     try {
       console.log('Сохраняем файлы проекта:', saveData);
+      console.log('ID пользователя:', userId);
 
       // Подготавливаем данные для вставки
       const filesToInsert = saveData.files.map(file => ({
@@ -118,19 +126,25 @@ export class UploadedFileService {
   }
 
   // Получение файлов проекта
-  async getProjectFiles(projectId: string, userId: string | null): Promise<UploadedFile[]> {
+  async getProjectFiles(projectId: string, userId: string): Promise<UploadedFile[]> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
     }
 
-    // Проверяем валидность userId
-    if (!userId || !isValidUUID(userId)) {
-      console.warn('Невалидный или отсутствующий userId, возвращаем пустой массив');
-      return [];
+    // Мягкая валидация с логированием
+    if (!userId) {
+      console.error('Отсутствует ID пользователя для загрузки файлов');
+      throw new Error('ID пользователя не предоставлен');
+    }
+    
+    if (!isValidUUID(userId)) {
+      console.error('Невалидный UUID пользователя для загрузки файлов:', userId);
+      throw new Error('Невалидный формат ID пользователя');
     }
 
     try {
       console.log('Загружаем файлы проекта:', projectId);
+      console.log('ID пользователя:', userId);
 
       // Получаем файлы пользователя, которые могут быть связаны с проектом
       // Пока используем простую логику - файлы пользователя за последние 30 дней

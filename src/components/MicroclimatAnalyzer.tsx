@@ -15,6 +15,32 @@ import { databaseService } from '../utils/database';
 import { uploadedFileService } from '../utils/uploadedFileService';
 import { VI2ParsingService } from '../utils/vi2Parser';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
+import { createClient } from '@supabase/supabase-js';
+
+// Инициализация Supabase клиента для получения пользователя
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+let supabase: any = null;
+if (supabaseUrl && supabaseAnonKey) {
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+}
+
+// Функция для получения ID пользователя из Supabase Auth
+async function getUserIdOrThrow(): Promise<string> {
+  if (!supabase) {
+    throw new Error('Supabase не настроен');
+  }
+  
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data?.user) {
+    throw new Error('Пользователь не авторизован');
+  }
+  
+  return data.user.id; // UUID
+}
 
 interface MicroclimatAnalyzerProps {
   showVisualization?: boolean;
@@ -242,8 +268,11 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       }
 
       try {
+        // Получаем userId из Supabase Auth
+        const userId = await getUserIdOrThrow();
+        
         console.log('Загружаем ранее сохраненные файлы проекта:', selectedProject.id);
-        const projectFiles = await uploadedFileService.getProjectFiles(selectedProject.id, user?.id || 'anonymous');
+        const projectFiles = await uploadedFileService.getProjectFiles(selectedProject.id, userId);
         
         if (projectFiles.length > 0) {
           console.log('Найдены ранее сохраненные файлы:', projectFiles.length);
@@ -258,7 +287,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     };
 
     loadProjectFiles();
-  }, [selectedProject, projectFilesLoaded, user?.id]);
+  }, [selectedProject, projectFilesLoaded]);
 
   // Загрузка объектов квалификации при выборе контрагента
   React.useEffect(() => {
@@ -512,13 +541,16 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     setSaveStatus(prev => ({ ...prev, isSaving: true, error: null }));
 
     try {
+      // Получаем userId из Supabase Auth
+      const userId = await getUserIdOrThrow();
+      
       // Сохраняем файлы в базе данных с привязкой к проекту
       await uploadedFileService.saveProjectFiles({
         projectId: selectedProject.id,
         qualificationObjectId: selectedQualificationObject,
         objectType: qualificationObject.type,
         files: uploadedFiles
-      }, user?.id || null);
+      }, userId);
       
       // Обновляем статус сохранения
       setSaveStatus({
@@ -538,10 +570,23 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
     } catch (error) {
       console.error('Ошибка сохранения данных проекта:', error);
+      
+      // Показываем пользователю понятное сообщение
+      let errorMessage = 'Неизвестная ошибка';
+      if (error instanceof Error) {
+        if (error.message.includes('не авторизован')) {
+          errorMessage = 'Необходимо войти в систему для сохранения данных';
+        } else if (error.message.includes('не настроен')) {
+          errorMessage = 'Система не настроена. Обратитесь к администратору';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       setSaveStatus({
         isSaving: false,
         lastSaved: null,
-        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+        error: errorMessage
       });
     }
   };
