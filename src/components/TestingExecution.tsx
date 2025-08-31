@@ -1375,5 +1375,3 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     </div>
   );
 };
-
-export { TestingExecution }
