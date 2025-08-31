@@ -190,38 +190,79 @@ export class ProjectDocumentService {
           uploadedAt: new Date(docData.uploaded_at)
         };
       } else {
-        // Для остальных типов используем upsert для замены существующего файла
-        // Определяем правильные колонки для onConflict в зависимости от типа документа
-        let onConflictColumns: string;
+        // Для остальных типов сначала пытаемся найти существующий документ
+        let existingDoc = null;
+        
         if (documentType === 'layout_scheme') {
-          onConflictColumns = 'project_id,qualification_object_id,document_type';
+          // Для layout_scheme ищем по project_id, qualification_object_id и document_type
+          const { data: existing } = await this.supabase
+            .from('project_documents')
+            .select('id')
+            .eq('project_id', projectId)
+            .eq('qualification_object_id', qualificationObjectId)
+            .eq('document_type', documentType)
+            .single();
+          existingDoc = existing;
         } else {
-          // Для commercial_offer и contract
-          onConflictColumns = 'project_id,document_type';
+          // Для commercial_offer и contract ищем по project_id и document_type (qualification_object_id должен быть null)
+          const { data: existing } = await this.supabase
+            .from('project_documents')
+            .select('id')
+            .eq('project_id', projectId)
+            .is('qualification_object_id', null)
+            .eq('document_type', documentType)
+            .single();
+          existingDoc = existing;
         }
 
-        const { data: docData, error: docError } = await this.supabase
-          .from('project_documents')
-          .upsert({
-            project_id: projectId,
-            qualification_object_id: qualificationObjectId || null,
-            document_type: documentType,
-            file_name: file.name,
-            file_size: file.size,
-            file_url: urlData.publicUrl,
-            mime_type: file.type,
-            uploaded_by: userId || null
-          }, {
-            onConflict: onConflictColumns
-          })
-          .select()
-          .single();
+        let docData;
+        
+        if (existingDoc) {
+          // Обновляем существующий документ
+          const { data: updateData, error: updateError } = await this.supabase
+            .from('project_documents')
+            .update({
+              file_name: file.name,
+              file_size: file.size,
+              file_url: urlData.publicUrl,
+              mime_type: file.type,
+              uploaded_by: userId || null,
+              uploaded_at: new Date().toISOString()
+            })
+            .eq('id', existingDoc.id)
+            .select()
+            .single();
 
-        if (docError) {
-          console.error('Ошибка сохранения информации о документе:', docError);
-          throw new Error(`Ошибка сохранения документа: ${docError.message}`);
+          if (updateError) {
+            console.error('Ошибка обновления документа:', updateError);
+            throw new Error(`Ошибка обновления документа: ${updateError.message}`);
+          }
+          
+          docData = updateData;
+        } else {
+          // Создаем новый документ
+          const { data: insertData, error: insertError } = await this.supabase
+            .from('project_documents')
+            .insert({
+              project_id: projectId,
+              qualification_object_id: qualificationObjectId || null,
+              document_type: documentType,
+              file_name: file.name,
+              file_size: file.size,
+              file_url: urlData.publicUrl,
+              mime_type: file.type,
+              uploaded_by: userId || null
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error('Ошибка создания документа:', insertError);
+            throw new Error(`Ошибка создания документа: ${insertError.message}`);
+          }
+          
+          docData = insertData;
         }
-
         console.log('Информация о документе сохранена в БД:', docData);
 
         return {
