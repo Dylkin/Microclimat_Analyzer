@@ -491,45 +491,8 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
     if (obj.serialNumber) details.push(`🔢 S/N: ${obj.serialNumber}`);
     if (obj.manufacturer) details.push(`🏭 ${obj.manufacturer}`);
     if (obj.climateSystem) details.push(`❄️ ${obj.climateSystem}`);
-  // Удаление документа испытания
-  const handleDeleteTestDocument = async (documentId: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот документ?')) {
-      return;
-    }
 
-    try {
-      await projectDocumentService.deleteDocument(documentId);
-      setObjectTestDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      alert('Документ испытания успешно удален');
-    } catch (error) {
-      console.error('Ошибка удаления документа испытания:', error);
-      alert(`Ошибка удаления документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
-  };
-
-  // Скачивание документа испытания
-  const handleDownloadTestDocument = async (document: ProjectDocument) => {
-    try {
-      const blob = await projectDocumentService.downloadDocument(document.fileUrl);
-      const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = document.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Ошибка скачивания документа испытания:', error);
-      alert(`Ошибка скачивания документа: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
-  };
-
-  // Просмотр документа испытания
-  const handleViewTestDocument = (document: ProjectDocument) => {
-    window.open(document.fileUrl, '_blank');
+    return details;
   };
 
   // Получение иконки для типа файла
