@@ -4,7 +4,6 @@ import { Project } from '../types/Project';
 import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
 import { QualificationObject } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
-import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { equipmentService } from '../utils/equipmentService';
 import { equipmentAssignmentService } from '../utils/equipmentAssignmentService';
