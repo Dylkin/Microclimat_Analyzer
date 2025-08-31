@@ -308,13 +308,6 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                 >
                   <Eye className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={() => handleDownloadProtocol(contractDoc)}
-                  className="text-green-600 hover:text-green-800 transition-colors"
-                  title="Скачать договор"
-                >
-                  <Download className="w-5 h-5" />
-                </button>
               </div>
             </div>
           </div>
