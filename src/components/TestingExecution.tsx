@@ -328,9 +328,31 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
 
   // Просмотр файла информации об испытаниях
   const handleViewTestInfoFile = (objectId: string, fileIndex: number) => {
-    const fileUrls = testInfoFileUrls[objectId];
-    if (fileUrls && fileUrls[fileIndex]) {
-      window.open(fileUrls[fileIndex], '_blank');
+    const files = testInfoFiles[objectId];
+    if (files && files[fileIndex]) {
+      const file = files[fileIndex];
+      
+      // Создаем новый blob URL для просмотра
+      const blobUrl = URL.createObjectURL(file);
+      
+      // Открываем в новой вкладке
+      const newWindow = window.open(blobUrl, '_blank');
+      
+      // Освобождаем URL через некоторое время
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 10000); // 10 секунд должно хватить для загрузки
+      
+      // Если окно не открылось, пытаемся скачать файл
+      if (!newWindow) {
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+      }
     }
   };
 
