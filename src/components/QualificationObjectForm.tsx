@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building, Car, Refrigerator, Snowflake, Upload, X, FileText, Image } from 'lucide-react';
+import { Building, Car, Refrigerator, Snowflake, Upload, X, FileText, Image as ImageIcon } from 'lucide-react';
 import { 
   QualificationObject, 
   QualificationObjectType, 
@@ -431,7 +431,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               {file.type.startsWith('image/') ? (
-                <Image className="w-5 h-5 text-blue-600" />
+                <ImageIcon className="w-5 h-5 text-blue-600" />
               ) : (
                 <FileText className="w-5 h-5 text-red-600" />
               )}
