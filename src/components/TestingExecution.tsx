@@ -783,6 +783,100 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
                 </div>
               </div>
               
+              {/* Блок загрузки документов о проведенных испытаниях */}
+              <div className="border-t border-gray-200 pt-6">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Документы о проведенных испытаниях</h4>
+                
+                {/* Загрузка нового документа */}
+                <div className="mb-6">
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleTestDocumentUpload(editingObject.id, file);
+                        }
+                      }}
+                      className="hidden"
+                      id={`test-document-upload-${editingObject.id}`}
+                    />
+                    <label
+                      htmlFor={`test-document-upload-${editingObject.id}`}
+                      className="cursor-pointer flex flex-col items-center space-y-2"
+                    >
+                      <Upload className="w-8 h-8 text-gray-400" />
+                      <span className="text-sm text-gray-600">
+                        Загрузить документ испытания
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Поддерживаются изображения (JPG, PNG) и PDF файлы
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Список загруженных документов */}
+                <div>
+                  {getObjectTestDocuments(editingObject.id).length > 0 ? (
+                    <div className="space-y-3">
+                      {getObjectTestDocuments(editingObject.id).map((document) => (
+                        <div key={document.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              {document.mimeType.startsWith('image/') ? (
+                                <FileImage className="w-6 h-6 text-blue-600" />
+                              ) : (
+                                <FileText className="w-6 h-6 text-red-600" />
+                              )}
+                              <div>
+                                <h5 className="font-medium text-gray-900">
+                                  {document.fileName}
+                                </h5>
+                                <p className="text-sm text-gray-500">
+                                  {formatFileSize(document.fileSize)} • 
+                                  Загружен {document.uploadedAt.toLocaleDateString('ru-RU')}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleViewTestDocument(document)}
+                                className="text-blue-600 hover:text-blue-800 transition-colors"
+                                title="Просмотреть документ"
+                              >
+                                <Eye className="w-5 h-5" />
+                              </button>
+                              <button
+                                onClick={() => handleDownloadTestDocument(document)}
+                                className="text-green-600 hover:text-green-800 transition-colors"
+                                title="Скачать документ"
+                              >
+                                <Download className="w-5 h-5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTestDocument(document.id)}
+                                className="text-red-600 hover:text-red-800 transition-colors"
+                                title="Удалить документ"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
+                      <FileText className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">Документы испытаний не загружены</p>
+                      <p className="text-xs mt-1">Загрузите изображения или PDF файлы с результатами испытаний</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
               {/* Кнопки управления формой в конце блока */}
               <div className="border-t border-gray-200 pt-6">
                 <div className="flex justify-end space-x-3">
