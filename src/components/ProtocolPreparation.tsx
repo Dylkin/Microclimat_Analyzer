@@ -451,18 +451,28 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
   // Загрузка размещения оборудования при редактировании объекта
   const loadEquipmentPlacement = async (objectId: string) => {
     if (!equipmentAssignmentService.isAvailable()) {
+      // Инициализируем пустое размещение если Supabase недоступен
+      setEquipmentPlacements(prev => ({
+        ...prev,
+        [objectId]: {
+          zones: [{ zoneNumber: 1, levels: [] }]
+        }
+      }));
       return;
     }
 
     try {
+      console.log('Загружаем размещение оборудования для объекта:', objectId);
       const placement = await equipmentAssignmentService.getEquipmentPlacement(project.id, objectId);
       
       if (placement.zones.length > 0) {
+        console.log('Загружено зон из БД:', placement.zones.length);
         setEquipmentPlacements(prev => ({
           ...prev,
           [objectId]: placement
         }));
       } else {
+        console.log('Нет сохраненных зон, инициализируем пустое размещение');
         // Инициализируем пустое размещение если нет сохраненных данных
         setEquipmentPlacements(prev => ({
           ...prev,
@@ -473,6 +483,7 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       }
     } catch (error) {
       console.error('Ошибка загрузки размещения оборудования:', error);
+      console.log('Инициализируем пустое размещение из-за ошибки');
       // Инициализируем пустое размещение при ошибке
       setEquipmentPlacements(prev => ({
         ...prev,
@@ -598,14 +609,14 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
               <div className="border-t border-gray-200 pt-6">
                 <h4 className="text-lg font-semibold text-gray-900 mb-4">Размещение измерительного оборудования</h4>
                 
-                {equipmentPlacements[editingObject.id]?.zones.length === 0 ? (
+                {!equipmentPlacements[editingObject.id] || equipmentPlacements[editingObject.id]?.zones.length === 0 ? (
                   <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg">
                     <p className="text-sm">Зоны измерения не добавлены</p>
                     <p className="text-xs mt-1">Нажмите "Добавить зону" для создания первой зоны</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {equipmentPlacements[editingObject.id]?.zones.map((zone, zoneIndex) => (
+                    {equipmentPlacements[editingObject.id]?.zones?.map((zone, zoneIndex) => (
                       <div key={zoneIndex} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-4">
                           <h5 className="font-medium text-gray-900">
@@ -765,7 +776,8 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
                     <Plus className="w-4 h-4" />
                     <span>Добавить зону</span>
                   </button>
-                  <button
+                      // Загружаем размещение оборудования при открытии формы редактирования
+                      setTimeout(() => loadEquipmentPlacement(object.id), 100);
                     onClick={() => handleSaveEquipmentPlacement(editingObject.id)}
                     disabled={operationLoading}
                     className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
