@@ -42,6 +42,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
   }>({});
   const [equipmentSearch, setEquipmentSearch] = useState<{ [key: string]: string }>({});
   const [showEquipmentDropdown, setShowEquipmentDropdown] = useState<{ [key: string]: boolean }>({});
+  const [objectTestDocuments, setObjectTestDocuments] = useState<ProjectDocument[]>([]);
 
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
