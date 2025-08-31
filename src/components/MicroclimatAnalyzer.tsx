@@ -696,88 +696,11 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         </div>
       )}
 
-      {/* Секция загрузки файлов */}
+      {/* Селекторы контрагента и объекта квалификации */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Загрузка файлов</h2>
-          <div className="flex space-x-3">
-            {selectedProject && (
-              <button
-                onClick={handleSaveProject}
-                disabled={saveStatus.isSaving || uploadedFiles.length === 0}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {saveStatus.isSaving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Сохранение...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Сохранить</span>
-                  </>
-                )}
-              </button>
-            )}
-            <button
-              onClick={handleExploreData}
-              disabled={uploadedFiles.filter(f => f.parsingStatus === 'completed').length === 0}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              <BarChart className="w-4 h-4" />
-              <span>Исследовать данные</span>
-            </button>
-            <button
-              onClick={triggerFileUpload}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-            >
-              <Upload className="w-4 h-4" />
-              <span>Загрузить файлы в формате Vi2</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Save Status */}
-        {selectedProject && (
-          <div className="mb-4">
-            {!projectFilesLoaded && uploadedFiles.length === 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  <span className="text-sm text-blue-800">
-                    Загрузка ранее сохраненных файлов проекта...
-                  </span>
-                </div>
-              </div>
-            )}
-            
-            {saveStatus.lastSaved && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-green-800">
-                    Последнее сохранение: {saveStatus.lastSaved.toLocaleString('ru-RU')}
-                  </span>
-                </div>
-              </div>
-            )}
-            
-            {saveStatus.error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <div className="flex items-center space-x-2">
-                  <XCircle className="w-4 h-4 text-red-600" />
-                  <span className="text-sm text-red-800">
-                    Ошибка сохранения: {saveStatus.error}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Селекторы контрагента и объекта квалификации */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Выбор объекта квалификации</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Селектор контрагента */}
           <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -904,6 +827,89 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Секция загрузки файлов - отображается только после выбора объекта квалификации */}
+      {selectedQualificationObject && (
+        <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Загрузка файлов</h2>
+          <div className="flex space-x-3">
+            {selectedProject && (
+              <button
+                onClick={handleSaveProject}
+                disabled={saveStatus.isSaving || uploadedFiles.length === 0}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {saveStatus.isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Сохранение...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Сохранить</span>
+                  </>
+                )}
+              </button>
+            )}
+            <button
+              onClick={handleExploreData}
+              disabled={uploadedFiles.filter(f => f.parsingStatus === 'completed').length === 0}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              <BarChart className="w-4 h-4" />
+              <span>Исследовать данные</span>
+            </button>
+            <button
+              onClick={triggerFileUpload}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Загрузить файлы в формате Vi2</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Save Status */}
+        {selectedProject && (
+          <div className="mb-4">
+            {!projectFilesLoaded && uploadedFiles.length === 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-sm text-blue-800">
+                    Загрузка ранее сохраненных файлов проекта...
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {saveStatus.lastSaved && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-green-800">
+                    Последнее сохранение: {saveStatus.lastSaved.toLocaleString('ru-RU')}
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {saveStatus.error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <XCircle className="w-4 h-4 text-red-600" />
+                  <span className="text-sm text-red-800">
+                    Ошибка сохранения: {saveStatus.error}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         
         <input
           ref={fileInputRef}
@@ -914,7 +920,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           className="hidden"
         />
 
-        {uploadedFiles.length > 0 ? (
+        {uploadedFiles.filter(f => f.actualFileName).length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -949,7 +955,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedFiles.map((file, index) => (
+                {sortedFiles.filter(f => f.actualFileName).map((file, index) => (
                   <tr key={file.id} className="hover:bg-gray-50">
                     <td className="px-3 py-4 whitespace-nowrap">
                       <div className="flex flex-col space-y-1">
@@ -962,7 +968,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                         </button>
                         <button
                           onClick={() => moveFile(file.id, 'down')}
-                          disabled={index === sortedFiles.length - 1}
+                          disabled={index === sortedFiles.filter(f => f.actualFileName).length - 1}
                           className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           <ChevronDown className="w-4 h-4" />
@@ -1115,23 +1121,28 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         ) : (
           <div className="text-center py-8 text-gray-500">
             <Upload className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            {selectedProject ? (
-              <>
-                <p>Файлы проекта не найдены</p>
-                <p className="text-sm">Нажмите кнопку "Загрузить файлы" для добавления файлов в формате .vi2 к проекту</p>
-              </>
-            ) : (
-              <>
-                <p>Файлы не загружены</p>
-                <p className="text-sm">Нажмите кнопку "Загрузить файлы" для добавления файлов в формате .vi2</p>
-              </>
-            )}
+            <p>Файлы не загружены для выбранного объекта квалификации</p>
+            <p className="text-sm">Используйте кнопки "Загрузить" в таблице для добавления файлов .vi2 к каждому оборудованию</p>
           </div>
         )}
-      </div>
+        </div>
+      )}
+
+      {/* Сообщение о необходимости выбора объекта квалификации */}
+      {!selectedQualificationObject && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <div className="text-center">
+            <FolderOpen className="w-12 h-12 mx-auto mb-4 text-yellow-400" />
+            <h3 className="text-lg font-medium text-yellow-800 mb-2">Выберите объект квалификации</h3>
+            <p className="text-yellow-700">
+              Для загрузки и анализа файлов необходимо сначала выбрать объект квалификации
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Примечание о внешнем датчике */}
-      {uploadedFiles.length > 0 && (
+      {selectedQualificationObject && uploadedFiles.filter(f => f.actualFileName).length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-600 text-sm font-medium">
             <strong>Примечание:</strong> Для внешнего датчика указать № зоны измерения 999.
