@@ -183,11 +183,11 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       if (equipmentService.isAvailable()) {
         try {
           const equipmentResult = await equipmentService.getAllEquipment(1, 1000); // Загружаем все оборудование
-          savedFiles = await uploadedFileService.getProjectFiles(
-            selectedProject.id, 
-            userId, 
-            selectedQualificationObject
-          );
+          setEquipment(equipmentResult.data);
+        } catch (error) {
+          console.error('Ошибка загрузки оборудования:', error);
+        }
+      }
     };
 
     loadInitialData();
