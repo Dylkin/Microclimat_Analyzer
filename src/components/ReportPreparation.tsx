@@ -855,7 +855,7 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                   className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
                 >
                   <BarChart3 className="w-4 h-4" />
-                  <span>Исследовать данные</span>
+                  <span>Работа над отчетом</span>
                 </button>
               )}
             </div>
