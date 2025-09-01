@@ -90,7 +90,7 @@ export class EquipmentService {
         throw new Error(`Ошибка получения оборудования: ${error.message}`);
       }
 
-      const equipment = data.map((item: DatabaseEquipment) => ({
+      const equipment = (data || []).map((item: DatabaseEquipment) => ({
         id: item.id,
         type: item.type,
         name: item.name,
