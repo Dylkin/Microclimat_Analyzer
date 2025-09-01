@@ -7,11 +7,16 @@ import { QualificationObjectForm } from '../QualificationObjectForm';
 interface QualificationObjectsCRUDProps {
   contractorId: string;
   contractorName: string;
+  projectQualificationObjects?: Array<{
+    qualificationObjectId: string;
+    qualificationObjectName?: string;
+  }>;
 }
 
 export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> = ({ 
   contractorId, 
-  contractorName 
+  contractorName,
+  projectQualificationObjects = []
 }) => {
   const [objects, setObjects] = useState<QualificationObject[]>([]);
   const [loading, setLoading] = useState(false);
@@ -25,8 +30,19 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
     setError(null);
 
     try {
-      const data = await qualificationObjectService.getQualificationObjectsByContractor(contractorId);
-      setObjects(data);
+      if (projectQualificationObjects.length > 0) {
+        // Если есть объекты проекта, загружаем только их
+        const allObjects = await qualificationObjectService.getQualificationObjectsByContractor(contractorId);
+        const projectObjectIds = projectQualificationObjects.map(obj => obj.qualificationObjectId);
+        const filteredObjects = allObjects.filter(obj => projectObjectIds.includes(obj.id));
+        setObjects(filteredObjects);
+        console.log('Загружены объекты квалификации проекта:', filteredObjects.length);
+      } else {
+        // Если объекты проекта не указаны, загружаем все объекты контрагента
+        const data = await qualificationObjectService.getQualificationObjectsByContractor(contractorId);
+        setObjects(data);
+        console.log('Загружены все объекты квалификации контрагента:', data.length);
+      }
     } catch (error) {
       console.error('Ошибка загрузки объектов:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
@@ -37,7 +53,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
 
   useEffect(() => {
     loadObjects();
-  }, [contractorId]);
+  }, [contractorId, projectQualificationObjects]);
 
   // Создание нового объекта
   const handleCreate = async (object: QualificationObject) => {
