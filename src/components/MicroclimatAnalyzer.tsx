@@ -292,6 +292,12 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
             };
           }
         });
+    // Проверяем наличие qualificationObjects перед использованием find
+    if (!selectedProject.qualificationObjects || !Array.isArray(selectedProject.qualificationObjects)) {
+      console.warn('qualificationObjects отсутствует или не является массивом');
+      return;
+    }
+
         
         // Добавляем файлы, которые не связаны с назначениями оборудования (если есть)
         const filesWithoutAssignment = savedFiles.filter(file => 
