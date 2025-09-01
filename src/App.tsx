@@ -90,9 +90,10 @@ const AppContent: React.FC = () => {
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;
       case 'report_work':
-        return hasAccess('analyzer') && selectedProject ? (
+        return hasAccess('analyzer') ? (
           <ReportWork 
-            project={selectedProject}
+            project={selectedProject?.project || selectedProject}
+            files={selectedProject?.files}
             onBack={() => handlePageChange('report_preparation', selectedProject)}
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;

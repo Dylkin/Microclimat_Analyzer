@@ -20,11 +20,12 @@ import html2canvas from 'html2canvas';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
 
 interface ReportWorkProps {
-  project: Project;
+  project?: Project;
   onBack: () => void;
+  files?: UploadedFile[];
 }
 
-export const ReportWork: React.FC<ReportWorkProps> = ({ project, onBack }) => {
+export const ReportWork: React.FC<ReportWorkProps> = ({ project, onBack, files: propFiles }) => {
   const { user } = useAuth();
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -88,7 +89,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, onBack }) => {
   const chartRef = useRef<HTMLDivElement>(null);
 
   // Безопасная проверка данных проекта
-  if (!project || !project.id) {
+  if (!project?.id && !propFiles) {
     return (
       <div className="space-y-6">
         <div className="flex items-center space-x-3">
@@ -102,7 +103,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, onBack }) => {
           <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки проекта</h1>
         </div>
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <p className="text-red-600">Данные проекта не найдены или повреждены</p>
+          <p className="text-red-600">Данные проекта или файлы не найдены</p>
         </div>
       </div>
     );
@@ -110,6 +111,19 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, onBack }) => {
 
   // Загрузка данных
   const loadData = async () => {
+    // Если переданы файлы напрямую, используем их
+    if (propFiles && propFiles.length > 0) {
+      setUploadedFiles(propFiles);
+      setLoading(false);
+      return;
+    }
+
+    if (!project?.id) {
+      setError('Проект не указан');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -163,7 +177,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, onBack }) => {
 
   useEffect(() => {
     loadData();
-  }, [project.id]);
+  }, [project?.id, propFiles]);
 
   // Загрузка файлов для выбранного объекта квалификации
   const loadFilesForObject = async (qualificationObjectId: string) => {
@@ -706,11 +720,11 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, onBack }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Название проекта</label>
-            <p className="text-gray-900">{project.name || 'Не указано'}</p>
+            <p className="text-gray-900">{project?.name || 'Не указано'}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Контрагент</label>
-            <p className="text-gray-900">{project.contractorName || 'Не указан'}</p>
+            <p className="text-gray-900">{project?.contractorName || 'Не указан'}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Статус</label>
@@ -720,7 +734,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, onBack }) => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Объектов квалификации</label>
-            <p className="text-gray-900">{qualificationObjects.length}</p>
+            <p className="text-gray-900">{project?.qualificationObjects?.length || qualificationObjects.length}</p>
           </div>
         </div>
       </div>
