@@ -247,7 +247,7 @@ export class ProjectDocumentService {
             .from('project_documents')
             .select('id')
             .eq('project_id', projectId)
-            .eq('qualification_object_id', qualificationObjectId)
+            .eq('qualification_object_id', qualificationObjectId || null)
             .eq('document_type', documentType)
             .maybeSingle();
           existingDoc = existing;
