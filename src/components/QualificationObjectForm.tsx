@@ -537,6 +537,22 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="Введите тип климатической системы"
           />
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Сохранение...' : (initialData ? 'Обновить' : 'Создать')}
+            </button>
+          </div>
         </div>
       </div>
 
