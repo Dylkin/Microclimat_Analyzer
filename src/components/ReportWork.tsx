@@ -102,13 +102,14 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
 
     setLoading(true);
     setError(null);
+    let projectObjects: QualificationObject[] = [];
 
     try {
       // Загружаем объекты квалификации проекта
       if (qualificationObjectService.isAvailable()) {
         const allObjects = await qualificationObjectService.getQualificationObjectsByContractor(project.contractorId);
         const projectObjectIds = project.qualificationObjects.map(obj => obj.qualificationObjectId);
-        const projectObjects = allObjects.filter(obj => projectObjectIds.includes(obj.id));
+        projectObjects = allObjects.filter(obj => projectObjectIds.includes(obj.id));
         setQualificationObjects(projectObjects);
         
         // Автоматически выбираем первый объект
