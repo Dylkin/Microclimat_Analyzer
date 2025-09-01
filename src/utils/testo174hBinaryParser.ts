@@ -251,7 +251,7 @@ export class Testo174HBinaryParser {
       
     } catch (error) {
       console.error('Ошибка определения интервала:', error);
-      return 900; // По умолчанию 15 минут
+      return this.detectIntervalFromData();
     }
   }
 
