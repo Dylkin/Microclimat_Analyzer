@@ -763,14 +763,9 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {assignmentFile ? (
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-2">
-                                      <CheckCircle className="w-4 h-4 text-green-600" />
-                                      <div>
-                                        <div className="text-xs text-gray-500">
-                                          {assignmentFile.recordCount} записей • {assignmentFile.period}
-                                        </div>
-                                      </div>
+                                  <div className="flex items-center space-x-2">
+                                    <div className="text-xs text-gray-500">
+                                      {assignmentFile.recordCount} записей • {assignmentFile.period}
                                     </div>
                                     <button
                                       onClick={() => handleDeleteFile(assignmentFile.id)}
