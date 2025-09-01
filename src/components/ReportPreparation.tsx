@@ -13,6 +13,33 @@ import { uploadedFileService } from '../utils/uploadedFileService';
 import { databaseService } from '../utils/database';
 import { VI2ParsingService } from '../utils/vi2Parser';
 import { useAuth } from '../contexts/AuthContext';
+import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
+
+interface AnalyzerModalProps {
+  files: UploadedFile[];
+  onClose: () => void;
+}
+
+const AnalyzerModal: React.FC<AnalyzerModalProps> = ({ files, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl h-full max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">Анализатор временных рядов</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-6">
+          <TimeSeriesAnalyzer files={files} />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface ReportPreparationProps {
   project: Project;
@@ -36,6 +63,8 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   const [fileUploading, setFileUploading] = useState<{ [key: string]: boolean }>({});
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [operationLoading, setOperationLoading] = useState(false);
+  const [showAnalyzer, setShowAnalyzer] = useState(false);
+  
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
     return (
@@ -137,13 +166,14 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   };
 
   // Загрузка VI2 файла
-  const handleFileUpload = async (assignment: any, file: File) => {
+  const handleFileUpload = async (zoneNumber: number, measurementLevel: number, file: File) => {
     if (!file.name.toLowerCase().endsWith('.vi2')) {
       alert('Поддерживаются только файлы в формате .vi2');
       return;
     }
 
-    setFileUploading(prev => ({ ...prev, [assignment.id]: true }));
+    const assignmentKey = `${zoneNumber}-${measurementLevel}`;
+    setFileUploading(prev => ({ ...prev, [assignmentKey]: true }));
 
     try {
       // Парсим файл
@@ -162,8 +192,8 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
         period: `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`,
         order: uploadedFiles.length,
         qualificationObjectId: selectedQualificationObject,
-        zoneNumber: assignment.zoneNumber,
-        measurementLevel: assignment.measurementLevel.toString()
+        zoneNumber: zoneNumber,
+        measurementLevel: measurementLevel.toString()
       };
 
       // Сохраняем данные в локальную базу
@@ -178,7 +208,7 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
       console.error('Ошибка загрузки файла:', error);
       alert(`Ошибка загрузки файла: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
-      setFileUploading(prev => ({ ...prev, [assignment.id]: false }));
+      setFileUploading(prev => ({ ...prev, [assignmentKey]: false }));
     }
   };
 
@@ -266,13 +296,12 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
 
   // Получение файла для назначения
   const getFileForAssignment = (assignmentId: string) => {
-    // Ищем файл по соответствию зоны и уровня
     const assignment = getEquipmentAssignments().find(a => a.id === assignmentId);
     if (!assignment) return undefined;
     
     return uploadedFiles.find(file => 
-      file.zoneNumber === assignment.zoneNumber && 
-      file.measurementLevel === assignment.measurementLevel.toString()
+      file.zoneNumber === assignment.zoneNumber &&
+      parseFloat(file.measurementLevel || '0') === assignment.measurementLevel
     );
   };
 
@@ -725,7 +754,8 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                       <tbody className="bg-white divide-y divide-gray-200">
                         {getEquipmentAssignments().map((assignment) => {
                           const assignmentFile = getFileForAssignment(assignment.id);
-                          const isUploading = fileUploading[assignment.id];
+                          const assignmentKey = `${assignment.zoneNumber}-${assignment.measurementLevel}`;
+                          const isUploading = fileUploading[assignmentKey];
                           
                           return (
                             <tr key={assignment.id} className="hover:bg-gray-50">
@@ -744,7 +774,9 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {assignmentFile ? (
                                   <div>
-                                    <div className="font-medium text-gray-900">{assignmentFile.name}</div>
+                                    <div className="font-medium text-gray-900">
+                                      {assignmentFile.name}
+                                    </div>
                                   </div>
                                 ) : (
                                   <span className="text-gray-400">Не загружен</span>
@@ -753,6 +785,9 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {assignmentFile ? (
                                   <div>
+                                    <div className="font-medium text-gray-900 mb-1">
+                                      {assignmentFile.name}
+                                    </div>
                                     <div className="text-xs text-gray-500">
                                       {assignmentFile.uploadDate}
                                     </div>
@@ -774,17 +809,19 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {assignmentFile ? (
-                                  <div className="flex items-center justify-between">
+                                  <div className="space-y-2">
                                     <div className="text-xs text-gray-500">
                                       {assignmentFile.recordCount} записей • {assignmentFile.period}
                                     </div>
-                                    <button
-                                      onClick={() => handleDeleteFile(assignmentFile.id)}
-                                      className="text-red-600 hover:text-red-800 transition-colors"
-                                      title="Удалить файл"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex items-center space-x-2">
+                                      <button
+                                        onClick={() => handleDeleteFile(assignmentFile.id)}
+                                        className="text-red-600 hover:text-red-800 transition-colors"
+                                        title="Удалить файл"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </div>
                                 ) : (
                                   <div className="flex items-center space-x-2">
@@ -801,14 +838,14 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                                           onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) {
-                                              handleFileUpload(assignment, file);
+                                              handleFileUpload(assignment.zoneNumber, assignment.measurementLevel, file);
                                             }
                                           }}
                                           className="hidden"
-                                          id={`file-upload-${assignment.id}`}
+                                          id={`file-upload-${assignmentKey}`}
                                         />
                                         <label
-                                          htmlFor={`file-upload-${assignment.id}`}
+                                          htmlFor={`file-upload-${assignmentKey}`}
                                           className="inline-flex items-center px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors cursor-pointer"
                                         >
                                           <Upload className="w-3 h-3 mr-1" />
@@ -838,48 +875,76 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
         )}
 
         {/* Files Summary */}
-        {selectedQualificationObject && uploadedFiles.length > 0 && (
+        {selectedQualificationObject && (
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">Сводка по загруженным файлам:</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div className="flex items-center space-x-2">
-                <FileText className="w-4 h-4 text-blue-600" />
-                <span className="text-blue-800">Всего файлов: {uploadedFiles.length}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span className="text-blue-800">
-                  Обработано: {uploadedFiles.filter(f => f.parsingStatus === 'completed').length}
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="w-4 h-4 text-red-600" />
-                <span className="text-blue-800">
-                  Ошибок: {uploadedFiles.filter(f => f.parsingStatus === 'error').length}
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <BarChart3 className="w-4 h-4 text-purple-600" />
-                <span className="text-blue-800">
-                  Записей: {uploadedFiles.reduce((sum, f) => sum + (f.recordCount || 0), 0)}
-                </span>
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-sm font-medium text-blue-900">Сводка по загруженным файлам:</h4>
+              {uploadedFiles.length > 0 && (
+                <button
+                  onClick={() => setShowAnalyzer(true)}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Исследовать данные</span>
+                </button>
+              )}
             </div>
             
-            {/* Кнопка сохранения */}
-            <div className="mt-4 flex justify-center">
-              <button
-                onClick={handleSaveFilesToDatabase}
-                disabled={operationLoading || uploadedFiles.length === 0}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                <Save className="w-4 h-4" />
-                <span>{operationLoading ? 'Сохранение...' : 'Сохранить в базу данных'}</span>
-              </button>
-            </div>
+            {uploadedFiles.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="flex items-center space-x-2">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  <span className="text-blue-800">Всего файлов: {uploadedFiles.length}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-blue-800">
+                    Обработано: {uploadedFiles.filter(f => f.parsingStatus === 'completed').length}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                  <span className="text-blue-800">
+                    Ошибок: {uploadedFiles.filter(f => f.parsingStatus === 'error').length}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <BarChart3 className="w-4 h-4 text-purple-600" />
+                  <span className="text-blue-800">
+                    Записей: {uploadedFiles.reduce((sum, f) => sum + (f.recordCount || 0), 0)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-blue-700">
+                <p className="text-sm">Файлы не загружены</p>
+                <p className="text-xs mt-1">Загрузите файлы .vi2 для анализа данных</p>
+              </div>
+            )}
+            
+            {uploadedFiles.length > 0 && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  onClick={handleSaveFilesToDatabase}
+                  disabled={operationLoading}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{operationLoading ? 'Сохранение...' : 'Сохранить в базу данных'}</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Analyzer Modal */}
+      {showAnalyzer && (
+        <AnalyzerModal
+          files={uploadedFiles}
+          onClose={() => setShowAnalyzer(false)}
+        />
+      )}
     </div>
   );
 };
