@@ -13,6 +13,7 @@ import { ContractNegotiation } from './components/ContractNegotiation';
 import { ProtocolPreparation } from './components/ProtocolPreparation';
 import { ReportPreparation } from './components/ReportPreparation';
 import { TestingExecution } from './components/TestingExecution';
+import { ReportWork } from './components/ReportWork';
 import './index.css';
 
 const AppContent: React.FC = () => {
