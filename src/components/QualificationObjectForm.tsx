@@ -12,7 +12,7 @@ interface QualificationObjectFormProps {
   contractorId: string;
   contractorAddress?: string;
   initialData?: QualificationObject;
-  onSubmit: (object: QualificationObject) => void;
+  onSubmit: (object: CreateQualificationObjectData) => Promise<void>;
   onCancel: () => void;
   hideTypeSelection?: boolean;
 }
@@ -122,8 +122,12 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         }
       }
 
+      console.log('Отправляем данные формы:', formData);
+      
       // Вызываем onSubmit с данными формы
-      onSubmit(formData as any);
+      await onSubmit(formData as any);
+      
+      console.log('Объект квалификации успешно сохранен через форму');
     } catch (error) {
       console.error('Ошибка сохранения объекта:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');

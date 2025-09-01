@@ -296,7 +296,28 @@ export const ContractorDirectory: React.FC = () => {
         console.log('Объект квалификации успешно обновлен:', updatedObject);
       } else {
         // Добавляем новый объект
-        const addedObject = await qualificationObjectService.addQualificationObject(objectData);
+        console.log('Создаем новый объект квалификации с данными:', objectData);
+        
+        // Подготавливаем данные для создания объекта
+        const newObjectData = {
+          contractorId: editingContractorData!.id,
+          type: objectData.type,
+          name: objectData.name || '',
+          manufacturer: objectData.manufacturer || '',
+          climateSystem: objectData.climateSystem || '',
+          address: objectData.address || '',
+          area: objectData.area,
+          vin: objectData.vin || '',
+          registrationNumber: objectData.registrationNumber || '',
+          bodyVolume: objectData.bodyVolume,
+          inventoryNumber: objectData.inventoryNumber || '',
+          chamberVolume: objectData.chamberVolume,
+          serialNumber: objectData.serialNumber || ''
+        };
+        
+        console.log('Подготовленные данные для создания:', newObjectData);
+        
+        const addedObject = await qualificationObjectService.createQualificationObject(newObjectData);
         setQualificationObjects(prev => [...prev, addedObject]);
         setFilteredQualificationObjects(prev => [...prev, addedObject]);
         console.log('Объект квалификации успешно добавлен:', addedObject);
