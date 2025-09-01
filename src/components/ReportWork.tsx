@@ -1433,5 +1433,3 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, onBack, files: 
     </div>
   );
 };
-
-export { ReportWork }
