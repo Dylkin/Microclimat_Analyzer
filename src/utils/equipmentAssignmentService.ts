@@ -245,7 +245,7 @@ export class EquipmentAssignmentService {
         throw new Error(`Ошибка загрузки назначений: ${error.message}`);
       }
 
-      return data.map((assignment: any) => ({
+      return (data || []).map((assignment: any) => ({
         id: assignment.id,
         projectId: assignment.project_id,
         qualificationObjectId: assignment.qualification_object_id,
