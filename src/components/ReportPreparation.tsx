@@ -137,13 +137,13 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   };
 
   // Загрузка VI2 файла
-  const handleFileUpload = async (assignmentKey: string, file: File) => {
+  const handleFileUpload = async (assignment: any, file: File) => {
     if (!file.name.toLowerCase().endsWith('.vi2')) {
       alert('Поддерживаются только файлы в формате .vi2');
       return;
     }
 
-    setFileUploading(prev => ({ ...prev, [assignmentKey]: true }));
+    setFileUploading(prev => ({ ...prev, [assignment.id]: true }));
 
     try {
       // Парсим файл
@@ -161,7 +161,9 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
         recordCount: parsedData.recordCount,
         period: `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`,
         order: uploadedFiles.length,
-        qualificationObjectId: selectedQualificationObject
+        qualificationObjectId: selectedQualificationObject,
+        zoneNumber: assignment.zoneNumber,
+        measurementLevel: assignment.measurementLevel.toString()
       };
 
       // Сохраняем данные в локальную базу
@@ -176,7 +178,7 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
       console.error('Ошибка загрузки файла:', error);
       alert(`Ошибка загрузки файла: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
-      setFileUploading(prev => ({ ...prev, [assignmentKey]: false }));
+      setFileUploading(prev => ({ ...prev, [assignment.id]: false }));
     }
   };
 
@@ -264,7 +266,14 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
 
   // Получение файла для назначения
   const getFileForAssignment = (assignmentId: string) => {
-    return uploadedFiles.find(file => file.id === assignmentId);
+    // Ищем файл по соответствию зоны и уровня
+    const assignment = getEquipmentAssignments().find(a => a.id === assignmentId);
+    if (!assignment) return undefined;
+    
+    return uploadedFiles.find(file => 
+      file.zoneNumber === assignment.zoneNumber && 
+      file.measurementLevel === assignment.measurementLevel.toString()
+    );
   };
 
   // Получение иконки для типа объекта
@@ -734,7 +743,9 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {assignmentFile ? (
-                                  <div className="font-medium text-gray-900">{assignmentFile.name}</div>
+                                  <div>
+                                    <div className="font-medium text-gray-900">{assignmentFile.name}</div>
+                                  </div>
                                 ) : (
                                   <span className="text-gray-400">Не загружен</span>
                                 )}
@@ -763,7 +774,7 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {assignmentFile ? (
-                                  <div className="flex items-center space-x-2">
+                                  <div className="flex items-center justify-between">
                                     <div className="text-xs text-gray-500">
                                       {assignmentFile.recordCount} записей • {assignmentFile.period}
                                     </div>
@@ -790,7 +801,7 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                                           onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) {
-                                              handleFileUpload(assignment.id, file);
+                                              handleFileUpload(assignment, file);
                                             }
                                           }}
                                           className="hidden"
