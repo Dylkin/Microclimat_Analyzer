@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, CheckCircle, Clock, AlertTriangle, Building, Car, Refrigerator, Snowflake, MapPin, Eye, Download, BarChart3, Upload, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle, Clock, AlertTriangle, Building, Car, Refrigerator, Snowflake, MapPin, Eye, Download, BarChart3, Upload, Trash2, Save } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
 import { UploadedFile } from '../types/FileData';
+import { QualificationObjectType } from '../types/QualificationObject';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { equipmentService } from '../utils/equipmentService';
 import { equipmentAssignmentService, EquipmentPlacement } from '../utils/equipmentAssignmentService';
@@ -170,7 +171,6 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
       // Обновляем список файлов
       setUploadedFiles(prev => [...prev, uploadedFile]);
 
-      alert('Файл успешно загружен и обработан');
     } catch (error) {
       console.error('Ошибка загрузки файла:', error);
       alert(`Ошибка загрузки файла: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -188,10 +188,44 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
     try {
       await databaseService.deleteFileData(fileId);
       setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
-      alert('Файл успешно удален');
     } catch (error) {
       console.error('Ошибка удаления файла:', error);
       alert(`Ошибка удаления файла: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  };
+
+  // Сохранение файлов в базу данных
+  const handleSaveFilesToDatabase = async () => {
+    if (!user?.id || !selectedQualificationObject || uploadedFiles.length === 0) {
+      alert('Нет данных для сохранения');
+      return;
+    }
+
+    setOperationLoading(true);
+    try {
+      // Получаем тип объекта квалификации
+      const selectedObject = qualificationObjects.find(obj => obj.id === selectedQualificationObject);
+      if (!selectedObject) {
+        throw new Error('Выбранный объект квалификации не найден');
+      }
+
+      // Подготавливаем данные для сохранения
+      const saveData = {
+        projectId: project.id,
+        qualificationObjectId: selectedQualificationObject,
+        objectType: selectedObject.type as QualificationObjectType,
+        files: uploadedFiles
+      };
+
+      // Сохраняем файлы в базу данных
+      await uploadedFileService.saveProjectFiles(saveData, user.id);
+      
+      alert('Файлы успешно сохранены в базу данных');
+    } catch (error) {
+      console.error('Ошибка сохранения файлов:', error);
+      alert(`Ошибка сохранения файлов: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
     }
   };
 
@@ -823,6 +857,18 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                   Записей: {uploadedFiles.reduce((sum, f) => sum + (f.recordCount || 0), 0)}
                 </span>
               </div>
+            </div>
+            
+            {/* Кнопка сохранения */}
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={handleSaveFilesToDatabase}
+                disabled={operationLoading || uploadedFiles.length === 0}
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4" />
+                <span>{operationLoading ? 'Сохранение...' : 'Сохранить в базу данных'}</span>
+              </button>
             </div>
           </div>
         )}
