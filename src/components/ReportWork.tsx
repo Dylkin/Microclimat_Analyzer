@@ -1,22 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, FileText, CheckCircle, Clock, AlertTriangle, Building, Car, Refrigerator, Snowflake, MapPin, Eye, Download, BarChart3, Upload, Trash2, Save, Settings, Plus, Edit2, X, BarChart, Thermometer, Droplets, ExternalLink, XCircle } from 'lucide-react';
+import { ArrowLeft, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, Trash2, Plus, Edit2, Save, X, Settings, CheckCircle, XCircle, Upload, Eye, AlertTriangle, Building, Car, Refrigerator, Snowflake } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
-import { Equipment } from '../types/Equipment';
 import { UploadedFile } from '../types/FileData';
-import { QualificationObjectType } from '../types/QualificationObject';
-import { qualificationObjectService } from '../utils/qualificationObjectService';
-import { equipmentService } from '../utils/equipmentService';
-import { equipmentAssignmentService, EquipmentPlacement } from '../utils/equipmentAssignmentService';
-import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
-import { uploadedFileService } from '../utils/uploadedFileService';
-import { databaseService } from '../utils/database';
-import { VI2ParsingService } from '../utils/vi2Parser';
-import { useAuth } from '../contexts/AuthContext';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType } from '../types/TimeSeriesData';
-import html2canvas from 'html2canvas';
+import { qualificationObjectService } from '../utils/qualificationObjectService';
+import { uploadedFileService } from '../utils/uploadedFileService';
+import { useAuth } from '../contexts/AuthContext';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
 
 interface ReportWorkProps {
@@ -25,54 +17,62 @@ interface ReportWorkProps {
   onBack: () => void;
 }
 
+interface ContractFields {
+  contractNumber: string;
+  contractDate: string;
+  climateInstallation: string;
+  testType: string;
+}
+
+interface ReportStatus {
+  isGenerating: boolean;
+  hasReport: boolean;
+  reportUrl: string | null;
+  reportFilename: string | null;
+  templateFile: File | null;
+  templateValidation: { isValid: boolean; errors: string[] } | null;
+}
+
+interface AnalysisResult {
+  zoneNumber: string | number;
+  measurementLevel: string;
+  loggerName: string;
+  serialNumber: string;
+  minTemp: string | number;
+  maxTemp: string | number;
+  avgTemp: string | number;
+  minHumidity: string | number;
+  maxHumidity: string | number;
+  avgHumidity: string | number;
+  meetsLimits: string;
+  isExternal?: boolean;
+}
+
 export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFiles, onBack }) => {
   const { user } = useAuth();
-  const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
-  const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   
-  // Equipment placement state
-  const [equipmentPlacements, setEquipmentPlacements] = useState<Map<string, EquipmentPlacement>>(new Map());
-
-  // Data analysis state
+  // Data state
+  const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
   const [selectedQualificationObject, setSelectedQualificationObject] = useState<string>('');
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [fileUploading, setFileUploading] = useState<{ [key: string]: boolean }>({});
-  const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [operationLoading, setOperationLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Time Series Analyzer state
-  const { data: timeSeriesData, loading: timeSeriesLoading, error: timeSeriesError } = useTimeSeriesData({ files: uploadedFiles });
-  
   // Chart settings
   const [dataType, setDataType] = useState<DataType>('temperature');
   const [limits, setLimits] = useState<ChartLimits>({});
   const [markers, setMarkers] = useState<VerticalMarker[]>([]);
   const [zoomState, setZoomState] = useState<ZoomState | undefined>();
   
-  // Contract fields
-  const [contractFields, setContractFields] = useState({
+  // Contract and report state
+  const [contractFields, setContractFields] = useState<ContractFields>({
     contractNumber: '',
     contractDate: '',
     climateInstallation: '',
     testType: ''
   });
-  
-  // UI state
-  const [showSettings, setShowSettings] = useState(false);
-  const [editingMarker, setEditingMarker] = useState<string | null>(null);
-  const [editingMarkerType, setEditingMarkerType] = useState<string | null>(null);
   const [conclusions, setConclusions] = useState('');
-  const [reportStatus, setReportStatus] = useState<{
-    isGenerating: boolean;
-    hasReport: boolean;
-    reportUrl: string | null;
-    reportFilename: string | null;
-    templateFile: File | null;
-    templateValidation: { isValid: boolean; errors: string[] } | null;
-  }>({
+  const [reportStatus, setReportStatus] = useState<ReportStatus>({
     isGenerating: false,
     hasReport: false,
     reportUrl: null,
@@ -80,7 +80,11 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
     templateFile: null,
     templateValidation: null
   });
-  
+
+  // UI state
+  const [editingMarker, setEditingMarker] = useState<string | null>(null);
+  const [editingMarkerType, setEditingMarkerType] = useState<string | null>(null);
+
   // Chart dimensions
   const chartWidth = 1200;
   const chartHeight = 400;
@@ -89,63 +93,34 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
   // Ref для элемента графика
   const chartRef = useRef<HTMLDivElement>(null);
 
-  // Загрузка данных
-  const loadData = async () => {
-    if (!project?.id) {
-      // Если нет проекта, используем переданные файлы
-      if (propFiles && propFiles.length > 0) {
-        setUploadedFiles(propFiles);
-        console.log('Используем переданные файлы:', propFiles.length);
-      }
-      return;
-    }
+  // Hook для загрузки данных временных рядов
+  const { data, loading: dataLoading, error: dataError } = useTimeSeriesData({ files: uploadedFiles });
 
+  // Загрузка данных
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    let projectObjects: QualificationObject[] = [];
 
     try {
+      let projectObjects: QualificationObject[] = [];
+
       // Загружаем объекты квалификации проекта
-      if (qualificationObjectService.isAvailable()) {
+      if (project?.id && qualificationObjectService.isAvailable()) {
         const allObjects = await qualificationObjectService.getQualificationObjectsByContractor(project.contractorId);
         const projectObjectIds = project.qualificationObjects.map(obj => obj.qualificationObjectId);
         projectObjects = allObjects.filter(obj => projectObjectIds.includes(obj.id));
-        setQualificationObjects(projectObjects);
+      }
+
+      setQualificationObjects(projectObjects);
+
+      // Если есть переданные файлы, используем их
+      if (propFiles && propFiles.length > 0) {
+        setUploadedFiles(propFiles);
         
-        // Автоматически выбираем первый объект
-        if (projectObjects.length > 0 && !selectedQualificationObject) {
+        // Автоматически выбираем первый объект квалификации если он есть
+        if (projectObjects.length > 0) {
           setSelectedQualificationObject(projectObjects[0].id);
         }
-        
-        // Загружаем размещение оборудования для каждого объекта
-        const placements = new Map<string, EquipmentPlacement>();
-        for (const obj of projectObjects) {
-          try {
-            const placement = await equipmentAssignmentService.getEquipmentPlacement(project.id, obj.id);
-            placements.set(obj.id, placement);
-          } catch (error) {
-            console.warn(`Не удалось загрузить размещение для объекта ${obj.id}:`, error);
-            placements.set(obj.id, { zones: [] });
-          }
-        }
-        setEquipmentPlacements(placements);
-      }
-
-      // Загружаем доступное оборудование
-      if (equipmentService.isAvailable()) {
-        const equipmentResult = await equipmentService.getAllEquipment(1, 1000);
-        setEquipment(Array.isArray(equipmentResult?.equipment) ? equipmentResult.equipment : []);
-      }
-
-      // Загружаем документы проекта
-      if (projectDocumentService.isAvailable()) {
-        const docs = await projectDocumentService.getProjectDocuments(project.id);
-        setDocuments(docs);
-      }
-
-      // Загружаем файлы для первого объекта
-      if (projectObjects.length > 0) {
-        await loadFilesForObject(projectObjects[0].id);
       }
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
@@ -153,27 +128,20 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [project?.id]);
+  }, [project, propFiles]);
 
   // Загрузка файлов для выбранного объекта квалификации
-  const loadFilesForObject = async (qualificationObjectId: string) => {
-    if (!user?.id) {
-      return;
-    }
+  const loadFilesForObject = useCallback(async (qualificationObjectId: string) => {
+    if (!user?.id) return;
 
-    setAnalysisLoading(true);
+    setLoading(true);
     try {
       if (uploadedFileService.isAvailable() && project?.id) {
-        // Загружаем файлы из базы данных
         const files = await uploadedFileService.getProjectFiles(project.id, user.id, qualificationObjectId);
         setUploadedFiles(Array.isArray(files) ? files : []);
-      } else {
-        // Используем переданные файлы, фильтруя по объекту квалификации
-        const filteredFiles = (files || []).filter(file => 
+      } else if (propFiles) {
+        // Фильтруем переданные файлы по объекту квалификации
+        const filteredFiles = propFiles.filter(file => 
           file.qualificationObjectId === qualificationObjectId
         );
         setUploadedFiles(filteredFiles);
@@ -182,40 +150,21 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
       console.error('Ошибка загрузки файлов:', error);
       setUploadedFiles([]);
     } finally {
-      setAnalysisLoading(false);
+      setLoading(false);
     }
-  };
+  }, [user?.id, project?.id, propFiles]);
 
-  // Обработчик выбора объекта квалификации
-  const handleQualificationObjectChange = (objectId: string) => {
+  // Обработчики событий
+  const handleQualificationObjectChange = useCallback((objectId: string) => {
     setSelectedQualificationObject(objectId);
     if (objectId) {
       loadFilesForObject(objectId);
     } else {
       setUploadedFiles([]);
     }
-  };
+  }, [loadFilesForObject]);
 
-  // Получение иконки для типа объекта
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'помещение':
-        return <Building className="w-5 h-5 text-blue-600" />;
-      case 'автомобиль':
-        return <Car className="w-5 h-5 text-green-600" />;
-      case 'холодильная_камера':
-        return <Refrigerator className="w-5 h-5 text-cyan-600" />;
-      case 'холодильник':
-        return <Refrigerator className="w-5 h-5 text-blue-500" />;
-      case 'морозильник':
-        return <Snowflake className="w-5 h-5 text-indigo-600" />;
-      default:
-        return <Building className="w-5 h-5 text-gray-600" />;
-    }
-  };
-
-  // Time Series Analyzer functionality
-  const handleLimitChange = (type: DataType, limitType: 'min' | 'max', value: string) => {
+  const handleLimitChange = useCallback((type: DataType, limitType: 'min' | 'max', value: string) => {
     const numValue = value === '' ? undefined : parseFloat(value);
     setLimits(prev => ({
       ...prev,
@@ -224,7 +173,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         [limitType]: numValue
       }
     }));
-  };
+  }, []);
 
   const handleAddMarker = useCallback((timestamp: number) => {
     const newMarker: VerticalMarker = {
@@ -237,60 +186,48 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
     setMarkers(prev => [...prev, newMarker]);
   }, [markers.length]);
 
-  const handleUpdateMarker = (id: string, label: string) => {
+  const handleUpdateMarker = useCallback((id: string, label: string) => {
     setMarkers(prev => prev.map(m => m.id === id ? { ...m, label } : m));
     setEditingMarker(null);
-  };
+  }, []);
 
-  const handleUpdateMarkerType = (id: string, type: MarkerType) => {
+  const handleUpdateMarkerType = useCallback((id: string, type: MarkerType) => {
     const color = type === 'test' ? '#8b5cf6' : '#f59e0b';
     setMarkers(prev => prev.map(m => m.id === id ? { ...m, type, color } : m));
     setEditingMarkerType(null);
-  };
+  }, []);
 
-  const getMarkerTypeLabel = (type: MarkerType): string => {
-    switch (type) {
-      case 'test':
-        return 'Испытание';
-      case 'door_opening':
-        return 'Открытие двери';
-      default:
-        return 'Неизвестно';
-    }
-  };
-
-  const handleDeleteMarker = (id: string) => {
+  const handleDeleteMarker = useCallback((id: string) => {
     setMarkers(prev => prev.filter(m => m.id !== id));
-  };
+  }, []);
 
-  const handleResetZoom = () => {
+  const handleResetZoom = useCallback(() => {
     setZoomState(undefined);
-  };
+  }, []);
 
-  const handleContractFieldChange = (field: keyof typeof contractFields, value: string) => {
+  const handleContractFieldChange = useCallback((field: keyof ContractFields, value: string) => {
     setContractFields(prev => ({
       ...prev,
       [field]: value
     }));
-  };
+  }, []);
 
-  // Generate analysis results table data
-  const analysisResults = useMemo(() => {
-    if (!timeSeriesData || !timeSeriesData.points.length) return [];
+  // Вычисление результатов анализа
+  const analysisResults = useMemo((): AnalysisResult[] => {
+    if (!data || !data.points.length) return [];
 
     // Фильтруем данные по времени если применен зум
-    let filteredPoints = timeSeriesData.points;
+    let filteredPoints = data.points;
     if (zoomState) {
-      filteredPoints = timeSeriesData.points.filter(point => 
+      filteredPoints = data.points.filter(point => 
         point.timestamp >= zoomState.startTime && point.timestamp <= zoomState.endTime
       );
     }
 
-    // Сортируем файлы по порядку (order) для соответствия таблице загрузки файлов
+    // Сортируем файлы по порядку
     const sortedFiles = [...uploadedFiles].sort((a, b) => a.order - b.order);
     
-    return sortedFiles.map((file) => {
-      // Find data points for this file
+    return sortedFiles.map((file): AnalysisResult => {
       const filePoints = filteredPoints.filter(point => point.fileId === file.name);
       
       if (filePoints.length === 0) {
@@ -309,7 +246,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         };
       }
 
-      // Calculate temperature statistics
+      // Вычисляем статистику
       const temperatures = filePoints
         .filter(p => p.temperature !== undefined)
         .map(p => p.temperature!);
@@ -318,39 +255,23 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         .filter(p => p.humidity !== undefined)
         .map(p => p.humidity!);
 
-      let tempStats = { min: '-', max: '-', avg: '-' };
-      let humidityStats = { min: '-', max: '-', avg: '-' };
+      const tempStats = temperatures.length > 0 ? {
+        min: Math.round(Math.min(...temperatures) * 10) / 10,
+        max: Math.round(Math.max(...temperatures) * 10) / 10,
+        avg: Math.round((temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length) * 10) / 10
+      } : { min: '-', max: '-', avg: '-' };
       
-      if (temperatures.length > 0) {
-        const min = Math.min(...temperatures);
-        const max = Math.max(...temperatures);
-        const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
-        
-        tempStats = {
-          min: Math.round(min * 10) / 10,
-          max: Math.round(max * 10) / 10,
-          avg: Math.round(avg * 10) / 10
-        };
-      }
-      
-      if (humidities.length > 0) {
-        const min = Math.min(...humidities);
-        const max = Math.max(...humidities);
-        const avg = humidities.reduce((sum, h) => sum + h, 0) / humidities.length;
-        
-        humidityStats = {
-          min: Math.round(min * 10) / 10,
-          max: Math.round(max * 10) / 10,
-          avg: Math.round(avg * 10) / 10
-        };
-      }
+      const humidityStats = humidities.length > 0 ? {
+        min: Math.round(Math.min(...humidities) * 10) / 10,
+        max: Math.round(Math.max(...humidities) * 10) / 10,
+        avg: Math.round((humidities.reduce((sum, h) => sum + h, 0) / humidities.length) * 10) / 10
+      } : { min: '-', max: '-', avg: '-' };
 
-      // Check if meets limits
+      // Проверяем соответствие лимитам
       let meetsLimits = 'Да';
-      // Для внешних датчиков не проверяем соответствие лимитам
-      if (file.zoneNumber === 999) {
-        meetsLimits = '-';
-      } else if (limits.temperature && temperatures.length > 0) {
+      const isExternal = file.zoneNumber === 999;
+      
+      if (!isExternal && limits.temperature && temperatures.length > 0) {
         const min = Math.min(...temperatures);
         const max = Math.max(...temperatures);
         
@@ -360,10 +281,12 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         if (limits.temperature.max !== undefined && max > limits.temperature.max) {
           meetsLimits = 'Нет';
         }
+      } else if (isExternal) {
+        meetsLimits = '-';
       }
 
       return {
-        zoneNumber: file.zoneNumber === 999 ? 'Внешний' : (file.zoneNumber || '-'),
+        zoneNumber: isExternal ? 'Внешний' : (file.zoneNumber || '-'),
         measurementLevel: file.measurementLevel || '-',
         loggerName: file.name.substring(0, 6),
         serialNumber: file.parsedData?.deviceMetadata?.serialNumber || 'Unknown',
@@ -374,19 +297,19 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         maxHumidity: humidityStats.max,
         avgHumidity: humidityStats.avg,
         meetsLimits,
-        isExternal: file.zoneNumber === 999
+        isExternal
       };
     });
-  }, [timeSeriesData, uploadedFiles, limits, zoomState]);
+  }, [data, uploadedFiles, limits, zoomState]);
 
-  // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
+  // Вычисляем глобальные минимальные и максимальные значения
   const { globalMinTemp, globalMaxTemp } = useMemo(() => {
     const nonExternalResults = analysisResults.filter(result => !result.isExternal);
     const minTempValues = nonExternalResults
-      .map(result => parseFloat(result.minTemp))
+      .map(result => parseFloat(result.minTemp as string))
       .filter(val => !isNaN(val));
     const maxTempValues = nonExternalResults
-      .map(result => parseFloat(result.maxTemp))
+      .map(result => parseFloat(result.maxTemp as string))
       .filter(val => !isNaN(val));
     
     return {
@@ -395,8 +318,102 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
     };
   }, [analysisResults]);
 
-  // Template and report functionality
-  const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Автозаполнение выводов
+  const handleAutoFillConclusions = useCallback(() => {
+    let startTime: Date;
+    let endTime: Date;
+
+    if (markers.length >= 2) {
+      const sortedMarkers = [...markers].sort((a, b) => a.timestamp - b.timestamp);
+      startTime = new Date(sortedMarkers[0].timestamp);
+      endTime = new Date(sortedMarkers[sortedMarkers.length - 1].timestamp);
+    } else if (zoomState) {
+      startTime = new Date(zoomState.startTime);
+      endTime = new Date(zoomState.endTime);
+    } else if (data) {
+      startTime = new Date(data.timeRange[0]);
+      endTime = new Date(data.timeRange[1]);
+    } else {
+      return;
+    }
+
+    const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+
+    // Форматируем длительность
+    const formatDuration = (minutes: number): string => {
+      if (minutes >= 60) {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (mins === 0) {
+          return `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'}`;
+        } else {
+          const hoursText = hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов';
+          const minutesText = mins === 1 ? 'минута' : mins < 5 ? 'минуты' : 'минут';
+          return `${hours} ${hoursText} ${mins} ${minutesText}`;
+        }
+      } else {
+        const minutesText = minutes === 1 ? 'минута' : minutes < 5 ? 'минуты' : 'минут';
+        return `${minutes} ${minutesText}`;
+      }
+    };
+
+    // Находим результаты с экстремальными значениями
+    const nonExternalResults = analysisResults.filter(result => !result.isExternal);
+    const validResults = nonExternalResults.filter(result => 
+      result.minTemp !== '-' && result.maxTemp !== '-'
+    );
+
+    if (validResults.length === 0) {
+      setConclusions('Недостаточно данных для формирования выводов.');
+      return;
+    }
+
+    const minTempResult = validResults.reduce((min, current) => {
+      const minTemp = parseFloat(min.minTemp as string);
+      const currentMinTemp = parseFloat(current.minTemp as string);
+      return currentMinTemp < minTemp ? current : min;
+    });
+
+    const maxTempResult = validResults.reduce((max, current) => {
+      const maxTemp = parseFloat(max.maxTemp as string);
+      const currentMaxTemp = parseFloat(current.maxTemp as string);
+      return currentMaxTemp > maxTemp ? current : max;
+    });
+
+    // Проверяем соответствие лимитам
+    let meetsLimits = true;
+    if (limits.temperature) {
+      const minTemp = parseFloat(minTempResult.minTemp as string);
+      const maxTemp = parseFloat(maxTempResult.maxTemp as string);
+      
+      if (limits.temperature.min !== undefined && minTemp < limits.temperature.min) {
+        meetsLimits = false;
+      }
+      if (limits.temperature.max !== undefined && maxTemp > limits.temperature.max) {
+        meetsLimits = false;
+      }
+    }
+
+    const formatDateTime = (date: Date) => date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const conclusionText = `Начало испытания: ${formatDateTime(startTime)}
+Завершение испытания: ${formatDateTime(endTime)}
+Длительность испытания: ${formatDuration(duration)}
+Зафиксированное минимальное значение: ${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
+Зафиксированное максимальное значение: ${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.
+Результаты испытания ${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
+
+    setConclusions(conclusionText);
+  }, [markers, zoomState, data, analysisResults, limits]);
+
+  // Обработчики для работы с шаблонами и отчетами
+  const handleTemplateUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.name.toLowerCase().endsWith('.docx')) {
       setReportStatus(prev => ({ 
@@ -405,14 +422,13 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         templateValidation: null 
       }));
       
-      // Валидируем шаблон
       validateTemplate(file);
     } else {
       alert('Пожалуйста, выберите файл в формате .docx');
     }
-  };
+  }, []);
 
-  const validateTemplate = async (file: File) => {
+  const validateTemplate = useCallback(async (file: File) => {
     try {
       const processor = DocxTemplateProcessor.getInstance();
       const validation = await processor.validateTemplate(file);
@@ -435,17 +451,17 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         } 
       }));
     }
-  };
+  }, []);
 
-  const handleRemoveTemplate = () => {
+  const handleRemoveTemplate = useCallback(() => {
     setReportStatus(prev => ({ 
       ...prev, 
       templateFile: null,
       templateValidation: null 
     }));
-  };
+  }, []);
 
-  const handleGenerateTemplateReport = async () => {
+  const handleGenerateTemplateReport = useCallback(async () => {
     if (!reportStatus.templateFile || !chartRef.current) {
       alert('Необходимо загрузить шаблон и убедиться, что график отображается');
       return;
@@ -459,10 +475,8 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
     setReportStatus(prev => ({ ...prev, isGenerating: true }));
 
     try {
-      // Получаем экземпляр процессора
       const processor = DocxTemplateProcessor.getInstance();
       
-      // Если уже есть отчет, устанавливаем его для добавления данных
       if (reportStatus.hasReport && reportStatus.reportUrl) {
         const existingReportResponse = await fetch(reportStatus.reportUrl);
         const existingReportBlob = await existingReportResponse.blob();
@@ -471,13 +485,11 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         processor.clearExistingReport();
       }
       
-      // Генерируем данные для шаблона
       const now = new Date();
       const dateStr = now.toLocaleDateString('ru-RU');
       const timeStr = now.toLocaleTimeString('ru-RU');
       const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
       
-      // Функция для получения читаемого названия типа испытания
       const getTestTypeLabel = (testType: string): string => {
         switch (testType) {
           case 'empty_volume':
@@ -495,7 +507,26 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         }
       };
       
-      const convertedTestType = getTestTypeLabel(contractFields.testType);
+      const getQualificationObjectDisplayName = (): string => {
+        const filesWithQualification = uploadedFiles.filter(f => f.qualificationObjectId);
+        
+        if (filesWithQualification.length === 0) {
+          return 'Не указан';
+        }
+        
+        const uniqueQualificationIds = [...new Set(filesWithQualification.map(f => f.qualificationObjectId))];
+        
+        if (uniqueQualificationIds.length === 1) {
+          const fileWithObject = filesWithQualification[0];
+          if (fileWithObject.qualificationObjectName) {
+            return fileWithObject.qualificationObjectName;
+          }
+          
+          return `Объект квалификации (ID: ${uniqueQualificationIds[0]?.substring(0, 8)}...)`;
+        } else {
+          return `Несколько объектов (${uniqueQualificationIds.length})`;
+        }
+      };
       
       const templateData: TemplateReportData = {
         title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
@@ -503,9 +534,9 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         dataType,
         analysisResults,
         conclusions,
-        researchObject: getQualificationObjectDisplayName() || '',
+        researchObject: getQualificationObjectDisplayName(),
         conditioningSystem: contractFields.climateInstallation || '',
-        testType: convertedTestType || '',
+        testType: getTestTypeLabel(contractFields.testType) || '',
         limits: limits,
         executor: user?.fullName || '',
         testDate: dateStr,
@@ -514,25 +545,21 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
           new Date(contractFields.contractDate).toLocaleDateString('ru-RU') : ''
       };
 
-      // Обрабатываем шаблон
       const docxBlob = await processor.processTemplate(
         reportStatus.templateFile,
         templateData,
         chartRef.current
       );
 
-      // Освобождаем старый URL если он есть
       if (reportStatus.reportUrl) {
         URL.revokeObjectURL(reportStatus.reportUrl);
       }
 
-      // Создаем URL для скачивания
       const reportUrl = URL.createObjectURL(docxBlob);
       const reportFilename = reportStatus.hasReport 
         ? reportStatus.reportFilename
         : `отчет_шаблон_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
 
-      // Обновляем состояние
       setReportStatus(prev => ({
         ...prev,
         isGenerating: false,
@@ -546,9 +573,9 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
       alert(`Ошибка при формировании отчета по шаблону: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       setReportStatus(prev => ({ ...prev, isGenerating: false }));
     }
-  };
+  }, [reportStatus, chartRef, dataType, analysisResults, conclusions, contractFields, limits, user, uploadedFiles]);
 
-  const handleDownloadReport = () => {
+  const handleDownloadReport = useCallback(() => {
     if (reportStatus.reportUrl && reportStatus.reportFilename) {
       const link = document.createElement('a');
       link.href = reportStatus.reportUrl;
@@ -557,14 +584,13 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
       link.click();
       document.body.removeChild(link);
     }
-  };
+  }, [reportStatus]);
 
-  const handleDeleteReport = () => {
+  const handleDeleteReport = useCallback(() => {
     if (reportStatus.reportUrl) {
       URL.revokeObjectURL(reportStatus.reportUrl);
     }
 
-    // Очищаем существующий отчет в процессоре
     const processor = DocxTemplateProcessor.getInstance();
     processor.clearExistingReport();
 
@@ -576,356 +602,85 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
       templateFile: null,
       templateValidation: null
     });
-  };
+  }, [reportStatus]);
 
-  const handleAutoFillConclusions = () => {
-    // Определяем временные рамки
-    let startTime: Date;
-    let endTime: Date;
-    let duration: number;
-
-    if (markers.length >= 2) {
-      // Если есть маркеры, используем первый и последний
-      const sortedMarkers = [...markers].sort((a, b) => a.timestamp - b.timestamp);
-      startTime = new Date(sortedMarkers[0].timestamp);
-      endTime = new Date(sortedMarkers[sortedMarkers.length - 1].timestamp);
-    } else if (zoomState) {
-      // Если применен зум, используем его границы
-      startTime = new Date(zoomState.startTime);
-      endTime = new Date(zoomState.endTime);
-    } else if (timeSeriesData) {
-      // Иначе используем полный диапазон данных
-      startTime = new Date(timeSeriesData.timeRange[0]);
-      endTime = new Date(timeSeriesData.timeRange[1]);
-    } else {
-      return; // Нет данных для анализа
-    }
-
-    duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // в минутах
-
-    // Форматируем длительность
-    let durationText: string;
-    if (duration >= 60) {
-      const hours = Math.floor(duration / 60);
-      const minutes = duration % 60;
-      if (minutes === 0) {
-        durationText = `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'}`;
-      } else {
-        const hoursText = hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов';
-        const minutesText = minutes === 1 ? 'минута' : minutes < 5 ? 'минуты' : 'минут';
-        durationText = `${hours} ${hoursText} ${minutes} ${minutesText}`;
-      }
-    } else {
-      const minutesText = duration === 1 ? 'минута' : duration < 5 ? 'минуты' : 'минут';
-      durationText = `${duration} ${minutesText}`;
-    }
-
-    // Находим минимальное и максимальное значения (исключая внешние датчики)
-    const nonExternalResults = analysisResults.filter(result => !result.isExternal);
-    const validResults = nonExternalResults.filter(result => 
-      result.minTemp !== '-' && result.maxTemp !== '-'
-    );
-
-    if (validResults.length === 0) {
-      setConclusions('Недостаточно данных для формирования выводов.');
-      return;
-    }
-
-    // Находим результат с минимальной температурой
-    const minTempResult = validResults.reduce((min, current) => {
-      const minTemp = parseFloat(min.minTemp);
-      const currentMinTemp = parseFloat(current.minTemp);
-      return currentMinTemp < minTemp ? current : min;
-    });
-
-    // Находим результат с максимальной температурой
-    const maxTempResult = validResults.reduce((max, current) => {
-      const maxTemp = parseFloat(max.maxTemp);
-      const currentMaxTemp = parseFloat(current.maxTemp);
-      return currentMaxTemp > maxTemp ? current : max;
-    });
-
-    // Проверяем соответствие лимитам
-    let meetsLimits = true;
-    if (limits.temperature) {
-      const minTemp = parseFloat(minTempResult.minTemp);
-      const maxTemp = parseFloat(maxTempResult.maxTemp);
-      
-      if (limits.temperature.min !== undefined && minTemp < limits.temperature.min) {
-        meetsLimits = false;
-      }
-      if (limits.temperature.max !== undefined && maxTemp > limits.temperature.max) {
-        meetsLimits = false;
-      }
-    }
-
-    // Формируем текст выводов
-    const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })}
-Завершение испытания: ${endTime.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })}
-Длительность испытания: ${durationText}
-Зафиксированное минимальное значение: ${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
-Зафиксированное максимальное значение: ${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.
-Результаты испытания ${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
-
-    setConclusions(conclusionText);
-  };
-
-  // Функция для получения названия объекта квалификации
-  const getQualificationObjectDisplayName = (): string => {
-    if (selectedQualificationObject) {
-      const selectedObject = qualificationObjects.find(obj => obj.id === selectedQualificationObject);
-      if (selectedObject) {
-        return selectedObject.name || selectedObject.vin || selectedObject.serialNumber || 'Без названия';
-      }
-    }
-    
-    // Находим файлы с привязанным объектом квалификации
-    const filesWithQualification = uploadedFiles.filter(f => f.qualificationObjectId);
-    
-    if (filesWithQualification.length === 0) {
-      return project?.name || 'Не указан';
-    }
-    
-    // Если все файлы привязаны к одному объекту, показываем его название
-    const uniqueQualificationIds = [...new Set(filesWithQualification.map(f => f.qualificationObjectId))];
-    
-    if (uniqueQualificationIds.length === 1) {
-      const fileWithObject = filesWithQualification[0];
-      if (fileWithObject.qualificationObjectName) {
-        return fileWithObject.qualificationObjectName;
-      }
-      
-      return `Объект квалификации (ID: ${uniqueQualificationIds[0]?.substring(0, 8)}...)`;
-    } else {
-      return `Несколько объектов (${uniqueQualificationIds.length})`;
+  // Вспомогательные функции
+  const getMarkerTypeLabel = (type: MarkerType): string => {
+    switch (type) {
+      case 'test':
+        return 'Испытание';
+      case 'door_opening':
+        return 'Открытие двери';
+      default:
+        return 'Неизвестно';
     }
   };
 
-  // Загрузка VI2 файла
-  const handleFileUpload = async (zoneNumber: number, measurementLevel: number, file: File) => {
-    if (!file.name.toLowerCase().endsWith('.vi2')) {
-      alert('Поддерживаются только файлы в формате .vi2');
-      return;
-    }
-
-    const assignmentKey = `${zoneNumber}-${measurementLevel}`;
-    setFileUploading(prev => ({ ...prev, [assignmentKey]: true }));
-
-    try {
-      // Парсим файл
-      const vi2Parser = new VI2ParsingService();
-      const parsedData = await vi2Parser.parseFile(file);
-
-      // Создаем объект UploadedFile
-      const uploadedFile: UploadedFile = {
-        id: crypto.randomUUID(),
-        name: file.name,
-        uploadDate: new Date().toLocaleString('ru-RU'),
-        parsedData,
-        parsingStatus: parsedData.parsingStatus,
-        errorMessage: parsedData.errorMessage,
-        recordCount: parsedData.recordCount,
-        period: `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`,
-        order: uploadedFiles.length,
-        qualificationObjectId: selectedQualificationObject,
-        zoneNumber: zoneNumber,
-        measurementLevel: measurementLevel.toString()
-      };
-
-      // Сохраняем данные в локальную базу
-      if (parsedData.parsingStatus === 'completed') {
-        await databaseService.saveParsedFileData(parsedData, uploadedFile.id);
-      }
-
-      // Обновляем список файлов
-      setUploadedFiles(prev => [...prev, uploadedFile]);
-
-    } catch (error) {
-      console.error('Ошибка загрузки файла:', error);
-      alert(`Ошибка загрузки файла: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    } finally {
-      setFileUploading(prev => ({ ...prev, [assignmentKey]: false }));
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'помещение':
+        return <Building className="w-5 h-5 text-blue-600" />;
+      case 'автомобиль':
+        return <Car className="w-5 h-5 text-green-600" />;
+      case 'холодильная_камера':
+        return <Refrigerator className="w-5 h-5 text-cyan-600" />;
+      case 'холодильник':
+        return <Refrigerator className="w-5 h-5 text-blue-500" />;
+      case 'морозильник':
+        return <Snowflake className="w-5 h-5 text-indigo-600" />;
+      default:
+        return <Building className="w-5 h-5 text-gray-600" />;
     }
   };
 
-  // Удаление файла
-  const handleDeleteFile = async (fileId: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот файл?')) {
-      return;
-    }
+  // Effects
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-    try {
-      await databaseService.deleteFileData(fileId);
-      setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
-    } catch (error) {
-      console.error('Ошибка удаления файла:', error);
-      alert(`Ошибка удаления файла: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-    }
-  };
-
-  // Получение назначений оборудования для выбранного объекта
-  const getEquipmentAssignments = () => {
-    if (!selectedQualificationObject) return [];
-
-    const placement = equipmentPlacements.get(selectedQualificationObject) || { zones: [] };
-    const assignments: any[] = [];
-
-    const zones = Array.isArray(placement?.zones) ? placement.zones : [];
-    zones.forEach(zone => {
-      const levels = Array.isArray(zone?.levels) ? zone.levels : [];
-      levels.forEach(level => {
-        if (level?.equipmentId) {
-          const equipmentItem = (equipment || []).find(eq => eq.id === level.equipmentId);
-          assignments.push({
-            id: `${zone.zoneNumber}-${level.levelValue}`,
-            zoneNumber: zone.zoneNumber,
-            measurementLevel: level.levelValue,
-            equipmentId: level.equipmentId,
-            equipmentName: level.equipmentName || equipmentItem?.name || 'Unknown'
-          });
-        }
-      });
-    });
-
-    return assignments.sort((a, b) => {
-      if (a.zoneNumber !== b.zoneNumber) {
-        return a.zoneNumber - b.zoneNumber;
-      }
-      return a.measurementLevel - b.measurementLevel;
-    });
-  };
-
-  // Получение файла для назначения
-  const getFileForAssignment = (assignmentId: string) => {
-    const assignment = getEquipmentAssignments().find(a => a.id === assignmentId);
-    if (!assignment) return undefined;
-    
-    return uploadedFiles.find(file => 
-      file.zoneNumber === assignment.zoneNumber &&
-      parseFloat(file.measurementLevel || '0') === assignment.measurementLevel
-    );
-  };
-
-  // Если нет данных для анализа
-  if (timeSeriesLoading) {
+  // Обработка состояний загрузки и ошибок
+  if (dataLoading || loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <FileText className="w-8 h-8 text-indigo-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Работа над отчетом</h1>
-        </div>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Загрузка данных для анализа...</p>
-          </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Загрузка данных для анализа...</p>
         </div>
       </div>
     );
   }
 
-  if (timeSeriesError) {
+  if (dataError || error) {
     return (
       <div className="space-y-6">
         <div className="flex items-center space-x-3">
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
+          <button onClick={onBack} className="text-gray-600 hover:text-gray-900 transition-colors">
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <FileText className="w-8 h-8 text-red-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Работа над отчетом</h1>
+          <BarChart className="w-8 h-8 text-red-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки данных</h1>
         </div>
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-red-800 mb-2">Ошибка загрузки данных</h3>
-          <p className="text-red-600">{timeSeriesError}</p>
+          <p className="text-red-600">{dataError || error}</p>
         </div>
       </div>
     );
   }
 
-  if (!timeSeriesData || timeSeriesData.points.length === 0) {
+  if (!data || data.points.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex items-center space-x-3">
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
+          <button onClick={onBack} className="text-gray-600 hover:text-gray-900 transition-colors">
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <FileText className="w-8 h-8 text-yellow-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Работа над отчетом</h1>
+          <BarChart className="w-8 h-8 text-yellow-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Нет данных для анализа</h1>
         </div>
-        
-        {/* Project Info */}
-        {project && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Информация о проекте</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Название проекта</label>
-                <p className="text-gray-900">{project.name || 'Не указано'}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Контрагент</label>
-                <p className="text-gray-900">{project.contractorName || 'Не указан'}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Object Selection */}
-        {qualificationObjects.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Выбор объекта для анализа</h3>
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Выберите объект квалификации для анализа данных
-              </label>
-              <select
-                value={selectedQualificationObject}
-                onChange={(e) => handleQualificationObjectChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">Выберите объект квалификации</option>
-                {qualificationObjects.map(obj => (
-                  <option key={obj.id} value={obj.id}>
-                    {obj.name || obj.vin || obj.serialNumber || 'Без названия'} - {QualificationObjectTypeLabels[obj.type]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-yellow-800 mb-2">Нет данных для анализа</h3>
-          <p className="text-yellow-600">
-            {uploadedFiles.length === 0 
-              ? 'Загруженные файлы не найдены. Вернитесь на страницу "Подготовка отчета" и загрузите файлы данных.'
-              : 'Загруженные файлы не содержат данных измерений.'
-            }
-          </p>
+          <p className="text-yellow-600">Загруженные файлы не содержат данных измерений.</p>
         </div>
       </div>
     );
@@ -936,13 +691,10 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
+          <button onClick={onBack} className="text-gray-600 hover:text-gray-900 transition-colors">
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <FileText className="w-8 h-8 text-indigo-600" />
+          <BarChart className="w-8 h-8 text-indigo-600" />
           <h1 className="text-2xl font-bold text-gray-900">Работа над отчетом</h1>
         </div>
       </div>
@@ -978,9 +730,9 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
       {qualificationObjects.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Выбор объекта для анализа</h3>
-          <div className="mb-6">
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Выберите объект квалификации для анализа данных
+              Объект квалификации
             </label>
             <select
               value={selectedQualificationObject}
@@ -1017,7 +769,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
               <Thermometer className="w-4 h-4" />
               <span>Температура</span>
             </button>
-            {timeSeriesData.hasHumidity && (
+            {data.hasHumidity && (
               <button
                 onClick={() => setDataType('humidity')}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
@@ -1111,10 +863,19 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Объект квалификации</label>
-              <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
-                {getQualificationObjectDisplayName()}
-              </div>
+              <label className="block text-xs text-gray-500 mb-1">Тип испытания</label>
+              <select
+                value={contractFields.testType}
+                onChange={(e) => handleContractFieldChange('testType', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="">Выберите тип испытания</option>
+                <option value="empty_volume">Испытание на соответствие критериям в пустом объеме</option>
+                <option value="loaded_volume">Испытание на соответствие критериям в загруженном объеме</option>
+                <option value="temperature_recovery">Испытание по восстановлению температуры после открытия двери</option>
+                <option value="power_off">Испытание на отключение электропитания</option>
+                <option value="power_on">Испытание на включение электропитания</option>
+              </select>
             </div>
           </div>
         </div>
@@ -1129,7 +890,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         </div>
         
         <TimeSeriesChart
-          data={timeSeriesData.points}
+          data={data.points}
           width={chartWidth}
           height={chartHeight}
           margin={chartMargin}
@@ -1143,137 +904,116 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
         />
       </div>
 
-      {/* Test Information and Markers */}
+      {/* Markers Management */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Испытания</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Маркеры времени</h3>
         
-        {/* Test Type Selection */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Тип испытания</label>
-          <select
-            value={contractFields.testType}
-            onChange={(e) => handleContractFieldChange('testType', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="">Выберите тип испытания</option>
-            <option value="empty_volume">Испытание на соответствие критериям в пустом объеме</option>
-            <option value="loaded_volume">Испытание на соответствие критериям в загруженном объеме</option>
-            <option value="temperature_recovery">Испытание по восстановлению температуры после открытия двери</option>
-            <option value="power_off">Испытание на отключение электропитания</option>
-            <option value="power_on">Испытание на включение электропитания</option>
-          </select>
-        </div>
-
-        {/* Markers section */}
-        <div>
-          <h4 className="text-md font-medium text-gray-900 mb-3">Маркеры времени</h4>
-          {markers.length > 0 ? (
-            <div className="space-y-2">
-              {markers.map((marker) => (
-                <div key={marker.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                  <div className="flex items-center space-x-3 flex-1">
-                    <div
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: marker.color }}
-                    ></div>
-                    
-                    <div className="flex flex-col space-y-1 flex-1">
-                      <div className="flex items-center space-x-3">
-                        {editingMarker === marker.id ? (
-                          <input
-                            type="text"
-                            value={marker.label}
-                            onChange={(e) => setMarkers(prev => 
-                              prev.map(m => m.id === marker.id ? { ...m, label: e.target.value } : m)
-                            )}
-                            onBlur={() => setEditingMarker(null)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                setEditingMarker(null);
-                              }
-                            }}
-                            className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            autoFocus
-                          />
-                        ) : (
-                          <span className="font-medium">{marker.label}</span>
-                        )}
-                        
-                        <span className="text-sm text-gray-500">
-                          {new Date(marker.timestamp).toLocaleString('ru-RU', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      </div>
+        {markers.length > 0 ? (
+          <div className="space-y-2">
+            {markers.map((marker) => (
+              <div key={marker.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                <div className="flex items-center space-x-3 flex-1">
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: marker.color }}
+                  ></div>
+                  
+                  <div className="flex flex-col space-y-1 flex-1">
+                    <div className="flex items-center space-x-3">
+                      {editingMarker === marker.id ? (
+                        <input
+                          type="text"
+                          value={marker.label}
+                          onChange={(e) => setMarkers(prev => 
+                            prev.map(m => m.id === marker.id ? { ...m, label: e.target.value } : m)
+                          )}
+                          onBlur={() => setEditingMarker(null)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setEditingMarker(null);
+                            }
+                          }}
+                          className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          autoFocus
+                        />
+                      ) : (
+                        <span className="font-medium">{marker.label}</span>
+                      )}
                       
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs text-gray-500">Тип:</span>
-                        {editingMarkerType === marker.id ? (
-                          <select
-                            value={marker.type}
-                            onChange={(e) => handleUpdateMarkerType(marker.id, e.target.value as MarkerType)}
-                            onBlur={() => setEditingMarkerType(null)}
-                            className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            autoFocus
-                          >
-                            <option value="test">Испытание</option>
-                            <option value="door_opening">Открытие двери</option>
-                          </select>
-                        ) : (
-                          <span 
-                            className="text-xs px-2 py-1 bg-white border border-gray-200 rounded cursor-pointer hover:bg-gray-50"
-                            onClick={() => setEditingMarkerType(marker.id)}
-                          >
-                            {getMarkerTypeLabel(marker.type)}
-                          </span>
-                        )}
-                      </div>
+                      <span className="text-sm text-gray-500">
+                        {new Date(marker.timestamp).toLocaleString('ru-RU', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500">Тип:</span>
+                      {editingMarkerType === marker.id ? (
+                        <select
+                          value={marker.type}
+                          onChange={(e) => handleUpdateMarkerType(marker.id, e.target.value as MarkerType)}
+                          onBlur={() => setEditingMarkerType(null)}
+                          className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          autoFocus
+                        >
+                          <option value="test">Испытание</option>
+                          <option value="door_opening">Открытие двери</option>
+                        </select>
+                      ) : (
+                        <span 
+                          className="text-xs px-2 py-1 bg-white border border-gray-200 rounded cursor-pointer hover:bg-gray-50"
+                          onClick={() => setEditingMarkerType(marker.id)}
+                        >
+                          {getMarkerTypeLabel(marker.type)}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => setEditingMarker(marker.id)}
-                      className="text-indigo-600 hover:text-indigo-800 transition-colors"
-                      title="Редактировать название"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteMarker(marker.id)}
-                      className="text-red-600 hover:text-red-800 transition-colors"
-                      title="Удалить маркер"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-              <p className="text-sm">Маркеры не добавлены</p>
-              <p className="text-xs mt-1">Сделайте двойной клик по графику для добавления маркера</p>
-              <div className="text-xs mt-2 space-y-1">
-                <p><strong>Типы маркеров:</strong></p>
-                <div className="flex justify-center space-x-4">
-                  <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                    <span>Испытание</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <span>Открытие двери</span>
-                  </div>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setEditingMarker(marker.id)}
+                    className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                    title="Редактировать название"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteMarker(marker.id)}
+                    className="text-red-600 hover:text-red-800 transition-colors"
+                    title="Удалить маркер"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+            <p className="text-sm">Маркеры не добавлены</p>
+            <p className="text-xs mt-1">Сделайте двойной клик по графику для добавления маркера</p>
+            <div className="text-xs mt-2 space-y-1">
+              <p><strong>Типы маркеров:</strong></p>
+              <div className="flex justify-center space-x-4">
+                <div className="flex items-center space-x-1">
+                  <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                  <span>Испытание</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <span>Открытие двери</span>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Analysis Results Table */}
@@ -1326,16 +1066,16 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
                     {result.serialNumber}
                   </td>
                   <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
-                    !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
-                    globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp
+                    !result.isExternal && !isNaN(parseFloat(result.minTemp as string)) && 
+                    globalMinTemp !== null && parseFloat(result.minTemp as string) === globalMinTemp
                       ? 'bg-blue-200' 
                       : ''
                   }`}>
                     {result.minTemp}
                   </td>
                   <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
-                    !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
-                    globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp
+                    !result.isExternal && !isNaN(parseFloat(result.maxTemp as string)) && 
+                    globalMaxTemp !== null && parseFloat(result.maxTemp as string) === globalMaxTemp
                       ? 'bg-red-200' 
                       : ''
                   }`}>
@@ -1391,7 +1131,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
           </div>
         </div>
 
-        {/* Поле для выводов */}
+        {/* Conclusions */}
         <div className="mt-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Выводы
@@ -1407,7 +1147,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
             onClick={handleAutoFillConclusions}
             className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
           >
-            Автоматически заполнить выводы
+            Автозаполнение выводов
           </button>
         </div>
       </div>
@@ -1419,7 +1159,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
             Формирование приложения к отчету с результатами испытаний
           </h2>
           
-          {/* Загрузка шаблона DOCX */}
+          {/* Template Upload */}
           <div className="w-full max-w-md">
             <h3 className="text-lg font-medium text-gray-700 mb-4 text-center">
               Использование пользовательского шаблона с плейсхолдером {'{chart}'}
@@ -1465,7 +1205,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
                   </button>
                 </div>
                 
-                {/* Результат валидации */}
+                {/* Template Validation */}
                 {reportStatus.templateValidation && (
                   <div className={`mt-2 p-2 rounded text-xs ${
                     reportStatus.templateValidation.isValid 
@@ -1496,7 +1236,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
             )}
           </div>
 
-          {/* Кнопка генерации отчета */}
+          {/* Generate Report Button */}
           <div className="flex justify-center">
             <button
               onClick={handleGenerateTemplateReport}
@@ -1506,7 +1246,6 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
                 (reportStatus.templateValidation && !reportStatus.templateValidation.isValid)
               }
               className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-              title="Сформировать отчет по загруженному шаблону"
             >
               {reportStatus.isGenerating ? (
                 <>
@@ -1522,7 +1261,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
             </button>
           </div>
           
-          {/* Ссылка для скачивания и кнопка удаления */}
+          {/* Download and Delete Report */}
           {reportStatus.hasReport && reportStatus.reportUrl && (
             <div className="flex items-center space-x-4">
               <button
@@ -1543,7 +1282,7 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
             </div>
           )}
           
-          {/* Информация о плейсхолдерах для шаблона */}
+          {/* Template Placeholders Info */}
           <div className="w-full max-w-2xl bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="text-sm font-medium text-blue-900 mb-2">
               Поддерживаемые плейсхолдеры в шаблоне:
@@ -1562,15 +1301,21 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
               <p>• <code>{'{ReportNo}'}</code> - номер договора из настроек анализа</p>
               <p>• <code>{'{ReportDate}'}</code> - дата договора из настроек анализа</p>
             </div>
-            <p className="text-xs mt-2"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки.</p>
+            <p className="text-xs mt-2">
+              <strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. 
+              Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки.
+            </p>
+            <p className="text-xs mt-1">
+              <strong>Колонтитулы:</strong> Все плейсхолдеры также работают в верхних и нижних колонтитулах документа.
+            </p>
           </div>
         </div>
       </div>
 
       {/* Instructions */}
-      <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-        <h4 className="text-sm font-medium text-purple-900 mb-2">Инструкции по работе над отчетом:</h4>
-        <ul className="text-sm text-purple-800 space-y-1">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h4 className="text-sm font-medium text-blue-900 mb-2">Инструкции по работе над отчетом:</h4>
+        <ul className="text-sm text-blue-800 space-y-1">
           <li>• <strong>Выбор объекта:</strong> Выберите объект квалификации для анализа данных</li>
           <li>• <strong>Настройка лимитов:</strong> Установите температурные пороги для проверки соответствия</li>
           <li>• <strong>Добавление маркеров:</strong> Двойной клик по графику для отметки важных моментов</li>
