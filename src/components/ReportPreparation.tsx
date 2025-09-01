@@ -35,6 +35,7 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [fileUploading, setFileUploading] = useState<{ [key: string]: boolean }>({});
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [operationLoading, setOperationLoading] = useState(false);
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
     return (
