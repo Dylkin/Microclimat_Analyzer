@@ -152,7 +152,7 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
 
       // Создаем объект UploadedFile
       const uploadedFile: UploadedFile = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         name: file.name,
         uploadDate: new Date().toLocaleString('ru-RU'),
         parsedData,
