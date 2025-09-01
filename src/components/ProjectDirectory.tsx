@@ -133,6 +133,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     console.log('Данные нового проекта:', newProject);
     console.log('ID контрагента:', newProject.contractorId);
     console.log('Тип ID контрагента:', typeof newProject.contractorId);
+    console.log('Выбранные объекты квалификации:', newProject.qualificationObjectIds);
     console.log('Все доступные контрагенты:', contractors.map(c => ({ id: c.id, name: c.name })));
     
     // Проверяем, что contractorId является строкой
@@ -182,6 +183,15 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       return;
     }
 
+    // Проверяем, что все выбранные объекты квалификации существуют
+    const availableObjectIds = getQualificationObjectsForContractor(trimmedContractorId).map(obj => obj.id);
+    const invalidObjectIds = newProject.qualificationObjectIds.filter(id => !availableObjectIds.includes(id));
+    if (invalidObjectIds.length > 0) {
+      console.error('Выбраны несуществующие объекты квалификации:', invalidObjectIds);
+      alert('Ошибка: некоторые выбранные объекты квалификации не найдены. Обновите страницу и попробуйте снова.');
+      return;
+    }
+
     // Проверяем, что все ID объектов квалификации являются валидными UUID
     const invalidQualificationObjectIds = newProject.qualificationObjectIds.filter(id => !isValidUUID(id));
     if (invalidQualificationObjectIds.length > 0) {
@@ -197,6 +207,8 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       const selectedObjects = getQualificationObjectsForContractor(trimmedContractorId)
         .filter(obj => newProject.qualificationObjectIds.includes(obj.id));
       
+      console.log('Найденные выбранные объекты:', selectedObjects.map(obj => ({ id: obj.id, name: obj.name })));
+      
       const contractorName = contractors.find(c => c.id === trimmedContractorId)?.name || 'Неизвестный контрагент';
       const objectNames = selectedObjects.map(obj => 
         obj.name || obj.vin || obj.serialNumber || 'Без названия'
@@ -207,7 +219,8 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       const projectData = {
         ...newProject,
         contractorId: trimmedContractorId,
-        name: projectName
+        name: projectName,
+        qualificationObjectIds: newProject.qualificationObjectIds // Явно передаем выбранные объекты
       };
       
       // Final validation before database call
@@ -216,6 +229,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       console.log('Type:', typeof projectData.contractorId);
       console.log('Is valid UUID:', isValidUUID(projectData.contractorId));
       console.log('Final projectData.qualificationObjectIds:', projectData.qualificationObjectIds);
+      console.log('Number of selected objects:', projectData.qualificationObjectIds.length);
       console.log('All qualification object IDs are valid UUIDs:', projectData.qualificationObjectIds.every(id => isValidUUID(id)));
       
       // Double-check UUID validity one more time
