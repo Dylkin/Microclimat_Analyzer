@@ -290,15 +290,23 @@ export const ContractorDirectory: React.FC = () => {
         setQualificationObjects(prev => prev.map(obj => 
           obj.id === editingQualificationObject.id ? updatedObject : obj
         ));
+        setFilteredQualificationObjects(prev => prev.map(obj => 
+          obj.id === editingQualificationObject.id ? updatedObject : obj
+        ));
+        console.log('Объект квалификации успешно обновлен:', updatedObject);
       } else {
         // Добавляем новый объект
-        const addedObject = await qualificationObjectService.createQualificationObject(objectData);
+        const addedObject = await qualificationObjectService.addQualificationObject(objectData);
         setQualificationObjects(prev => [...prev, addedObject]);
+        setFilteredQualificationObjects(prev => [...prev, addedObject]);
+        console.log('Объект квалификации успешно добавлен:', addedObject);
       }
       setShowAddQualificationForm(false);
       setEditingQualificationObject(null);
+      alert(editingQualificationObject ? 'Объект квалификации успешно обновлен' : 'Объект квалификации успешно добавлен');
     } catch (error) {
       console.error('Ошибка сохранения объекта квалификации:', error);
+      alert(`Ошибка сохранения объекта квалификации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
       setOperationLoading(false);
     }

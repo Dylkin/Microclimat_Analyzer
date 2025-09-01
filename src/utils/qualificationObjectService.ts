@@ -60,6 +60,29 @@ export class QualificationObjectService {
     return data.map(this.mapFromDatabase);
   }
 
+  async addQualificationObject(qualificationObject: Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>): Promise<QualificationObject> {
+    if (!this.isAvailable()) {
+      throw new Error('Supabase не настроен');
+    }
+
+    const dbData = this.mapToDatabase(qualificationObject);
+    
+    const { data, error } = await this.supabase
+      .from('qualification_objects')
+      .insert(dbData)
+      .select(`
+        *,
+        contractor:contractors(name)
+      `)
+      .single();
+
+    if (error) {
+      throw new Error(`Ошибка создания объекта квалификации: ${error.message}`);
+    }
+
+    return this.mapFromDatabase(data);
+  }
+
   async createQualificationObject(qualificationObject: Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>): Promise<QualificationObject> {
     if (!this.isAvailable()) {
       throw new Error('Supabase не настроен');
