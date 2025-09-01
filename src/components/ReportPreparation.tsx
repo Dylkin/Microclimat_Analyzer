@@ -15,32 +15,6 @@ import { VI2ParsingService } from '../utils/vi2Parser';
 import { useAuth } from '../contexts/AuthContext';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 
-interface AnalyzerModalProps {
-  files: UploadedFile[];
-  onClose: () => void;
-}
-
-const AnalyzerModal: React.FC<AnalyzerModalProps> = ({ files, onClose }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl h-full max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Анализатор временных рядов</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-auto p-6">
-          <TimeSeriesAnalyzer files={files} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
 interface ReportPreparationProps {
   project: Project;
   onBack: () => void;
@@ -63,7 +37,6 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   const [fileUploading, setFileUploading] = useState<{ [key: string]: boolean }>({});
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [operationLoading, setOperationLoading] = useState(false);
-  const [showAnalyzer, setShowAnalyzer] = useState(false);
   
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -879,15 +852,6 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-sm font-medium text-blue-900">Сводка по загруженным файлам:</h4>
-              {uploadedFiles.length > 0 && (
-                <button
-                  onClick={() => setShowAnalyzer(true)}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
-                >
-                  <BarChart3 className="w-4 h-4" />
-                  <span>Исследовать данные</span>
-                </button>
-              )}
             </div>
             
             {uploadedFiles.length > 0 ? (
@@ -936,15 +900,25 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
             )}
           </div>
         )}
-      </div>
 
-      {/* Analyzer Modal */}
-      {showAnalyzer && (
-        <AnalyzerModal
-          files={uploadedFiles}
-          onClose={() => setShowAnalyzer(false)}
-        />
-      )}
+        {/* Анализатор временных рядов */}
+        {selectedQualificationObject && uploadedFiles.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-gray-900">Анализатор временных рядов</h4>
+              <div className="flex items-center space-x-2">
+                <BarChart3 className="w-5 h-5 text-purple-600" />
+                <span className="text-sm text-gray-600">
+                  Анализ данных для выбранного объекта квалификации
+                </span>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <TimeSeriesAnalyzer files={uploadedFiles} />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
