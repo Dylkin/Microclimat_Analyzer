@@ -249,7 +249,7 @@ export class ProjectDocumentService {
             .eq('project_id', projectId)
             .eq('qualification_object_id', qualificationObjectId)
             .eq('document_type', documentType)
-            .single();
+            .maybeSingle();
           existingDoc = existing;
         } else {
           // Для commercial_offer и contract ищем по project_id и document_type (qualification_object_id должен быть null)
@@ -259,7 +259,7 @@ export class ProjectDocumentService {
             .eq('project_id', projectId)
             .is('qualification_object_id', null)
             .eq('document_type', documentType)
-            .single();
+            .maybeSingle();
           existingDoc = existing;
         }
 
