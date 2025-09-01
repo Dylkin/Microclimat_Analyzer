@@ -299,15 +299,6 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   // Получение файла для назначения
   const getFileForAssignment = (assignmentId: string) => {
     const assignment = getEquipmentAssignments().find(a => a.id === assignmentId);
-      {uploadedFiles.length > 0 && (
-        <button
-          onClick={() => setShowAnalyzer(true)}
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span>Исследовать данные</span>
-        </button>
-      )}
     if (!assignment) return undefined;
     
     return uploadedFiles.find(file => 
@@ -380,6 +371,11 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Объектов квалификации</label>
+            <p className="text-gray-900">{qualificationObjects.length}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Модальное окно анализатора */}
       <AnalyzerModal
         isOpen={showAnalyzer}
@@ -879,6 +875,15 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-sm font-medium text-blue-900">Сводка по загруженным файлам:</h4>
+              {uploadedFiles.length > 0 && (
+                <button
+                  onClick={() => setShowAnalyzer(true)}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Исследовать данные</span>
+                </button>
+              )}
             </div>
             
             {uploadedFiles.length > 0 ? (
