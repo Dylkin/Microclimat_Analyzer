@@ -69,6 +69,8 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   showVisualization = false, 
   onShowVisualization,
   selectedProject,
+  onBack,
+  analysisData,
   selectedQualificationObjectId
 }) => {
   // Безопасная проверка данных проекта

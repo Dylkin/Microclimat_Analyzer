@@ -45,6 +45,18 @@ const AppContent: React.FC = () => {
             showVisualization={showVisualization}
             onShowVisualization={setShowVisualization}
             selectedProject={selectedProject}
+            onBack={selectedProject?.returnPage ? () => {
+              if (selectedProject.returnPage === 'report_preparation') {
+                handlePageChange('report_preparation', selectedProject.returnData);
+              } else {
+                handlePageChange('projects');
+              }
+            } : undefined}
+            analysisData={selectedProject?.files ? {
+              files: selectedProject.files,
+              returnPage: selectedProject.returnPage,
+              returnData: selectedProject.returnData
+            } : undefined}
           />
         ) : <div>Доступ запрещен</div>;
       case 'contract_negotiation':
