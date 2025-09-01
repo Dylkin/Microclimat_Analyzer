@@ -111,7 +111,7 @@ export class ProjectService {
         .from('project_qualification_objects')
         .select(`
           *,
-          qualification_objects (
+          qualification_object:qualification_objects (
             id,
             name,
             type,
@@ -140,13 +140,19 @@ export class ProjectService {
       // Группируем объекты квалификации по проектам
       const qualificationObjectsByProject = new Map<string, ProjectQualificationObject[]>();
       qualificationObjectsData?.forEach((pqo: any) => {
+        console.log('Обрабатываем связь проект-объект:', {
+          projectId: pqo.project_id,
+          qualificationObjectId: pqo.qualification_object_id,
+          objectData: pqo.qualification_object
+        });
+        
         if (!qualificationObjectsByProject.has(pqo.project_id)) {
           qualificationObjectsByProject.set(pqo.project_id, []);
         }
         
-        const objectName = pqo.qualification_objects?.name || 
-                          pqo.qualification_objects?.vin || 
-                          pqo.qualification_objects?.serial_number || 
+        const objectName = pqo.qualification_object?.name || 
+                          pqo.qualification_object?.vin || 
+                          pqo.qualification_object?.serial_number || 
                           'Без названия';
         
         qualificationObjectsByProject.get(pqo.project_id)!.push({
@@ -154,7 +160,7 @@ export class ProjectService {
           projectId: pqo.project_id,
           qualificationObjectId: pqo.qualification_object_id,
           qualificationObjectName: objectName,
-          qualificationObjectType: pqo.qualification_objects?.type,
+          qualificationObjectType: pqo.qualification_object?.type,
           createdAt: new Date(pqo.created_at)
         });
       });
@@ -180,7 +186,13 @@ export class ProjectService {
       });
 
       // Формируем результат
-      return projectsData.map((project: DatabaseProject) => ({
+      const projects = projectsData.map((project: DatabaseProject) => {
+        const projectQualificationObjects = qualificationObjectsByProject.get(project.id) || [];
+        
+        console.log(`Проект "${project.name}" (ID: ${project.id}) содержит объектов квалификации:`, projectQualificationObjects.length);
+        console.log('ID объектов:', projectQualificationObjects.map(obj => obj.qualificationObjectId));
+        
+        return {
         id: project.id,
         name: project.name,
         description: project.description || undefined,
@@ -192,9 +204,13 @@ export class ProjectService {
         createdByName: project.created_by ? usersMap.get(project.created_by) : undefined,
         createdAt: new Date(project.created_at),
         updatedAt: new Date(project.updated_at),
-        qualificationObjects: qualificationObjectsByProject.get(project.id) || [],
+        qualificationObjects: projectQualificationObjects,
         stageAssignments: stageAssignmentsByProject.get(project.id) || []
-      }));
+        };
+      });
+      
+      console.log('Всего загружено проектов:', projects.length);
+      return projects;
     } catch (error) {
       console.error('Ошибка при получении проектов:', error);
       throw error;
