@@ -46,6 +46,12 @@ interface MicroclimatAnalyzerProps {
   showVisualization?: boolean;
   onShowVisualization?: (show: boolean) => void;
   selectedProject?: {
+  onBack?: () => void;
+  analysisData?: {
+    files: any[];
+    returnPage: string;
+    returnData: any;
+  };
     id: string;
     name: string;
     contractorId: string;

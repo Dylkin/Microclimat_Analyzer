@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, CheckCircle, Clock, AlertTriangle, Building, Car, Refrigerator, Snowflake, MapPin, Eye, Download, BarChart3, Upload, Trash2, Save, X } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle, Clock, AlertTriangle, Building, Car, Refrigerator, Snowflake, MapPin, Eye, Download, BarChart3, Upload, Trash2, Save } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
@@ -13,42 +13,14 @@ import { uploadedFileService } from '../utils/uploadedFileService';
 import { databaseService } from '../utils/database';
 import { VI2ParsingService } from '../utils/vi2Parser';
 import { useAuth } from '../contexts/AuthContext';
-import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
-
-// Компонент модального окна для анализатора
-const AnalyzerModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  files: UploadedFile[];
-}> = ({ isOpen, onClose, files }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full h-full max-w-7xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Анализатор временных рядов</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-auto p-6">
-          <TimeSeriesAnalyzer files={files} />
-        </div>
-      </div>
-    </div>
-  );
-};
 
 interface ReportPreparationProps {
   project: Project;
   onBack: () => void;
+  onPageChange?: (page: string, data?: any) => void;
 }
 
-export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, onBack }) => {
+export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, onBack, onPageChange }) => {
   const { user } = useAuth();
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -65,7 +37,6 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   const [fileUploading, setFileUploading] = useState<{ [key: string]: boolean }>({});
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [operationLoading, setOperationLoading] = useState(false);
-  const [showAnalyzer, setShowAnalyzer] = useState(false);
   
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -377,11 +348,6 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
       </div>
 
       {/* Модальное окно анализатора */}
-      <AnalyzerModal
-        isOpen={showAnalyzer}
-        onClose={() => setShowAnalyzer(false)}
-        files={uploadedFiles}
-      />
 
       {/* Loading State */}
       {loading && (
@@ -877,7 +843,15 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
               <h4 className="text-sm font-medium text-blue-900">Сводка по загруженным файлам:</h4>
               {uploadedFiles.length > 0 && (
                 <button
-                  onClick={() => setShowAnalyzer(true)}
+                  onClick={() => {
+                    if (onPageChange) {
+                      onPageChange('analyzer', {
+                        files: uploadedFiles,
+                        returnPage: 'report_preparation',
+                        returnData: project
+                      });
+                    }
+                  }}
                   className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
                 >
                   <BarChart3 className="w-4 h-4" />
@@ -930,24 +904,6 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                 </button>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Анализатор временных рядов */}
-        {selectedQualificationObject && uploadedFiles.length > 0 && (
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-lg font-semibold text-gray-900">Анализатор временных рядов</h4>
-              <div className="flex items-center space-x-2">
-                <BarChart3 className="w-5 h-5 text-purple-600" />
-                <span className="text-sm text-gray-600">
-                  Анализ данных для выбранного объекта квалификации
-                </span>
-              </div>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <TimeSeriesAnalyzer files={uploadedFiles} />
-            </div>
           </div>
         )}
       </div>
