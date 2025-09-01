@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, CheckCircle, Clock, AlertTriangle, Building, Car, Refrigerator, Snowflake, MapPin, Eye, Download } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle, Clock, AlertTriangle, Building, Car, Refrigerator, Snowflake, MapPin, Eye, Download, BarChart3, Upload, Trash2 } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
+import { UploadedFile } from '../types/FileData';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { equipmentService } from '../utils/equipmentService';
 import { equipmentAssignmentService, EquipmentPlacement } from '../utils/equipmentAssignmentService';
 import { projectDocumentService, ProjectDocument } from '../utils/projectDocumentService';
+import { uploadedFileService } from '../utils/uploadedFileService';
+import { databaseService } from '../utils/database';
+import { VI2ParsingService } from '../utils/vi2Parser';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ReportPreparationProps {
   project: Project;
@@ -14,6 +19,7 @@ interface ReportPreparationProps {
 }
 
 export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, onBack }) => {
+  const { user } = useAuth();
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
@@ -23,6 +29,11 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   // Equipment placement state
   const [equipmentPlacements, setEquipmentPlacements] = useState<Map<string, EquipmentPlacement>>(new Map());
 
+  // Data analysis state
+  const [selectedQualificationObject, setSelectedQualificationObject] = useState<string>('');
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [fileUploading, setFileUploading] = useState<{ [key: string]: boolean }>({});
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
     return (
@@ -94,6 +105,132 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   useEffect(() => {
     loadData();
   }, [project.id]);
+
+  // Загрузка файлов для выбранного объекта квалификации
+  const loadFilesForObject = async (qualificationObjectId: string) => {
+    if (!user?.id || !uploadedFileService.isAvailable()) {
+      return;
+    }
+
+    setAnalysisLoading(true);
+    try {
+      const files = await uploadedFileService.getProjectFiles(project.id, user.id, qualificationObjectId);
+      setUploadedFiles(Array.isArray(files) ? files : []);
+    } catch (error) {
+      console.error('Ошибка загрузки файлов:', error);
+      setUploadedFiles([]);
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
+
+  // Обработчик выбора объекта квалификации
+  const handleQualificationObjectChange = (objectId: string) => {
+    setSelectedQualificationObject(objectId);
+    if (objectId) {
+      loadFilesForObject(objectId);
+    } else {
+      setUploadedFiles([]);
+    }
+  };
+
+  // Загрузка VI2 файла
+  const handleFileUpload = async (assignmentKey: string, file: File) => {
+    if (!file.name.toLowerCase().endsWith('.vi2')) {
+      alert('Поддерживаются только файлы в формате .vi2');
+      return;
+    }
+
+    setFileUploading(prev => ({ ...prev, [assignmentKey]: true }));
+
+    try {
+      // Парсим файл
+      const vi2Parser = new VI2ParsingService();
+      const parsedData = await vi2Parser.parseFile(file);
+
+      // Создаем объект UploadedFile
+      const uploadedFile: UploadedFile = {
+        id: Date.now().toString(),
+        name: file.name,
+        uploadDate: new Date().toLocaleString('ru-RU'),
+        parsedData,
+        parsingStatus: parsedData.parsingStatus,
+        errorMessage: parsedData.errorMessage,
+        recordCount: parsedData.recordCount,
+        period: `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`,
+        order: uploadedFiles.length,
+        qualificationObjectId: selectedQualificationObject
+      };
+
+      // Сохраняем данные в локальную базу
+      if (parsedData.parsingStatus === 'completed') {
+        await databaseService.saveParsedFileData(parsedData, uploadedFile.id);
+      }
+
+      // Обновляем список файлов
+      setUploadedFiles(prev => [...prev, uploadedFile]);
+
+      alert('Файл успешно загружен и обработан');
+    } catch (error) {
+      console.error('Ошибка загрузки файла:', error);
+      alert(`Ошибка загрузки файла: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setFileUploading(prev => ({ ...prev, [assignmentKey]: false }));
+    }
+  };
+
+  // Удаление файла
+  const handleDeleteFile = async (fileId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот файл?')) {
+      return;
+    }
+
+    try {
+      await databaseService.deleteFileData(fileId);
+      setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+      alert('Файл успешно удален');
+    } catch (error) {
+      console.error('Ошибка удаления файла:', error);
+      alert(`Ошибка удаления файла: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
+  };
+
+  // Получение назначений оборудования для выбранного объекта
+  const getEquipmentAssignments = () => {
+    if (!selectedQualificationObject) return [];
+
+    const placement = equipmentPlacements.get(selectedQualificationObject) || { zones: [] };
+    const assignments: any[] = [];
+
+    const zones = Array.isArray(placement?.zones) ? placement.zones : [];
+    zones.forEach(zone => {
+      const levels = Array.isArray(zone?.levels) ? zone.levels : [];
+      levels.forEach(level => {
+        if (level?.equipmentId) {
+          const equipmentItem = (equipment || []).find(eq => eq.id === level.equipmentId);
+          assignments.push({
+            id: `${zone.zoneNumber}-${level.levelValue}`,
+            zoneNumber: zone.zoneNumber,
+            measurementLevel: level.levelValue,
+            equipmentId: level.equipmentId,
+            equipmentName: level.equipmentName || equipmentItem?.name || 'Unknown'
+          });
+        }
+      });
+    });
+
+    return assignments.sort((a, b) => {
+      if (a.zoneNumber !== b.zoneNumber) {
+        return a.zoneNumber - b.zoneNumber;
+      }
+      return a.measurementLevel - b.measurementLevel;
+    });
+  };
+
+  // Получение файла для назначения
+  const getFileForAssignment = (assignmentId: string) => {
+    return uploadedFiles.find(file => file.id === assignmentId);
+  };
 
   // Получение иконки для типа объекта
   const getTypeIcon = (type: string) => {
@@ -476,6 +613,185 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
           <li>• <strong>Информация об испытаниях:</strong> Проверьте наличие всех необходимых файлов</li>
           <li>• <strong>Формирование отчета:</strong> После проверки данных можно переходить к формированию итогового отчета</li>
         </ul>
+      </div>
+
+      {/* Data Analysis Block */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center space-x-3 mb-6">
+          <BarChart3 className="w-6 h-6 text-purple-600" />
+          <h3 className="text-lg font-semibold text-gray-900">Анализ данных</h3>
+        </div>
+
+        {/* Qualification Object Selection */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Выберите объект квалификации для анализа
+          </label>
+          <select
+            value={selectedQualificationObject}
+            onChange={(e) => handleQualificationObjectChange(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option value="">Выберите объект квалификации</option>
+            {qualificationObjects.map(obj => (
+              <option key={obj.id} value={obj.id}>
+                {obj.name || obj.vin || obj.serialNumber || 'Без названия'} - {QualificationObjectTypeLabels[obj.type]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Equipment Assignments Table */}
+        {selectedQualificationObject && (
+          <div>
+            <h4 className="text-md font-medium text-gray-900 mb-4">Назначения оборудования и загрузка данных</h4>
+            
+            {analysisLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Загрузка данных...</p>
+              </div>
+            ) : (
+              <>
+                {getEquipmentAssignments().length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
+                            № зоны
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
+                            Уровень (м)
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
+                            Оборудование
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Файл данных (.vi2)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {getEquipmentAssignments().map((assignment) => {
+                          const assignmentFile = getFileForAssignment(assignment.id);
+                          const isUploading = fileUploading[assignment.id];
+                          
+                          return (
+                            <tr key={assignment.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r border-gray-200">
+                                {assignment.zoneNumber}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 border-r border-gray-200">
+                                {assignment.measurementLevel}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 border-r border-gray-200">
+                                <div>
+                                  <div className="font-medium">{assignment.equipmentName}</div>
+                                  <div className="text-xs text-gray-400">ID: {assignment.equipmentId}</div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {assignmentFile ? (
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                      <CheckCircle className="w-4 h-4 text-green-600" />
+                                      <div>
+                                        <div className="font-medium text-gray-900">{assignmentFile.name}</div>
+                                        <div className="text-xs text-gray-500">
+                                          {assignmentFile.recordCount} записей • {assignmentFile.period}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => handleDeleteFile(assignmentFile.id)}
+                                      className="text-red-600 hover:text-red-800 transition-colors"
+                                      title="Удалить файл"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center space-x-2">
+                                    {isUploading ? (
+                                      <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                                        <span className="text-indigo-600">Загрузка...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <input
+                                          type="file"
+                                          accept=".vi2"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                              handleFileUpload(assignment.id, file);
+                                            }
+                                          }}
+                                          className="hidden"
+                                          id={`file-upload-${assignment.id}`}
+                                        />
+                                        <label
+                                          htmlFor={`file-upload-${assignment.id}`}
+                                          className="inline-flex items-center px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors cursor-pointer"
+                                        >
+                                          <Upload className="w-3 h-3 mr-1" />
+                                          Загрузить
+                                        </label>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                    <Building className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p>Назначения оборудования не настроены для выбранного объекта</p>
+                    <p className="text-sm mt-1">Настройте размещение оборудования на этапе "Проведение испытаний"</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Files Summary */}
+        {selectedQualificationObject && uploadedFiles.length > 0 && (
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="text-sm font-medium text-blue-900 mb-2">Сводка по загруженным файлам:</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="flex items-center space-x-2">
+                <FileText className="w-4 h-4 text-blue-600" />
+                <span className="text-blue-800">Всего файлов: {uploadedFiles.length}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="w-4 h-4 text-green-600" />
+                <span className="text-blue-800">
+                  Обработано: {uploadedFiles.filter(f => f.parsingStatus === 'completed').length}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+                <span className="text-blue-800">
+                  Ошибок: {uploadedFiles.filter(f => f.parsingStatus === 'error').length}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <BarChart3 className="w-4 h-4 text-purple-600" />
+                <span className="text-blue-800">
+                  Записей: {uploadedFiles.reduce((sum, f) => sum + (f.recordCount || 0), 0)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
