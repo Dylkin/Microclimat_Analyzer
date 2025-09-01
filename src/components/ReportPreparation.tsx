@@ -845,10 +845,9 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                 <button
                   onClick={() => {
                     if (onPageChange) {
-                      onPageChange('analyzer', {
-                        files: uploadedFiles,
-                        returnPage: 'report_preparation',
-                        returnData: project
+                      onPageChange('report_work', {
+                        project: project,
+                        files: uploadedFiles
                       });
                     }
                   }}

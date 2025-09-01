@@ -88,6 +88,13 @@ const AppContent: React.FC = () => {
             onPageChange={handlePageChange}
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;
+      case 'report_work':
+        return hasAccess('analyzer') && selectedProject ? (
+          <ReportWork 
+            project={selectedProject}
+            onBack={() => handlePageChange('report_preparation', selectedProject)}
+          />
+        ) : <div>Доступ запрещен или проект не выбран</div>;
       case 'help':
         return hasAccess('help') ? <Help /> : <div>Доступ запрещен</div>;
       case 'users':
