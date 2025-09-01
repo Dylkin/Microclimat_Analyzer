@@ -126,7 +126,7 @@ export class UploadedFileService {
   }
 
   // Получение файлов проекта
-  async getProjectFiles(projectId: string, userId: string): Promise<UploadedFile[]> {
+  async getProjectFiles(projectId: string, userId: string, qualificationObjectId?: string): Promise<UploadedFile[]> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
     }
@@ -146,12 +146,8 @@ export class UploadedFileService {
       console.log('Загружаем файлы проекта:', projectId);
       console.log('ID пользователя:', userId);
 
-      // Получаем файлы пользователя, которые могут быть связаны с проектом
-      // Пока используем простую логику - файлы пользователя за последние 30 дней
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      const { data, error } = await this.supabase
+      // Строим запрос для получения файлов
+      let query = this.supabase
         .from('uploaded_files')
         .select(`
           id,
@@ -171,9 +167,18 @@ export class UploadedFileService {
           created_at,
           updated_at
         `)
-        .eq('user_id', userId)
-        .gte('upload_date', thirtyDaysAgo.toISOString())
-        .order('file_order', { ascending: true });
+        .eq('user_id', userId);
+      
+      // Если указан объект квалификации, фильтруем по нему
+      if (qualificationObjectId) {
+        // Для файлов проекта ищем по связи через project_equipment_assignments
+        // Пока используем простую логику - файлы за последние 30 дней
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        query = query.gte('upload_date', thirtyDaysAgo.toISOString());
+      }
+      
+      const { data, error } = await query.order('file_order', { ascending: true });
 
       if (error) {
         console.error('Ошибка получения файлов проекта:', error);

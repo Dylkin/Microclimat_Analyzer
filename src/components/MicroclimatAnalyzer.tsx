@@ -183,11 +183,11 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       if (equipmentService.isAvailable()) {
         try {
           const equipmentResult = await equipmentService.getAllEquipment(1, 1000); // Загружаем все оборудование
-          setEquipment(equipmentResult.equipment);
-        } catch (error) {
-          console.error('Ошибка загрузки оборудования:', error);
-        }
-      }
+          savedFiles = await uploadedFileService.getProjectFiles(
+            selectedProject.id, 
+            userId, 
+            selectedQualificationObject
+          );
     };
 
     loadInitialData();
@@ -196,17 +196,26 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   // Загрузка назначений оборудования при выборе объекта квалификации
   React.useEffect(() => {
     const loadEquipmentAssignments = async () => {
-      if (!selectedQualificationObject || !selectedProject || !equipmentAssignmentService.isAvailable()) {
+      if (!selectedQualificationObject || !equipmentAssignmentService.isAvailable()) {
         setEquipmentAssignments([]);
+        setUploadedFiles([]);
         return;
       }
 
       try {
         console.log('Загружаем назначения оборудования для объекта:', selectedQualificationObject);
-        const placement = await equipmentAssignmentService.getEquipmentPlacement(
-          selectedProject.id, 
-          selectedQualificationObject
-        );
+        
+        let placement;
+        if (selectedProject) {
+          // Если есть проект, загружаем размещение для проекта
+          placement = await equipmentAssignmentService.getEquipmentPlacement(
+            selectedProject.id, 
+            selectedQualificationObject
+          );
+        } else {
+          // Если нет проекта, создаем пустое размещение
+          placement = { zones: [] };
+        }
         
         // Преобразуем размещение в список назначений
         const assignments: EquipmentAssignment[] = [];
@@ -216,7 +225,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
               const equipmentItem = equipment.find(eq => eq.id === level.equipmentId);
               assignments.push({
                 id: `${zone.zoneNumber}-${level.levelValue}`,
-                projectId: selectedProject.id,
+                projectId: selectedProject?.id || '',
                 qualificationObjectId: selectedQualificationObject,
                 equipmentId: level.equipmentId,
                 equipmentName: level.equipmentName || equipmentItem?.name,
@@ -232,33 +241,89 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         setEquipmentAssignments(assignments);
         console.log('Загружено назначений оборудования:', assignments.length);
         
+        // Загружаем ранее сохраненные файлы для этого объекта квалификации
+        let savedFiles: UploadedFile[] = [];
+        if (selectedProject && uploadedFileService.isAvailable()) {
+          try {
+            const userId = await getUserIdOrThrow();
+            const projectFiles = await uploadedFileService.getProjectFiles(selectedProject.id, userId);
+            // Фильтруем файлы для выбранного объекта квалификации
+            savedFiles = projectFiles.filter(file => 
+              file.qualificationObjectId === selectedQualificationObject
+            );
+            console.log('Загружено сохраненных файлов для объекта:', savedFiles.length);
+          } catch (error) {
+            console.error('Ошибка загрузки сохраненных файлов:', error);
+          }
+        }
+        
         // Создаем строки в таблице для каждого назначения оборудования
-        const newFiles: UploadedFile[] = assignments.map((assignment, index) => ({
-          id: crypto.randomUUID(),
-          name: `${assignment.equipmentName || 'Unknown'}_zone${assignment.zoneNumber}_level${assignment.measurementLevel}.vi2`,
-          uploadDate: new Date().toLocaleString('ru-RU'),
-          parsingStatus: 'pending' as const,
-          order: index,
-          zoneNumber: assignment.zoneNumber,
-          measurementLevel: assignment.measurementLevel.toString(),
+        const newFiles: UploadedFile[] = assignments.map((assignment, index) => {
+          // Ищем сохраненный файл для этого назначения
+          const savedFile = savedFiles.find(file => 
+            file.zoneNumber === assignment.zoneNumber && 
+            file.measurementLevel === assignment.measurementLevel.toString()
+          );
+          
+          if (savedFile) {
+            // Если есть сохраненный файл, используем его данные
+            return {
+              ...savedFile,
+              order: index,
+              contractorId: selectedContractor || undefined,
+              qualificationObjectId: selectedQualificationObject,
+              qualificationObjectName: getQualificationObjectName(selectedQualificationObject),
+              contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
+            };
+          } else {
+            // Если нет сохраненного файла, создаем новую строку
+            return {
+              id: crypto.randomUUID(),
+              name: `${assignment.equipmentName || 'Unknown'}_zone${assignment.zoneNumber}_level${assignment.measurementLevel}.vi2`,
+              uploadDate: new Date().toLocaleString('ru-RU'),
+              parsingStatus: 'pending' as const,
+              order: index,
+              zoneNumber: assignment.zoneNumber,
+              measurementLevel: assignment.measurementLevel.toString(),
+              contractorId: selectedContractor || undefined,
+              qualificationObjectId: selectedQualificationObject,
+              qualificationObjectName: getQualificationObjectName(selectedQualificationObject),
+              contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
+            };
+          }
+        });
+        
+        // Добавляем файлы, которые не связаны с назначениями оборудования (если есть)
+        const filesWithoutAssignment = savedFiles.filter(file => 
+          !assignments.some(assignment => 
+            assignment.zoneNumber === file.zoneNumber && 
+            assignment.measurementLevel.toString() === file.measurementLevel
+          )
+        );
+        
+        // Объединяем файлы из назначений и дополнительные файлы
+        const allFiles = [...newFiles, ...filesWithoutAssignment.map((file, index) => ({
+          ...file,
+          order: newFiles.length + index,
           contractorId: selectedContractor || undefined,
           qualificationObjectId: selectedQualificationObject,
           qualificationObjectName: getQualificationObjectName(selectedQualificationObject),
           contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
-        }));
+        }))];
         
-        // Заменяем текущие файлы на файлы из назначений оборудования
-        setUploadedFiles(newFiles);
-        console.log('Создано строк в таблице:', newFiles.length);
+        // Заменяем текущие файлы на объединенные файлы
+        setUploadedFiles(allFiles);
+        console.log('Загружено строк в таблице:', allFiles.length, '(назначения:', newFiles.length, ', дополнительные:', filesWithoutAssignment.length, ')');
         
       } catch (error) {
         console.error('Ошибка загрузки назначений оборудования:', error);
         setEquipmentAssignments([]);
+        setUploadedFiles([]);
       }
     };
 
     loadEquipmentAssignments();
-  }, [selectedQualificationObject, selectedProject, equipment]);
+  }, [selectedQualificationObject, selectedProject, equipment, selectedContractor]);
 
   // Загрузка ранее сохраненных файлов проекта
   React.useEffect(() => {
