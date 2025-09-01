@@ -66,38 +66,39 @@ export class UploadedFileService {
       throw new Error('Supabase не настроен');
     }
 
-    // Мягкая валидация с логированием
-    if (!userId) {
-      console.error('Отсутствует ID пользователя');
-      throw new Error('ID пользователя не предоставлен');
-    }
-    
-    if (!isValidUUID(userId)) {
-      console.error('Невалидный UUID пользователя:', userId);
-      throw new Error('Невалидный формат ID пользователя');
-    }
-
     try {
+      // Получаем текущего аутентифицированного пользователя
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError) {
+        console.error('Ошибка получения пользователя:', authError);
+        throw new Error('Ошибка аутентификации');
+      }
+      if (!user) {
+        throw new Error('Пользователь не авторизован');
+      }
+
       console.log('Сохраняем файлы проекта:', saveData);
-      console.log('ID пользователя:', userId);
+      console.log('ID аутентифицированного пользователя:', user.id);
 
       // Подготавливаем данные для вставки
       const filesToInsert = saveData.files.map(file => ({
         id: file.id,
-        user_id: userId,
+        user_id: user.id,
         name: file.name,
         original_name: file.name,
         upload_date: new Date().toISOString(),
         parsing_status: file.parsingStatus,
         error_message: file.errorMessage || null,
         record_count: file.recordCount || 0,
-        period_start: file.parsedData?.startDate?.toISOString() || null,
-        period_end: file.parsedData?.endDate?.toISOString() || null,
+        period_start: file.parsedData?.startDate ? file.parsedData.startDate.toISOString() : null,
+        period_end: file.parsedData?.endDate ? file.parsedData.endDate.toISOString() : null,
         zone_number: file.zoneNumber || null,
         measurement_level: file.measurementLevel || null,
         file_order: file.order,
         object_type: saveData.objectType
       }));
+
+      console.log('Данные для вставки:', filesToInsert);
 
       // Используем upsert для обновления существующих записей или создания новых
       const { error } = await this.supabase
@@ -131,20 +132,19 @@ export class UploadedFileService {
       throw new Error('Supabase не настроен');
     }
 
-    // Мягкая валидация с логированием
-    if (!userId) {
-      console.error('Отсутствует ID пользователя для загрузки файлов');
-      throw new Error('ID пользователя не предоставлен');
-    }
-    
-    if (!isValidUUID(userId)) {
-      console.error('Невалидный UUID пользователя для загрузки файлов:', userId);
-      throw new Error('Невалидный формат ID пользователя');
-    }
-
     try {
+      // Получаем текущего аутентифицированного пользователя
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError) {
+        console.error('Ошибка получения пользователя:', authError);
+        throw new Error('Ошибка аутентификации');
+      }
+      if (!user) {
+        throw new Error('Пользователь не авторизован');
+      }
+
       console.log('Загружаем файлы проекта:', projectId);
-      console.log('ID пользователя:', userId);
+      console.log('ID аутентифицированного пользователя:', user.id);
 
       // Строим запрос для получения файлов
       let query = this.supabase
@@ -167,7 +167,7 @@ export class UploadedFileService {
           created_at,
           updated_at
         `)
-        .eq('user_id', userId);
+        .eq('user_id', user.id);
       
       // Если указан объект квалификации, фильтруем по нему
       if (qualificationObjectId) {
