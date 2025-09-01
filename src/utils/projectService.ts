@@ -209,6 +209,7 @@ export class ProjectService {
 
     try {
       console.log('Добавляем проект:', projectData);
+      console.log('Выбранные объекты квалификации:', projectData.qualificationObjectIds);
 
       // Валидация UUID контрагента
       if (!this.isValidUUID(projectData.contractorId)) {
@@ -249,10 +250,13 @@ export class ProjectService {
 
       // Добавляем связи с объектами квалификации
       if (projectData.qualificationObjectIds.length > 0) {
+        console.log('Добавляем связи с объектами квалификации:', projectData.qualificationObjectIds);
         const qualificationObjectsToInsert = projectData.qualificationObjectIds.map(objectId => ({
           project_id: projectResult.id,
           qualification_object_id: objectId
         }));
+        
+        console.log('Данные для вставки в project_qualification_objects:', qualificationObjectsToInsert);
 
         const { error: qualificationObjectsError } = await this.supabase
           .from('project_qualification_objects')
@@ -260,6 +264,9 @@ export class ProjectService {
 
         if (qualificationObjectsError) {
           console.error('Ошибка добавления объектов квалификации:', qualificationObjectsError);
+          throw new Error(`Ошибка добавления объектов квалификации: ${qualificationObjectsError.message}`);
+        } else {
+          console.log('Связи с объектами квалификации успешно добавлены');
         }
       }
 
@@ -291,6 +298,8 @@ export class ProjectService {
         throw new Error('Не удалось найти созданный проект');
       }
 
+      console.log('Созданный проект содержит объектов квалификации:', createdProject.qualificationObjects.length);
+      console.log('ID объектов в созданном проекте:', createdProject.qualificationObjects.map(obj => obj.qualificationObjectId));
       return createdProject;
     } catch (error) {
       console.error('Ошибка при добавлении проекта:', error);
