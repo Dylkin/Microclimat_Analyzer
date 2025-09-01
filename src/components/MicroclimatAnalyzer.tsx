@@ -65,6 +65,21 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   selectedProject,
   selectedQualificationObjectId
 }) => {
+  // Безопасная проверка данных проекта
+  if (selectedProject && (!selectedProject.id || !selectedProject.qualificationObjects)) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-3">
+          <BarChart3 className="w-8 h-8 text-red-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки проекта</h1>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <p className="text-red-600">Данные проекта не найдены или повреждены</p>
+        </div>
+      </div>
+    );
+  }
+
   const { user } = useAuth();
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const [contractors, setContractors] = React.useState<Contractor[]>([]);
