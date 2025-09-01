@@ -15,6 +15,34 @@ import { VI2ParsingService } from '../utils/vi2Parser';
 import { useAuth } from '../contexts/AuthContext';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 
+// Компонент модального окна для анализатора
+const AnalyzerModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  files: UploadedFile[];
+}> = ({ isOpen, onClose, files }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full h-full max-w-7xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">Анализатор временных рядов</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-6">
+          <TimeSeriesAnalyzer files={files} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface ReportPreparationProps {
   project: Project;
   onBack: () => void;
@@ -37,6 +65,7 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   const [fileUploading, setFileUploading] = useState<{ [key: string]: boolean }>({});
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [operationLoading, setOperationLoading] = useState(false);
+  const [showAnalyzer, setShowAnalyzer] = useState(false);
   
   // Безопасная проверка данных проекта
   if (!project || !project.id) {
@@ -270,6 +299,15 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
   // Получение файла для назначения
   const getFileForAssignment = (assignmentId: string) => {
     const assignment = getEquipmentAssignments().find(a => a.id === assignmentId);
+      {uploadedFiles.length > 0 && (
+        <button
+          onClick={() => setShowAnalyzer(true)}
+          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Исследовать данные</span>
+        </button>
+      )}
     if (!assignment) return undefined;
     
     return uploadedFiles.find(file => 
@@ -342,23 +380,12 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Объектов квалификации</label>
-            <p className="text-gray-900">{project.qualificationObjects.length}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start space-x-2">
-            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки данных</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Модальное окно анализатора */}
+      <AnalyzerModal
+        isOpen={showAnalyzer}
+        onClose={() => setShowAnalyzer(false)}
+        files={uploadedFiles}
+      />
 
       {/* Loading State */}
       {loading && (
