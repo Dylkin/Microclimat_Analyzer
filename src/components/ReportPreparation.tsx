@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, CheckCircle, Clock, AlertTriangle, Building, Car, Refrigerator, Snowflake, MapPin, Eye, Download, BarChart3, Upload, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle, Clock, AlertTriangle, Building, Car, Refrigerator, Snowflake, MapPin, Eye, Download, BarChart3, Upload, Trash2, Save, X } from 'lucide-react';
 import { Project } from '../types/Project';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
 import { Equipment } from '../types/Equipment';
