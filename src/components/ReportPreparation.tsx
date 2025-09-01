@@ -668,6 +668,12 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                             Оборудование
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Файл
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Статус
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Файл данных (.vi2)
                           </th>
                         </tr>
@@ -693,11 +699,39 @@ export const ReportPreparation: React.FC<ReportPreparationProps> = ({ project, o
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {assignmentFile ? (
+                                  <div className="font-medium text-gray-900">{assignmentFile.name}</div>
+                                ) : (
+                                  <span className="text-gray-400">Не загружен</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {assignmentFile ? (
+                                  <div>
+                                    <div className="text-xs text-gray-500">
+                                      {assignmentFile.uploadDate}
+                                    </div>
+                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                      assignmentFile.parsingStatus === 'completed' 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : assignmentFile.parsingStatus === 'error'
+                                        ? 'bg-red-100 text-red-800'
+                                        : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                      {assignmentFile.parsingStatus === 'completed' ? 'Обработан' :
+                                       assignmentFile.parsingStatus === 'error' ? 'Ошибка' :
+                                       assignmentFile.parsingStatus === 'processing' ? 'Обработка' : 'Ожидание'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {assignmentFile ? (
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-2">
                                       <CheckCircle className="w-4 h-4 text-green-600" />
                                       <div>
-                                        <div className="font-medium text-gray-900">{assignmentFile.name}</div>
                                         <div className="text-xs text-gray-500">
                                           {assignmentFile.recordCount} записей • {assignmentFile.period}
                                         </div>
