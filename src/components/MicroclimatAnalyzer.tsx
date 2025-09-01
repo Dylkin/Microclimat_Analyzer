@@ -198,7 +198,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       if (equipmentService.isAvailable()) {
         try {
           const equipmentResult = await equipmentService.getAllEquipment(1, 1000); // Загружаем все оборудование
-          setEquipment(equipmentResult.data);
+          setEquipment(Array.isArray(equipmentResult?.data) ? equipmentResult.data : []);
         } catch (error) {
           console.error('Ошибка загрузки оборудования:', error);
         }
@@ -237,7 +237,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         placement.zones.forEach(zone => {
           zone.levels.forEach(level => {
             if (level.equipmentId) {
-              const equipmentItem = equipment.find(eq => eq.id === level.equipmentId);
+              const equipmentItem = (equipment || []).find(eq => eq.id === level.equipmentId);
               assignments.push({
                 id: `${zone.zoneNumber}-${level.levelValue}`,
                 projectId: selectedProject?.id || '',
@@ -459,7 +459,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
   // Получение названия оборудования по ID
   const getEquipmentNameById = (equipmentId: string) => {
-    const eq = equipment.find(e => e.id === equipmentId);
+    const eq = (equipment || []).find(e => e.id === equipmentId);
     return eq ? eq.name : 'Unknown';
   };
 
