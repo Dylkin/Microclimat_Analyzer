@@ -161,14 +161,23 @@ export const ReportWork: React.FC<ReportWorkProps> = ({ project, files: propFile
 
   // Загрузка файлов для выбранного объекта квалификации
   const loadFilesForObject = async (qualificationObjectId: string) => {
-    if (!user?.id || !uploadedFileService.isAvailable()) {
+    if (!user?.id) {
       return;
     }
 
     setAnalysisLoading(true);
     try {
-      const files = await uploadedFileService.getProjectFiles(project?.id || '', user.id, qualificationObjectId);
-      setUploadedFiles(Array.isArray(files) ? files : []);
+      if (uploadedFileService.isAvailable() && project?.id) {
+        // Загружаем файлы из базы данных
+        const files = await uploadedFileService.getProjectFiles(project.id, user.id, qualificationObjectId);
+        setUploadedFiles(Array.isArray(files) ? files : []);
+      } else {
+        // Используем переданные файлы, фильтруя по объекту квалификации
+        const filteredFiles = (files || []).filter(file => 
+          file.qualificationObjectId === qualificationObjectId
+        );
+        setUploadedFiles(filteredFiles);
+      }
     } catch (error) {
       console.error('Ошибка загрузки файлов:', error);
       setUploadedFiles([]);
