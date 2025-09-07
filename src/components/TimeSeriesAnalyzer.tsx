@@ -556,7 +556,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     } else {
       return `Несколько объектов (${uniqueQualificationIds.length})`;
     }
-  };
+  }, []);
 
   if (loading) {
     return (
