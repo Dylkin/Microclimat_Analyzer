@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, BarChart, Thermometer, Droplets, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, BarChart, Thermometer, Droplets, FileText, ExternalLink, XCircle, CheckCircle, X } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -189,7 +189,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         [limitType]: numValue
       }
     }));
-  }, []);
+  };
 
   const handleAddMarker = useCallback((timestamp: number) => {
     const newMarker: VerticalMarker = {
@@ -279,6 +279,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }));
     }
   }, []);
+  
   const handleRemoveTemplate = useCallback(() => {
     setReportStatus(prev => ({ 
       ...prev, 
@@ -322,8 +323,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Отладка: выводим все поля contractFields
       console.log('Contract fields:', contractFields);
       console.log('Test type value:', contractFields.testType);
-     console.log('Current limits:', limits);
-     console.log('Current dataType:', dataType);
+      console.log('Current limits:', limits);
+      console.log('Current dataType:', dataType);
       
       // Функция для получения читаемого названия типа испытания
       const getTestTypeLabel = (testType: string): string => {
@@ -355,7 +356,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         conclusions,
         researchObject: getQualificationObjectDisplayName() || '',
         conditioningSystem: contractFields.climateInstallation || '',
-       testType: convertedTestType || '',
+        testType: convertedTestType || '',
         limits: limits,
         executor: user?.fullName || '',
         testDate: dateStr,
@@ -556,14 +557,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     } else {
       return `Несколько объектов (${uniqueQualificationIds.length})`;
     }
-  };
+  }, [files]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-        testType: getTestTypeLabel(contractFields.testType) || ''
+          <p className="text-gray-600">Загрузка данных...</p>
         </div>
       </div>
     );
@@ -898,6 +899,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           )}
         </div>
       </div>
+      
       {/* Analysis Results Table */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
