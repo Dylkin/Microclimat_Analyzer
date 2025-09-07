@@ -22,7 +22,7 @@ const initSupabase = () => {
   return supabase;
 };
 
-export interface DatabaseProject {
+interface DatabaseProject {
   id: string;
   name: string;
   description: string | null;
@@ -34,14 +34,14 @@ export interface DatabaseProject {
   updated_at: string;
 }
 
-export interface DatabaseProjectQualificationObject {
+interface DatabaseProjectQualificationObject {
   id: string;
   project_id: string;
   qualification_object_id: string;
   created_at: string;
 }
 
-export interface DatabaseProjectStageAssignment {
+interface DatabaseProjectStageAssignment {
   id: string;
   project_id: string;
   stage: ProjectStatus;
@@ -52,7 +52,7 @@ export interface DatabaseProjectStageAssignment {
   created_at: string;
 }
 
-export class ProjectService {
+class ProjectService {
   private supabase: any;
 
   constructor() {

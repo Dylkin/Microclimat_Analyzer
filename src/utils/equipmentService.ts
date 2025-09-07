@@ -15,7 +15,7 @@ const initSupabase = () => {
   return supabase;
 };
 
-export interface DatabaseEquipment {
+interface DatabaseEquipment {
   id: string;
   type: EquipmentType;
   name: string;
@@ -24,7 +24,7 @@ export interface DatabaseEquipment {
   updated_at: string;
 }
 
-export interface DatabaseEquipmentVerification {
+interface DatabaseEquipmentVerification {
   id: string;
   equipment_id: string;
   verification_start_date: string;
@@ -34,7 +34,7 @@ export interface DatabaseEquipmentVerification {
   created_at: string;
 }
 
-export class EquipmentService {
+class EquipmentService {
   private supabase: any;
 
   constructor() {

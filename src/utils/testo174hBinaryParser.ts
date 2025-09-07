@@ -500,7 +500,7 @@ export class Testo174HBinaryParser {
 /**
  * Сервис для парсинга файлов Testo 174H
  */
-export class Testo174HParsingService {
+class Testo174HParsingService {
   async parseFile(file: File): Promise<ParsedFileData> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
