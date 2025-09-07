@@ -279,7 +279,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }));
     }
   }, []);
-  
   const handleRemoveTemplate = useCallback(() => {
     setReportStatus(prev => ({ 
       ...prev, 
@@ -323,8 +322,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Отладка: выводим все поля contractFields
       console.log('Contract fields:', contractFields);
       console.log('Test type value:', contractFields.testType);
-      console.log('Current limits:', limits);
-      console.log('Current dataType:', dataType);
+     console.log('Current limits:', limits);
+     console.log('Current dataType:', dataType);
       
       // Функция для получения читаемого названия типа испытания
       const getTestTypeLabel = (testType: string): string => {
@@ -356,7 +355,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         conclusions,
         researchObject: getQualificationObjectDisplayName() || '',
         conditioningSystem: contractFields.climateInstallation || '',
-        testType: convertedTestType || '',
+       testType: convertedTestType || '',
         limits: limits,
         executor: user?.fullName || '',
         testDate: dateStr,
@@ -899,7 +898,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           )}
         </div>
       </div>
-      
       {/* Analysis Results Table */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
