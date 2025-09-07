@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, BarChart, Thermometer, Droplets, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, BarChart, Thermometer, Droplets, FileText, ExternalLink, XCircle, CheckCircle, X } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -189,7 +189,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         [limitType]: numValue
       }
     }));
-  }, []);
+  };
 
   const handleAddMarker = useCallback((timestamp: number) => {
     const newMarker: VerticalMarker = {
@@ -556,14 +556,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     } else {
       return `Несколько объектов (${uniqueQualificationIds.length})`;
     }
-  };
+  }, [files]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-        testType: getTestTypeLabel(contractFields.testType) || ''
+          <p className="text-gray-600">Загрузка данных...</p>
         </div>
       </div>
     );
