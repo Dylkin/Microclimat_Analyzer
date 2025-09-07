@@ -1,11 +1,10 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, BarChart, Thermometer, Droplets, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
-import html2canvas from 'html2canvas';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
 
 interface TimeSeriesAnalyzerProps {

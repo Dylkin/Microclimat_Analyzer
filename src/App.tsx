@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
-import { MicroclimatAnalyzer } from './components/MicroclimatAnalyzer';
 import { Help } from './components/Help';
 import { DatabaseTest } from './components/DatabaseTest';
 import { UserDirectory } from './components/UserDirectory';
@@ -14,6 +13,7 @@ import { ProtocolPreparation } from './components/ProtocolPreparation';
 import { ReportPreparation } from './components/ReportPreparation';
 import { TestingExecution } from './components/TestingExecution';
 import { ReportWork } from './components/ReportWork';
+import { TimeSeriesAnalyzer } from './components/TimeSeriesAnalyzer';
 import './index.css';
 
 const AppContent: React.FC = () => {
@@ -42,22 +42,9 @@ const AppContent: React.FC = () => {
     switch (currentPage) {
       case 'analyzer':
         return hasAccess('analyzer') ? (
-          <MicroclimatAnalyzer 
-            showVisualization={showVisualization}
-            onShowVisualization={setShowVisualization}
-            selectedProject={selectedProject}
-            onBack={selectedProject?.returnPage ? () => {
-              if (selectedProject.returnPage === 'report_preparation') {
-                handlePageChange('report_preparation', selectedProject.returnData);
-              } else {
-                handlePageChange('projects');
-              }
-            } : undefined}
-            analysisData={selectedProject?.files ? {
-              files: selectedProject.files,
-              returnPage: selectedProject.returnPage,
-              returnData: selectedProject.returnData
-            } : undefined}
+          <TimeSeriesAnalyzer 
+            files={selectedProject?.files || []}
+            onBack={() => handlePageChange('projects')}
           />
         ) : <div>Доступ запрещен</div>;
       case 'contract_negotiation':
@@ -110,11 +97,12 @@ const AppContent: React.FC = () => {
       case 'database':
         return hasAccess('database') ? <DatabaseTest /> : <div>Доступ запрещен</div>;
       default:
-        return <MicroclimatAnalyzer 
-          showVisualization={showVisualization}
-          onShowVisualization={setShowVisualization}
-          selectedProject={selectedProject}
-        />;
+        return hasAccess('analyzer') ? (
+          <TimeSeriesAnalyzer 
+            files={[]}
+            onBack={() => handlePageChange('projects')}
+          />
+        ) : <div>Доступ запрещен</div>;
     }
   };
 
