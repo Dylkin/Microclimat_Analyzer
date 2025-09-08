@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { QualificationObject } from '../types/QualificationObject';
 
-class QualificationObjectService {
+export class QualificationObjectService {
   private supabase;
 
   constructor() {

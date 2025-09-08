@@ -198,7 +198,7 @@ export class Testo174TBinaryParser {
 /**
  * Сервис для парсинга файлов Testo 174T (одноканальный)
  */
-class Testo174TParsingService {
+export class Testo174TParsingService {
   async parseFile(file: File): Promise<ParsedFileData> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();

@@ -15,7 +15,7 @@ const initSupabase = () => {
   return supabase;
 };
 
-interface DatabaseUser {
+export interface DatabaseUser {
   id: string;
   full_name: string;
   email: string;
@@ -26,7 +26,7 @@ interface DatabaseUser {
   updated_at: string;
 }
 
-class UserService {
+export class UserService {
   private supabase: any;
 
   constructor() {

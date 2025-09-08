@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, BarChart, Thermometer, Droplets, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
+import html2canvas from 'html2canvas';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
 
 interface TimeSeriesAnalyzerProps {
@@ -189,7 +190,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         [limitType]: numValue
       }
     }));
-  }, []);
+  };
 
   const handleAddMarker = useCallback((timestamp: number) => {
     const newMarker: VerticalMarker = {
@@ -202,18 +203,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setMarkers(prev => [...prev, newMarker]);
   }, [markers.length]);
 
-  const handleUpdateMarker = useCallback((id: string, label: string) => {
+  const handleUpdateMarker = (id: string, label: string) => {
     setMarkers(prev => prev.map(m => m.id === id ? { ...m, label } : m));
     setEditingMarker(null);
-  }, []);
+  };
 
-  const handleUpdateMarkerType = useCallback((id: string, type: MarkerType) => {
+  const handleUpdateMarkerType = (id: string, type: MarkerType) => {
     const color = type === 'test' ? '#8b5cf6' : '#f59e0b';
     setMarkers(prev => prev.map(m => m.id === id ? { ...m, type, color } : m));
     setEditingMarkerType(null);
-  }, []);
+  };
 
-  const getMarkerTypeLabel = useCallback((type: MarkerType): string => {
+  const getMarkerTypeLabel = (type: MarkerType): string => {
     switch (type) {
       case 'test':
         return 'Испытание';
@@ -222,24 +223,24 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       default:
         return 'Неизвестно';
     }
-  }, []);
+  };
 
-  const handleDeleteMarker = useCallback((id: string) => {
+  const handleDeleteMarker = (id: string) => {
     setMarkers(prev => prev.filter(m => m.id !== id));
-  }, []);
+  };
 
-  const handleResetZoom = useCallback(() => {
+  const handleResetZoom = () => {
     setZoomState(undefined);
-  }, []);
+  };
 
-  const handleContractFieldChange = useCallback((field: keyof typeof contractFields, value: string) => {
+  const handleContractFieldChange = (field: keyof typeof contractFields, value: string) => {
     setContractFields(prev => ({
       ...prev,
       [field]: value
     }));
-  }, []);
+  };
 
-  const handleTemplateUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.name.toLowerCase().endsWith('.docx')) {
       setReportStatus(prev => ({ 
@@ -253,9 +254,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     } else {
       alert('Пожалуйста, выберите файл в формате .docx');
     }
-  }, []);
+  };
 
-  const validateTemplate = useCallback(async (file: File) => {
+  const validateTemplate = async (file: File) => {
     try {
       const processor = DocxTemplateProcessor.getInstance();
       const validation = await processor.validateTemplate(file);
@@ -278,16 +279,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         } 
       }));
     }
-  }, []);
-  const handleRemoveTemplate = useCallback(() => {
+  };
+  const handleRemoveTemplate = () => {
     setReportStatus(prev => ({ 
       ...prev, 
       templateFile: null,
       templateValidation: null 
     }));
-  }, []);
+  };
 
-  const handleGenerateTemplateReport = useCallback(async () => {
+  const handleGenerateTemplateReport = async () => {
     if (!reportStatus.templateFile || !chartRef.current) {
       alert('Необходимо загрузить шаблон и убедиться, что график отображается');
       return;
@@ -396,9 +397,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       alert(`Ошибка при формировании отчета по шаблону: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       setReportStatus(prev => ({ ...prev, isGenerating: false }));
     }
-  }, [reportStatus.templateFile, reportStatus.templateValidation, reportStatus.hasReport, reportStatus.reportUrl, reportStatus.reportFilename, dataType, analysisResults, conclusions, limits, user?.fullName, contractFields]);
+  };
 
-  const handleDownloadReport = useCallback(() => {
+  const handleDownloadReport = () => {
     if (reportStatus.reportUrl && reportStatus.reportFilename) {
       const link = document.createElement('a');
       link.href = reportStatus.reportUrl;
@@ -407,9 +408,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       link.click();
       document.body.removeChild(link);
     }
-  }, [reportStatus.reportUrl, reportStatus.reportFilename]);
+  };
 
-  const handleDeleteReport = useCallback(() => {
+  const handleDeleteReport = () => {
     if (reportStatus.reportUrl) {
       URL.revokeObjectURL(reportStatus.reportUrl);
     }
@@ -426,9 +427,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       templateFile: null,
       templateValidation: null
     });
-  }, [reportStatus.reportUrl]);
+  };
 
-  const handleAutoFillConclusions = useCallback(() => {
+  const handleAutoFillConclusions = () => {
     // Определяем временные рамки
     let startTime: Date;
     let endTime: Date;
@@ -530,10 +531,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 Результаты испытания ${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
 
     setConclusions(conclusionText);
-  }, [markers, zoomState, data, analysisResults, limits]);
+  };
 
   // Функция для получения названия объекта квалификации
-  const getQualificationObjectDisplayName = useCallback((): string => {
+  const getQualificationObjectDisplayName = (): string => {
     // Находим файлы с привязанным объектом квалификации
     const filesWithQualification = files.filter(f => f.qualificationObjectId);
     
@@ -556,7 +557,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     } else {
       return `Несколько объектов (${uniqueQualificationIds.length})`;
     }
-  }, []);
+  };
 
   if (loading) {
     return (

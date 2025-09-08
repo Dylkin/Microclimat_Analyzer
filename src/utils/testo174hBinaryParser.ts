@@ -251,7 +251,7 @@ export class Testo174HBinaryParser {
       
     } catch (error) {
       console.error('Ошибка определения интервала:', error);
-      return this.detectIntervalFromData();
+      return 900; // По умолчанию 15 минут
     }
   }
 
@@ -286,12 +286,12 @@ export class Testo174HBinaryParser {
         }
       }
       
-      console.warn('Не удалось определить интервал по данным, используем 60 секунд');
-      return 60; // 1 минута по умолчанию
+      console.log('Не удалось определить интервал по данным, используем 15 минут');
+      return 900; // 15 минут по умолчанию
       
     } catch (error) {
       console.error('Ошибка определения интервала по данным:', error);
-      return 60;
+      return 900;
     }
   }
   /**
@@ -500,7 +500,7 @@ export class Testo174HBinaryParser {
 /**
  * Сервис для парсинга файлов Testo 174H
  */
-class Testo174HParsingService {
+export class Testo174HParsingService {
   async parseFile(file: File): Promise<ParsedFileData> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();

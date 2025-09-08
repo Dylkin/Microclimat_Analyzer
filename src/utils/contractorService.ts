@@ -15,7 +15,7 @@ const initSupabase = () => {
   return supabase;
 };
 
-interface DatabaseContractor {
+export interface DatabaseContractor {
   id: string;
   name: string;
   address: string | null;
@@ -26,7 +26,7 @@ interface DatabaseContractor {
   updated_at: string;
 }
 
-interface DatabaseContractorContact {
+export interface DatabaseContractorContact {
   id: string;
   contractor_id: string;
   employee_name: string;
@@ -35,7 +35,7 @@ interface DatabaseContractorContact {
   created_at: string;
 }
 
-class ContractorService {
+export class ContractorService {
   private supabase: any;
 
   constructor() {

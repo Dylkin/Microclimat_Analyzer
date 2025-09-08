@@ -26,7 +26,7 @@ export interface ProjectDocument {
   uploadedAt: Date;
 }
 
-interface DatabaseProjectDocument {
+export interface DatabaseProjectDocument {
   id: string;
   project_id: string;
   qualification_object_id: string | null;
@@ -40,7 +40,7 @@ interface DatabaseProjectDocument {
   created_at: string;
 }
 
-class ProjectDocumentService {
+export class ProjectDocumentService {
   private supabase: any;
 
   constructor() {
