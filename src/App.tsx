@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
-import { TimeSeriesChart } from './TimeSeriesChart';
+import { TimeSeriesChart } from '../components/TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,7 +13,7 @@ interface TimeSeriesAnalyzerProps {
   onBack?: () => void;
 }
 
-export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack }) => {
+const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack }) => {
   const { user } = useAuth();
   const { data, loading, error } = useTimeSeriesData({ files });
   
@@ -1197,3 +1197,5 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     </div>
   );
 };
+
+export default TimeSeriesAnalyzer;
