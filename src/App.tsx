@@ -190,7 +190,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         [limitType]: numValue
       }
     }));
-  };
+  }, []);
 
   const handleAddMarker = useCallback((timestamp: number) => {
     const newMarker: VerticalMarker = {
@@ -280,7 +280,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }));
     }
   }, []);
-  
   const handleRemoveTemplate = useCallback(() => {
     setReportStatus(prev => ({ 
       ...prev, 
@@ -558,14 +557,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     } else {
       return `Несколько объектов (${uniqueQualificationIds.length})`;
     }
-  }, [files]);
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Загрузка данных...</p>
+        testType: getTestTypeLabel(contractFields.testType) || ''
         </div>
       </div>
     );
@@ -900,7 +899,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           )}
         </div>
       </div>
-      
       {/* Analysis Results Table */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
