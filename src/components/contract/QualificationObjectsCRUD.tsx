@@ -191,6 +191,27 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                           Климатическая система: <span className="font-medium">{object.climateSystem}</span>
                         </p>
                       )}
+                      {object.measurementZones && object.measurementZones.length > 0 && (
+                        <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                          <h5 className="text-sm font-medium text-indigo-900 mb-2">
+                            Расстановка оборудования ({object.measurementZones.length} зон):
+                          </h5>
+                          <div className="space-y-2">
+                            {object.measurementZones.map((zone) => (
+                              <div key={zone.id} className="text-sm text-indigo-800">
+                                <span className="font-medium">Зона {zone.zoneNumber}:</span>
+                                {zone.measurementLevels.length > 0 ? (
+                                  <span className="ml-2">
+                                    {zone.measurementLevels.map(level => `${level.level}м`).join(', ')}
+                                  </span>
+                                ) : (
+                                  <span className="ml-2 text-indigo-600">уровни не заданы</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

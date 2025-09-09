@@ -74,10 +74,19 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             {obj.serialNumber && <div>🔢 S/N: {obj.serialNumber}</div>}
             {obj.inventoryNumber && <div>📋 Инв. №: {obj.inventoryNumber}</div>}
             {obj.manufacturer && <div>🏭 {obj.manufacturer}</div>}
+            {obj.measurementZones && obj.measurementZones.length > 0 && (
+              <div>📍 Зон измерения: {obj.measurementZones.length}</div>
+            )}
           </div>
         );
       default:
-        return null;
+        return (
+          <div className="text-sm text-gray-600">
+            {obj.measurementZones && obj.measurementZones.length > 0 && (
+              <div>📍 Зон измерения: {obj.measurementZones.length}</div>
+            )}
+          </div>
+        );
     }
   };
 
@@ -170,6 +179,14 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                           >
                             <MapPin className="w-4 h-4" />
                           </button>
+                        )}
+                        {obj.measurementZones && obj.measurementZones.length > 0 && (
+                          <span 
+                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                            title={`Зон измерения: ${obj.measurementZones.length}`}
+                          >
+                            {obj.measurementZones.length}
+                          </span>
                         )}
                       </div>
                     </td>
