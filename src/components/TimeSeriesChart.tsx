@@ -21,12 +21,27 @@ interface TimeSeriesChartProps {
   yAxisLabel?: string;
   showLegend?: boolean;
 }
+export interface TimeSeriesChartProps {
+  data: any[];
+  width?: number;
+  height?: number;
+  margin?: { top: number; right: number; bottom: number; left: number };
+  dataType?: string;
+  limits?: { min: number; max: number };
+  markers?: any[];
+  zoomState?: any;
+  onZoomChange?: (zoom: any) => void;
+  onMarkerAdd?: (marker: any) => void;
+  color?: string;
+  yAxisLabel?: string;
+  showLegend?: boolean;
+}
 
 export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   data,
-  width,
-  height,
-  margin,
+  width = 800,
+  height = 400,
+  margin = { top: 20, right: 30, bottom: 40, left: 60 },
   dataType,
   limits,
   markers = [],
@@ -37,14 +52,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   yAxisLabel,
   showLegend = true
 }) => {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [tooltip, setTooltip] = useState<TooltipData>({ x: 0, y: 0, timestamp: 0, visible: false });
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [selectionStart, setSelectionStart] = useState<number | null>(null);
-  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
 
-  const innerWidth = width - margin.left - margin.right;
-  const innerHeight = height - margin.top - margin.bottom;
 
   // Фильтруем данные по типу
   const filteredData = data.filter(d => {
