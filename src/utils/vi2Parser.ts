@@ -6,7 +6,7 @@ import { Testo174TBinaryParser } from './testo174tBinaryParser';
  * Универсальный парсер для файлов VI2
  * Автоматически определяет тип устройства и выбирает подходящий парсер
  */
-export class VI2Parser {
+class VI2Parser {
   private buffer: ArrayBuffer;
   private view: DataView;
   

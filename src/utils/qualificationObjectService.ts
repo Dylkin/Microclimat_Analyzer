@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { QualificationObject } from '../types/QualificationObject';
 
-export class QualificationObjectService {
+class QualificationObjectService {
   private supabase;
 
   constructor() {
@@ -209,7 +209,8 @@ export class QualificationObjectService {
       testDataFileUrl: data.test_data_file_url || '',
       testDataFileName: data.test_data_file_name || '',
       createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
+      updatedAt: new Date(data.updated_at),
+      measurementZones: data.measurement_zones ? JSON.parse(data.measurement_zones) : []
     };
   }
 
@@ -236,6 +237,7 @@ export class QualificationObjectService {
     if (data.serialNumber !== undefined) dbData.serial_number = data.serialNumber;
     if (data.testDataFileUrl !== undefined) dbData.test_data_file_url = data.testDataFileUrl;
     if (data.testDataFileName !== undefined) dbData.test_data_file_name = data.testDataFileName;
+    if (data.measurementZones !== undefined) dbData.measurement_zones = JSON.stringify(data.measurementZones);
 
     return dbData;
   }

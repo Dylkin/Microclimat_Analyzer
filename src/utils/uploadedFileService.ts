@@ -22,7 +22,7 @@ const isValidUUID = (uuid: string): boolean => {
   return uuidRegex.test(uuid);
 };
 
-export interface DatabaseUploadedFile {
+interface DatabaseUploadedFile {
   id: string;
   user_id: string | null;
   name: string;
@@ -41,14 +41,14 @@ export interface DatabaseUploadedFile {
   updated_at: string;
 }
 
-export interface SaveFileData {
+interface SaveFileData {
   projectId: string;
   qualificationObjectId: string;
   objectType: QualificationObjectType;
   files: UploadedFile[];
 }
 
-export class UploadedFileService {
+class UploadedFileService {
   private supabase: any;
 
   constructor() {
