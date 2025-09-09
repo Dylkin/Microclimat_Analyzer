@@ -14,7 +14,7 @@ interface TimeSeriesAnalyzerProps {
   onBack?: () => void;
 }
 
-const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack }) => {
+const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files = [], onBack }) => {
   const { user } = useAuth();
   const { data, loading, error } = useTimeSeriesData({ files });
   
