@@ -62,15 +62,23 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     setError(null);
 
     try {
+      // Проверяем доступность сервисов
+      if (!projectService.isAvailable()) {
+        throw new Error('Supabase не настроен. Проверьте переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY');
+      }
+
       // Загружаем проекты
-      if (projectService.isAvailable()) {
+      try {
         const projectsData = await projectService.getAllProjects();
         setProjects(projectsData);
         setFilteredProjects(projectsData);
+      } catch (projectError) {
+        console.error('Ошибка загрузки проектов:', projectError);
+        throw new Error(`Ошибка загрузки проектов: ${projectError instanceof Error ? projectError.message : 'Неизвестная ошибка'}`);
       }
 
       // Загружаем контрагентов
-      if (contractorService.isAvailable()) {
+      try {
         const contractorsData = await contractorService.getAllContractors();
         // Фильтруем контрагентов с валидными UUID
         const validContractors = contractorsData.filter(contractor => {
@@ -81,16 +89,28 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           return isValid;
         });
         setContractors(validContractors);
+      } catch (contractorError) {
+        console.error('Ошибка загрузки контрагентов:', contractorError);
+        throw new Error(`Ошибка загрузки контрагентов: ${contractorError instanceof Error ? contractorError.message : 'Неизвестная ошибка'}`);
       }
 
       // Загружаем все объекты квалификации
-      if (qualificationObjectService.isAvailable()) {
+      try {
         const objectsData = await qualificationObjectService.getAllQualificationObjects();
         setQualificationObjects(objectsData);
+      } catch (objectError) {
+        console.error('Ошибка загрузки объектов квалификации:', objectError);
+        throw new Error(`Ошибка загрузки объектов квалификации: ${objectError instanceof Error ? objectError.message : 'Неизвестная ошибка'}`);
       }
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
-      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      setError(errorMessage);
+      
+      // Если ошибка связана с подключением к Supabase, показываем специальное сообщение
+      if (errorMessage.includes('fetch') || errorMessage.includes('JSON') || errorMessage.includes('network')) {
+        setError('Ошибка подключения к базе данных. Проверьте настройки Supabase в разделе "Проверка БД".');
+      }
     } finally {
       setLoading(false);
     }
@@ -382,6 +402,25 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           <span>Создать проект</span>
         </button>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start space-x-2">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки данных</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+              {error.includes('Supabase') && (
+                <div className="mt-2">
+                  <p className="text-xs text-red-600">
+                    Перейдите в раздел "Проверка БД" для диагностики подключения к базе данных.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="bg-white rounded-lg shadow p-4">

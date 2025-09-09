@@ -24,6 +24,14 @@ class QualificationObjectService {
       throw new Error('Supabase не настроен');
     }
 
+    // Проверяем переменные окружения
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY не настроены');
+    }
+
     const { data, error } = await this.supabase
       .from('qualification_objects')
       .select(`
@@ -33,7 +41,20 @@ class QualificationObjectService {
       .order('created_at', { ascending: false });
 
     if (error) {
+      // Специальная обработка ошибок подключения
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        throw new Error('Ошибка сети при подключении к Supabase. Проверьте URL проекта.');
+      }
+      if (error.message?.includes('Invalid API key') || error.message?.includes('unauthorized')) {
+        throw new Error('Неверный ключ API Supabase. Проверьте VITE_SUPABASE_ANON_KEY.');
+      }
+      
       throw new Error(`Ошибка загрузки объектов квалификации: ${error.message}`);
+    }
+
+    if (!data) {
+      console.warn('Получен null/undefined ответ от Supabase для объектов квалификации');
+      return [];
     }
 
     return data.map(this.mapFromDatabase);
@@ -42,6 +63,14 @@ class QualificationObjectService {
   async getQualificationObjectsByContractor(contractorId: string): Promise<QualificationObject[]> {
     if (!this.isAvailable()) {
       throw new Error('Supabase не настроен');
+    }
+
+    // Проверяем переменные окружения
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY не настроены');
     }
 
     const { data, error } = await this.supabase
@@ -54,7 +83,20 @@ class QualificationObjectService {
       .order('created_at', { ascending: false });
 
     if (error) {
+      // Специальная обработка ошибок подключения
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        throw new Error('Ошибка сети при подключении к Supabase. Проверьте URL проекта.');
+      }
+      if (error.message?.includes('Invalid API key') || error.message?.includes('unauthorized')) {
+        throw new Error('Неверный ключ API Supabase. Проверьте VITE_SUPABASE_ANON_KEY.');
+      }
+      
       throw new Error(`Ошибка загрузки объектов квалификации: ${error.message}`);
+    }
+
+    if (!data) {
+      console.warn('Получен null/undefined ответ от Supabase для объектов квалификации контрагента');
+      return [];
     }
 
     return data.map(this.mapFromDatabase);

@@ -77,6 +77,11 @@ class ProjectService {
     }
 
     try {
+      // Проверяем подключение к Supabase
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY не настроены');
+      }
+
       // Получаем проекты
       const { data: projectsData, error: projectsError } = await this.supabase
         .from('projects')
@@ -85,7 +90,21 @@ class ProjectService {
 
       if (projectsError) {
         console.error('Ошибка получения проектов:', projectsError);
+        
+        // Специальная обработка ошибок подключения
+        if (projectsError.message?.includes('fetch') || projectsError.message?.includes('network')) {
+          throw new Error('Ошибка сети при подключении к Supabase. Проверьте URL проекта.');
+        }
+        if (projectsError.message?.includes('Invalid API key') || projectsError.message?.includes('unauthorized')) {
+          throw new Error('Неверный ключ API Supabase. Проверьте VITE_SUPABASE_ANON_KEY.');
+        }
+        
         throw new Error(`Ошибка получения проектов: ${projectsError.message}`);
+      }
+
+      if (!projectsData) {
+        console.warn('Получен null/undefined ответ от Supabase');
+        return [];
       }
 
       // Получаем контрагентов
