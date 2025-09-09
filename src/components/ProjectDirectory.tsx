@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play, FileText } from 'lucide-react';
+import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play, FileText, AlertTriangle } from 'lucide-react';
 import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, CreateProjectData } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels, CreateQualificationObjectData } from '../types/QualificationObject';
@@ -100,7 +100,9 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
         setQualificationObjects(objectsData);
       } catch (objectError) {
         console.error('Ошибка загрузки объектов квалификации:', objectError);
-        throw new Error(`Ошибка загрузки объектов квалификации: ${objectError instanceof Error ? objectError.message : 'Неизвестная ошибка'}`);
+        // Не прерываем загрузку из-за ошибки объектов квалификации
+        console.warn('Продолжаем работу без объектов квалификации');
+        setQualificationObjects([]);
       }
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
