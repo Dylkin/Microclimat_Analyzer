@@ -139,7 +139,9 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       const lastZone = measurementZones[measurementZones.length - 1];
       measurementLevels = lastZone.measurementLevels.map(level => ({
         id: crypto.randomUUID(),
-        level: level.level
+        level: level.level,
+        equipmentId: undefined, // Не копируем привязку к оборудованию
+        equipmentName: undefined
       }));
     }
     
@@ -265,9 +267,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           zoneNumber: zone.zoneNumber,
           measurementLevels: zone.measurementLevels.map(level => ({
             id: level.id,
-            level: level.level,
-            equipmentId: level.equipmentId,
-            equipmentName: level.equipmentName
+            level: level.level
           }))
         }))
       };
