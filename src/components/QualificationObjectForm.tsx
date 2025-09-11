@@ -8,6 +8,8 @@ import {
   MeasurementZone,
   MeasurementLevel
 } from '../types/QualificationObject';
+import { Equipment } from '../types/Equipment';
+import { equipmentService } from '../utils/equipmentService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 
 interface QualificationObjectFormProps {
@@ -66,6 +68,29 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   const [measurementZones, setMeasurementZones] = useState<MeasurementZone[]>(
     initialData?.measurementZones || []
   );
+
+  // Загрузка оборудования при инициализации
+  React.useEffect(() => {
+    const loadEquipment = async () => {
+      if (!equipmentService.isAvailable()) return;
+      
+      setEquipmentLoading(true);
+      try {
+        const result = await equipmentService.getAllEquipment(1, 1000); // Загружаем все оборудование
+        setEquipment(result.equipment);
+      } catch (error) {
+        console.error('Ошибка загрузки оборудования:', error);
+      } finally {
+        setEquipmentLoading(false);
+      }
+    };
+
+    loadEquipment();
+  }, []);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [equipmentLoading, setEquipmentLoading] = useState(false);
+  const [equipmentSearchTerms, setEquipmentSearchTerms] = useState<{ [key: string]: string }>({});
+  const [showEquipmentDropdowns, setShowEquipmentDropdowns] = useState<{ [key: string]: boolean }>({});
 
   const handleInputChange = (field: keyof CreateQualificationObjectData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -134,7 +159,9 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   const addMeasurementLevel = (zoneId: string) => {
     const newLevel: MeasurementLevel = {
       id: crypto.randomUUID(),
-      level: 0.0
+      level: 0.0,
+      equipmentId: undefined,
+      equipmentName: undefined
     };
     
     setMeasurementZones(prev => prev.map(zone => 
@@ -163,6 +190,45 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           }
         : zone
     ));
+  };
+
+  const updateMeasurementLevelEquipment = (zoneId: string, levelId: string, equipmentId: string, equipmentName: string) => {
+    setMeasurementZones(prev => prev.map(zone => 
+      zone.id === zoneId 
+        ? { 
+            ...zone, 
+            measurementLevels: zone.measurementLevels.map(level => 
+              level.id === levelId ? { ...level, equipmentId, equipmentName } : level
+            ) 
+          }
+        : zone
+    ));
+  };
+
+  // Фильтрация оборудования по поисковому запросу
+  const getFilteredEquipment = (searchTerm: string) => {
+    if (!searchTerm.trim()) return equipment;
+    
+    return equipment.filter(eq =>
+      eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      eq.serialNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
+  // Получение названия оборудования по ID
+  const getEquipmentName = (equipmentId: string) => {
+    const eq = equipment.find(e => e.id === equipmentId);
+    return eq ? eq.name : 'Выберите оборудование';
+  };
+
+  // Обработчик выбора оборудования
+  const handleEquipmentSelect = (zoneId: string, levelId: string, equipmentId: string) => {
+    const selectedEquipment = equipment.find(eq => eq.id === equipmentId);
+    if (selectedEquipment) {
+      updateMeasurementLevelEquipment(zoneId, levelId, equipmentId, selectedEquipment.name);
+      setShowEquipmentDropdowns(prev => ({ ...prev, [`${zoneId}-${levelId}`]: false }));
+      setEquipmentSearchTerms(prev => ({ ...prev, [`${zoneId}-${levelId}`]: '' }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

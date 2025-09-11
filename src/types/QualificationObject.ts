@@ -49,6 +49,8 @@ export interface MeasurementZone {
 export interface MeasurementLevel {
   id: string;
   level: number; // в метрах, дробное число
+  equipmentId?: string;
+  equipmentName?: string;
 }
 
 export interface CreateQualificationObjectData {
