@@ -58,8 +58,8 @@ class TestingPeriodService {
         .from('qualification_object_testing_periods')
         .select(`
           *,
-          created_by_user:auth.users!created_by(
-            raw_user_meta_data
+          created_by_user:users!created_by(
+            full_name
           )
         `)
         .eq('qualification_object_id', qualificationObjectId)
@@ -81,7 +81,7 @@ class TestingPeriodService {
         status: period.status,
         notes: period.notes || undefined,
         createdBy: period.created_by || undefined,
-        createdByName: period.created_by_user?.raw_user_meta_data?.full_name || undefined,
+        createdByName: period.created_by_user?.full_name || undefined,
         createdAt: new Date(period.created_at),
         updatedAt: new Date(period.updated_at)
       }));
@@ -102,8 +102,8 @@ class TestingPeriodService {
         .from('qualification_object_testing_periods')
         .select(`
           *,
-          created_by_user:auth.users!created_by(
-            raw_user_meta_data
+          created_by_user:users!created_by(
+            full_name
           )
         `)
         .eq('project_id', projectId)
@@ -125,7 +125,7 @@ class TestingPeriodService {
         status: period.status,
         notes: period.notes || undefined,
         createdBy: period.created_by || undefined,
-        createdByName: period.created_by_user?.raw_user_meta_data?.full_name || undefined,
+        createdByName: period.created_by_user?.full_name || undefined,
         createdAt: new Date(period.created_at),
         updatedAt: new Date(period.updated_at)
       }));
