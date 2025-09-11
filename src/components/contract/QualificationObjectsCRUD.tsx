@@ -17,6 +17,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingObject, setEditingObject] = useState<QualificationObject | null>(null);
+  const [showForm, setShowForm] = useState(false);
 
   // Загрузка объектов квалификации
   const loadObjects = async () => {
@@ -233,7 +234,10 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
 
       {/* Edit Form Modal */}
       {/* Edit Form - не в модальном окне */}
+      {editingObject && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+        </div>
+      )}
     </div>
   );
 };
