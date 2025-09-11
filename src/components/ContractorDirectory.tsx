@@ -810,7 +810,10 @@ export const ContractorDirectory: React.FC = () => {
             <QualificationObjectsTable
               objects={filteredQualificationObjects}
               onAdd={() => setShowAddQualificationForm(true)}
-              onEdit={setEditingQualificationObject}
+              onEdit={(obj) => {
+                console.log('Setting editing qualification object:', obj);
+                setEditingQualificationObject(obj);
+              }}
               onDelete={handleDeleteQualificationObject}
               onShowOnMap={(obj) => {
                 console.log('Show on map:', obj);
@@ -818,7 +821,12 @@ export const ContractorDirectory: React.FC = () => {
               loading={loading}
               hideAddButton={true}
               editingQualificationObject={editingQualificationObject}
-              onSaveQualificationObject={handleSaveQualificationObject}
+              onSaveQualificationObject={async (objectData) => {
+                console.log('Saving qualification object:', objectData);
+                await handleSaveQualificationObject(objectData);
+              }}
+                await handleSaveQualificationObject(objectData);
+              }}
               onCancelQualificationObjectEdit={() => setEditingQualificationObject(null)}
               contractorId={editingContractorData.id}
               contractorAddress={editingContractorData.address}

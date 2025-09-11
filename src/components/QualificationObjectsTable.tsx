@@ -235,8 +235,16 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                                 contractorId={contractorId || editingQualificationObject.contractorId}
                                 contractorAddress={contractorAddress || editingQualificationObject.address}
                                 initialData={editingQualificationObject}
-                                onSubmit={onSaveQualificationObject || (() => Promise.resolve())}
-                                onCancel={onCancelQualificationObjectEdit || (() => {})}
+                                onSubmit={async (objectData) => {
+                                  if (onSaveQualificationObject) {
+                                    await onSaveQualificationObject(objectData as any);
+                                  }
+                                }}
+                                onCancel={() => {
+                                  if (onCancelQualificationObjectEdit) {
+                                    onCancelQualificationObjectEdit();
+                                  }
+                                }}
                                 hideTypeSelection={true}
                               />
                             </div>
