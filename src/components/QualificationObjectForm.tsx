@@ -788,7 +788,10 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                             <X className="w-3 h-3" />
                           </button>
                         </div>
-                        <div className="relative">
+                        
+                        {/* Поле высоты */}
+                        <div className="relative mb-3">
+                          <label className="block text-xs text-gray-500 mb-1">Высота (м)</label>
                           <input
                             type="number"
                             step="0.1"
@@ -806,6 +809,75 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                           <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
                             м
                           </span>
+                        </div>
+                        
+                        {/* Селектор оборудования */}
+                        <div className="relative">
+                          <label className="block text-xs text-gray-500 mb-1">Оборудование</label>
+                          {level.equipmentId ? (
+                            <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded p-2">
+                              <div className="flex items-center space-x-2">
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                <span className="text-sm text-green-800 font-medium">
+                                  {level.equipmentName}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateMeasurementLevelEquipment(zone.id, level.id, '', '');
+                                  setEquipmentSearchTerms(prev => ({ ...prev, [`${zone.id}-${level.id}`]: '' }));
+                                }}
+                                className="text-red-600 hover:text-red-800"
+                                title="Убрать оборудование"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={equipmentSearchTerms[`${zone.id}-${level.id}`] || ''}
+                                onChange={(e) => {
+                                  const searchKey = `${zone.id}-${level.id}`;
+                                  setEquipmentSearchTerms(prev => ({ ...prev, [searchKey]: e.target.value }));
+                                  setShowEquipmentDropdowns(prev => ({ ...prev, [searchKey]: true }));
+                                }}
+                                onFocus={() => {
+                                  const searchKey = `${zone.id}-${level.id}`;
+                                  setShowEquipmentDropdowns(prev => ({ ...prev, [searchKey]: true }));
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                placeholder="Поиск оборудования..."
+                              />
+                              
+                              {showEquipmentDropdowns[`${zone.id}-${level.id}`] && (
+                                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                  {equipmentLoading ? (
+                                    <div className="px-3 py-2 text-center text-gray-500">
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mx-auto"></div>
+                                    </div>
+                                  ) : getFilteredEquipment(equipmentSearchTerms[`${zone.id}-${level.id}`] || '').length > 0 ? (
+                                    getFilteredEquipment(equipmentSearchTerms[`${zone.id}-${level.id}`] || '').map((eq) => (
+                                      <div
+                                        key={eq.id}
+                                        onClick={() => handleEquipmentSelect(zone.id, level.id, eq.id)}
+                                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                      >
+                                        <div className="font-medium text-gray-900 text-sm">{eq.name}</div>
+                                        <div className="text-xs text-gray-500">S/N: {eq.serialNumber}</div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="px-3 py-2 text-gray-500 text-sm">
+                                      Оборудование не найдено
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
