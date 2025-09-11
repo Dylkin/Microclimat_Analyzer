@@ -3,6 +3,7 @@ import { Plus, Edit2, Save, X, Building, Car, Refrigerator, Snowflake, MapPin, T
 import { QualificationObject, QualificationObjectTypeLabels, CreateQualificationObjectData } from '../../types/QualificationObject';
 import { qualificationObjectService } from '../../utils/qualificationObjectService';
 import { QualificationObjectForm } from '../QualificationObjectForm';
+import { QualificationObjectsTable } from '../QualificationObjectsTable';
 
 interface QualificationObjectsCRUDProps {
   contractorId: string;
