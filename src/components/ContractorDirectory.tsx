@@ -825,8 +825,6 @@ export const ContractorDirectory: React.FC = () => {
                 console.log('Saving qualification object:', objectData);
                 await handleSaveQualificationObject(objectData);
               }}
-                await handleSaveQualificationObject(objectData);
-              }}
               onCancelQualificationObjectEdit={() => setEditingQualificationObject(null)}
               contractorId={editingContractorData.id}
               contractorAddress={editingContractorData.address}
