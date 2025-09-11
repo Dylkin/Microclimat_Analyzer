@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play, FileText } from 'lucide-react';
+import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play, FileText, AlertTriangle } from 'lucide-react';
 import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, CreateProjectData } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels, CreateQualificationObjectData } from '../types/QualificationObject';
@@ -62,15 +62,23 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     setError(null);
 
     try {
+      // Проверяем доступность сервисов
+      if (!projectService.isAvailable()) {
+        throw new Error('Supabase не настроен. Проверьте переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY');
+      }
+
       // Загружаем проекты
-      if (projectService.isAvailable()) {
+      try {
         const projectsData = await projectService.getAllProjects();
         setProjects(projectsData);
         setFilteredProjects(projectsData);
+      } catch (projectError) {
+        console.error('Ошибка загрузки проектов:', projectError);
+        throw new Error(`Ошибка загрузки проектов: ${projectError instanceof Error ? projectError.message : 'Неизвестная ошибка'}`);
       }
 
       // Загружаем контрагентов
-      if (contractorService.isAvailable()) {
+      try {
         const contractorsData = await contractorService.getAllContractors();
         // Фильтруем контрагентов с валидными UUID
         const validContractors = contractorsData.filter(contractor => {
@@ -81,16 +89,30 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           return isValid;
         });
         setContractors(validContractors);
+      } catch (contractorError) {
+        console.error('Ошибка загрузки контрагентов:', contractorError);
+        throw new Error(`Ошибка загрузки контрагентов: ${contractorError instanceof Error ? contractorError.message : 'Неизвестная ошибка'}`);
       }
 
       // Загружаем все объекты квалификации
-      if (qualificationObjectService.isAvailable()) {
+      try {
         const objectsData = await qualificationObjectService.getAllQualificationObjects();
         setQualificationObjects(objectsData);
+      } catch (objectError) {
+        console.error('Ошибка загрузки объектов квалификации:', objectError);
+        // Не прерываем загрузку из-за ошибки объектов квалификации
+        console.warn('Продолжаем работу без объектов квалификации');
+        setQualificationObjects([]);
       }
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
-      setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      setError(errorMessage);
+      
+      // Если ошибка связана с подключением к Supabase, показываем специальное сообщение
+      if (errorMessage.includes('fetch') || errorMessage.includes('JSON') || errorMessage.includes('network')) {
+        setError('Ошибка подключения к базе данных. Проверьте настройки Supabase в разделе "Проверка БД".');
+      }
     } finally {
       setLoading(false);
     }
@@ -133,7 +155,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     console.log('Данные нового проекта:', newProject);
     console.log('ID контрагента:', newProject.contractorId);
     console.log('Тип ID контрагента:', typeof newProject.contractorId);
-    console.log('Выбранные объекты квалификации:', newProject.qualificationObjectIds);
     console.log('Все доступные контрагенты:', contractors.map(c => ({ id: c.id, name: c.name })));
     
     // Проверяем, что contractorId является строкой
@@ -183,15 +204,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       return;
     }
 
-    // Проверяем, что все выбранные объекты квалификации существуют
-    const availableObjectIds = getQualificationObjectsForContractor(trimmedContractorId).map(obj => obj.id);
-    const invalidObjectIds = newProject.qualificationObjectIds.filter(id => !availableObjectIds.includes(id));
-    if (invalidObjectIds.length > 0) {
-      console.error('Выбраны несуществующие объекты квалификации:', invalidObjectIds);
-      alert('Ошибка: некоторые выбранные объекты квалификации не найдены. Обновите страницу и попробуйте снова.');
-      return;
-    }
-
     // Проверяем, что все ID объектов квалификации являются валидными UUID
     const invalidQualificationObjectIds = newProject.qualificationObjectIds.filter(id => !isValidUUID(id));
     if (invalidQualificationObjectIds.length > 0) {
@@ -207,8 +219,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       const selectedObjects = getQualificationObjectsForContractor(trimmedContractorId)
         .filter(obj => newProject.qualificationObjectIds.includes(obj.id));
       
-      console.log('Найденные выбранные объекты:', selectedObjects.map(obj => ({ id: obj.id, name: obj.name })));
-      
       const contractorName = contractors.find(c => c.id === trimmedContractorId)?.name || 'Неизвестный контрагент';
       const objectNames = selectedObjects.map(obj => 
         obj.name || obj.vin || obj.serialNumber || 'Без названия'
@@ -219,8 +229,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       const projectData = {
         ...newProject,
         contractorId: trimmedContractorId,
-        name: projectName,
-        qualificationObjectIds: newProject.qualificationObjectIds // Явно передаем выбранные объекты
+        name: projectName
       };
       
       // Final validation before database call
@@ -229,7 +238,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       console.log('Type:', typeof projectData.contractorId);
       console.log('Is valid UUID:', isValidUUID(projectData.contractorId));
       console.log('Final projectData.qualificationObjectIds:', projectData.qualificationObjectIds);
-      console.log('Number of selected objects:', projectData.qualificationObjectIds.length);
       console.log('All qualification object IDs are valid UUIDs:', projectData.qualificationObjectIds.every(id => isValidUUID(id)));
       
       // Double-check UUID validity one more time
@@ -342,15 +350,21 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
         };
       case 'testing_execution':
         return {
-          label: 'Проведение испытаний',
-          page: 'testing_execution',
+          label: 'Перейти к испытаниям',
+          page: 'analyzer',
+          icon: Play
+        };
+      case 'protocol_preparation':
+        return {
+          label: 'Подготовить протокол',
+          page: 'analyzer',
           icon: Play
         };
       case 'report_preparation':
         return {
-          label: 'Подготовка отчета',
-          page: 'report_preparation',
-          icon: FileText
+          label: 'Подготовить отчет',
+          page: 'analyzer',
+          icon: Play
         };
       default:
         return null;
@@ -390,6 +404,25 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           <span>Создать проект</span>
         </button>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start space-x-2">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки данных</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+              {error.includes('Supabase') && (
+                <div className="mt-2">
+                  <p className="text-xs text-red-600">
+                    Перейдите в раздел "Проверка БД" для диагностики подключения к базе данных.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="bg-white rounded-lg shadow p-4">

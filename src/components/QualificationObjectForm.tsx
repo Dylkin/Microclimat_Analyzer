@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Building, Car, Refrigerator, Snowflake, Upload, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { Building, Car, Refrigerator, Snowflake, Upload, X, FileText, Image, Plus, Trash2, MapPin } from 'lucide-react';
 import { 
   QualificationObject, 
   QualificationObjectType, 
   QualificationObjectTypeLabels,
-  CreateQualificationObjectData 
+  CreateQualificationObjectData,
+  MeasurementZone,
+  MeasurementLevel
 } from '../types/QualificationObject';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 
@@ -12,7 +14,7 @@ interface QualificationObjectFormProps {
   contractorId: string;
   contractorAddress?: string;
   initialData?: QualificationObject;
-  onSubmit: (object: CreateQualificationObjectData) => Promise<void>;
+  onSubmit: (object: QualificationObject) => void;
   onCancel: () => void;
   hideTypeSelection?: boolean;
 }
@@ -42,7 +44,6 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   hideTypeSelection = false
 }) => {
   const [formData, setFormData] = useState<CreateQualificationObjectData>({
-    id: initialData?.id || '',
     contractorId,
     type: initialData?.type || 'помещение',
     name: initialData?.name || '',
@@ -62,6 +63,9 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   const [testDataFile, setTestDataFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [measurementZones, setMeasurementZones] = useState<MeasurementZone[]>(
+    initialData?.measurementZones || []
+  );
 
   const handleInputChange = (field: keyof CreateQualificationObjectData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -97,6 +101,59 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     return null;
   };
 
+  // Управление зонами измерения
+  const addMeasurementZone = () => {
+    const nextZoneNumber = measurementZones.length > 0 
+      ? Math.max(...measurementZones.map(z => z.zoneNumber)) + 1 
+      : 1;
+    
+    const newZone: MeasurementZone = {
+      id: crypto.randomUUID(),
+      zoneNumber: nextZoneNumber,
+      measurementLevels: []
+    };
+    
+    setMeasurementZones(prev => [...prev, newZone]);
+  };
+
+  const removeMeasurementZone = (zoneId: string) => {
+    setMeasurementZones(prev => prev.filter(zone => zone.id !== zoneId));
+  };
+
+  const addMeasurementLevel = (zoneId: string) => {
+    const newLevel: MeasurementLevel = {
+      id: crypto.randomUUID(),
+      level: 0.0
+    };
+    
+    setMeasurementZones(prev => prev.map(zone => 
+      zone.id === zoneId 
+        ? { ...zone, measurementLevels: [...zone.measurementLevels, newLevel] }
+        : zone
+    ));
+  };
+
+  const removeMeasurementLevel = (zoneId: string, levelId: string) => {
+    setMeasurementZones(prev => prev.map(zone => 
+      zone.id === zoneId 
+        ? { ...zone, measurementLevels: zone.measurementLevels.filter(level => level.id !== levelId) }
+        : zone
+    ));
+  };
+
+  const updateMeasurementLevel = (zoneId: string, levelId: string, newLevel: number) => {
+    setMeasurementZones(prev => prev.map(zone => 
+      zone.id === zoneId 
+        ? { 
+            ...zone, 
+            measurementLevels: zone.measurementLevels.map(level => 
+              level.id === levelId ? { ...level, level: newLevel } : level
+            ) 
+          }
+        : zone
+    ));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -122,12 +179,16 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         }
       }
 
-      console.log('Отправляем данные формы:', formData);
-      
       // Вызываем onSubmit с данными формы
-      await onSubmit(formData as any);
+      const finalFormData = {
+        ...formData,
+        measurementZones: measurementZones.map(zone => ({
+          zoneNumber: zone.zoneNumber,
+          measurementLevels: zone.measurementLevels
+        }))
+      };
       
-      console.log('Объект квалификации успешно сохранен через форму');
+      onSubmit(finalFormData as any);
     } catch (error) {
       console.error('Ошибка сохранения объекта:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
@@ -435,7 +496,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               {file.type.startsWith('image/') ? (
-                <ImageIcon className="w-5 h-5 text-blue-600" />
+                <Image className="w-5 h-5 text-blue-600" />
               ) : (
                 <FileText className="w-5 h-5 text-red-600" />
               )}
@@ -537,22 +598,6 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="Введите тип климатической системы"
           />
-          <div className="flex justify-end space-x-3 mt-6">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Сохранение...' : (initialData ? 'Обновить' : 'Создать')}
-            </button>
-          </div>
         </div>
       </div>
 
@@ -583,6 +628,143 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           onChange={(file) => handleFileChange('plan', file)}
           type="plan"
         />
+      </div>
+
+      {/* Расстановка оборудования */}
+      <div className="border-t border-gray-200 pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Расстановка оборудования</h3>
+          <button
+            type="button"
+            onClick={addMeasurementZone}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Добавить зону измерения</span>
+          </button>
+        </div>
+
+        {measurementZones.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <MapPin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm">Зоны измерения не добавлены</p>
+            <p className="text-xs mt-1">Нажмите "Добавить зону измерения" для создания первой зоны</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {measurementZones.map((zone) => (
+              <div key={zone.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="w-5 h-5 text-indigo-600" />
+                    <h4 className="text-md font-medium text-gray-900">
+                      Зона измерения № {zone.zoneNumber}
+                    </h4>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => addMeasurementLevel(zone.id)}
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Добавить уровень</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeMeasurementZone(zone.id)}
+                      className="text-red-600 hover:text-red-800 transition-colors"
+                      title="Удалить зону"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Уровни измерения */}
+                {zone.measurementLevels.length === 0 ? (
+                  <div className="text-center py-4 text-gray-500 bg-white rounded border border-gray-200">
+                    <p className="text-sm">Уровни измерения не добавлены</p>
+                    <p className="text-xs mt-1">Нажмите "Добавить уровень" для создания первого уровня</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {zone.measurementLevels.map((level, levelIndex) => (
+                      <div key={level.id} className="bg-white border border-gray-200 rounded p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-sm font-medium text-gray-700">
+                            Уровень {levelIndex + 1}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => removeMeasurementLevel(zone.id, level.id)}
+                            className="text-red-600 hover:text-red-800 transition-colors"
+                            title="Удалить уровень"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="10"
+                            value={level.level}
+                            onChange={(e) => updateMeasurementLevel(
+                              zone.id, 
+                              level.id, 
+                              parseFloat(e.target.value) || 0
+                            )}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center"
+                            placeholder="0.0"
+                          />
+                          <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                            м
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Информация о расстановке */}
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 className="text-sm font-medium text-blue-900 mb-2">Информация о расстановке оборудования:</h4>
+          <ul className="text-sm text-blue-800 space-y-1">
+            <li>• Номера зон измерения присваиваются автоматически по формуле n+1</li>
+            <li>• Для каждой зоны можно добавить несколько уровней измерения</li>
+            <li>• Уровень измерения указывается в метрах с точностью до 0.1 м</li>
+            <li>• Максимальный уровень измерения: 10.0 м</li>
+            <li>• Данные о расстановке используются при планировании испытаний</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Кнопки */}
+      <div className="flex justify-end space-x-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={loading}
+          className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
+        >
+          Отмена
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+        >
+          {loading && (
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          )}
+          <span>{initialData ? 'Сохранить' : 'Создать'}</span>
+        </button>
       </div>
     </form>
   );

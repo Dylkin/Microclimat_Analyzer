@@ -37,6 +37,18 @@ export interface QualificationObject {
   testDataFileName?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  measurementZones?: MeasurementZone[];
+}
+
+export interface MeasurementZone {
+  id: string;
+  zoneNumber: number;
+  measurementLevels: MeasurementLevel[];
+}
+
+export interface MeasurementLevel {
+  id: string;
+  level: number; // в метрах, дробное число
 }
 
 export interface CreateQualificationObjectData {
@@ -57,4 +69,5 @@ export interface CreateQualificationObjectData {
   chamberVolume?: number;
   serialNumber?: string;
   testDataFile?: File;
+  measurementZones?: Omit<MeasurementZone, 'id'>[];
 }

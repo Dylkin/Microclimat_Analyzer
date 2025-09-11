@@ -18,11 +18,11 @@ const initSupabase = () => {
 
 // Helper function to validate UUID format
 const isValidUUID = (uuid: string): boolean => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(uuid);
 };
 
-export interface DatabaseUploadedFile {
+interface DatabaseUploadedFile {
   id: string;
   user_id: string | null;
   name: string;
@@ -41,14 +41,14 @@ export interface DatabaseUploadedFile {
   updated_at: string;
 }
 
-export interface SaveFileData {
+interface SaveFileData {
   projectId: string;
   qualificationObjectId: string;
   objectType: QualificationObjectType;
   files: UploadedFile[];
 }
 
-export class UploadedFileService {
+class UploadedFileService {
   private supabase: any;
 
   constructor() {
@@ -61,44 +61,35 @@ export class UploadedFileService {
   }
 
   // Сохранение файлов в связке с проектом
-  async saveProjectFiles(saveData: SaveFileData, userId: string): Promise<void> {
+  async saveProjectFiles(saveData: SaveFileData, userId: string | null): Promise<void> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
     }
 
-    try {
-      // Получаем текущего аутентифицированного пользователя
-      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-      if (authError) {
-        console.error('Ошибка получения пользователя:', authError);
-        throw new Error('Ошибка аутентификации');
-      }
-      if (!user) {
-        throw new Error('Пользователь не авторизован');
-      }
+    if (!userId || !isValidUUID(userId)) {
+      throw new Error('Невалидный ID пользователя');
+    }
 
+    try {
       console.log('Сохраняем файлы проекта:', saveData);
-      console.log('ID аутентифицированного пользователя:', user.id);
 
       // Подготавливаем данные для вставки
       const filesToInsert = saveData.files.map(file => ({
         id: file.id,
-        user_id: user.id,
+        user_id: userId,
         name: file.name,
         original_name: file.name,
         upload_date: new Date().toISOString(),
         parsing_status: file.parsingStatus,
         error_message: file.errorMessage || null,
         record_count: file.recordCount || 0,
-        period_start: file.parsedData?.startDate ? file.parsedData.startDate.toISOString() : null,
-        period_end: file.parsedData?.endDate ? file.parsedData.endDate.toISOString() : null,
+        period_start: file.parsedData?.startDate?.toISOString() || null,
+        period_end: file.parsedData?.endDate?.toISOString() || null,
         zone_number: file.zoneNumber || null,
         measurement_level: file.measurementLevel || null,
         file_order: file.order,
         object_type: saveData.objectType
       }));
-
-      console.log('Данные для вставки:', filesToInsert);
 
       // Используем upsert для обновления существующих записей или создания новых
       const { error } = await this.supabase
@@ -127,27 +118,26 @@ export class UploadedFileService {
   }
 
   // Получение файлов проекта
-  async getProjectFiles(projectId: string, userId: string, qualificationObjectId?: string): Promise<UploadedFile[]> {
+  async getProjectFiles(projectId: string, userId: string | null): Promise<UploadedFile[]> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
     }
 
+    // Проверяем валидность userId
+    if (!userId || !isValidUUID(userId)) {
+      console.warn('Невалидный или отсутствующий userId, возвращаем пустой массив');
+      return [];
+    }
+
     try {
-      // Получаем текущего аутентифицированного пользователя
-      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-      if (authError) {
-        console.error('Ошибка получения пользователя:', authError);
-        throw new Error('Ошибка аутентификации');
-      }
-      if (!user) {
-        throw new Error('Пользователь не авторизован');
-      }
-
       console.log('Загружаем файлы проекта:', projectId);
-      console.log('ID аутентифицированного пользователя:', user.id);
 
-      // Строим запрос для получения файлов
-      let query = this.supabase
+      // Получаем файлы пользователя, которые могут быть связаны с проектом
+      // Пока используем простую логику - файлы пользователя за последние 30 дней
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { data, error } = await this.supabase
         .from('uploaded_files')
         .select(`
           id,
@@ -167,18 +157,9 @@ export class UploadedFileService {
           created_at,
           updated_at
         `)
-        .eq('user_id', user.id);
-      
-      // Если указан объект квалификации, фильтруем по нему
-      if (qualificationObjectId) {
-        // Для файлов проекта ищем по связи через project_equipment_assignments
-        // Пока используем простую логику - файлы за последние 30 дней
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        query = query.gte('upload_date', thirtyDaysAgo.toISOString());
-      }
-      
-      const { data, error } = await query.order('file_order', { ascending: true });
+        .eq('user_id', userId)
+        .gte('upload_date', thirtyDaysAgo.toISOString())
+        .order('file_order', { ascending: true });
 
       if (error) {
         console.error('Ошибка получения файлов проекта:', error);

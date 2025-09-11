@@ -61,16 +61,8 @@ export const UserDirectory: React.FC = () => {
       alert('Пользователь успешно добавлен');
     } catch (error) {
       console.error('Ошибка в handleAddUser:', error);
-      
       const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-      
-      // Проверяем, является ли это ошибкой дублирования email
-      if (errorMessage === 'DUPLICATE_EMAIL') {
-        alert('Пользователь с таким email уже существует. Используйте другой email адрес.');
-      } else {
-        alert(`Ошибка добавления пользователя: ${errorMessage}`);
-      }
-      
+      alert(`Ошибка добавления пользователя: ${errorMessage}`);
       setOperationLoading(false);
       return;
     }

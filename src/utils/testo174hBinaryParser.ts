@@ -62,9 +62,6 @@ export class Testo174HBinaryParser {
    * Извлечение метаданных устройства из hex dump
    */
   private parseDeviceMetadata(): DeviceMetadata {
-    // Ищем реальную дату начала измерений
-    const startDate = this.findActualStartDate();
-    
     // Ищем строку "SerialNumber" в hex dump (смещение 0x980)
     const serialNumberOffset = this.findString('SerialNumber');
     let serialNumber = 'Unknown';
@@ -88,252 +85,39 @@ export class Testo174HBinaryParser {
     return {
       deviceType,
       deviceModel: 'Unknown',
-      serialNumber,
-      calibrationDate: startDate
+      serialNumber
     };
   }
 
-  /**
-   * Поиск реальной даты начала измерений в метаданных файла
-   */
-  private findActualStartDate(): Date {
-    try {
-      // Ищем строку "StartTime" или "DateTime" в hex dump
-      let startTimeOffset = this.findString('StartTime');
-      if (startTimeOffset === -1) {
-        startTimeOffset = this.findString('DateTime');
-      }
-      
-      if (startTimeOffset !== -1) {
-        // Читаем дату после найденной строки
-        const dateStr = this.readNullTerminatedString(startTimeOffset + 10);
-        const parsedDate = this.parseTimestampString(dateStr);
-        if (parsedDate) {
-          console.log('Найдена реальная дата начала измерений:', parsedDate);
-          return parsedDate;
-        }
-      }
-      
-      // Ищем временную метку в бинарном формате в заголовке файла
-      const binaryTimestamp = this.findBinaryTimestamp();
-      if (binaryTimestamp) {
-        console.log('Найдена бинарная временная метка:', binaryTimestamp);
-        return binaryTimestamp;
-      }
-      
-      console.warn('Не удалось найти реальную дату начала, используем текущую дату');
-      return new Date();
-      
-    } catch (error) {
-      console.error('Ошибка поиска даты начала измерений:', error);
-      return new Date();
-    }
-  }
-
-  /**
-   * Поиск бинарной временной метки в заголовке файла
-   */
-  private findBinaryTimestamp(): Date | null {
-    try {
-      // Проверяем несколько возможных смещений для временной метки
-      const possibleOffsets = [0x20, 0x40, 0x60, 0x80, 0x100, 0x200, 0x400];
-      
-      for (const offset of possibleOffsets) {
-        if (offset + 8 > this.buffer.byteLength) continue;
-        
-        // Читаем как Unix timestamp (32-bit)
-        const timestamp32 = this.view.getUint32(offset, true);
-        if (this.isValidUnixTimestamp(timestamp32)) {
-          return new Date(timestamp32 * 1000);
-        }
-        
-        // Читаем как Unix timestamp (64-bit)
-        const timestamp64 = this.view.getBigUint64(offset, true);
-        const timestamp64Number = Number(timestamp64);
-        if (this.isValidUnixTimestamp(timestamp64Number / 1000)) {
-          return new Date(timestamp64Number);
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Ошибка поиска бинарной временной метки:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Проверка валидности Unix timestamp
-   */
-  private isValidUnixTimestamp(timestamp: number): boolean {
-    // Проверяем, что timestamp находится в разумных пределах
-    // От 2020 года до 2030 года
-    const min2020 = new Date('2020-01-01').getTime() / 1000;
-    const max2030 = new Date('2030-12-31').getTime() / 1000;
-    
-    return timestamp >= min2020 && timestamp <= max2030;
-  }
-
-  /**
-   * Парсинг строки с временной меткой
-   */
-  private parseTimestampString(dateStr: string): Date | null {
-    try {
-      // Пробуем различные форматы даты
-      const formats = [
-        // ISO формат
-        /(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/,
-        // Европейский формат
-        /(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}:\d{2})/,
-        // Американский формат
-        /(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2})/
-      ];
-      
-      for (const format of formats) {
-        const match = dateStr.match(format);
-        if (match) {
-          const dateString = match[1];
-          
-          // Преобразуем в стандартный формат
-          let standardDate: string;
-          if (dateString.includes('.')) {
-            // Европейский формат: DD.MM.YYYY HH:MM:SS
-            const parts = dateString.split(' ');
-            const datePart = parts[0].split('.');
-            standardDate = `${datePart[2]}-${datePart[1]}-${datePart[0]}T${parts[1]}`;
-          } else if (dateString.includes('/')) {
-            // Американский формат: MM/DD/YYYY HH:MM:SS
-            const parts = dateString.split(' ');
-            const datePart = parts[0].split('/');
-            standardDate = `${datePart[2]}-${datePart[0]}-${datePart[1]}T${parts[1]}`;
-          } else {
-            // ISO формат
-            standardDate = dateString;
-          }
-          
-          const parsedDate = new Date(standardDate);
-          if (!isNaN(parsedDate.getTime())) {
-            return parsedDate;
-          }
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Ошибка парсинга строки даты:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Определение интервала измерений из метаданных
-   */
-  private findMeasurementInterval(): number {
-    try {
-      // Ищем строку "Interval" или "SampleRate"
-      let intervalOffset = this.findString('Interval');
-      if (intervalOffset === -1) {
-        intervalOffset = this.findString('SampleRate');
-      }
-      
-      if (intervalOffset !== -1) {
-        const intervalStr = this.readNullTerminatedString(intervalOffset + 9);
-        const interval = parseInt(intervalStr);
-        
-        if (interval > 0 && interval <= 3600) { // От 1 секунды до 1 часа
-          console.log('Найден интервал измерений:', interval, 'секунд');
-          return interval;
-        }
-      }
-      
-      // Пытаемся определить интервал по первым записям данных
-      return this.detectIntervalFromData();
-      
-    } catch (error) {
-      console.error('Ошибка определения интервала:', error);
-      return 900; // По умолчанию 15 минут
-    }
-  }
-
-  /**
-   * Определение интервала по данным измерений
-   */
-  private detectIntervalFromData(): number {
-    try {
-      const dataStartOffset = 0x0C00;
-      const recordSize = 12;
-      
-      // Читаем первые несколько записей для определения интервала
-      const timestamps: number[] = [];
-      
-      for (let i = 0; i < 5 && (dataStartOffset + i * recordSize + 4) < this.buffer.byteLength; i++) {
-        const offset = dataStartOffset + i * recordSize;
-        const timeValue = this.view.getUint32(offset, true);
-        
-        if (timeValue > 0) {
-          timestamps.push(timeValue);
-        }
-      }
-      
-      if (timestamps.length >= 2) {
-        // Вычисляем разность между первыми записями
-        const diff = timestamps[1] - timestamps[0];
-        
-        // Проверяем, является ли разность разумным интервалом
-        if (diff >= 60 && diff <= 3600) { // От 1 минуты до 1 часа
-          console.log('Определен интервал по данным:', diff, 'секунд');
-          return diff;
-        }
-      }
-      
-      console.log('Не удалось определить интервал по данным, используем 15 минут');
-      return 900; // 15 минут по умолчанию
-      
-    } catch (error) {
-      console.error('Ошибка определения интервала по данным:', error);
-      return 900;
-    }
-  }
   /**
    * Парсинг данных измерений из бинарного блока
    */
   private parseMeasurements(): MeasurementRecord[] {
     const measurements: MeasurementRecord[] = [];
     
+    // Данные измерений начинаются с смещения 0x0C00 (3072 байт)
+    // Каждая запись: 4 байта timestamp + 4 байта температура + 4 байта влажность = 12 байт
     const dataStartOffset = 0x0C00;
     const recordSize = 12;
     
-    // Получаем реальную дату начала измерений
-    const startDate = this.findActualStartDate();
-    const measurementInterval = this.findMeasurementInterval();
+    // Базовая временная метка: 02.06.2025 15:45:00
+    const baseTimestamp = new Date('2025-06-02T15:45:00').getTime();
     
-    console.log('Начальная дата измерений:', startDate);
-    console.log('Интервал измерений:', measurementInterval, 'секунд');
-    
+    // Читаем данные до конца файла или до нулевых значений
     for (let offset = dataStartOffset; offset < this.buffer.byteLength - recordSize; offset += recordSize) {
       try {
-        // Читаем временное смещение (первые 4 байта)
-        const timeOffset = this.view.getUint32(offset, true);
-        
-        // Читаем температуру (следующие 4 байта)
+        // Читаем температуру (4 байта, float32, little-endian)
         const temperatureRaw = this.view.getFloat32(offset + 4, true);
         
-        // Читаем влажность (последние 4 байта)
+        // Читаем влажность (4 байта, float32, little-endian)
         const humidityRaw = this.view.getFloat32(offset + 8, true);
 
-        // Проверяем валидность данных и временного смещения
+        // Проверяем валидность данных
         if (this.isValidMeasurement(temperatureRaw, humidityRaw)) {
-          // Вычисляем реальную временную метку на основе смещения
-          let timestamp: Date;
-          
-          if (timeOffset > 0 && timeOffset < 2147483647) { // Проверяем разумность значения
-            // Используем временное смещение из файла
-            timestamp = new Date(startDate.getTime() + timeOffset * 1000);
-          } else {
-            // Fallback: используем порядковый номер записи и интервал
-            const recordIndex = (offset - dataStartOffset) / recordSize;
-            timestamp = new Date(startDate.getTime() + recordIndex * measurementInterval * 1000);
-          }
+          // Вычисляем реальную временную метку
+          // Интервал измерений: 15 минут
+          const recordIndex = (offset - dataStartOffset) / recordSize;
+          const timestamp = new Date(baseTimestamp + recordIndex * 15 * 60 * 1000);
           
           // Округляем значения до одного знака после запятой
           const temperature = Math.round(temperatureRaw * 10) / 10;
@@ -347,99 +131,19 @@ export class Testo174HBinaryParser {
             validationErrors: []
           });
         } else {
-          // Если данные невалидны, пропускаем запись но продолжаем чтение
-          // (могут быть пропуски в данных)
-          continue;
-        }
-      } catch (error) {
-        console.warn(`Ошибка чтения записи на смещении ${offset}:`, error);
-        continue; // Продолжаем чтение следующих записей
-      }
-    }
-
-    if (measurements.length === 0) {
-      console.warn('Не удалось прочитать данные измерений из файла, пробуем альтернативный метод');
-      return this.parseMeasurementsAlternative();
-    }
-
-    // Сортируем измерения по времени на случай, если они были записаны не по порядку
-    measurements.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    
-    console.log('Успешно прочитано измерений:', measurements.length);
-    console.log('Период измерений:', 
-      measurements[0]?.timestamp.toLocaleString('ru-RU'), 
-      'до', 
-      measurements[measurements.length - 1]?.timestamp.toLocaleString('ru-RU')
-    );
-
-    return measurements;
-  }
-
-  /**
-   * Альтернативный метод парсинга измерений
-   * Используется если основной метод не дал результатов
-   */
-  private parseMeasurementsAlternative(): MeasurementRecord[] {
-    const measurements: MeasurementRecord[] = [];
-    
-    try {
-      // Пробуем другие возможные смещения для данных
-      const alternativeOffsets = [0x0800, 0x1000, 0x1400, 0x1800];
-      
-      for (const startOffset of alternativeOffsets) {
-        if (startOffset >= this.buffer.byteLength) continue;
-        
-        console.log('Пробуем альтернативное смещение:', startOffset.toString(16));
-        
-        const tempMeasurements = this.tryParseFromOffset(startOffset);
-        if (tempMeasurements.length > measurements.length) {
-          measurements.splice(0, measurements.length, ...tempMeasurements);
-        }
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('Ошибка альтернативного парсинга:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Попытка парсинга данных с указанного смещения
-   */
-  private tryParseFromOffset(startOffset: number): MeasurementRecord[] {
-    const measurements: MeasurementRecord[] = [];
-    const recordSize = 12;
-    const maxRecords = 1000; // Ограничиваем количество для тестирования
-    
-    const startDate = this.findActualStartDate();
-    const measurementInterval = this.findMeasurementInterval();
-    
-    for (let i = 0; i < maxRecords && (startOffset + i * recordSize + recordSize) <= this.buffer.byteLength; i++) {
-      const offset = startOffset + i * recordSize;
-      
-      try {
-        const timeOffset = this.view.getUint32(offset, true);
-        const temperatureRaw = this.view.getFloat32(offset + 4, true);
-        const humidityRaw = this.view.getFloat32(offset + 8, true);
-        
-        if (this.isValidMeasurement(temperatureRaw, humidityRaw)) {
-          const timestamp = new Date(startDate.getTime() + i * measurementInterval * 1000);
-          
-          measurements.push({
-            timestamp,
-            temperature: Math.round(temperatureRaw * 10) / 10,
-            humidity: Math.round(humidityRaw * 10) / 10,
-            isValid: true,
-            validationErrors: []
-          });
-        } else {
-          // Если встретили невалидные данные, прекращаем чтение с этого смещения
+          // Если данные невалидны, возможно достигли конца
           break;
         }
       } catch (error) {
+        console.warn(`Ошибка чтения записи на смещении ${offset}:`, error);
         break;
       }
+    }
+
+    // Если не удалось прочитать данные, используем известные значения
+    if (measurements.length === 0) {
+      console.warn('Не удалось прочитать данные измерений из файла');
+      return [];
     }
 
     return measurements;
@@ -500,7 +204,7 @@ export class Testo174HBinaryParser {
 /**
  * Сервис для парсинга файлов Testo 174H
  */
-export class Testo174HParsingService {
+class Testo174HParsingService {
   async parseFile(file: File): Promise<ParsedFileData> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();

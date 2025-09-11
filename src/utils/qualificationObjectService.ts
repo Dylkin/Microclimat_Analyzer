@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { QualificationObject } from '../types/QualificationObject';
 
-export class QualificationObjectService {
+class QualificationObjectService {
   private supabase;
 
   constructor() {
@@ -24,6 +24,14 @@ export class QualificationObjectService {
       throw new Error('Supabase не настроен');
     }
 
+    // Проверяем переменные окружения
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY не настроены');
+    }
+
     const { data, error } = await this.supabase
       .from('qualification_objects')
       .select(`
@@ -33,7 +41,20 @@ export class QualificationObjectService {
       .order('created_at', { ascending: false });
 
     if (error) {
+      // Специальная обработка ошибок подключения
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        throw new Error('Ошибка сети при подключении к Supabase. Проверьте URL проекта.');
+      }
+      if (error.message?.includes('Invalid API key') || error.message?.includes('unauthorized')) {
+        throw new Error('Неверный ключ API Supabase. Проверьте VITE_SUPABASE_ANON_KEY.');
+      }
+      
       throw new Error(`Ошибка загрузки объектов квалификации: ${error.message}`);
+    }
+
+    if (!data) {
+      console.warn('Получен null/undefined ответ от Supabase для объектов квалификации');
+      return [];
     }
 
     return data.map(this.mapFromDatabase);
@@ -42,6 +63,14 @@ export class QualificationObjectService {
   async getQualificationObjectsByContractor(contractorId: string): Promise<QualificationObject[]> {
     if (!this.isAvailable()) {
       throw new Error('Supabase не настроен');
+    }
+
+    // Проверяем переменные окружения
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY не настроены');
     }
 
     const { data, error } = await this.supabase
@@ -54,33 +83,23 @@ export class QualificationObjectService {
       .order('created_at', { ascending: false });
 
     if (error) {
+      // Специальная обработка ошибок подключения
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        throw new Error('Ошибка сети при подключении к Supabase. Проверьте URL проекта.');
+      }
+      if (error.message?.includes('Invalid API key') || error.message?.includes('unauthorized')) {
+        throw new Error('Неверный ключ API Supabase. Проверьте VITE_SUPABASE_ANON_KEY.');
+      }
+      
       throw new Error(`Ошибка загрузки объектов квалификации: ${error.message}`);
     }
 
+    if (!data) {
+      console.warn('Получен null/undefined ответ от Supabase для объектов квалификации контрагента');
+      return [];
+    }
+
     return data.map(this.mapFromDatabase);
-  }
-
-  async addQualificationObject(qualificationObject: Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>): Promise<QualificationObject> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
-    const dbData = this.mapToDatabase(qualificationObject);
-    
-    const { data, error } = await this.supabase
-      .from('qualification_objects')
-      .insert(dbData)
-      .select(`
-        *,
-        contractor:contractors(name)
-      `)
-      .single();
-
-    if (error) {
-      throw new Error(`Ошибка создания объекта квалификации: ${error.message}`);
-    }
-
-    return this.mapFromDatabase(data);
   }
 
   async createQualificationObject(qualificationObject: Omit<QualificationObject, 'id' | 'createdAt' | 'updatedAt'>): Promise<QualificationObject> {
@@ -208,6 +227,27 @@ export class QualificationObjectService {
   }
 
   private mapFromDatabase(data: any): QualificationObject {
+    // Безопасный парсинг measurement_zones с проверкой на пустые значения
+    let measurementZones = [];
+    try {
+      const jsonString = data.measurement_zones;
+      if (jsonString && typeof jsonString === 'string' && jsonString.trim() !== '') {
+        measurementZones = JSON.parse(jsonString);
+        // Дополнительная проверка, что результат парсинга - массив
+        if (!Array.isArray(measurementZones)) {
+          console.warn('measurement_zones не является массивом, используем пустой массив');
+          measurementZones = [];
+        }
+      } else {
+        // Если поле пустое, null или не строка - используем пустой массив
+        measurementZones = [];
+      }
+    } catch (error) {
+      // Логируем ошибку и используем пустой массив как fallback
+      console.error('Ошибка парсинга measurement_zones для объекта:', data.id, error);
+      measurementZones = [];
+    }
+
     return {
       id: data.id,
       contractorId: data.contractor_id,
@@ -232,7 +272,8 @@ export class QualificationObjectService {
       testDataFileUrl: data.test_data_file_url || '',
       testDataFileName: data.test_data_file_name || '',
       createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
+      updatedAt: new Date(data.updated_at),
+      measurementZones: measurementZones
     };
   }
 
@@ -259,6 +300,7 @@ export class QualificationObjectService {
     if (data.serialNumber !== undefined) dbData.serial_number = data.serialNumber;
     if (data.testDataFileUrl !== undefined) dbData.test_data_file_url = data.testDataFileUrl;
     if (data.testDataFileName !== undefined) dbData.test_data_file_name = data.testDataFileName;
+    if (data.measurementZones !== undefined) dbData.measurement_zones = JSON.stringify(data.measurementZones);
 
     return dbData;
   }

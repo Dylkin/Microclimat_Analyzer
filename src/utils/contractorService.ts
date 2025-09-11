@@ -15,7 +15,7 @@ const initSupabase = () => {
   return supabase;
 };
 
-export interface DatabaseContractor {
+interface DatabaseContractor {
   id: string;
   name: string;
   address: string | null;
@@ -26,7 +26,7 @@ export interface DatabaseContractor {
   updated_at: string;
 }
 
-export interface DatabaseContractorContact {
+interface DatabaseContractorContact {
   id: string;
   contractor_id: string;
   employee_name: string;
@@ -35,7 +35,7 @@ export interface DatabaseContractorContact {
   created_at: string;
 }
 
-export class ContractorService {
+class ContractorService {
   private supabase: any;
 
   constructor() {
@@ -86,6 +86,11 @@ export class ContractorService {
     }
 
     try {
+      // Проверяем подключение к Supabase
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY не настроены');
+      }
+
       console.log('Загружаем контрагентов...');
       // Получаем контрагентов
       const { data: contractorsData, error: contractorsError } = await this.supabase
@@ -95,7 +100,21 @@ export class ContractorService {
 
       if (contractorsError) {
         console.error('Ошибка получения контрагентов:', contractorsError);
+        
+        // Специальная обработка ошибок подключения
+        if (contractorsError.message?.includes('fetch') || contractorsError.message?.includes('network')) {
+          throw new Error('Ошибка сети при подключении к Supabase. Проверьте URL проекта.');
+        }
+        if (contractorsError.message?.includes('Invalid API key') || contractorsError.message?.includes('unauthorized')) {
+          throw new Error('Неверный ключ API Supabase. Проверьте VITE_SUPABASE_ANON_KEY.');
+        }
+        
         throw new Error(`Ошибка получения контрагентов: ${contractorsError.message}`);
+      }
+
+      if (!contractorsData) {
+        console.warn('Получен null/undefined ответ от Supabase для контрагентов');
+        return [];
       }
 
       console.log('Загружено контрагентов:', contractorsData?.length || 0);

@@ -22,7 +22,7 @@ const initSupabase = () => {
   return supabase;
 };
 
-export interface DatabaseProject {
+interface DatabaseProject {
   id: string;
   name: string;
   description: string | null;
@@ -34,14 +34,14 @@ export interface DatabaseProject {
   updated_at: string;
 }
 
-export interface DatabaseProjectQualificationObject {
+interface DatabaseProjectQualificationObject {
   id: string;
   project_id: string;
   qualification_object_id: string;
   created_at: string;
 }
 
-export interface DatabaseProjectStageAssignment {
+interface DatabaseProjectStageAssignment {
   id: string;
   project_id: string;
   stage: ProjectStatus;
@@ -52,7 +52,7 @@ export interface DatabaseProjectStageAssignment {
   created_at: string;
 }
 
-export class ProjectService {
+class ProjectService {
   private supabase: any;
 
   constructor() {
@@ -77,6 +77,11 @@ export class ProjectService {
     }
 
     try {
+      // Проверяем подключение к Supabase
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY не настроены');
+      }
+
       // Получаем проекты
       const { data: projectsData, error: projectsError } = await this.supabase
         .from('projects')
@@ -85,7 +90,21 @@ export class ProjectService {
 
       if (projectsError) {
         console.error('Ошибка получения проектов:', projectsError);
+        
+        // Специальная обработка ошибок подключения
+        if (projectsError.message?.includes('fetch') || projectsError.message?.includes('network')) {
+          throw new Error('Ошибка сети при подключении к Supabase. Проверьте URL проекта.');
+        }
+        if (projectsError.message?.includes('Invalid API key') || projectsError.message?.includes('unauthorized')) {
+          throw new Error('Неверный ключ API Supabase. Проверьте VITE_SUPABASE_ANON_KEY.');
+        }
+        
         throw new Error(`Ошибка получения проектов: ${projectsError.message}`);
+      }
+
+      if (!projectsData) {
+        console.warn('Получен null/undefined ответ от Supabase');
+        return [];
       }
 
       // Получаем контрагентов
@@ -111,7 +130,7 @@ export class ProjectService {
         .from('project_qualification_objects')
         .select(`
           *,
-          qualification_object:qualification_objects (
+          qualification_objects (
             id,
             name,
             type,
@@ -140,19 +159,13 @@ export class ProjectService {
       // Группируем объекты квалификации по проектам
       const qualificationObjectsByProject = new Map<string, ProjectQualificationObject[]>();
       qualificationObjectsData?.forEach((pqo: any) => {
-        console.log('Обрабатываем связь проект-объект:', {
-          projectId: pqo.project_id,
-          qualificationObjectId: pqo.qualification_object_id,
-          objectData: pqo.qualification_object
-        });
-        
         if (!qualificationObjectsByProject.has(pqo.project_id)) {
           qualificationObjectsByProject.set(pqo.project_id, []);
         }
         
-        const objectName = pqo.qualification_object?.name || 
-                          pqo.qualification_object?.vin || 
-                          pqo.qualification_object?.serial_number || 
+        const objectName = pqo.qualification_objects?.name || 
+                          pqo.qualification_objects?.vin || 
+                          pqo.qualification_objects?.serial_number || 
                           'Без названия';
         
         qualificationObjectsByProject.get(pqo.project_id)!.push({
@@ -160,7 +173,7 @@ export class ProjectService {
           projectId: pqo.project_id,
           qualificationObjectId: pqo.qualification_object_id,
           qualificationObjectName: objectName,
-          qualificationObjectType: pqo.qualification_object?.type,
+          qualificationObjectType: pqo.qualification_objects?.type,
           createdAt: new Date(pqo.created_at)
         });
       });
@@ -186,13 +199,7 @@ export class ProjectService {
       });
 
       // Формируем результат
-      const projects = projectsData.map((project: DatabaseProject) => {
-        const projectQualificationObjects = qualificationObjectsByProject.get(project.id) || [];
-        
-        console.log(`Проект "${project.name}" (ID: ${project.id}) содержит объектов квалификации:`, projectQualificationObjects.length);
-        console.log('ID объектов:', projectQualificationObjects.map(obj => obj.qualificationObjectId));
-        
-        return {
+      return projectsData.map((project: DatabaseProject) => ({
         id: project.id,
         name: project.name,
         description: project.description || undefined,
@@ -204,13 +211,9 @@ export class ProjectService {
         createdByName: project.created_by ? usersMap.get(project.created_by) : undefined,
         createdAt: new Date(project.created_at),
         updatedAt: new Date(project.updated_at),
-        qualificationObjects: projectQualificationObjects,
+        qualificationObjects: qualificationObjectsByProject.get(project.id) || [],
         stageAssignments: stageAssignmentsByProject.get(project.id) || []
-        };
-      });
-      
-      console.log('Всего загружено проектов:', projects.length);
-      return projects;
+      }));
     } catch (error) {
       console.error('Ошибка при получении проектов:', error);
       throw error;
@@ -225,7 +228,6 @@ export class ProjectService {
 
     try {
       console.log('Добавляем проект:', projectData);
-      console.log('Выбранные объекты квалификации:', projectData.qualificationObjectIds);
 
       // Валидация UUID контрагента
       if (!this.isValidUUID(projectData.contractorId)) {
@@ -266,13 +268,10 @@ export class ProjectService {
 
       // Добавляем связи с объектами квалификации
       if (projectData.qualificationObjectIds.length > 0) {
-        console.log('Добавляем связи с объектами квалификации:', projectData.qualificationObjectIds);
         const qualificationObjectsToInsert = projectData.qualificationObjectIds.map(objectId => ({
           project_id: projectResult.id,
           qualification_object_id: objectId
         }));
-        
-        console.log('Данные для вставки в project_qualification_objects:', qualificationObjectsToInsert);
 
         const { error: qualificationObjectsError } = await this.supabase
           .from('project_qualification_objects')
@@ -280,9 +279,6 @@ export class ProjectService {
 
         if (qualificationObjectsError) {
           console.error('Ошибка добавления объектов квалификации:', qualificationObjectsError);
-          throw new Error(`Ошибка добавления объектов квалификации: ${qualificationObjectsError.message}`);
-        } else {
-          console.log('Связи с объектами квалификации успешно добавлены');
         }
       }
 
@@ -314,8 +310,6 @@ export class ProjectService {
         throw new Error('Не удалось найти созданный проект');
       }
 
-      console.log('Созданный проект содержит объектов квалификации:', createdProject.qualificationObjects.length);
-      console.log('ID объектов в созданном проекте:', createdProject.qualificationObjects.map(obj => obj.qualificationObjectId));
       return createdProject;
     } catch (error) {
       console.error('Ошибка при добавлении проекта:', error);

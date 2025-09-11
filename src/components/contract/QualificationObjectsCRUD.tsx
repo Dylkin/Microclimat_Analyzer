@@ -7,22 +7,17 @@ import { QualificationObjectForm } from '../QualificationObjectForm';
 interface QualificationObjectsCRUDProps {
   contractorId: string;
   contractorName: string;
-  projectQualificationObjects?: Array<{
-    qualificationObjectId: string;
-    qualificationObjectName?: string;
-  }>;
 }
 
 export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> = ({ 
   contractorId, 
-  contractorName,
-  projectQualificationObjects = []
+  contractorName 
 }) => {
   const [objects, setObjects] = useState<QualificationObject[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
   const [editingObject, setEditingObject] = useState<QualificationObject | null>(null);
+  const [showForm, setShowForm] = useState(false);
 
   // Загрузка объектов квалификации
   const loadObjects = async () => {
@@ -30,19 +25,8 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
     setError(null);
 
     try {
-      if (projectQualificationObjects.length > 0) {
-        // Если есть объекты проекта, загружаем только их
-        const allObjects = await qualificationObjectService.getQualificationObjectsByContractor(contractorId);
-        const projectObjectIds = projectQualificationObjects.map(obj => obj.qualificationObjectId);
-        const filteredObjects = allObjects.filter(obj => projectObjectIds.includes(obj.id));
-        setObjects(filteredObjects);
-        console.log('Загружены объекты квалификации проекта:', filteredObjects.length);
-      } else {
-        // Если объекты проекта не указаны, загружаем все объекты контрагента
-        const data = await qualificationObjectService.getQualificationObjectsByContractor(contractorId);
-        setObjects(data);
-        console.log('Загружены все объекты квалификации контрагента:', data.length);
-      }
+      const data = await qualificationObjectService.getQualificationObjectsByContractor(contractorId);
+      setObjects(data);
     } catch (error) {
       console.error('Ошибка загрузки объектов:', error);
       setError(error instanceof Error ? error.message : 'Неизвестная ошибка');
@@ -53,7 +37,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
 
   useEffect(() => {
     loadObjects();
-  }, [contractorId, projectQualificationObjects]);
+  }, [contractorId]);
 
   // Создание нового объекта
   const handleCreate = async (object: QualificationObject) => {
@@ -207,6 +191,27 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                           Климатическая система: <span className="font-medium">{object.climateSystem}</span>
                         </p>
                       )}
+                      {object.measurementZones && object.measurementZones.length > 0 && (
+                        <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                          <h5 className="text-sm font-medium text-indigo-900 mb-2">
+                            Расстановка оборудования ({object.measurementZones.length} зон):
+                          </h5>
+                          <div className="space-y-2">
+                            {object.measurementZones.map((zone) => (
+                              <div key={zone.id} className="text-sm text-indigo-800">
+                                <span className="font-medium">Зона {zone.zoneNumber}:</span>
+                                {zone.measurementLevels.length > 0 ? (
+                                  <span className="ml-2">
+                                    {zone.measurementLevels.map(level => `${level.level}м`).join(', ')}
+                                  </span>
+                                ) : (
+                                  <span className="ml-2 text-indigo-600">уровни не заданы</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -231,22 +236,6 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
       {/* Edit Form - не в модальном окне */}
       {editingObject && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Редактировать объект квалификации</h3>
-            <button
-              onClick={() => setEditingObject(null)}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <QualificationObjectForm
-            initialData={editingObject}
-            contractorAddress={editingObject?.address}
-            onSubmit={handleUpdate}
-            onCancel={() => setEditingObject(null)}
-            hideTypeSelection={true}
-          />
         </div>
       )}
     </div>

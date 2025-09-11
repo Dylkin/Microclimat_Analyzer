@@ -4,7 +4,7 @@ import { userService } from '../utils/userService';
 
 // Helper function to validate UUID format
 const isValidUUID = (uuid: string): boolean => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(uuid);
 };
 
@@ -32,7 +32,7 @@ export const useAuth = () => {
 };
 
 const defaultUser: User = {
-  id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  id: '00000000-0000-0000-0000-000000000001',
   fullName: 'Дылкин П.А.',
   email: 'pavel.dylkin@gmail.com',
   password: '00016346',
@@ -170,11 +170,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('Пользователь добавлен в БД:', addedUser);
         } catch (error) {
           console.error('Ошибка добавления в БД:', error);
-          
-          // Если ошибка связана с дублированием email, выбрасываем специфичную ошибку
-          if (error instanceof Error && error.message.includes('23505')) {
-            throw new Error('DUPLICATE_EMAIL');
-          }
           
           // Если ошибка связана с правами доступа, пробуем fallback
           if (error instanceof Error && error.message.includes('прав')) {

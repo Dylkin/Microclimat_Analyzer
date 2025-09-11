@@ -4,54 +4,18 @@ import { useAuth } from '../contexts/AuthContext';
 import { UploadedFile } from '../types/FileData';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject } from '../types/QualificationObject';
-import { Equipment } from '../types/Equipment';
-import { EquipmentAssignment } from '../utils/equipmentAssignmentService';
 import { ProjectStatusLabels, ProjectStatus } from '../types/Project';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
-import { equipmentService } from '../utils/equipmentService';
-import { equipmentAssignmentService } from '../utils/equipmentAssignmentService';
 import { databaseService } from '../utils/database';
 import { uploadedFileService } from '../utils/uploadedFileService';
 import { VI2ParsingService } from '../utils/vi2Parser';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
-import { createClient } from '@supabase/supabase-js';
-
-// Инициализация Supabase клиента для получения пользователя
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-let supabase: any = null;
-if (supabaseUrl && supabaseAnonKey) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-  });
-}
-
-// Функция для получения ID пользователя из Supabase Auth
-async function getUserIdOrThrow(): Promise<string> {
-  if (!supabase) {
-    throw new Error('Supabase не настроен');
-  }
-  
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) {
-    throw new Error('Пользователь не авторизован');
-  }
-  
-  return data.user.id; // UUID
-}
 
 interface MicroclimatAnalyzerProps {
   showVisualization?: boolean;
   onShowVisualization?: (show: boolean) => void;
   selectedProject?: {
-  onBack?: () => void;
-  analysisData?: {
-    files: any[];
-    returnPage: string;
-    returnData: any;
-  };
     id: string;
     name: string;
     contractorId: string;
@@ -62,38 +26,17 @@ interface MicroclimatAnalyzerProps {
     }>;
     status: string;
   } | null;
-  selectedQualificationObjectId?: string;
 }
 
 export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({ 
   showVisualization = false, 
   onShowVisualization,
-  selectedProject,
-  onBack,
-  analysisData,
-  selectedQualificationObjectId
+  selectedProject
 }) => {
-  // Безопасная проверка данных проекта
-  if (selectedProject && (!selectedProject.id || !selectedProject.qualificationObjects)) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-3">
-          <BarChart3 className="w-8 h-8 text-red-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки проекта</h1>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <p className="text-red-600">Данные проекта не найдены или повреждены</p>
-        </div>
-      </div>
-    );
-  }
-
   const { user } = useAuth();
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([]);
   const [contractors, setContractors] = React.useState<Contractor[]>([]);
   const [qualificationObjects, setQualificationObjects] = React.useState<QualificationObject[]>([]);
-  const [equipment, setEquipment] = React.useState<Equipment[]>([]);
-  const [equipmentAssignments, setEquipmentAssignments] = React.useState<EquipmentAssignment[]>([]);
   const [selectedContractor, setSelectedContractor] = React.useState<string>('');
   const [selectedQualificationObject, setSelectedQualificationObject] = React.useState<string>('');
   const [contractorSearch, setContractorSearch] = React.useState('');
@@ -113,71 +56,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   });
   const [projectFilesLoaded, setProjectFilesLoaded] = React.useState(false);
 
-  // Обработчик загрузки файла для конкретной строки
-  const handleFileUploadForRow = async (fileId: string, uploadedFile: File) => {
-    // Проверяем расширение файла
-    if (!uploadedFile.name.toLowerCase().endsWith('.vi2')) {
-      alert(`Файл "${uploadedFile.name}" имеет неподдерживаемый формат. Поддерживаются только файлы .vi2`);
-      return;
-    }
-
-    // Обновляем статус файла на "обработка"
-    setUploadedFiles(prev => prev.map(f => 
-      f.id === fileId ? { 
-        ...f, 
-        parsingStatus: 'processing' as const,
-        actualFileName: uploadedFile.name,
-        uploadDate: new Date().toLocaleString('ru-RU')
-      } : f
-    ));
-
-    try {
-      // Реальный парсинг файла
-      console.log(`Парсинг файла для строки: ${uploadedFile.name}`);
-      
-      // Читаем файл как ArrayBuffer
-      const arrayBuffer = await uploadedFile.arrayBuffer();
-      
-      // Используем универсальный парсер VI2
-      const parsingService = new VI2ParsingService();
-      const parsedData = await parsingService.parseFile(uploadedFile);
-      
-      // Сохраняем в базу данных
-      await databaseService.saveParsedFileData(parsedData, fileId);
-      
-      setUploadedFiles(prev => prev.map(f => {
-        if (f.id === fileId) {
-          const period = `${parsedData.startDate.toLocaleDateString('ru-RU')} - ${parsedData.endDate.toLocaleDateString('ru-RU')}`;
-          return {
-            ...f,
-            parsingStatus: 'completed' as const, 
-            parsedData,
-            recordCount: parsedData.recordCount,
-            period,
-            actualFileName: uploadedFile.name
-          };
-        }
-        return f;
-      }));
-      
-    } catch (error) {
-      console.error('Ошибка парсинга файла:', error);
-      
-      // Обновляем статус на ошибку
-      setUploadedFiles(prev => prev.map(f => {
-        if (f.id === fileId) {
-          return {
-            ...f,
-            parsingStatus: 'error' as const,
-            errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка',
-            actualFileName: uploadedFile.name
-          };
-        }
-        return f;
-      }));
-    }
-  };
-
   const mockData = [
     { label: 'Температура', value: '22.5°C', icon: Thermometer, color: 'text-red-600', bg: 'bg-red-100' },
     { label: 'Влажность', value: '65%', icon: Droplets, color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -187,7 +65,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
 
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
-    const loadInitialData = async () => {
+    const loadContractors = async () => {
       if (!contractorService.isAvailable()) return;
       
       try {
@@ -201,158 +79,10 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       } catch (error) {
         console.error('Ошибка загрузки контрагентов:', error);
       }
-      
-      // Загружаем оборудование
-      if (equipmentService.isAvailable()) {
-        try {
-          const equipmentResult = await equipmentService.getAllEquipment(1, 1000); // Загружаем все оборудование
-          setEquipment(Array.isArray(equipmentResult?.data) ? equipmentResult.data : []);
-        } catch (error) {
-          console.error('Ошибка загрузки оборудования:', error);
-        }
-      }
     };
 
-    loadInitialData();
+    loadContractors();
   }, [selectedProject]);
-
-  // Загрузка назначений оборудования при выборе объекта квалификации
-  React.useEffect(() => {
-    const loadEquipmentAssignments = async () => {
-      if (!selectedQualificationObject || !equipmentAssignmentService.isAvailable()) {
-        setEquipmentAssignments([]);
-        setUploadedFiles([]);
-        return;
-      }
-
-      try {
-        console.log('Загружаем назначения оборудования для объекта:', selectedQualificationObject);
-        
-        let placement;
-        if (selectedProject) {
-          // Если есть проект, загружаем размещение для проекта
-          placement = await equipmentAssignmentService.getEquipmentPlacement(
-            selectedProject.id, 
-            selectedQualificationObject
-          );
-        } else {
-          // Если нет проекта, создаем пустое размещение
-          placement = { zones: [] };
-        }
-        
-        // Преобразуем размещение в список назначений
-        const assignments: EquipmentAssignment[] = [];
-        placement.zones.forEach(zone => {
-          zone.levels.forEach(level => {
-            if (level.equipmentId) {
-              const equipmentItem = (equipment || []).find(eq => eq.id === level.equipmentId);
-              assignments.push({
-                id: `${zone.zoneNumber}-${level.levelValue}`,
-                projectId: selectedProject?.id || '',
-                qualificationObjectId: selectedQualificationObject,
-                equipmentId: level.equipmentId,
-                equipmentName: level.equipmentName || equipmentItem?.name,
-                zoneNumber: zone.zoneNumber,
-                measurementLevel: level.levelValue,
-                assignedAt: new Date(),
-                createdAt: new Date()
-              });
-            }
-          });
-        });
-        
-        setEquipmentAssignments(assignments);
-        console.log('Загружено назначений оборудования:', assignments.length);
-        
-        // Загружаем ранее сохраненные файлы для этого объекта квалификации
-        let savedFiles: UploadedFile[] = [];
-        if (selectedProject && uploadedFileService.isAvailable()) {
-          try {
-            const userId = await getUserIdOrThrow();
-            const projectFiles = await uploadedFileService.getProjectFiles(selectedProject.id, userId);
-            // Фильтруем файлы для выбранного объекта квалификации
-            savedFiles = projectFiles.filter(file => 
-              file.qualificationObjectId === selectedQualificationObject
-            );
-            console.log('Загружено сохраненных файлов для объекта:', savedFiles.length);
-          } catch (error) {
-            console.error('Ошибка загрузки сохраненных файлов:', error);
-          }
-        }
-        
-        // Создаем строки в таблице для каждого назначения оборудования
-        const newFiles: UploadedFile[] = assignments.map((assignment, index) => {
-          // Ищем сохраненный файл для этого назначения
-          const savedFile = savedFiles.find(file => 
-            file.zoneNumber === assignment.zoneNumber && 
-            file.measurementLevel === assignment.measurementLevel.toString()
-          );
-          
-          if (savedFile) {
-            // Если есть сохраненный файл, используем его данные
-            return {
-              ...savedFile,
-              order: index,
-              contractorId: selectedContractor || undefined,
-              qualificationObjectId: selectedQualificationObject,
-              qualificationObjectName: getQualificationObjectName(selectedQualificationObject),
-              contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
-            };
-          } else {
-            // Если нет сохраненного файла, создаем новую строку
-            return {
-              id: crypto.randomUUID(),
-              name: `${assignment.equipmentName || 'Unknown'}_zone${assignment.zoneNumber}_level${assignment.measurementLevel}.vi2`,
-              uploadDate: new Date().toLocaleString('ru-RU'),
-              parsingStatus: 'pending' as const,
-              order: index,
-              zoneNumber: assignment.zoneNumber,
-              measurementLevel: assignment.measurementLevel.toString(),
-              contractorId: selectedContractor || undefined,
-              qualificationObjectId: selectedQualificationObject,
-              qualificationObjectName: getQualificationObjectName(selectedQualificationObject),
-              contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
-            };
-          }
-        });
-    // Проверяем наличие qualificationObjects перед использованием find
-    if (!selectedProject.qualificationObjects || !Array.isArray(selectedProject.qualificationObjects)) {
-      console.warn('qualificationObjects отсутствует или не является массивом');
-      return;
-    }
-
-        
-        // Добавляем файлы, которые не связаны с назначениями оборудования (если есть)
-        const filesWithoutAssignment = savedFiles.filter(file => 
-          !assignments.some(assignment => 
-            assignment.zoneNumber === file.zoneNumber && 
-            assignment.measurementLevel.toString() === file.measurementLevel
-          )
-        );
-        
-        // Объединяем файлы из назначений и дополнительные файлы
-        const allFiles = [...newFiles, ...filesWithoutAssignment.map((file, index) => ({
-          ...file,
-          order: newFiles.length + index,
-          contractorId: selectedContractor || undefined,
-          qualificationObjectId: selectedQualificationObject,
-          qualificationObjectName: getQualificationObjectName(selectedQualificationObject),
-          contractorName: selectedContractor ? getContractorName(selectedContractor) : undefined
-        }))];
-        
-        // Заменяем текущие файлы на объединенные файлы
-        setUploadedFiles(allFiles);
-        console.log('Загружено строк в таблице:', allFiles.length, '(назначения:', newFiles.length, ', дополнительные:', filesWithoutAssignment.length, ')');
-        
-      } catch (error) {
-        console.error('Ошибка загрузки назначений оборудования:', error);
-        setEquipmentAssignments([]);
-        setUploadedFiles([]);
-      }
-    };
-
-    loadEquipmentAssignments();
-  }, [selectedQualificationObject, selectedProject, equipment, selectedContractor]);
 
   // Загрузка ранее сохраненных файлов проекта
   React.useEffect(() => {
@@ -362,11 +92,8 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       }
 
       try {
-        // Получаем userId из Supabase Auth
-        const userId = await getUserIdOrThrow();
-        
         console.log('Загружаем ранее сохраненные файлы проекта:', selectedProject.id);
-        const projectFiles = await uploadedFileService.getProjectFiles(selectedProject.id, userId);
+        const projectFiles = await uploadedFileService.getProjectFiles(selectedProject.id, user?.id || 'anonymous');
         
         if (projectFiles.length > 0) {
           console.log('Найдены ранее сохраненные файлы:', projectFiles.length);
@@ -381,7 +108,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     };
 
     loadProjectFiles();
-  }, [selectedProject, projectFilesLoaded]);
+  }, [selectedProject, projectFilesLoaded, user?.id]);
 
   // Загрузка объектов квалификации при выборе контрагента
   React.useEffect(() => {
@@ -400,19 +127,11 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           const projectObjectIds = selectedProject.qualificationObjects.map(obj => obj.qualificationObjectId);
           const filteredData = data.filter(obj => projectObjectIds.includes(obj.id));
           setQualificationObjects(filteredData);
-          
-          // Если передан selectedQualificationObjectId, устанавливаем его
-          if (selectedQualificationObjectId && projectObjectIds.includes(selectedQualificationObjectId)) {
-            setSelectedQualificationObject(selectedQualificationObjectId);
-          }
         } else {
           setQualificationObjects(data);
         }
         
-        // Сбрасываем выбор объекта при смене контрагента только если не передан selectedQualificationObjectId
-        if (!selectedQualificationObjectId) {
-          setSelectedQualificationObject('');
-        }
+        setSelectedQualificationObject(''); // Сбрасываем выбор объекта при смене контрагента
       } catch (error) {
         console.error('Ошибка загрузки объектов квалификации:', error);
         setQualificationObjects([]);
@@ -420,7 +139,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     };
 
     loadQualificationObjects();
-  }, [selectedContractor, selectedProject, selectedQualificationObjectId]);
+  }, [selectedContractor, selectedProject]);
 
   // Фильтрация контрагентов по поиску
   const filteredContractors = React.useMemo(() => {
@@ -457,18 +176,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     if (!obj) return 'Выберите объект квалификации';
     
     return obj.name || obj.vin || obj.serialNumber || `${obj.type} (без названия)`;
-  };
-
-  // Получение названия оборудования по серийному номеру
-  const getEquipmentName = (serialNumber: string) => {
-    const eq = equipment.find(e => e.serialNumber === serialNumber);
-    return eq ? eq.name : serialNumber;
-  };
-
-  // Получение названия оборудования по ID
-  const getEquipmentNameById = (equipmentId: string) => {
-    const eq = (equipment || []).find(e => e.id === equipmentId);
-    return eq ? eq.name : 'Unknown';
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -615,10 +322,8 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       return;
     }
 
-    // Проверяем, есть ли файлы с загруженными данными
-    const filesWithData = uploadedFiles.filter(f => f.actualFileName && f.parsingStatus === 'completed');
-    if (filesWithData.length === 0) {
-      alert('Нет обработанных файлов для сохранения');
+    if (uploadedFiles.length === 0) {
+      alert('Нет файлов для сохранения');
       return;
     }
 
@@ -637,16 +342,13 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     setSaveStatus(prev => ({ ...prev, isSaving: true, error: null }));
 
     try {
-      // Получаем userId из Supabase Auth
-      const userId = await getUserIdOrThrow();
-      
-      // Сохраняем только файлы с загруженными данными в базе данных с привязкой к проекту
+      // Сохраняем файлы в базе данных с привязкой к проекту
       await uploadedFileService.saveProjectFiles({
         projectId: selectedProject.id,
         qualificationObjectId: selectedQualificationObject,
         objectType: qualificationObject.type,
-        files: filesWithData
-      }, userId);
+        files: uploadedFiles
+      }, user?.id || null);
       
       // Обновляем статус сохранения
       setSaveStatus({
@@ -660,31 +362,16 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         projectName: selectedProject.name,
         qualificationObjectId: selectedQualificationObject,
         objectType: qualificationObject.type,
-        filesCount: filesWithData.length,
-        completedFiles: filesWithData.length
+        filesCount: uploadedFiles.length,
+        completedFiles: uploadedFiles.filter(f => f.parsingStatus === 'completed').length
       });
-
-      alert(`Успешно сохранено ${filesWithData.length} файлов для проекта`);
 
     } catch (error) {
       console.error('Ошибка сохранения данных проекта:', error);
-      
-      // Показываем пользователю понятное сообщение
-      let errorMessage = 'Неизвестная ошибка';
-      if (error instanceof Error) {
-        if (error.message.includes('не авторизован')) {
-          errorMessage = 'Необходимо войти в систему для сохранения данных';
-        } else if (error.message.includes('не настроен')) {
-          errorMessage = 'Система не настроена. Обратитесь к администратору';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
       setSaveStatus({
         isSaving: false,
         lastSaved: null,
-        error: errorMessage
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
       });
     }
   };
@@ -790,7 +477,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         </div>
       )}
 
-      {/* Селекторы контрагента и объекта квалификации */}
+      {/* Секция загрузки файлов */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Загрузка файлов</h2>
@@ -869,7 +556,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
             )}
           </div>
         )}
-
 
         {/* Селекторы контрагента и объекта квалификации */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -1018,15 +704,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                     Порядок
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Оборудование
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    № зоны измерения
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Уровень измерения (м.)
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Имя файла
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1034,6 +711,12 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Количество записей
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    № зоны измерения
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Уровень измерения (м.)
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Статус
@@ -1057,7 +740,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                         </button>
                         <button
                           onClick={() => moveFile(file.id, 'down')}
-                          disabled={index === sortedFiles.filter(f => f.actualFileName).length - 1}
+                          disabled={index === sortedFiles.length - 1}
                           className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           <ChevronDown className="w-4 h-4" />
@@ -1065,43 +748,35 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {(() => {
-                          // Сначала пытаемся найти оборудование по назначению
-                          const assignment = equipmentAssignments.find(a => 
-                            a.zoneNumber === file.zoneNumber && 
-                            a.measurementLevel.toString() === file.measurementLevel
-                          );
-                          
-                          if (assignment && assignment.equipmentName) {
-                            return assignment.equipmentName;
-                          }
-                          
-                          // Если не найдено по назначению, ищем по серийному номеру из файла
-                          if (file.parsedData?.deviceMetadata?.serialNumber) {
-                            return getEquipmentName(file.parsedData.deviceMetadata.serialNumber);
-                          }
-                          
-                          return '-';
-                        })()
-                        }
-                      </div>
-                      {(() => {
-                        const assignment = equipmentAssignments.find(a => 
-                          a.zoneNumber === file.zoneNumber && 
-                          a.measurementLevel.toString() === file.measurementLevel
-                        );
-                        
-                        const serialNumber = assignment ? 
-                          equipment.find(eq => eq.id === assignment.equipmentId)?.serialNumber :
-                          file.parsedData?.deviceMetadata?.serialNumber;
-                        
-                        return serialNumber ? (
-                          <div className="text-xs text-gray-500">
-                            S/N: {serialNumber}
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{file.name}</div>
+                        <div className="text-xs text-gray-500">{file.uploadDate}</div>
+                        {file.parsedData && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {file.parsedData.deviceMetadata.deviceModel} (S/N: {file.parsedData.deviceMetadata.serialNumber})
                           </div>
-                        ) : null;
-                      })()}
+                        )}
+                        {file.contractorId && (
+                          <div className="text-xs text-blue-600 mt-1">
+                            📋 {getContractorName(file.contractorId)}
+                          </div>
+                        )}
+                        {file.qualificationObjectId && (
+                          <div className="text-xs text-green-600 mt-1">
+                            🏢 {getQualificationObjectName(file.qualificationObjectId)}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {file.period || '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {file.recordCount ? file.recordCount.toLocaleString('ru-RU') : '-'}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {editingField?.fileId === file.id && editingField?.field === 'zoneNumber' ? (
@@ -1146,45 +821,6 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <div className="text-sm font-medium text-gray-900">
-                            {file.actualFileName || file.name}
-                          </div>
-                          <input
-                            type="file"
-                            accept=".vi2"
-                            onChange={(e) => {
-                              const uploadedFile = e.target.files?.[0];
-                              if (uploadedFile) {
-                                handleFileUploadForRow(file.id, uploadedFile);
-                              }
-                            }}
-                            className="hidden"
-                            id={`file-upload-${file.id}`}
-                          />
-                          <label
-                            htmlFor={`file-upload-${file.id}`}
-                            className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors cursor-pointer flex items-center space-x-1"
-                          >
-                            <Upload className="w-3 h-3" />
-                            <span>Загрузить</span>
-                          </label>
-                        </div>
-                        <div className="text-xs text-gray-500">{file.uploadDate}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {file.period || '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {file.recordCount ? file.recordCount.toLocaleString('ru-RU') : '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
                         {getStatusIcon(file.parsingStatus)}
                         <span className="text-sm text-gray-900">{getStatusText(file.parsingStatus)}</span>
@@ -1210,8 +846,17 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
         ) : (
           <div className="text-center py-8 text-gray-500">
             <Upload className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>Файлы не загружены</p>
-            <p className="text-sm">Нажмите кнопку "Загрузить файлы в формате Vi2" для добавления файлов</p>
+            {selectedProject ? (
+              <>
+                <p>Файлы проекта не найдены</p>
+                <p className="text-sm">Нажмите кнопку "Загрузить файлы" для добавления файлов в формате .vi2 к проекту</p>
+              </>
+            ) : (
+              <>
+                <p>Файлы не загружены</p>
+                <p className="text-sm">Нажмите кнопку "Загрузить файлы" для добавления файлов в формате .vi2</p>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -1224,6 +869,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           </p>
         </div>
       )}
+
     </div>
   );
 };
