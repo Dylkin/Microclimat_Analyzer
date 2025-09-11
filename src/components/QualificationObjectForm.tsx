@@ -265,7 +265,9 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           zoneNumber: zone.zoneNumber,
           measurementLevels: zone.measurementLevels.map(level => ({
             id: level.id,
-            level: level.level
+            level: level.level,
+            equipmentId: level.equipmentId,
+            equipmentName: level.equipmentName
           }))
         }))
       };
