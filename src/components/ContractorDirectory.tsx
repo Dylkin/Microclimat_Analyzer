@@ -526,7 +526,7 @@ export const ContractorDirectory: React.FC = () => {
 
       {/* Add Contractor Form */}
       {showAddForm && (
-        {renderContractorForm(false)}
+        renderContractorForm(false)
       )}
 
       {/* Contractors Table */}

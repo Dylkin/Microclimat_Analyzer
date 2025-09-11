@@ -79,10 +79,10 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
         <button
           onClick={() => console.log('Добавить объект')}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-          <p className="text-sm text-gray-600 mt-1">
-            Контрагент: <span className="font-medium">{contractorName}</span>
-          </p>
-        </div>
+        >
+          <Plus className="w-4 h-4" />
+          <span>Добавить объект</span>
+        </button>
       </div>
 
       {/* Error Display */}
