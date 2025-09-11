@@ -16,6 +16,7 @@ interface QualificationObjectsTableProps {
   onCancelQualificationObjectEdit?: () => void;
   contractorId?: string;
   contractorAddress?: string;
+  readOnlyTestingPeriods?: boolean;
 }
 
 export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps> = ({
@@ -30,7 +31,8 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
   onSaveQualificationObject,
   onCancelQualificationObjectEdit,
   contractorId,
-  contractorAddress
+  contractorAddress,
+  readOnlyTestingPeriods = false
 }) => {
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -246,6 +248,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                                   }
                                 }}
                                 hideTypeSelection={true}
+                                readOnlyTestingPeriods={readOnlyTestingPeriods}
                               />
                             </div>
                           </div>

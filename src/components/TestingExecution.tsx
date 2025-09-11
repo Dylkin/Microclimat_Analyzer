@@ -231,6 +231,7 @@ export const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onB
         contractorId={project.contractorId}
         contractorName={project.contractorName || 'Неизвестный контрагент'}
         projectId={project.id}
+        readOnlyTestingPeriods={true}
       />
 
       {/* Protocol Section */}

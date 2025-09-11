@@ -20,6 +20,7 @@ interface QualificationObjectFormProps {
   onSubmit: (object: QualificationObject) => void;
   onCancel: () => void;
   hideTypeSelection?: boolean;
+  readOnlyTestingPeriods?: boolean;
 }
 
 const getTypeIcon = (type: QualificationObjectType) => {
@@ -44,7 +45,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   initialData,
   onSubmit,
   onCancel,
-  hideTypeSelection = false
+  hideTypeSelection = false,
+  readOnlyTestingPeriods = false
 }) => {
   const [formData, setFormData] = useState<CreateQualificationObjectData>({
     contractorId,
@@ -930,6 +932,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           <TestingPeriodsCRUD
             qualificationObjectId={initialData.id}
             qualificationObjectName={initialData.name || initialData.vin || initialData.serialNumber || 'Без названия'}
+            readOnlyMode={readOnlyTestingPeriods}
           />
         </div>
       )}
