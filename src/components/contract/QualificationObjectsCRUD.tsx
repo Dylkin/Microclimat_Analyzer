@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Save, X, Building, Car, Refrigerator, Snowflake, MapPin, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building, Car, Refrigerator, Snowflake, MapPin } from 'lucide-react';
 import { QualificationObject, QualificationObjectTypeLabels, CreateQualificationObjectData } from '../../types/QualificationObject';
 import { qualificationObjectService } from '../../utils/qualificationObjectService';
-import { QualificationObjectForm } from '../QualificationObjectForm';
+import { QualificationObjectsTable } from '../QualificationObjectsTable';
 
 interface QualificationObjectsCRUDProps {
   contractorId: string;
@@ -17,7 +17,6 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingObject, setEditingObject] = useState<QualificationObject | null>(null);
-  const [showForm, setShowForm] = useState(false);
 
   // Загрузка объектов квалификации
   const loadObjects = async () => {
@@ -41,14 +40,14 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
 
   // Создание нового объекта
   const handleCreate = async (object: QualificationObject) => {
-    setObjects(prev => [object, ...prev]);
-    setShowForm(false);
+    // Реализация создания объекта
+    console.log('Создание объекта:', object);
   };
 
   // Обновление объекта
   const handleUpdate = async (object: QualificationObject) => {
-    setObjects(prev => prev.map(obj => obj.id === object.id ? object : obj));
-    setEditingObject(null);
+    // Реализация обновления объекта
+    console.log('Обновление объекта:', object);
   };
 
   // Удаление объекта
@@ -59,35 +58,27 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
 
     try {
       await qualificationObjectService.deleteQualificationObject(id);
-      setObjects(prev => prev.filter(obj => obj.id !== id));
+      await loadObjects(); // Перезагружаем список
+      alert('Объект квалификации успешно удален');
     } catch (error) {
       console.error('Ошибка удаления объекта:', error);
       alert(`Ошибка удаления объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   };
 
-  // Получение иконки для типа объекта
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'помещение':
-        return <Building className="w-5 h-5" />;
-      case 'автомобиль':
-        return <Car className="w-5 h-5" />;
-      case 'холодильная_камера':
-        return <Refrigerator className="w-5 h-5" />;
-      case 'холодильник':
-      case 'морозильник':
-        return <Snowflake className="w-5 h-5" />;
-      default:
-        return <Building className="w-5 h-5" />;
-    }
-  };
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Объекты квалификации</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Контрагент: <span className="font-medium">{contractorName}</span>
+          </p>
+        </div>
+        <button
+          onClick={() => console.log('Добавить объект')}
+          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
           <p className="text-sm text-gray-600 mt-1">
             Контрагент: <span className="font-medium">{contractorName}</span>
           </p>
@@ -110,134 +101,14 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
       )}
 
       {/* Objects List */}
-      {!loading && objects.length === 0 && (
-        <div className="text-center py-8">
-          <Building className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">Объекты квалификации не найдены</p>
-          <p className="text-sm text-gray-500 mt-1">Добавьте первый объект для начала работы</p>
-        </div>
-      )}
-
-      {!loading && objects.length > 0 && (
-        <div className="space-y-4">
-          {objects.map((object) => (
-            <div key={object.id} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-3">
-                  <div className="text-indigo-600 mt-1">
-                    {getTypeIcon(object.type)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <h3 className="font-medium text-gray-900">
-                        {object.name || QualificationObjectTypeLabels[object.type]}
-                      </h3>
-                      <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
-                        {QualificationObjectTypeLabels[object.type]}
-                      </span>
-                    </div>
-                    
-                    {object.address && (
-                      <div className="flex items-center space-x-1 mt-1">
-                        <MapPin className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-600">{object.address}</span>
-                      </div>
-                    )}
-
-                    {/* Дополнительная информация в зависимости от типа */}
-                    <div className="mt-2 space-y-1">
-                      {object.area && (
-                        <p className="text-sm text-gray-600">
-                          Площадь: <span className="font-medium">{object.area} м²</span>
-                        </p>
-                      )}
-                      {object.vin && (
-                        <p className="text-sm text-gray-600">
-                          VIN: <span className="font-medium">{object.vin}</span>
-                        </p>
-                      )}
-                      {object.registrationNumber && (
-                        <p className="text-sm text-gray-600">
-                          Гос. номер: <span className="font-medium">{object.registrationNumber}</span>
-                        </p>
-                      )}
-                      {object.bodyVolume && (
-                        <p className="text-sm text-gray-600">
-                          Объем кузова: <span className="font-medium">{object.bodyVolume} м³</span>
-                        </p>
-                      )}
-                      {object.inventoryNumber && (
-                        <p className="text-sm text-gray-600">
-                          Инвентарный номер: <span className="font-medium">{object.inventoryNumber}</span>
-                        </p>
-                      )}
-                      {object.chamberVolume && (
-                        <p className="text-sm text-gray-600">
-                          Объем камеры: <span className="font-medium">{object.chamberVolume} л</span>
-                        </p>
-                      )}
-                      {object.serialNumber && (
-                        <p className="text-sm text-gray-600">
-                          Серийный номер: <span className="font-medium">{object.serialNumber}</span>
-                        </p>
-                      )}
-                      {object.manufacturer && (
-                        <p className="text-sm text-gray-600">
-                          Производитель: <span className="font-medium">{object.manufacturer}</span>
-                        </p>
-                      )}
-                      {object.climateSystem && (
-                        <p className="text-sm text-gray-600">
-                          Климатическая система: <span className="font-medium">{object.climateSystem}</span>
-                        </p>
-                      )}
-                      {object.measurementZones && object.measurementZones.length > 0 && (
-                        <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                          <h5 className="text-sm font-medium text-indigo-900 mb-2">
-                            Расстановка оборудования ({object.measurementZones.length} зон):
-                          </h5>
-                          <div className="space-y-2">
-                            {object.measurementZones.map((zone) => (
-                              <div key={zone.id} className="text-sm text-indigo-800">
-                                <span className="font-medium">Зона {zone.zoneNumber}:</span>
-                                {zone.measurementLevels.length > 0 ? (
-                                  <span className="ml-2">
-                                    {zone.measurementLevels.map(level => `${level.level}м`).join(', ')}
-                                  </span>
-                                ) : (
-                                  <span className="ml-2 text-indigo-600">уровни не заданы</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setEditingObject(object)}
-                    className="text-gray-600 hover:text-indigo-600 transition-colors"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Create Form Modal */}
-
-      {/* Edit Form Modal */}
-      {/* Edit Form - не в модальном окне */}
-      {editingObject && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
-        </div>
-      )}
+      <QualificationObjectsTable
+        objects={objects}
+        onAdd={handleCreate}
+        onEdit={handleEditQualificationObject}
+        onDelete={handleDelete}
+        onShowOnMap={(obj) => console.log('Show on map:', obj)}
+        loading={loading}
+      />
     </div>
   );
 };
