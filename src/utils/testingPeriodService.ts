@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   TestingPeriod, 
   TestingPeriodStatus,
+  TestingPeriodDocument,
   CreateTestingPeriodData, 
   UpdateTestingPeriodData 
 } from '../types/TestingPeriod';
@@ -32,6 +33,17 @@ interface DatabaseTestingPeriod {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface DatabaseTestingPeriodDocument {
+  id: string;
+  testing_period_id: string;
+  file_name: string;
+  file_url: string;
+  file_size: number;
+  mime_type: string;
+  uploaded_at: string;
+  created_at: string;
 }
 
 class TestingPeriodService {
@@ -304,7 +316,170 @@ class TestingPeriodService {
       throw error;
     }
   }
+
+  // Загрузка документа для периода испытаний
+  async uploadTestingPeriodDocument(
+    testingPeriodId: string, 
+    file: File
+  ): Promise<TestingPeriodDocument> {
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
+    }
+
+    try {
+      // Генерируем уникальное имя файла
+      const fileExt = file.name.split('.').pop();
+      const fileName = `testing-period-${testingPeriodId}-${Date.now()}.${fileExt}`;
+      const filePath = `testing-period-documents/${fileName}`;
+
+      console.log('Загружаем файл документа испытаний в Storage:', { fileName, filePath, fileSize: file.size });
+
+      // Загружаем файл в Supabase Storage
+      const { data: uploadData, error: uploadError } = await this.supabase.storage
+        .from('documents')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Ошибка загрузки файла в Storage:', uploadError);
+        throw new Error(`Ошибка загрузки файла: ${uploadError.message}`);
+      }
+
+      console.log('Файл успешно загружен в Storage:', uploadData);
+
+      // Получаем публичный URL файла
+      const { data: urlData } = this.supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Не удалось получить публичный URL файла');
+      }
+
+      console.log('Получен публичный URL:', urlData.publicUrl);
+
+      // Сохраняем информацию о документе в базе данных
+      const { data: docData, error: docError } = await this.supabase
+        .from('testing_period_documents')
+        .insert({
+          testing_period_id: testingPeriodId,
+          file_name: file.name,
+          file_url: urlData.publicUrl,
+          file_size: file.size,
+          mime_type: file.type
+        })
+        .select()
+        .single();
+
+      if (docError) {
+        console.error('Ошибка сохранения информации о документе:', docError);
+        throw new Error(`Ошибка сохранения документа: ${docError.message}`);
+      }
+
+      console.log('Информация о документе сохранена в БД:', docData);
+
+      return {
+        id: docData.id,
+        testingPeriodId: docData.testing_period_id,
+        fileName: docData.file_name,
+        fileUrl: docData.file_url,
+        fileSize: docData.file_size,
+        mimeType: docData.mime_type,
+        uploadedAt: new Date(docData.uploaded_at),
+        createdAt: new Date(docData.created_at)
+      };
+    } catch (error) {
+      console.error('Ошибка при загрузке документа испытаний:', error);
+      throw error;
+    }
+  }
+
+  // Получение документов для периода испытаний
+  async getTestingPeriodDocuments(testingPeriodId: string): Promise<TestingPeriodDocument[]> {
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
+    }
+
+    try {
+      const { data, error } = await this.supabase
+        .from('testing_period_documents')
+        .select('*')
+        .eq('testing_period_id', testingPeriodId)
+        .order('uploaded_at', { ascending: false });
+
+      if (error) {
+        console.error('Ошибка получения документов периода испытаний:', error);
+        throw new Error(`Ошибка получения документов: ${error.message}`);
+      }
+
+      return data.map((doc: DatabaseTestingPeriodDocument) => ({
+        id: doc.id,
+        testingPeriodId: doc.testing_period_id,
+        fileName: doc.file_name,
+        fileUrl: doc.file_url,
+        fileSize: doc.file_size,
+        mimeType: doc.mime_type,
+        uploadedAt: new Date(doc.uploaded_at),
+        createdAt: new Date(doc.created_at)
+      }));
+    } catch (error) {
+      console.error('Ошибка при получении документов периода испытаний:', error);
+      throw error;
+    }
+  }
+
+  // Удаление документа периода испытаний
+  async deleteTestingPeriodDocument(documentId: string): Promise<void> {
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
+    }
+
+    try {
+      // Сначала получаем информацию о документе для удаления файла из Storage
+      const { data: docData, error: getError } = await this.supabase
+        .from('testing_period_documents')
+        .select('file_url')
+        .eq('id', documentId)
+        .single();
+
+      if (getError) {
+        console.error('Ошибка получения информации о документе:', getError);
+        throw new Error(`Ошибка получения документа: ${getError.message}`);
+      }
+
+      // Извлекаем путь файла из URL
+      const urlParts = docData.file_url.split('/');
+      const filePath = urlParts.slice(-2).join('/'); // Получаем последние 2 части пути
+      
+      if (filePath) {
+        // Удаляем файл из Storage
+        const { error: storageError } = await this.supabase.storage
+          .from('documents')
+          .remove([filePath]);
+
+        if (storageError) {
+          console.warn('Ошибка удаления файла из Storage:', storageError);
+          // Не прерываем выполнение, так как запись в БД все равно нужно удалить
+        }
+      }
+
+      // Удаляем запись из базы данных
+      const { error: deleteError } = await this.supabase
+        .from('testing_period_documents')
+        .delete()
+        .eq('id', documentId);
+
+      if (deleteError) {
+        console.error('Ошибка удаления документа из БД:', deleteError);
+        throw new Error(`Ошибка удаления документа: ${deleteError.message}`);
+      }
+    } catch (error) {
+      console.error('Ошибка при удалении документа периода испытаний:', error);
+      throw error;
+    }
+  }
 }
 
 // Экспорт синглтона сервиса
-export const testingPeriodService = new TestingPeriodService();

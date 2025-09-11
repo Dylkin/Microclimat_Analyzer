@@ -13,6 +13,18 @@ export interface TestingPeriod {
   createdByName?: string;
   createdAt: Date;
   updatedAt: Date;
+  documents?: TestingPeriodDocument[];
+}
+
+export interface TestingPeriodDocument {
+  id: string;
+  testingPeriodId: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize: number;
+  mimeType: string;
+  uploadedAt: Date;
+  createdAt: Date;
 }
 
 export interface CreateTestingPeriodData {
