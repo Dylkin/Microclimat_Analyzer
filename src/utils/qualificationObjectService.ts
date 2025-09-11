@@ -227,6 +227,27 @@ class QualificationObjectService {
   }
 
   private mapFromDatabase(data: any): QualificationObject {
+    // Безопасный парсинг measurement_zones с проверкой на пустые значения
+    let measurementZones = [];
+    try {
+      const jsonString = data.measurement_zones;
+      if (jsonString && typeof jsonString === 'string' && jsonString.trim() !== '') {
+        measurementZones = JSON.parse(jsonString);
+        // Дополнительная проверка, что результат парсинга - массив
+        if (!Array.isArray(measurementZones)) {
+          console.warn('measurement_zones не является массивом, используем пустой массив');
+          measurementZones = [];
+        }
+      } else {
+        // Если поле пустое, null или не строка - используем пустой массив
+        measurementZones = [];
+      }
+    } catch (error) {
+      // Логируем ошибку и используем пустой массив как fallback
+      console.error('Ошибка парсинга measurement_zones для объекта:', data.id, error);
+      measurementZones = [];
+    }
+
     return {
       id: data.id,
       contractorId: data.contractor_id,
@@ -252,7 +273,7 @@ class QualificationObjectService {
       testDataFileName: data.test_data_file_name || '',
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at),
-      measurementZones: data.measurement_zones ? JSON.parse(data.measurement_zones) : []
+      measurementZones: measurementZones
     };
   }
 
