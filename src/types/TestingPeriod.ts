@@ -3,7 +3,6 @@ export type TestingPeriodStatus = 'planned' | 'in_progress' | 'completed' | 'can
 export interface TestingPeriod {
   id: string;
   qualificationObjectId: string;
-  projectId: string;
   plannedStartDate: Date;
   plannedEndDate: Date;
   actualStartDate?: Date;
@@ -18,7 +17,6 @@ export interface TestingPeriod {
 
 export interface CreateTestingPeriodData {
   qualificationObjectId: string;
-  projectId: string;
   plannedStartDate: Date;
   plannedEndDate: Date;
   actualStartDate?: Date;
