@@ -47,8 +47,22 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
 
   // Обновление объекта
   const handleUpdate = async (object: QualificationObject) => {
-    setObjects(prev => prev.map(obj => obj.id === object.id ? object : obj));
-    setEditingObject(null);
+    try {
+      // Обновляем объект в базе данных
+      const updatedObject = await qualificationObjectService.updateQualificationObject(
+        object.id,
+        object
+      );
+      
+      // Обновляем локальное состояние
+      setObjects(prev => prev.map(obj => obj.id === object.id ? updatedObject : obj));
+      setEditingObject(null);
+      
+      console.log('Объект квалификации успешно обновлен в БД:', updatedObject);
+    } catch (error) {
+      console.error('Ошибка обновления объекта квалификации:', error);
+      alert(`Ошибка сохранения изменений: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
   };
 
   // Удаление объекта

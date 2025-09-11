@@ -193,9 +193,14 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       // Вызываем onSubmit с данными формы
       const finalFormData = {
         ...formData,
+        id: initialData?.id, // Добавляем ID для обновления существующего объекта
         measurementZones: measurementZones.map(zone => ({
+          id: zone.id,
           zoneNumber: zone.zoneNumber,
-          measurementLevels: zone.measurementLevels
+          measurementLevels: zone.measurementLevels.map(level => ({
+            id: level.id,
+            level: level.level
+          }))
         }))
       };
       
