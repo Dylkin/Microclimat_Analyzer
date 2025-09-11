@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building, Car, Refrigerator, Snowflake, Upload, X, FileText, Image, Plus, Trash2, MapPin } from 'lucide-react';
+import { Building, Car, Refrigerator, Snowflake, Upload, X, FileText, Image, Plus, Trash2, MapPin, CheckCircle } from 'lucide-react';
 import { 
   QualificationObject, 
   QualificationObjectType, 
