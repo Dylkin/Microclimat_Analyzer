@@ -55,12 +55,7 @@ class TestingPeriodService {
     try {
       const { data, error } = await this.supabase
         .from('qualification_object_testing_periods')
-        .select(`
-          *,
-          created_by_user:users!created_by(
-            full_name
-          )
-        `)
+        .select('*')
         .eq('qualification_object_id', qualificationObjectId)
         .order('planned_start_date', { ascending: true });
 
@@ -79,7 +74,7 @@ class TestingPeriodService {
         status: period.status,
         notes: period.notes || undefined,
         createdBy: period.created_by || undefined,
-        createdByName: period.created_by_user?.full_name || undefined,
+        createdByName: undefined, // Will be populated separately if needed
         createdAt: new Date(period.created_at),
         updatedAt: new Date(period.updated_at)
       }));
@@ -98,12 +93,7 @@ class TestingPeriodService {
     try {
       const { data, error } = await this.supabase
         .from('qualification_object_testing_periods')
-        .select(`
-          *,
-          created_by_user:users!created_by(
-            full_name
-          )
-        `)
+        .select('*')
         .in('qualification_object_id', qualificationObjectIds)
         .order('planned_start_date', { ascending: true });
 
@@ -122,7 +112,7 @@ class TestingPeriodService {
         status: period.status,
         notes: period.notes || undefined,
         createdBy: period.created_by || undefined,
-        createdByName: period.created_by_user?.full_name || undefined,
+        createdByName: undefined, // Will be populated separately if needed
         createdAt: new Date(period.created_at),
         updatedAt: new Date(period.updated_at)
       }));
@@ -133,13 +123,28 @@ class TestingPeriodService {
   }
 
   // Добавление нового периода испытаний
-  async addTestingPeriod(periodData: CreateTestingPeriodData, userId?: string): Promise<TestingPeriod> {
+  async addTestingPeriod(periodData: CreateTestingPeriodData, userId?: string | null): Promise<TestingPeriod> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
     }
 
     try {
       console.log('Добавляем период испытаний:', periodData);
+      
+      // Если userId не передан или это локальный пользователь, устанавливаем null
+      let createdByValue = null;
+      if (userId && userId.length === 36 && userId.includes('-')) {
+        // Проверяем, существует ли пользователь в базе данных
+        const { data: userExists } = await this.supabase
+          .from('users')
+          .select('id')
+          .eq('id', userId)
+          .single();
+        
+        if (userExists) {
+          createdByValue = userId;
+        }
+      }
 
       const { data, error } = await this.supabase
         .from('qualification_object_testing_periods')
@@ -151,7 +156,7 @@ class TestingPeriodService {
           actual_end_date: periodData.actualEndDate?.toISOString().split('T')[0] || null,
           status: periodData.status || 'planned',
           notes: periodData.notes || null,
-          created_by: userId || null
+          created_by: createdByValue
         })
         .select()
         .single();
