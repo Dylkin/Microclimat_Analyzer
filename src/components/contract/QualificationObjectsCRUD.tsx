@@ -66,6 +66,9 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
     }
   };
 
+  const handleEditQualificationObject = (object: QualificationObject) => {
+    setEditingObject(object);
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -110,6 +113,5 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
         loading={loading}
       />
     </div>
-  )
   );
 };
