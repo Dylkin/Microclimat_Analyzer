@@ -211,6 +211,7 @@ export const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ projec
       <QualificationObjectsCRUD 
         contractorId={project.contractorId}
         contractorName={project.contractorName || 'Неизвестный контрагент'}
+        projectId={project.id}
       />
 
       {/* Document Uploads */}

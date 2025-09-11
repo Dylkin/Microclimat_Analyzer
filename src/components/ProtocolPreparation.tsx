@@ -235,6 +235,7 @@ export const ProtocolPreparation: React.FC<ProtocolPreparationProps> = ({ projec
       <QualificationObjectsCRUD 
         contractorId={project.contractorId}
         contractorName={project.contractorName || 'Неизвестный контрагент'}
+        projectId={project.id}
       />
 
       {/* Protocol Upload */}

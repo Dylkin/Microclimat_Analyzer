@@ -4,15 +4,18 @@ import { QualificationObject, QualificationObjectTypeLabels, CreateQualification
 import { qualificationObjectService } from '../../utils/qualificationObjectService';
 import { QualificationObjectForm } from '../QualificationObjectForm';
 import { QualificationObjectsTable } from '../QualificationObjectsTable';
+import { TestingPeriodsCRUD } from '../TestingPeriodsCRUD';
 
 interface QualificationObjectsCRUDProps {
   contractorId: string;
   contractorName: string;
+  projectId?: string;
 }
 
 export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> = ({ 
   contractorId, 
-  contractorName 
+  contractorName,
+  projectId
 }) => {
   const [objects, setObjects] = useState<QualificationObject[]>([]);
   const [loading, setLoading] = useState(false);
@@ -107,6 +110,24 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
           </p>
         </div>
       </div>
+
+      {/* Testing Periods for each object - only show if projectId is provided */}
+      {projectId && objects.length > 0 && (
+        <div className="mt-6 space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">Планирование испытаний</h3>
+          {objects.map((obj) => {
+            const objectName = obj.name || obj.vin || obj.serialNumber || 'Без названия';
+            return (
+              <TestingPeriodsCRUD
+                key={obj.id}
+                qualificationObjectId={obj.id}
+                qualificationObjectName={objectName}
+                projectId={projectId}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (
