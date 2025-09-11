@@ -110,5 +110,6 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
         loading={loading}
       />
     </div>
+  )
   );
 };
