@@ -195,6 +195,21 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   };
 
   const updateMeasurementLevelEquipment = (zoneId: string, levelId: string, equipmentId: string, equipmentName: string) => {
+    // Проверяем уникальность оборудования в рамках объекта квалификации
+    if (equipmentId) {
+      const isEquipmentUsed = measurementZones.some(zone => 
+        zone.measurementLevels.some(level => 
+          level.id !== levelId && level.equipmentId === equipmentId
+        )
+      );
+      
+      if (isEquipmentUsed) {
+        const equipmentName = equipment.find(eq => eq.id === equipmentId)?.name || 'Неизвестное оборудование';
+        alert(`Оборудование "${equipmentName}" уже используется в другом уровне измерения этого объекта квалификации. Выберите другое оборудование.`);
+        return;
+      }
+    }
+    
     setMeasurementZones(prev => prev.map(zone => 
       zone.id === zoneId 
         ? { 
@@ -239,6 +254,23 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     setError(null);
 
     try {
+      // Дополнительная проверка уникальности оборудования перед сохранением
+      const equipmentIds = measurementZones.flatMap(zone => 
+        zone.measurementLevels
+          .filter(level => level.equipmentId)
+          .map(level => level.equipmentId!)
+      );
+      
+      const duplicateEquipment = equipmentIds.filter((id, index) => equipmentIds.indexOf(id) !== index);
+      if (duplicateEquipment.length > 0) {
+        const duplicateNames = duplicateEquipment.map(id => 
+          equipment.find(eq => eq.id === id)?.name || 'Неизвестное'
+        ).join(', ');
+        setError(`Обнаружено дублирование оборудования: ${duplicateNames}. Каждое оборудование может использоваться только один раз в объекте квалификации.`);
+        setLoading(false);
+        return;
+      }
+
       // Валидация файлов
       if (planFile) {
         const planError = validateFile(planFile, 'plan');
@@ -267,7 +299,9 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           zoneNumber: zone.zoneNumber,
           measurementLevels: zone.measurementLevels.map(level => ({
             id: level.id,
-            level: level.level
+            level: level.level,
+            equipmentId: level.equipmentId,
+            equipmentName: level.equipmentName
           }))
         }))
       };
