@@ -11,6 +11,7 @@ import {
 import { Equipment } from '../types/Equipment';
 import { equipmentService } from '../utils/equipmentService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
+import { TestingPeriodsCRUD } from './TestingPeriodsCRUD';
 
 interface QualificationObjectFormProps {
   contractorId: string;
@@ -923,6 +924,16 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         )}
 
         {/* Информация о расстановке */}
+      {/* Testing Periods - только для существующих объектов */}
+      {initialData && (
+        <div className="border-t border-gray-200 pt-6">
+          <TestingPeriodsCRUD
+            qualificationObjectId={initialData.id}
+            qualificationObjectName={initialData.name || initialData.vin || initialData.serialNumber || 'Без названия'}
+          />
+        </div>
+      )}
+
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <h4 className="text-sm font-medium text-blue-900 mb-2">Информация о расстановке оборудования:</h4>
           <ul className="text-sm text-blue-800 space-y-1">

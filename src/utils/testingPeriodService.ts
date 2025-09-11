@@ -23,7 +23,6 @@ const initSupabase = () => {
 interface DatabaseTestingPeriod {
   id: string;
   qualification_object_id: string;
-  project_id: string;
   planned_start_date: string;
   planned_end_date: string;
   actual_start_date: string | null;
@@ -73,7 +72,6 @@ class TestingPeriodService {
       return data.map((period: any) => ({
         id: period.id,
         qualificationObjectId: period.qualification_object_id,
-        projectId: period.project_id,
         plannedStartDate: new Date(period.planned_start_date),
         plannedEndDate: new Date(period.planned_end_date),
         actualStartDate: period.actual_start_date ? new Date(period.actual_start_date) : undefined,
@@ -92,7 +90,7 @@ class TestingPeriodService {
   }
 
   // Получение периодов испытаний для проекта
-  async getTestingPeriodsByProject(projectId: string): Promise<TestingPeriod[]> {
+  async getTestingPeriodsByProject(qualificationObjectIds: string[]): Promise<TestingPeriod[]> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
     }
@@ -106,7 +104,7 @@ class TestingPeriodService {
             full_name
           )
         `)
-        .eq('project_id', projectId)
+        .in('qualification_object_id', qualificationObjectIds)
         .order('planned_start_date', { ascending: true });
 
       if (error) {
@@ -117,7 +115,6 @@ class TestingPeriodService {
       return data.map((period: any) => ({
         id: period.id,
         qualificationObjectId: period.qualification_object_id,
-        projectId: period.project_id,
         plannedStartDate: new Date(period.planned_start_date),
         plannedEndDate: new Date(period.planned_end_date),
         actualStartDate: period.actual_start_date ? new Date(period.actual_start_date) : undefined,
@@ -148,7 +145,6 @@ class TestingPeriodService {
         .from('qualification_object_testing_periods')
         .insert({
           qualification_object_id: periodData.qualificationObjectId,
-          project_id: periodData.projectId,
           planned_start_date: periodData.plannedStartDate.toISOString().split('T')[0],
           planned_end_date: periodData.plannedEndDate.toISOString().split('T')[0],
           actual_start_date: periodData.actualStartDate?.toISOString().split('T')[0] || null,
@@ -170,7 +166,6 @@ class TestingPeriodService {
       return {
         id: data.id,
         qualificationObjectId: data.qualification_object_id,
-        projectId: data.project_id,
         plannedStartDate: new Date(data.planned_start_date),
         plannedEndDate: new Date(data.planned_end_date),
         actualStartDate: data.actual_start_date ? new Date(data.actual_start_date) : undefined,
@@ -226,7 +221,6 @@ class TestingPeriodService {
       return {
         id: data.id,
         qualificationObjectId: data.qualification_object_id,
-        projectId: data.project_id,
         plannedStartDate: new Date(data.planned_start_date),
         plannedEndDate: new Date(data.planned_end_date),
         actualStartDate: data.actual_start_date ? new Date(data.actual_start_date) : undefined,
@@ -266,7 +260,7 @@ class TestingPeriodService {
   }
 
   // Получение статистики по периодам испытаний
-  async getTestingPeriodsStats(projectId: string): Promise<{
+  async getTestingPeriodsStats(qualificationObjectIds: string[]): Promise<{
     total: number;
     byStatus: Record<TestingPeriodStatus, number>;
   }> {
@@ -278,7 +272,7 @@ class TestingPeriodService {
       const { data, error } = await this.supabase
         .from('qualification_object_testing_periods')
         .select('status')
-        .eq('project_id', projectId);
+        .in('qualification_object_id', qualificationObjectIds);
 
       if (error) {
         console.error('Ошибка получения статистики периодов испытаний:', error);

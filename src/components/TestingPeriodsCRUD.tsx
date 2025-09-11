@@ -14,13 +14,11 @@ import { useAuth } from '../contexts/AuthContext';
 interface TestingPeriodsCRUDProps {
   qualificationObjectId: string;
   qualificationObjectName: string;
-  projectId: string;
 }
 
 export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
   qualificationObjectId,
   qualificationObjectName,
-  projectId
 }) => {
   const { user } = useAuth();
   const [periods, setPeriods] = useState<TestingPeriod[]>([]);
@@ -109,7 +107,6 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
     try {
       const periodData: CreateTestingPeriodData = {
         qualificationObjectId,
-        projectId,
         plannedStartDate: startDate,
         plannedEndDate: endDate,
         actualStartDate: newPeriod.actualStartDate ? new Date(newPeriod.actualStartDate) : undefined,
