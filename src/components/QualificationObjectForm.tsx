@@ -107,10 +107,21 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       ? Math.max(...measurementZones.map(z => z.zoneNumber)) + 1 
       : 1;
     
+    // Копируем уровни из предыдущей зоны, если она существует
+    let measurementLevels: MeasurementLevel[] = [];
+    if (measurementZones.length > 0) {
+      // Берем уровни из последней добавленной зоны
+      const lastZone = measurementZones[measurementZones.length - 1];
+      measurementLevels = lastZone.measurementLevels.map(level => ({
+        id: crypto.randomUUID(),
+        level: level.level
+      }));
+    }
+    
     const newZone: MeasurementZone = {
       id: crypto.randomUUID(),
       zoneNumber: nextZoneNumber,
-      measurementLevels: []
+      measurementLevels: measurementLevels
     };
     
     setMeasurementZones(prev => [...prev, newZone]);
