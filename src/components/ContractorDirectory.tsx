@@ -21,7 +21,6 @@ export const ContractorDirectory: React.FC = () => {
   const [editingContractor, setEditingContractor] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
-  const [showEditForm, setShowEditForm] = useState(false);
   const [editingContractorData, setEditingContractorData] = useState<Contractor | null>(null);
   const [viewingContractor, setViewingContractor] = useState<Contractor | null>(null);
   
@@ -196,7 +195,6 @@ export const ContractorDirectory: React.FC = () => {
       }))
     });
     setEditingContractorData(contractor);
-    setShowEditForm(true);
     // Загружаем объекты квалификации для редактируемого контрагента
     loadQualificationObjects(contractor.id);
   };
@@ -290,13 +288,13 @@ export const ContractorDirectory: React.FC = () => {
         setQualificationObjects(prev => prev.map(obj => 
           obj.id === editingQualificationObject.id ? updatedObject : obj
         ));
+        setEditingQualificationObject(null);
       } else {
         // Добавляем новый объект
         const addedObject = await qualificationObjectService.createQualificationObject(objectData);
         setQualificationObjects(prev => [...prev, addedObject]);
       }
       setShowAddQualificationForm(false);
-      setEditingQualificationObject(null);
     } catch (error) {
       console.error('Ошибка сохранения объекта квалификации:', error);
     } finally {
@@ -392,7 +390,6 @@ export const ContractorDirectory: React.FC = () => {
     const submitText = isEdit ? (operationLoading ? 'Сохранение...' : 'Сохранить') : (operationLoading ? 'Добавление...' : 'Добавить');
     const onSubmit = isEdit ? handleSaveEdit : handleAddContractor;
     const onCancel = isEdit ? () => {
-      setShowEditForm(false);
       setEditingContractorData(null);
       setEditContractor({ name: '', address: '', contacts: [] });
       setQualificationObjects([]);
@@ -561,13 +558,12 @@ export const ContractorDirectory: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          {(showAddForm || showEditForm) && (
+          {(showAddForm || editingContractorData) && (
             <button
               onClick={() => {
                 if (showAddForm) {
                   setShowAddForm(false);
-                } else if (showEditForm) {
-                  setShowEditForm(false);
+                } else if (editingContractorData) {
                   setEditingContractorData(null);
                   setEditContractor({ name: '', address: '', contacts: [] });
                   setQualificationObjects([]);
@@ -586,7 +582,7 @@ export const ContractorDirectory: React.FC = () => {
           <Building2 className="w-8 h-8 text-indigo-600" />
           <h1 className="text-2xl font-bold text-gray-900">Справочник контрагентов</h1>
         </div>
-        {!showAddForm && !showEditForm && (
+        {!showAddForm && !editingContractorData && (
           <button
             onClick={() => setShowAddForm(true)}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
@@ -598,7 +594,7 @@ export const ContractorDirectory: React.FC = () => {
       </div>
 
       {/* Search */}
-      {!showAddForm && !showEditForm && (
+      {!showAddForm && !editingContractorData && (
         <div className="bg-white rounded-lg shadow p-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -626,72 +622,8 @@ export const ContractorDirectory: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Contractor Form */}
-      {showEditForm && editingContractorData && (
-        <div className="space-y-6">
-          {renderContractorForm(true)}
-          
-          {/* Объекты квалификации для редактируемого контрагента */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Объекты квалификации</h3>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowAddQualificationForm(true)}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Добавить объект</span>
-                </button>
-                <button
-                  onClick={() => {
-                    // Сохраняем изменения без возврата к списку
-                    console.log('Сохранение изменений объектов квалификации');
-                  }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Сохранить</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Add Qualification Object Form */}
-            {showAddQualificationForm && (
-              <div className="mb-6">
-                <QualificationObjectForm
-                  contractorId={editingContractorData.id}
-                  contractorAddress={editingContractorData.address}
-                  onSubmit={handleSaveQualificationObject}
-                  onCancel={() => {
-                    setShowAddQualificationForm(false);
-                    setEditingQualificationObject(null);
-                  }}
-                  loading={operationLoading}
-                  editingObject={editingQualificationObject}
-                />
-              </div>
-            )}
-
-            {/* Qualification Objects Table */}
-            <QualificationObjectsTable
-              objects={filteredQualificationObjects}
-              onAdd={() => setShowAddQualificationForm(true)}
-              onEdit={handleEditQualificationObject}
-              onDelete={handleDeleteQualificationObject}
-              onShowOnMap={(obj) => {
-                // TODO: Implement map functionality for objects
-                console.log('Show on map:', obj);
-              }}
-              loading={loading}
-              hideAddButton={true}
-            />
-          </div>
-        </div>
-      )}
-
       {/* Contractors Table */}
-      {!showAddForm && !showEditForm && (
+      {!showAddForm && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -822,6 +754,79 @@ export const ContractorDirectory: React.FC = () => {
         </div>
       )}
 
+      {/* Edit Contractor Form */}
+      {editingContractorData && (
+        <div className="space-y-6">
+          {renderContractorForm(true)}
+          
+          {/* Объекты квалификации для редактируемого контрагента */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Объекты квалификации</h3>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowAddQualificationForm(true)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Добавить объект</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingContractorData(null);
+                    setEditContractor({ name: '', address: '', contacts: [] });
+                    setQualificationObjects([]);
+                    setFilteredQualificationObjects([]);
+                    setQualificationSearchTerm('');
+                    setShowAddQualificationForm(false);
+                    setEditingQualificationObject(null);
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Завершить редактирование</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Add Qualification Object Form */}
+            {showAddQualificationForm && (
+              <div className="mb-6">
+                <QualificationObjectForm
+                  contractorId={editingContractorData.id}
+                  contractorAddress={editingContractorData.address}
+                  onSubmit={handleSaveQualificationObject}
+                  onCancel={() => {
+                    setShowAddQualificationForm(false);
+                    setEditingQualificationObject(null);
+                  }}
+                  loading={operationLoading}
+                  editingObject={editingQualificationObject}
+                />
+              </div>
+            )}
+
+            {/* Qualification Objects Table */}
+            <QualificationObjectsTable
+              objects={filteredQualificationObjects}
+              onAdd={() => setShowAddQualificationForm(true)}
+              onEdit={setEditingQualificationObject}
+              onDelete={handleDeleteQualificationObject}
+              onShowOnMap={(obj) => {
+                console.log('Show on map:', obj);
+              }}
+              loading={loading}
+              hideAddButton={true}
+              editingQualificationObject={editingQualificationObject}
+              onSaveQualificationObject={handleSaveQualificationObject}
+              onCancelQualificationObjectEdit={() => setEditingQualificationObject(null)}
+              contractorId={editingContractorData.id}
+              contractorAddress={editingContractorData.address}
+            />
+          </div>
+        </div>
+      )}
+
       {/* View Contractor Modal */}
       {viewingContractor && (
         <div className="bg-white rounded-lg shadow p-6 mt-6">
@@ -906,9 +911,9 @@ export const ContractorDirectory: React.FC = () => {
             
             <QualificationObjectsTable
               objects={filteredQualificationObjects}
-              onAdd={() => {}} // Отключаем добавление в режиме просмотра
-              onEdit={() => {}} // Отключаем редактирование в режиме просмотра
-              onDelete={() => {}} // Отключаем удаление в режиме просмотра
+              onAdd={() => {}}
+              onEdit={() => {}}
+              onDelete={() => {}}
               onShowOnMap={(obj) => {
                 console.log('Show on map:', obj);
               }}

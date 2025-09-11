@@ -16,7 +16,6 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   const [objects, setObjects] = useState<QualificationObject[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
   const [editingObject, setEditingObject] = useState<QualificationObject | null>(null);
 
   // Загрузка объектов квалификации
@@ -234,26 +233,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
 
       {/* Edit Form Modal */}
       {/* Edit Form - не в модальном окне */}
-      {editingObject && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Редактировать объект квалификации</h3>
-            <button
-              onClick={() => setEditingObject(null)}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <QualificationObjectForm
-            initialData={editingObject}
-            contractorAddress={editingObject?.address}
-            onSubmit={handleUpdate}
-            onCancel={() => setEditingObject(null)}
-            hideTypeSelection={true}
-          />
-        </div>
-      )}
     </div>
   );
 };
