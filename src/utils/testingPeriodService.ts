@@ -308,3 +308,5 @@ class TestingPeriodService {
 
 // Экспорт синглтона сервиса
 export const testingPeriodService = new TestingPeriodService();
+
+export { testingPeriodService }
