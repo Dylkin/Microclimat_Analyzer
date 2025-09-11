@@ -130,8 +130,6 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
         onCancelQualificationObjectEdit={() => setEditingObject(null)}
         contractorId={contractorId}
       />
-        </div>
-      )}
 
     </div>
   );
