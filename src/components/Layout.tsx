@@ -1,11 +1,11 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, BarChart3, Users, Menu, X } from 'lucide-react';
+import { LogOut, BarChart3, Menu, X, HelpCircle, Database, Users, Building2, FolderOpen, Wrench } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
   currentPage: string;
-  onPageChange: (page: string) => void;
+  onPageChange: (page: string, projectData?: any) => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) => {
@@ -20,10 +20,40 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       access: 'analyzer' as const
     },
     {
-      name: 'Справочник пользователей',
+      name: 'Справка',
+      key: 'help',
+      icon: HelpCircle,
+      access: 'help' as const
+    },
+    {
+      name: 'Пользователи',
       key: 'users',
       icon: Users,
       access: 'users' as const
+    },
+    {
+      name: 'Контрагенты',
+      key: 'contractors',
+      icon: Building2,
+      access: 'analyzer' as const
+    },
+    {
+      name: 'Проекты',
+      key: 'projects',
+      icon: FolderOpen,
+      access: 'analyzer' as const
+    },
+    {
+      name: 'Оборудование',
+      key: 'equipment',
+      icon: Wrench,
+      access: 'analyzer' as const
+    },
+    {
+      name: 'Проверка БД',
+      key: 'database',
+      icon: Database,
+      access: 'analyzer' as const
     }
   ];
 
@@ -34,6 +64,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       case 'administrator': return 'Администратор';
       case 'specialist': return 'Специалист';
       case 'manager': return 'Руководитель';
+      case 'director': return 'Менеджер';
       default: return role;
     }
   };

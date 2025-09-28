@@ -140,12 +140,24 @@ class DatabaseService {
   // Получение измерений из IndexedDB
   async getMeasurements(fileId: string): Promise<MeasurementRecord[] | null> {
     try {
+      console.log(`Запрос измерений для файла: ${fileId}`);
+      
       const fileData = await this.performDBOperation<any>(
         this.MEASUREMENTS_STORE,
         (store) => store.get(fileId)
       );
       
-      if (!fileData) return null;
+      if (!fileData) {
+        console.log(`Данные не найдены для файла: ${fileId}`);
+        return null;
+      }
+      
+      if (!fileData.measurements || !Array.isArray(fileData.measurements)) {
+        console.log(`Некорректная структура данных для файла: ${fileId}`);
+        return null;
+      }
+      
+      console.log(`Найдено ${fileData.measurements.length} измерений для файла: ${fileId}`);
       
       return fileData.measurements.map((m: any) => ({
         ...m,

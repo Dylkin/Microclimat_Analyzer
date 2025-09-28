@@ -6,17 +6,25 @@ export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    if (login(email, password)) {
-      // Успешная авторизация
-    } else {
-      setError('Неверный логин или пароль');
+    try {
+      const success = await login(email, password);
+      if (!success) {
+        setError('Неверный логин или пароль');
+      }
+    } catch (error) {
+      setError('Ошибка авторизации. Попробуйте позже.');
+      console.error('Ошибка авторизации:', error);
     }
+    
+    setLoading(false);
   };
 
   const fillDefaultCredentials = () => {
@@ -79,23 +87,20 @@ export const Login: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors font-medium"
+            disabled={loading}
+            className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Войти
+            {loading ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Вход...</span>
+              </div>
+            ) : (
+              'Войти'
+            )}
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <button
-            onClick={fillDefaultCredentials}
-            className="w-full text-sm text-indigo-600 hover:text-indigo-700 transition-colors"
-          >
-            Использовать данные администратора по умолчанию
-          </button>
-          <div className="mt-2 text-xs text-gray-500 text-center">
-            pavel.dylkin@gmail.com / 00016346
-          </div>
-        </div>
       </div>
     </div>
   );

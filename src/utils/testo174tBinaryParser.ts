@@ -45,7 +45,7 @@ export class Testo174TBinaryParser {
         fileName,
         deviceMetadata: {
           deviceType: 1,
-          deviceModel: 'DL-019',
+          deviceModel: 'Unknown',
           serialNumber: 'Unknown'
         },
         measurements: [],
@@ -82,15 +82,9 @@ export class Testo174TBinaryParser {
       deviceType = parseInt(typeStr) || 1;
     }
 
-    // Определяем модель устройства
-    let deviceModel = 'DL-019';
-    if (serialNumber === '58963022') {
-      deviceModel = 'DL-019';
-    }
-
     return {
       deviceType,
-      deviceModel,
+      deviceModel: 'Unknown',
       serialNumber
     };
   }
@@ -204,7 +198,7 @@ export class Testo174TBinaryParser {
 /**
  * Сервис для парсинга файлов Testo 174T (одноканальный)
  */
-export class Testo174TParsingService {
+class Testo174TParsingService {
   async parseFile(file: File): Promise<ParsedFileData> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
