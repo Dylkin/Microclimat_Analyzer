@@ -1,19 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabaseClient';
 import { User, UserRole } from '../types/User';
-
-// Получаем конфигурацию Supabase из переменных окружения
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-let supabase: any = null;
-
-// Инициализация Supabase клиента
-const initSupabase = () => {
-  if (!supabase && supabaseUrl && supabaseAnonKey) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-  }
-  return supabase;
-};
 
 interface DatabaseUser {
   id: string;
@@ -30,7 +16,7 @@ class UserService {
   private supabase: any;
 
   constructor() {
-    this.supabase = initSupabase();
+    this.supabase = supabase;
   }
 
   // Проверка доступности Supabase
@@ -76,29 +62,51 @@ class UserService {
     }
 
     try {
-      const { data, error } = await this.supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .eq('password', password)
-        .single();
+      // Используем Supabase Auth для авторизации
+      const { data: authData, error: authError } = await this.supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // Пользователь не найден
-          return null;
-        }
-        console.error('Ошибка получения пользователя:', error);
-        throw new Error(`Ошибка получения пользователя: ${error.message}`);
+      if (authError) {
+        console.error('Ошибка авторизации:', authError);
+        return null;
       }
 
+      if (!authData.user) {
+        return null;
+      }
+
+      // Получаем дополнительную информацию из public.users
+      const { data: userData, error: userError } = await this.supabase
+        .from('users')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (userError) {
+        console.warn('Не удалось получить дополнительную информацию о пользователе:', userError);
+        // Возвращаем базовую информацию из auth.users
+        return {
+          id: authData.user.id,
+          fullName: authData.user.user_metadata?.full_name || authData.user.email || '',
+          email: authData.user.email || '',
+          password: '', // Пароль не возвращаем из соображений безопасности
+          role: authData.user.user_metadata?.role || 'user',
+          isDefault: false
+        };
+      }
+
+      // Приоритизируем роль из public.users, но используем auth.users как fallback
+      const userRole = userData.role || authData.user.user_metadata?.role || 'user';
+      
       return {
-        id: data.id,
-        fullName: data.full_name,
-        email: data.email,
-        password: data.password,
-        role: data.role,
-        isDefault: data.is_default
+        id: userData.id,
+        fullName: userData.full_name,
+        email: userData.email,
+        password: '', // Пароль не возвращаем из соображений безопасности
+        role: userRole,
+        isDefault: userData.is_default
       };
     } catch (error) {
       console.error('Ошибка при получении пользователя по учетным данным:', error);
@@ -249,6 +257,48 @@ class UserService {
       }
     } catch (error) {
       console.error('Ошибка при сбросе пароля:', error);
+      throw error;
+    }
+  }
+
+  // Отправка письма для сброса пароля
+  async sendPasswordResetEmail(email: string): Promise<void> {
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
+    }
+
+    try {
+      const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        console.error('Ошибка отправки письма для сброса пароля:', error);
+        throw new Error(`Ошибка отправки письма: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Ошибка при отправке письма для сброса пароля:', error);
+      throw error;
+    }
+  }
+
+  // Обновление пароля через токен сброса
+  async updatePasswordWithToken(newPassword: string): Promise<void> {
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
+    }
+
+    try {
+      const { error } = await this.supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        console.error('Ошибка обновления пароля:', error);
+        throw new Error(`Ошибка обновления пароля: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Ошибка при обновлении пароля:', error);
       throw error;
     }
   }

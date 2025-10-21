@@ -11,14 +11,17 @@ const isValidUUID = (uuid: string): boolean => {
 interface AuthContextType {
   user: AuthUser | null;
   users: User[];
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  addUser: (user: Omit<User, 'id'>) => void;
-  updateUser: (id: string, user: Partial<User>) => void;
-  deleteUser: (id: string) => void;
-  changePassword: (userId: string, oldPassword: string, newPassword: string) => boolean;
-  resetPassword: (userId: string, newPassword: string) => boolean;
-  hasAccess: (page: 'analyzer' | 'help' | 'database' | 'users') => boolean;
+  addUser: (user: Omit<User, 'id'>) => Promise<void>;
+  updateUser: (id: string, user: Partial<User>) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+  changePassword: (userId: string, oldPassword: string, newPassword: string) => Promise<boolean>;
+  resetPassword: (userId: string, newPassword: string) => Promise<boolean>;
+  sendPasswordResetEmail: (email: string) => Promise<void>;
+  updatePasswordWithToken: (newPassword: string) => Promise<void>;
+  hasAccess: (page: 'analyzer' | 'help' | 'database' | 'users' | 'admin') => boolean;
+  reloadUsers: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -96,10 +99,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Проверка доступа к страницам
-  const hasAccess = (page: 'analyzer' | 'help' | 'database' | 'users'): boolean => {
+  const hasAccess = (page: 'analyzer' | 'help' | 'database' | 'users' | 'admin'): boolean => {
     if (!user) return false;
 
+    console.log('hasAccess: проверка доступа для пользователя:', { 
+      user: user.email, 
+      role: user.role, 
+      page 
+    });
+
     switch (user.role) {
+      case 'admin':
       case 'administrator':
         return true; // Полный доступ
       case 'specialist':
@@ -108,6 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'director':
         return page === 'analyzer' || page === 'help' || page === 'database';
       default:
+        console.log('hasAccess: неизвестная роль:', user.role);
         return false;
     }
   };
@@ -117,16 +128,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       let foundUser: User | null = null;
 
-      // Сначала пытаемся найти в базе данных
+      // Сначала пытаемся авторизоваться через Supabase Auth
       if (userService.isAvailable()) {
         try {
           foundUser = await userService.getUserByCredentials(email, password);
         } catch (error) {
-          console.error('Ошибка авторизации через БД:', error);
+          console.error('Ошибка авторизации через Supabase Auth:', error);
         }
       }
 
-      // Если не найден в БД, ищем в локальных данных
+      // Если не найден через Supabase Auth, ищем в локальных данных (fallback)
       if (!foundUser) {
         foundUser = users.find(u => u.email === email && u.password === password) || null;
       }
@@ -280,7 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Сброс пароля (только для администраторов)
   const resetPassword = async (userId: string, newPassword: string): Promise<boolean> => {
     try {
-      if (user?.role !== 'administrator') return false;
+      if (user?.role !== 'admin' && user?.role !== 'administrator') return false;
       
       const targetUser = users.find(u => u.id === userId);
       if (!targetUser) return false;
@@ -304,6 +315,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Ошибка сброса пароля:', error);
       return false;
+    }
+  };
+
+  // Отправка письма для сброса пароля
+  const sendPasswordResetEmail = async (email: string): Promise<void> => {
+    try {
+      if (userService.isAvailable()) {
+        await userService.sendPasswordResetEmail(email);
+      } else {
+        throw new Error('Сервис сброса пароля недоступен');
+      }
+    } catch (error) {
+      console.error('Ошибка отправки письма для сброса пароля:', error);
+      throw error;
+    }
+  };
+
+  // Обновление пароля через токен сброса
+  const updatePasswordWithToken = async (newPassword: string): Promise<void> => {
+    try {
+      if (userService.isAvailable()) {
+        await userService.updatePasswordWithToken(newPassword);
+      } else {
+        throw new Error('Сервис обновления пароля недоступен');
+      }
+    } catch (error) {
+      console.error('Ошибка обновления пароля через токен:', error);
+      throw error;
     }
   };
 
@@ -339,6 +378,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     deleteUser,
     changePassword,
     resetPassword,
+    sendPasswordResetEmail,
+    updatePasswordWithToken,
     hasAccess,
     reloadUsers: loadUsers
   };

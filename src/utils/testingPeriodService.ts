@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabaseClient';
 import { 
   TestingPeriod, 
   TestingPeriodStatus,
@@ -6,20 +6,7 @@ import {
   CreateTestingPeriodData, 
   UpdateTestingPeriodData 
 } from '../types/TestingPeriod';
-
-// Получаем конфигурацию Supabase из переменных окружения
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-let supabase: any = null;
-
-// Инициализация Supabase клиента
-const initSupabase = () => {
-  if (!supabase && supabaseUrl && supabaseAnonKey) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-  }
-  return supabase;
-};
+import { sanitizeFileName } from './fileNameUtils';
 
 interface DatabaseTestingPeriod {
   id: string;
@@ -33,6 +20,8 @@ interface DatabaseTestingPeriod {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  testing_start_date: string | null;
+  testing_end_date: string | null;
 }
 
 interface DatabaseTestingPeriodDocument {
@@ -50,7 +39,7 @@ class TestingPeriodService {
   private supabase: any;
 
   constructor() {
-    this.supabase = initSupabase();
+    this.supabase = supabase;
   }
 
   // Проверка доступности Supabase
@@ -88,7 +77,9 @@ class TestingPeriodService {
         createdBy: period.created_by || undefined,
         createdByName: undefined, // Will be populated separately if needed
         createdAt: new Date(period.created_at),
-        updatedAt: new Date(period.updated_at)
+        updatedAt: new Date(period.updated_at),
+        testingStartDate: period.testing_start_date ? new Date(period.testing_start_date) : undefined,
+        testingEndDate: period.testing_end_date ? new Date(period.testing_end_date) : undefined
       }));
     } catch (error) {
       console.error('Ошибка при получении периодов испытаний:', error);
@@ -126,7 +117,9 @@ class TestingPeriodService {
         createdBy: period.created_by || undefined,
         createdByName: undefined, // Will be populated separately if needed
         createdAt: new Date(period.created_at),
-        updatedAt: new Date(period.updated_at)
+        updatedAt: new Date(period.updated_at),
+        testingStartDate: period.testing_start_date ? new Date(period.testing_start_date) : undefined,
+        testingEndDate: period.testing_end_date ? new Date(period.testing_end_date) : undefined
       }));
     } catch (error) {
       console.error('Ошибка при получении периодов испытаний проекта:', error);
@@ -168,7 +161,9 @@ class TestingPeriodService {
           actual_end_date: periodData.actualEndDate?.toISOString().split('T')[0] || null,
           status: periodData.status || 'planned',
           notes: periodData.notes || null,
-          created_by: createdByValue
+          created_by: createdByValue,
+          testing_start_date: periodData.testingStartDate?.toISOString().split('T')[0] || null,
+          testing_end_date: periodData.testingEndDate?.toISOString().split('T')[0] || null
         })
         .select()
         .single();
@@ -222,6 +217,12 @@ class TestingPeriodService {
       }
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.notes !== undefined) updateData.notes = updates.notes || null;
+      if (updates.testingStartDate !== undefined) {
+        updateData.testing_start_date = updates.testingStartDate?.toISOString().split('T')[0] || null;
+      }
+      if (updates.testingEndDate !== undefined) {
+        updateData.testing_end_date = updates.testingEndDate?.toISOString().split('T')[0] || null;
+      }
 
       const { data, error } = await this.supabase
         .from('qualification_object_testing_periods')
@@ -246,7 +247,9 @@ class TestingPeriodService {
         notes: data.notes || undefined,
         createdBy: data.created_by || undefined,
         createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at)
+        updatedAt: new Date(data.updated_at),
+        testingStartDate: data.testing_start_date ? new Date(data.testing_start_date) : undefined,
+        testingEndDate: data.testing_end_date ? new Date(data.testing_end_date) : undefined
       };
     } catch (error) {
       console.error('Ошибка при обновлении периода испытаний:', error);
@@ -328,7 +331,8 @@ class TestingPeriodService {
 
     try {
       // Генерируем уникальное имя файла
-      const fileExt = file.name.split('.').pop();
+      const sanitizedOriginalName = sanitizeFileName(file.name);
+      const fileExt = sanitizedOriginalName.split('.').pop();
       const fileName = `testing-period-${testingPeriodId}-${Date.now()}.${fileExt}`;
       const filePath = `testing-period-documents/${fileName}`;
 
@@ -483,3 +487,4 @@ class TestingPeriodService {
 }
 
 // Экспорт синглтона сервиса
+export const testingPeriodService = new TestingPeriodService();

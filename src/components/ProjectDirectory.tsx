@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, User, Building2, CheckCircle, Clock, AlertCircle, Play, FileText, AlertTriangle } from 'lucide-react';
-import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, CreateProjectData } from '../types/Project';
+import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, Building2, CheckCircle, Clock, AlertCircle, Play, FileText, AlertTriangle, Calendar, Printer, Eye } from 'lucide-react';
+import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors } from '../types/Project';
 import { Contractor } from '../types/Contractor';
-import { QualificationObject, QualificationObjectTypeLabels, CreateQualificationObjectData } from '../types/QualificationObject';
-import { User as UserType } from '../types/User';
+import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
 import { projectService } from '../utils/projectService';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { useAuth } from '../contexts/AuthContext';
-import { QualificationObjectForm } from './QualificationObjectForm';
+// import { QualificationObjectForm } from './QualificationObjectForm';
 
 // UUID validation function
 function isValidUUID(uuid: string): boolean {
@@ -20,8 +19,8 @@ interface ProjectDirectoryProps {
   onPageChange?: (page: string, projectData?: any) => void;
 }
 
-export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => {
-  const { user, users } = useAuth();
+const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => {
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
@@ -70,8 +69,12 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       // Загружаем проекты
       try {
         const projectsData = await projectService.getAllProjects();
-        setProjects(projectsData);
-        setFilteredProjects(projectsData);
+        // Сортируем проекты по дате создания (новые сверху)
+        const sortedProjects = projectsData.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setProjects(sortedProjects);
+        setFilteredProjects(sortedProjects);
       } catch (projectError) {
         console.error('Ошибка загрузки проектов:', projectError);
         throw new Error(`Ошибка загрузки проектов: ${projectError instanceof Error ? projectError.message : 'Неизвестная ошибка'}`);
@@ -141,7 +144,12 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       );
     });
 
-    setFilteredProjects(filtered);
+    // Сохраняем сортировку по дате создания (новые сверху)
+    const sortedFiltered = filtered.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    setFilteredProjects(sortedFiltered);
   }, [searchTerm, projects]);
 
   // Получение объектов квалификации для выбранного контрагента
@@ -325,7 +333,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       case 'completed':
         return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'contract_negotiation':
-      case 'protocol_preparation':
       case 'report_approval':
         return <Clock className="w-4 h-4 text-yellow-600" />;
       default:
@@ -342,23 +349,35 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           page: 'contract_negotiation',
           icon: FileText
         };
-      case 'protocol_preparation':
-        return {
-          label: 'Подготовка протокола',
-          page: 'protocol_preparation',
-          icon: FileText
-        };
       case 'testing_execution':
         return {
-          label: 'Перейти к испытаниям',
+          label: 'Проведение испытаний',
           page: 'testing_execution',
           icon: Play
         };
-      case 'report_preparation':
+      case 'creating_report':
         return {
-          label: 'Подготовить отчет',
-          page: 'analyzer',
-          icon: Play
+          label: 'Создание отчета',
+          page: 'creating_report',
+          icon: FileText
+        };
+      case 'report_approval':
+        return {
+          label: 'Согласование отчета',
+          page: 'report_approval',
+          icon: CheckCircle
+        };
+      case 'report_printing':
+        return {
+          label: 'Печать отчета',
+          page: 'report_printing',
+          icon: Printer
+        };
+      case 'completed':
+        return {
+          label: 'Просмотр проекта',
+          page: 'project_view',
+          icon: Eye
         };
       default:
         return null;
@@ -373,10 +392,15 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
       const projectData = {
         id: project.id,
         name: project.name,
+        description: project.description,
         contractorId: project.contractorId,
         contractorName: project.contractorName,
+        contractNumber: project.contractNumber,  // ✅ Добавлено
+        contractDate: project.contractDate,      // ✅ Добавлено
         qualificationObjects: project.qualificationObjects,
-        status: project.status
+        status: project.status,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt
       };
       onPageChange(action.page, projectData);
     }
@@ -445,6 +469,8 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
             <button
               onClick={() => setShowAddForm(false)}
               className="text-gray-400 hover:text-gray-600"
+              title="Закрыть"
+              aria-label="Закрыть"
             >
               <X className="w-5 h-5" />
             </button>
@@ -465,6 +491,8 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                 }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 required
+                title="Выберите контрагента"
+                aria-label="Выберите контрагента"
               >
                 <option value="">Выберите контрагента</option>
                 {contractors.map(contractor => (
@@ -579,6 +607,12 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>Дата создания</span>
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Проект
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -599,6 +633,14 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                 {filteredProjects.map((project) => (
                   <tr key={project.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <div className="text-sm text-gray-900">
+                          {project.createdAt.toLocaleDateString('ru-RU')}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       {editingProject === project.id ? (
                         <textarea
                           value={editProject.description}
@@ -613,9 +655,6 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                           {project.description && (
                             <div className="text-xs text-gray-500 mt-1">{project.description}</div>
                           )}
-                          <div className="text-xs text-gray-400 mt-1">
-                            Создан: {project.createdAt.toLocaleDateString('ru-RU')}
-                          </div>
                         </div>
                       )}
                     </td>
@@ -631,6 +670,8 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                           value={editProject.status}
                           onChange={(e) => setEditProject(prev => ({ ...prev, status: e.target.value as ProjectStatus }))}
                           className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          title="Статус проекта"
+                          aria-label="Статус проекта"
                         >
                           {Object.entries(ProjectStatusLabels).map(([value, label]) => (
                             <option key={value} value={value}>{label}</option>
@@ -679,10 +720,11 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
                             <button
                               onClick={() => handleProjectAction(project)}
                               disabled={operationLoading}
-                              className="text-blue-600 hover:text-blue-900"
+                              className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                               title={getProjectAction(project.status)?.label}
                             >
-                              <Play className="w-4 h-4" />
+                              <Play className="w-3 h-3 mr-1" />
+                              Выполнить
                             </button>
                           )}
                           <button
@@ -737,7 +779,7 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-yellow-600">
-              {projects.filter(p => ['contract_negotiation', 'protocol_preparation', 'testing_execution', 'report_preparation', 'report_approval', 'report_printing'].includes(p.status)).length}
+              {projects.filter(p => ['contract_negotiation', 'testing_execution', 'report_approval', 'report_printing'].includes(p.status)).length}
             </div>
             <div className="text-sm text-gray-500">В работе</div>
           </div>
@@ -758,3 +800,5 @@ export const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange
     </div>
   );
 };
+
+export default ProjectDirectory;

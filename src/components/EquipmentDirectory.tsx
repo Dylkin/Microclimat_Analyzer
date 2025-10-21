@@ -3,7 +3,7 @@ import { Wrench, Plus, Edit2, Trash2, Save, X, Search, Eye, AlertTriangle, Loade
 import { Equipment, EquipmentType, EquipmentTypeLabels, EquipmentTypeColors, CreateEquipmentData, EquipmentVerification } from '../types/Equipment';
 import { equipmentService } from '../utils/equipmentService';
 
-export const EquipmentDirectory: React.FC = () => {
+const EquipmentDirectory: React.FC = () => {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [filteredEquipment, setFilteredEquipment] = useState<Equipment[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -354,6 +354,8 @@ export const EquipmentDirectory: React.FC = () => {
                     onChange={(e) => updateVerification(index, 'verificationStartDate', new Date(e.target.value), isEdit)}
                     className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
+                    title="Дата начала поверки"
+                    aria-label="Дата начала поверки"
                   />
                 </div>
                 <div>
@@ -367,6 +369,8 @@ export const EquipmentDirectory: React.FC = () => {
                     onChange={(e) => updateVerification(index, 'verificationEndDate', new Date(e.target.value), isEdit)}
                     className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
+                    title="Дата окончания поверки"
+                    aria-label="Дата окончания поверки"
                   />
                 </div>
               </div>
@@ -530,6 +534,8 @@ export const EquipmentDirectory: React.FC = () => {
                 });
               }}
               className="text-gray-400 hover:text-gray-600"
+              title="Закрыть"
+              aria-label="Закрыть"
             >
               <X className="w-5 h-5" />
             </button>
@@ -550,6 +556,8 @@ export const EquipmentDirectory: React.FC = () => {
                   }
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                title="Тип оборудования"
+                aria-label="Тип оборудования"
               >
                 <option value="-">Не указано</option>
                 <option value="Testo 174T">Testo 174T</option>
@@ -674,7 +682,7 @@ export const EquipmentDirectory: React.FC = () => {
               {equipment.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {editingEquipment === item.id ? (
+                    {editingEquipment?.id === item.id ? (
                       <input
                         type="text"
                         value={editEquipment.name}
@@ -690,7 +698,7 @@ export const EquipmentDirectory: React.FC = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {editingEquipment === item.id ? (
+                    {editingEquipment?.id === item.id ? (
                       <input
                         type="text"
                         value={editEquipment.serialNumber}
@@ -703,7 +711,7 @@ export const EquipmentDirectory: React.FC = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {editingEquipment === item.id ? (
+                    {editingEquipment?.id === item.id ? (
                       <div className="flex justify-end space-x-2">
                         <button
                           onClick={handleSaveEdit}
@@ -807,6 +815,8 @@ export const EquipmentDirectory: React.FC = () => {
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 1}
                     className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    title="Предыдущая страница"
+                    aria-label="Предыдущая страница"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
@@ -843,6 +853,8 @@ export const EquipmentDirectory: React.FC = () => {
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
                     className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    title="Следующая страница"
+                    aria-label="Следующая страница"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
@@ -861,6 +873,8 @@ export const EquipmentDirectory: React.FC = () => {
             <button
               onClick={() => setViewingEquipment(null)}
               className="text-gray-400 hover:text-gray-600"
+              title="Закрыть"
+              aria-label="Закрыть"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1013,3 +1027,5 @@ export const EquipmentDirectory: React.FC = () => {
     </div>
   );
 };
+
+export default EquipmentDirectory;

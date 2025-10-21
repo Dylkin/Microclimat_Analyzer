@@ -14,20 +14,22 @@ export class Testo174HBinaryParser {
    */
   parse(fileName: string): ParsedFileData {
     try {
-      console.log('Начинаем парсинг файла:', fileName);
-      console.log('Размер файла:', this.buffer.byteLength, 'байт');
+      console.log('Testo174H: Начинаем парсинг файла:', fileName);
+      console.log('Testo174H: Размер файла:', this.buffer.byteLength, 'байт');
 
       // 1. Извлекаем метаданные устройства
       const deviceMetadata = this.parseDeviceMetadata();
-      console.log('Метаданные устройства:', deviceMetadata);
+      console.log('Testo174H: Метаданные устройства:', deviceMetadata);
 
       // 2. Находим и парсим данные измерений
       const measurements = this.parseMeasurements();
-      console.log('Количество измерений:', measurements.length);
+      console.log('Testo174H: Количество измерений:', measurements.length);
 
       // 3. Определяем временные рамки
       const startDate = measurements.length > 0 ? measurements[0].timestamp : new Date();
       const endDate = measurements.length > 0 ? measurements[measurements.length - 1].timestamp : new Date();
+
+      console.log('Testo174H: Временные рамки:', { startDate, endDate });
 
       return {
         fileName,
@@ -40,7 +42,7 @@ export class Testo174HBinaryParser {
       };
 
     } catch (error) {
-      console.error('Ошибка парсинга:', error);
+      console.error('Testo174H: Ошибка парсинга:', error);
       return {
         fileName,
         deviceMetadata: {
@@ -100,8 +102,16 @@ export class Testo174HBinaryParser {
     const dataStartOffset = 0x0C00;
     const recordSize = 12;
     
+    console.log('Testo174H: Начинаем парсинг измерений');
+    console.log('Testo174H: Размер файла:', this.buffer.byteLength, 'байт');
+    console.log('Testo174H: Смещение начала данных:', dataStartOffset);
+    console.log('Testo174H: Размер записи:', recordSize);
+    
     // Базовая временная метка: 02.06.2025 15:45:00
     const baseTimestamp = new Date('2025-06-02T15:45:00').getTime();
+    
+    let validRecords = 0;
+    let invalidRecords = 0;
     
     // Читаем данные до конца файла или до нулевых значений
     for (let offset = dataStartOffset; offset < this.buffer.byteLength - recordSize; offset += recordSize) {
@@ -111,6 +121,11 @@ export class Testo174HBinaryParser {
         
         // Читаем влажность (4 байта, float32, little-endian)
         const humidityRaw = this.view.getFloat32(offset + 8, true);
+
+        // Логируем первые несколько записей для отладки
+        if (validRecords < 5) {
+          console.log(`Testo174H: Запись ${validRecords + 1} на смещении ${offset}: temp=${temperatureRaw}, humidity=${humidityRaw}`);
+        }
 
         // Проверяем валидность данных
         if (this.isValidMeasurement(temperatureRaw, humidityRaw)) {
@@ -130,15 +145,23 @@ export class Testo174HBinaryParser {
             isValid: true,
             validationErrors: []
           });
+          
+          validRecords++;
         } else {
-          // Если данные невалидны, возможно достигли конца
-          break;
+          invalidRecords++;
+          // Если подряд много невалидных записей, возможно достигли конца
+          if (invalidRecords > 10 && validRecords > 0) {
+            console.log('Testo174H: Обнаружено много невалидных записей подряд, завершаем парсинг');
+            break;
+          }
         }
       } catch (error) {
-        console.warn(`Ошибка чтения записи на смещении ${offset}:`, error);
+        console.warn(`Testo174H: Ошибка чтения записи на смещении ${offset}:`, error);
         break;
       }
     }
+    
+    console.log(`Testo174H: Парсинг завершен. Валидных записей: ${validRecords}, невалидных: ${invalidRecords}`);
 
     // Если не удалось прочитать данные, используем известные значения
     if (measurements.length === 0) {
@@ -225,3 +248,6 @@ class Testo174HParsingService {
     });
   }
 }
+
+// Экспорт сервиса парсинга
+export const testo174HParsingService = new Testo174HParsingService();

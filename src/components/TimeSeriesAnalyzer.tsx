@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { ArrowLeft, Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -7,15 +7,29 @@ import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType } from '..
 import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
+import { reportService, ReportData } from '../utils/reportService';
+import PizZip from 'pizzip';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
   onBack?: () => void;
+  qualificationObjectId?: string;
+  projectId?: string;
 }
 
-export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack }) => {
+export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack, qualificationObjectId, projectId }) => {
   const { user } = useAuth();
-  const { data, loading, error } = useTimeSeriesData({ files });
+  const { data, loading, error } = useTimeSeriesData({ 
+    files, 
+    qualificationObjectId, 
+    projectId 
+  });
+
+  // Отладочная информация
+  console.log('TimeSeriesAnalyzer: props:', { files, qualificationObjectId, projectId });
+  console.log('TimeSeriesAnalyzer: data:', data);
+  console.log('TimeSeriesAnalyzer: loading:', loading);
+  console.log('TimeSeriesAnalyzer: error:', error);
   
   // Chart settings
   const [dataType, setDataType] = useState<DataType>('temperature');
@@ -25,9 +39,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   
   // Contract fields
   const [contractFields, setContractFields] = useState({
-    contractNumber: '',
-    contractDate: '',
-    climateInstallation: '',
     testType: ''
   });
   
@@ -51,18 +62,98 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     templateFile: null,
     templateValidation: null
   });
+
+  // Состояние для отчета по испытанию
+  const [trialReportStatus, setTrialReportStatus] = useState<{
+    hasReport: boolean;
+    reportUrl: string | null;
+    reportFilename: string | null;
+  }>({
+    hasReport: false,
+    reportUrl: null,
+    reportFilename: null
+  });
+
+  // Состояние для сохраненных отчетов
+  const [savedReports, setSavedReports] = useState<ReportData[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
   
   // Chart dimensions
-  const chartWidth = 1200;
-  const chartHeight = 400;
-  const chartMargin = { top: 20, right: 60, bottom: 60, left: 80 };
+  const chartWidth = 1400;
+  const chartHeight = 600;
+  const chartMargin = { top: 50, right: 20, bottom: 80, left: 60 };
 
   // Ref для элемента графика
   const chartRef = useRef<HTMLDivElement>(null);
 
+  // Загрузка сохраненных отчетов
+  const loadSavedReports = async () => {
+    if (!reportService.isAvailable() || !projectId || !qualificationObjectId) {
+      console.warn('Недостаточно данных для загрузки отчетов:', { projectId, qualificationObjectId });
+      return;
+    }
+
+    setLoadingReports(true);
+    try {
+      const reports = await reportService.getReportsByProjectAndObject(projectId, qualificationObjectId);
+      setSavedReports(reports);
+      console.log('Загружено сохраненных отчетов:', reports.length);
+    } catch (error) {
+      console.error('Ошибка загрузки сохраненных отчетов:', error);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  // Загружаем отчет по испытанию
+  const loadTrialReport = async () => {
+    if (!projectId || !qualificationObjectId) return;
+    
+    try {
+      const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
+      const trialReportName = `Отчет по испытанию ${dataTypeLabel}`;
+      const trialReport = await reportService.findExistingReport(projectId, qualificationObjectId, trialReportName);
+      
+      if (trialReport) {
+        setTrialReportStatus({
+          hasReport: true,
+          reportUrl: trialReport.reportUrl,
+          reportFilename: trialReport.reportFilename
+        });
+        console.log('Отчет по испытанию загружен:', trialReport.reportName);
+      } else {
+        setTrialReportStatus({
+          hasReport: false,
+          reportUrl: null,
+          reportFilename: null
+        });
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки отчета по испытанию:', error);
+    }
+  };
+
+  // Загружаем отчеты при инициализации
+  useEffect(() => {
+    loadSavedReports();
+    loadTrialReport();
+  }, [projectId, qualificationObjectId, dataType]);
+
+
   // Generate analysis results table data
   const analysisResults = useMemo(() => {
-    if (!data || !data.points.length) return [];
+    console.log('TimeSeriesAnalyzer: analysisResults useMemo called', { 
+      hasData: !!data, 
+      pointsLength: data?.points?.length || 0,
+      filesLength: files.length,
+      qualificationObjectId,
+      projectId
+    });
+    
+    if (!data || !data.points.length) {
+      console.log('TimeSeriesAnalyzer: No data or points, returning empty array');
+      return [];
+    }
 
     // Фильтруем данные по времени если применен зум
     let filteredPoints = data.points;
@@ -70,6 +161,92 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       filteredPoints = data.points.filter(point => 
         point.timestamp >= zoomState.startTime && point.timestamp <= zoomState.endTime
       );
+    }
+
+    // Если есть данные из базы данных (qualificationObjectId и projectId), используем их
+    if (qualificationObjectId && projectId) {
+      console.log('TimeSeriesAnalyzer: Generating analysis results from database data');
+      
+      // Группируем точки по zone_number и measurement_level
+      const groupedPoints = filteredPoints.reduce((acc, point) => {
+        const key = `${point.zoneNumber || 'unknown'}_${point.measurementLevel || 'unknown'}`;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(point);
+        return acc;
+      }, {} as Record<string, typeof filteredPoints>);
+
+      console.log('TimeSeriesAnalyzer: Grouped points:', Object.keys(groupedPoints).length, 'groups');
+
+      return Object.entries(groupedPoints).map(([key, points]) => {
+        const zoneNumber = points[0]?.zoneNumber !== undefined ? points[0].zoneNumber : 'unknown';
+        const measurementLevel = points[0]?.measurementLevel || 'unknown';
+        
+        // Calculate temperature statistics
+        const temperatures = points
+          .filter(p => p.temperature !== undefined)
+          .map(p => p.temperature!);
+        
+        const humidities = points
+          .filter(p => p.humidity !== undefined)
+          .map(p => p.humidity!);
+
+        let tempStats = { min: '-', max: '-', avg: '-' };
+        let humidityStats = { min: '-', max: '-', avg: '-' };
+        
+        if (temperatures.length > 0) {
+          const min = Math.min(...temperatures);
+          const max = Math.max(...temperatures);
+          const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+          
+          tempStats = {
+            min: (Math.round(min * 10) / 10).toString(),
+            max: (Math.round(max * 10) / 10).toString(),
+            avg: (Math.round(avg * 10) / 10).toString()
+          };
+        }
+        
+        if (humidities.length > 0) {
+          const min = Math.min(...humidities);
+          const max = Math.max(...humidities);
+          const avg = humidities.reduce((sum, h) => sum + h, 0) / humidities.length;
+          
+          humidityStats = {
+            min: (Math.round(min * 10) / 10).toString(),
+            max: (Math.round(max * 10) / 10).toString(),
+            avg: (Math.round(avg * 10) / 10).toString()
+          };
+        }
+
+        // Check if meets limits (исключаем внешние датчики)
+        let meetsLimits = '-';
+        if (zoneNumber !== 0 && tempStats.min !== '-' && limits.temperature) {
+          const minTemp = parseFloat(tempStats.min);
+          const maxTemp = parseFloat(tempStats.max);
+          const minLimit = limits.temperature.min;
+          const maxLimit = limits.temperature.max;
+          
+          if (minLimit !== undefined && maxLimit !== undefined) {
+            meetsLimits = (minTemp >= minLimit && maxTemp <= maxLimit) ? 'Да' : 'Нет';
+          }
+        }
+
+        return {
+          zoneNumber: zoneNumber === 0 ? 'Внешний' : zoneNumber.toString(),
+          measurementLevel: measurementLevel.toString(),
+          loggerName: points[0]?.loggerName || 'Unknown',
+          serialNumber: (points[0]?.serialNumber && !points[0]?.serialNumber.startsWith('XLS-Logger-')) ? points[0]?.serialNumber : 'Не указан',
+          minTemp: tempStats.min,
+          maxTemp: tempStats.max,
+          avgTemp: tempStats.avg,
+          minHumidity: humidityStats.min,
+          maxHumidity: humidityStats.max,
+          avgHumidity: humidityStats.avg,
+          meetsLimits,
+          isExternal: zoneNumber === 0
+        };
+      });
     }
 
     // Сортируем файлы по порядку (order) для соответствия таблице загрузки файлов
@@ -81,10 +258,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       if (filePoints.length === 0) {
         return {
-          zoneNumber: file.zoneNumber || '-',
+          zoneNumber: file.zoneNumber === 0 ? 'Внешний' : (file.zoneNumber || '-'),
           measurementLevel: file.measurementLevel || '-',
-          loggerName: file.name.substring(0, 6),
-          serialNumber: file.parsedData?.deviceMetadata?.serialNumber || 'Unknown',
+          loggerName: file.parsedData?.deviceMetadata?.deviceModel || file.name,
+          serialNumber: (file.parsedData?.deviceMetadata?.serialNumber && !file.parsedData?.deviceMetadata?.serialNumber.startsWith('XLS-Logger-')) ? file.parsedData?.deviceMetadata?.serialNumber : 'Не указан',
           minTemp: '-',
           maxTemp: '-',
           avgTemp: '-',
@@ -113,9 +290,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
         
         tempStats = {
-          min: Math.round(min * 10) / 10,
-          max: Math.round(max * 10) / 10,
-          avg: Math.round(avg * 10) / 10
+          min: (Math.round(min * 10) / 10).toString(),
+          max: (Math.round(max * 10) / 10).toString(),
+          avg: (Math.round(avg * 10) / 10).toString()
         };
       }
       
@@ -125,16 +302,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         const avg = humidities.reduce((sum, h) => sum + h, 0) / humidities.length;
         
         humidityStats = {
-          min: Math.round(min * 10) / 10,
-          max: Math.round(max * 10) / 10,
-          avg: Math.round(avg * 10) / 10
+          min: (Math.round(min * 10) / 10).toString(),
+          max: (Math.round(max * 10) / 10).toString(),
+          avg: (Math.round(avg * 10) / 10).toString()
         };
       }
 
       // Check if meets limits
       let meetsLimits = 'Да';
       // Для внешних датчиков не проверяем соответствие лимитам
-      if (file.zoneNumber === 999) {
+      if (file.zoneNumber === 0) {
         meetsLimits = '-';
       } else if (limits.temperature && temperatures.length > 0) {
         const min = Math.min(...temperatures);
@@ -149,9 +326,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
 
       return {
-        zoneNumber: file.zoneNumber === 999 ? 'Внешний' : (file.zoneNumber || '-'),
+          zoneNumber: file.zoneNumber === 0 ? 'Внешний' : (file.zoneNumber || '-'),
         measurementLevel: file.measurementLevel || '-',
-        loggerName: file.name.substring(0, 6), // Первые 6 символов названия файла
+        loggerName: file.parsedData?.deviceMetadata?.deviceModel || file.name, // Полное название логгера
         serialNumber: file.parsedData?.deviceMetadata?.serialNumber || 'Unknown',
         minTemp: tempStats.min,
         maxTemp: tempStats.max,
@@ -160,10 +337,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         maxHumidity: humidityStats.max,
         avgHumidity: humidityStats.avg,
         meetsLimits,
-        isExternal: file.zoneNumber === 999
+        isExternal: file.zoneNumber === 0
       };
     });
-  }, [data, files, limits, zoomState]); // Добавляем zoomState в зависимости
+  }, [data, files, limits, zoomState, qualificationObjectId, projectId]); // Добавляем zoomState, qualificationObjectId и projectId в зависимости
 
   // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
   const { globalMinTemp, globalMaxTemp } = useMemo(() => {
@@ -240,17 +417,33 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }));
   };
 
-  const handleTemplateUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTemplateUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.name.toLowerCase().endsWith('.docx')) {
-      setReportStatus(prev => ({ 
-        ...prev, 
-        templateFile: file,
-        templateValidation: null 
-      }));
+      console.log('📄 Загрузка шаблона:', file.name);
+      console.log('  - Размер:', file.size, 'байт');
+      console.log('  - Тип:', file.type);
       
-      // Валидируем шаблон
-      validateTemplate(file);
+      // Сразу читаем файл в память, чтобы избежать проблем с доступом позже
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        console.log('✅ Файл шаблона загружен в память:', arrayBuffer.byteLength, 'байт');
+        
+        // Создаем новый File объект из ArrayBuffer для надежного хранения
+        const clonedFile = new File([arrayBuffer], file.name, { type: file.type });
+        
+        setReportStatus(prev => ({ 
+          ...prev, 
+          templateFile: clonedFile,
+          templateValidation: null 
+        }));
+        
+        // Валидируем шаблон
+        validateTemplate(clonedFile);
+      } catch (error) {
+        console.error('❌ Ошибка загрузки файла шаблона:', error);
+        alert(`Не удалось загрузить файл шаблона: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      }
     } else {
       alert('Пожалуйста, выберите файл в формате .docx');
     }
@@ -288,6 +481,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }));
   };
 
+
   const handleGenerateTemplateReport = async () => {
     if (!reportStatus.templateFile || !chartRef.current) {
       alert('Необходимо загрузить шаблон и убедиться, что график отображается');
@@ -317,7 +511,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Генерируем данные для шаблона
       const now = new Date();
       const dateStr = now.toLocaleDateString('ru-RU');
-      const timeStr = now.toLocaleTimeString('ru-RU');
+      
+      // Отладка: проверяем формат даты
+      console.log('Generated dateStr (только дата):', dateStr);
       const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
       
       // Отладка: выводим все поля contractFields
@@ -350,20 +546,44 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       const templateData: TemplateReportData = {
         title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
-        date: `${dateStr} ${timeStr}`,
+        date: dateStr, // Только дата без времени
         dataType,
         analysisResults,
         conclusions,
         researchObject: getQualificationObjectDisplayName() || '',
-        conditioningSystem: contractFields.climateInstallation || '',
+        conditioningSystem: qualificationObject?.climateSystem || '',
        testType: convertedTestType || '',
         limits: limits,
         executor: user?.fullName || '',
-        testDate: dateStr,
-        reportNo: contractFields.contractNumber || '',
-        reportDate: contractFields.contractDate ? 
-          new Date(contractFields.contractDate).toLocaleDateString('ru-RU') : ''
+        testDate: (() => {
+          console.log('🔍 DEBUG testDate:');
+          console.log('  - dateStr:', dateStr);
+          console.log('  - dateStr type:', typeof dateStr);
+          console.log('  - dateStr length:', dateStr.length);
+          return dateStr;
+        })(),
+        reportNo: '',
+        reportDate: ''
       };
+      
+      // Отладочная информация для {Table}
+      console.log('TemplateData for {Table}:');
+      console.log('- analysisResults count:', analysisResults.length);
+      console.log('- analysisResults data:', analysisResults);
+      console.log('- dataType:', dataType);
+
+        // Анализируем содержимое шаблона для диагностики плейсхолдеров
+        const analysis = await processor.analyzeTemplateContent(reportStatus.templateFile);
+        console.log('Template analysis:', analysis);
+
+        if (!analysis.hasTable) {
+          console.warn('Шаблон не содержит плейсхолдер {Table}. Таблица результатов не будет вставлена.');
+          console.log('Found placeholders in template:', analysis.placeholders);
+          console.log('Template content preview:', analysis.content);
+          // Можно добавить уведомление пользователю
+        } else {
+          console.log('Found Table placeholder in template');
+        }
 
       // Обрабатываем шаблон
       const docxBlob = await processor.processTemplate(
@@ -378,18 +598,86 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
 
       // Создаем URL для скачивания
-      const reportUrl = URL.createObjectURL(docxBlob);
-      const reportFilename = reportStatus.hasReport 
+      let reportUrl = URL.createObjectURL(docxBlob);
+      let reportFilename = reportStatus.hasReport 
         ? reportStatus.reportFilename // Сохраняем старое имя файла
         : `отчет_шаблон_${dataTypeLabel}_${now.toISOString().slice(0, 10)}_${now.toTimeString().slice(0, 8).replace(/:/g, '-')}.docx`;
+
+      // Новая логика создания отчетов
+      if (reportService.isAvailable() && projectId && qualificationObjectId && user?.id) {
+        try {
+          // 1. Создаем отчет по испытанию (всегда перезаписывается)
+          const trialReportName = `Отчет по испытанию ${dataTypeLabel}`;
+          const trialReportFilename = `отчет_шаблон_${dataTypeLabel}_${now.toISOString().slice(0, 10)}.docx`;
+          
+          // Ищем существующий отчет по испытанию
+          const existingTrialReport = await reportService.findExistingReport(projectId, qualificationObjectId, trialReportName);
+          
+          if (existingTrialReport) {
+            console.log('Обновляем отчет по испытанию...');
+            // Обновляем существующий отчет по испытанию
+            await reportService.updateReport(existingTrialReport.id!, {
+              reportUrl,
+              reportFilename: trialReportFilename,
+              reportData: {
+                dataType,
+                analysisResults,
+                contractFields,
+                conclusions,
+                markers,
+                limits
+              }
+            });
+            
+            
+            console.log('Отчет по испытанию обновлен');
+          } else {
+            console.log('Создаем новый отчет по испытанию...');
+            // Создаем новый отчет по испытанию
+            const trialReportData = {
+              projectId,
+              qualificationObjectId,
+              reportName: trialReportName,
+              reportType: 'template' as const,
+              reportUrl,
+              reportFilename: trialReportFilename,
+              reportData: {
+                dataType,
+                analysisResults,
+                contractFields,
+                conclusions,
+                markers,
+                limits
+              },
+              createdBy: user.id
+            };
+            const savedTrialReport = await reportService.saveReport(trialReportData);
+            console.log('Отчет по испытанию создан');
+            
+          }
+          
+          // Обновляем состояние отчета по испытанию
+          setTrialReportStatus({
+            hasReport: true,
+            reportUrl,
+            reportFilename: trialReportFilename
+          });
+          
+          // Перезагружаем список отчетов
+          await loadSavedReports();
+        } catch (error) {
+          console.error('Ошибка сохранения отчетов в базу данных:', error);
+          // Не прерываем выполнение, так как отчет уже создан локально
+        }
+      }
 
       // Обновляем состояние
       setReportStatus(prev => ({
         ...prev,
         isGenerating: false,
         hasReport: true,
-        reportUrl,
-        reportFilename
+        reportUrl: reportUrl,
+        reportFilename: reportFilename
       }));
       
     } catch (error) {
@@ -410,7 +698,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
   };
 
-  const handleDeleteReport = () => {
+  const handleDeleteReport = async () => {
     if (reportStatus.reportUrl) {
       URL.revokeObjectURL(reportStatus.reportUrl);
     }
@@ -418,6 +706,22 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     // Очищаем существующий отчет в процессоре
     const processor = DocxTemplateProcessor.getInstance();
     processor.clearExistingReport();
+
+    // Удаляем отчет по испытанию из базы данных
+    if (reportService.isAvailable() && projectId && qualificationObjectId) {
+      try {
+        const dataTypeLabel = dataType === 'temperature' ? 'температура' : 'влажность';
+        const trialReportName = `Отчет по испытанию ${dataTypeLabel}`;
+        const trialReport = await reportService.findExistingReport(projectId, qualificationObjectId, trialReportName);
+        
+        if (trialReport) {
+          await reportService.deleteReport(trialReport.id!);
+          console.log('Отчет по испытанию удален из базы данных');
+        }
+      } catch (error) {
+        console.error('Ошибка удаления отчета по испытанию из базы данных:', error);
+      }
+    }
 
     setReportStatus({
       isGenerating: false,
@@ -427,6 +731,101 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       templateFile: null,
       templateValidation: null
     });
+
+    // Очищаем состояние отчета по испытанию
+    setTrialReportStatus({
+      hasReport: false,
+      reportUrl: null,
+      reportFilename: null
+    });
+
+    // Перезагружаем список отчетов
+    await loadSavedReports();
+  };
+
+  // Загрузка сохраненного отчета
+  const handleLoadSavedReport = async (report: ReportData) => {
+    try {
+      // Загружаем данные отчета
+      const reportData = report.reportData;
+      
+      // Восстанавливаем состояние анализа
+      if (reportData.dataType && (reportData.dataType === 'temperature' || reportData.dataType === 'humidity')) {
+        setDataType(reportData.dataType as DataType);
+      }
+      if (reportData.contractFields) {
+        setContractFields(reportData.contractFields);
+      }
+      if (reportData.conclusions) {
+        setConclusions(reportData.conclusions);
+      }
+      if (reportData.markers) {
+        setMarkers(reportData.markers);
+      }
+      if (reportData.limits) {
+        setLimits(reportData.limits);
+      }
+
+      // Создаем URL для скачивания
+      const reportUrl = report.reportUrl;
+      
+      setReportStatus(prev => ({
+        ...prev,
+        hasReport: true,
+        reportUrl,
+        reportFilename: report.reportFilename
+      }));
+
+      console.log('Отчет загружен:', report.reportName);
+    } catch (error) {
+      console.error('Ошибка загрузки отчета:', error);
+      alert('Ошибка при загрузке отчета');
+    }
+  };
+
+  // Удаление сохраненного отчета
+  const handleDeleteSavedReport = async (reportId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот отчет?')) {
+      return;
+    }
+
+    try {
+      await reportService.deleteReport(reportId);
+      await loadSavedReports();
+      console.log('Отчет удален');
+    } catch (error) {
+      console.error('Ошибка удаления отчета:', error);
+      alert('Ошибка при удалении отчета');
+    }
+  };
+
+  // Скачивание сохраненного отчета
+  const handleDownloadSavedReport = async (report: ReportData) => {
+    try {
+      console.log('Скачиваем отчет:', report);
+      
+      // Проверяем, есть ли URL отчета
+      if (!report.reportUrl) {
+        alert('Ссылка на отчет недоступна');
+        return;
+      }
+
+      // Создаем временную ссылку для скачивания
+      const link = document.createElement('a');
+      link.href = report.reportUrl;
+      link.download = report.reportFilename || 'отчет.docx';
+      link.target = '_blank';
+      
+      // Добавляем ссылку в DOM, кликаем и удаляем
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('Отчет скачан:', report.reportFilename);
+    } catch (error) {
+      console.error('Ошибка скачивания отчета:', error);
+      alert('Ошибка при скачивании отчета');
+    }
   };
 
   const handleAutoFillConclusions = () => {
@@ -533,30 +932,34 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setConclusions(conclusionText);
   };
 
+  // Состояние для данных объекта квалификации
+  const [qualificationObject, setQualificationObject] = useState<any>(null);
+
+  // Загрузка данных объекта квалификации
+  useEffect(() => {
+    const loadQualificationObject = async () => {
+      if (qualificationObjectId) {
+        try {
+          const { qualificationObjectService } = await import('../utils/qualificationObjectService');
+          const service = qualificationObjectService;
+          const objectData = await service.getQualificationObjectById(qualificationObjectId);
+          setQualificationObject(objectData);
+        } catch (error) {
+          console.error('Ошибка загрузки объекта квалификации:', error);
+        }
+      }
+    };
+
+    loadQualificationObject();
+  }, [qualificationObjectId]);
+
   // Функция для получения названия объекта квалификации
   const getQualificationObjectDisplayName = (): string => {
-    // Находим файлы с привязанным объектом квалификации
-    const filesWithQualification = files.filter(f => f.qualificationObjectId);
-    
-    if (filesWithQualification.length === 0) {
-      return 'Не указан';
+    if (qualificationObject?.name) {
+      return qualificationObject.name;
     }
     
-    // Если все файлы привязаны к одному объекту, показываем его название
-    const uniqueQualificationIds = [...new Set(filesWithQualification.map(f => f.qualificationObjectId))];
-    
-    if (uniqueQualificationIds.length === 1) {
-      // Получаем название объекта квалификации из сохраненных данных файла
-      const fileWithObject = filesWithQualification[0];
-      if (fileWithObject.qualificationObjectName) {
-        return fileWithObject.qualificationObjectName;
-      }
-      
-      // Если название не сохранено, возвращаем ID
-      return `Объект квалификации (ID: ${uniqueQualificationIds[0]?.substring(0, 8)}...)`;
-    } else {
-      return `Несколько объектов (${uniqueQualificationIds.length})`;
-    }
+    return 'Не указан';
   };
 
   if (loading) {
@@ -606,25 +1009,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-          )}
-          <BarChart className="w-8 h-8 text-indigo-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Анализатор временных рядов</h1>
-        </div>
-      </div>
-
       {/* Settings Panel */}
       <div className="bg-white rounded-lg shadow p-6 space-y-6">
-        <h3 className="text-lg font-semibold text-gray-900">Информация об объекте</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Настройки анализа</h3>
         
         {/* Data Type Selection */}
         <div>
@@ -672,6 +1059,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 onChange={(e) => handleLimitChange(dataType, 'min', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Не установлен"
+                title="Минимальное значение"
+                aria-label="Минимальное значение"
               />
             </div>
             <div>
@@ -683,70 +1072,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 onChange={(e) => handleLimitChange(dataType, 'max', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Не установлен"
+                title="Максимальное значение"
+                aria-label="Максимальное значение"
               />
             </div>
           </div>
         </div>
 
         {/* Zoom Controls */}
-        {zoomState && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Управление масштабом</label>
-            <button
-              onClick={handleResetZoom}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Сбросить масштаб
-            </button>
-          </div>
-        )}
 
-        {/* Contract Information - moved test type to markers section */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Информация о договоре</label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">№ договора</label>
-              <input
-                type="text"
-                value={contractFields.contractNumber}
-                onChange={(e) => handleContractFieldChange('contractNumber', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите номер договора"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Дата договора</label>
-              <input
-                type="date"
-                value={contractFields.contractDate}
-                onChange={(e) => handleContractFieldChange('contractDate', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Климатическая установка</label>
-              <input
-                type="text"
-                value={contractFields.climateInstallation}
-                onChange={(e) => handleContractFieldChange('climateInstallation', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите тип климатической установки"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Объект квалификации</label>
-              <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
-                {getQualificationObjectDisplayName()}
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Chart */}
-      <div ref={chartRef} className="bg-white rounded-lg shadow p-6">
-        <div className="mb-4">
+      <div ref={chartRef} className="bg-white rounded-lg shadow p-3 w-full">
+        <div className="mb-2">
           <h3 className="text-lg font-semibold text-gray-900">
             График {dataType === 'temperature' ? 'температуры' : 'влажности'}
           </h3>
@@ -771,21 +1110,36 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Испытания</h3>
         
-        {/* Test Type Selection */}
+        {/* Contract Fields */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Тип испытания</label>
-          <select
-            value={contractFields.testType}
-            onChange={(e) => handleContractFieldChange('testType', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="">Выберите тип испытания</option>
-            <option value="empty_volume">Испытание на соответствие критериям в пустом объеме</option>
-            <option value="loaded_volume">Испытание на соответствие критериям в загруженном объеме</option>
-            <option value="temperature_recovery">Испытание по восстановлению температуры после открытия двери</option>
-            <option value="power_off">Испытание на отключение электропитания</option>
-            <option value="power_on">Испытание на включение электропитания</option>
-          </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Тип испытания</label>
+              <select
+                value={contractFields.testType}
+                onChange={(e) => handleContractFieldChange('testType', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                title="Тип испытания"
+                aria-label="Тип испытания"
+              >
+                <option value="">Выберите тип испытания</option>
+                <option value="empty_volume">Испытание на соответствие критериям в пустом объеме</option>
+                <option value="loaded_volume">Испытание на соответствие критериям в загруженном объеме</option>
+                <option value="temperature_recovery">Испытание по восстановлению температуры после открытия двери</option>
+                <option value="power_off">Испытание на отключение электропитания</option>
+                <option value="power_on">Испытание на включение электропитания</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Управление масштабом</label>
+              <button
+                onClick={handleResetZoom}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors w-full"
+              >
+                Сбросить масштаб
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Markers section */}
@@ -818,6 +1172,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                             }}
                             className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             autoFocus
+                            title="Название маркера"
+                            aria-label="Название маркера"
                           />
                         ) : (
                           <span className="font-medium">{marker.label}</span>
@@ -843,6 +1199,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                             onBlur={() => setEditingMarkerType(null)}
                             className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             autoFocus
+                            title="Тип маркера"
+                            aria-label="Тип маркера"
                           >
                             <option value="test">Испытание</option>
                             <option value="door_opening">Открытие двери</option>
@@ -914,7 +1272,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                   Уровень измерения (м.)
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Наименование логгера (6 символов)
+                  Наименование логгера
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Серийный № логгера
@@ -937,10 +1295,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               {analysisResults.map((result, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {result.zoneNumber}
+                    {result.zoneNumber === '0' ? 'Внешний' : result.zoneNumber}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {result.measurementLevel}
+                    {result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ',')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {result.loggerName}
@@ -1060,6 +1418,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                   onChange={handleTemplateUpload}
                   className="hidden"
                   id="template-upload"
+                  title="Загрузить DOCX шаблон"
+                  aria-label="Загрузить DOCX шаблон"
                 />
                 <label
                   htmlFor="template-upload"
@@ -1127,11 +1487,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <div className="flex justify-center">
             <button
               onClick={handleGenerateTemplateReport}
-              disabled={
+              disabled={Boolean(
                 reportStatus.isGenerating || 
                 !reportStatus.templateFile || 
                 (reportStatus.templateValidation && !reportStatus.templateValidation.isValid)
-              }
+              )}
               className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
               title="Сформировать отчет по загруженному шаблону"
             >
@@ -1149,26 +1509,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             </button>
           </div>
           
-          {/* Ссылка для скачивания и кнопка удаления */}
-          {reportStatus.hasReport && reportStatus.reportUrl && (
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleDownloadReport}
-                className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-                <span>Скачать отчет ({reportStatus.reportFilename})</span>
-              </button>
-              
-              <button
-                onClick={handleDeleteReport}
-                className="text-red-600 hover:text-red-800 transition-colors"
-                title="Удалить отчет"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          )}
           
           {/* Информация о плейсхолдерах для шаблона */}
           <div className="w-full max-w-2xl bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -1176,23 +1516,92 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               Поддерживаемые плейсхолдеры в шаблоне:
             </h4>
             <div className="text-xs text-blue-800 space-y-1">
-              <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
-              <p>• <code>{'{resultsTable}'}</code> - таблица результатов анализа</p>
-              <p>• <code>{'{Result}'}</code> - текст выводов из поля "Выводы"</p>
-              <p>• <code>{'{Object}'}</code> - объект исследования</p>
-              <p>• <code>{'{ConditioningSystem}'}</code> - климатическая установка</p>
-              <p>• <code>{'{System}'}</code> - климатическая установка</p>
-              <p>• <code>{'{NameTest}'}</code> - тип испытания</p>
-              <p>• <code>{'{Limits}'}</code> - установленные лимиты с единицами измерения</p>
-              <p>• <code>{'{Executor}'}</code> - ФИО исполнителя (текущий пользователь)</p>
-              <p>• <code>{'{TestDate}'}</code> - дата испытания (текущая дата)</p>
-              <p>• <code>{'{ReportNo}'}</code> - номер договора из настроек анализа</p>
-              <p>• <code>{'{ReportDate}'}</code> - дата договора из настроек анализа</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <p><strong>Основные:</strong></p>
+                  <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
+                  <p>• <code>{'{Table}'}</code> - таблица результатов анализа</p>
+                  <p>• <code>{'{Result}'}</code> - текст выводов из поля "Выводы"</p>
+                  <p>• <code>{'{Object}'}</code> - наименование объекта квалификации</p>
+                  <p>• <code>{'{ConditioningSystem}'}</code> - климатическая установка</p>
+                  <p>• <code>{'{System}'}</code> - климатическая установка (альтернативный)</p>
+                  <p>• <code>{'{NameTest}'}</code> - тип испытания</p>
+                </div>
+                <div>
+                  <p><strong>Дополнительные:</strong></p>
+                  <p>• <code>{'{Limits}'}</code> - установленные лимиты с единицами измерения</p>
+                  <p>• <code>{'{Executor}'}</code> - ФИО исполнителя (текущий пользователь)</p>
+                  <p>• <code>{'{TestDate}'}</code> - дата испытания (текущая дата)</p>
+                  <p>• <code>{'{ReportNo}'}</code> - номер договора из настроек анализа</p>
+                  <p>• <code>{'{ReportDate}'}</code> - дата договора из настроек анализа</p>
+                  <p>• <code>{'{title}'}</code> - заголовок отчета</p>
+                  <p>• <code>{'{date}'}</code> - дата создания отчета</p>
+                </div>
+              </div>
             </div>
             <p className="text-xs mt-2"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки.</p>
+            <p className="text-xs mt-1"><strong>Таблица результатов:</strong> Для вставки таблицы результатов анализа используйте плейсхолдер <code>{'{Table}'}</code>. Если плейсхолдер отсутствует в шаблоне, таблица не будет вставлена.</p>
             <p className="text-xs mt-1"><strong>Колонтитулы:</strong> Все плейсхолдеры также работают в верхних и нижних колонтитулах документа (header1.xml, header2.xml, header3.xml, footer1.xml, footer2.xml, footer3.xml).</p>
           </div>
         </div>
+
+        {/* Секция сохраненных отчетов */}
+        {projectId && qualificationObjectId && (
+          <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+              <FileText className="w-5 h-5 mr-2 text-indigo-600" />
+              Сохраненные отчеты
+            </h3>
+            
+            {loadingReports ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto"></div>
+                <p className="text-sm text-gray-500 mt-2">Загрузка отчетов...</p>
+              </div>
+            ) : savedReports.length > 0 ? (
+              <div className="space-y-3">
+                {savedReports.map((report) => (
+                  <div key={report.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <FileText className="w-4 h-4 text-gray-600" />
+                        <span className="font-medium text-gray-900">{report.reportName}</span>
+                        <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
+                          {report.reportType === 'template' ? 'По шаблону' : 'Анализ'}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        Создан: {report.createdAt.toLocaleDateString('ru-RU')} в {report.createdAt.toLocaleTimeString('ru-RU')}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleDownloadSavedReport(report)}
+                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                        title="Скачать отчет"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSavedReport(report.id!)}
+                        className="text-red-600 hover:text-red-800 transition-colors"
+                        title="Удалить отчет"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p>Сохраненных отчетов пока нет</p>
+                <p className="text-sm">Создайте отчет, чтобы он появился здесь</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

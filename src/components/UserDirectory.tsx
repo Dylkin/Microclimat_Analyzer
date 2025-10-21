@@ -3,8 +3,8 @@ import { Users, Plus, Edit2, Trash2, Save, X, Eye, EyeOff, Key } from 'lucide-re
 import { useAuth } from '../contexts/AuthContext';
 import { User, UserRole } from '../types/User';
 
-export const UserDirectory: React.FC = () => {
-  const { users, addUser, updateUser, deleteUser, resetPassword, user: currentUser, loading, error } = useAuth();
+const UserDirectory: React.FC = () => {
+  const { users, addUser, updateUser, deleteUser, resetPassword, user: currentUser } = useAuth();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [showPasswords, setShowPasswords] = useState<{ [key: string]: boolean }>({});
@@ -16,16 +16,19 @@ export const UserDirectory: React.FC = () => {
     fullName: '',
     email: '',
     password: '',
-    role: 'specialist' as UserRole
+    role: 'specialist' as UserRole,
+    position: ''
   });
 
   const [editUser, setEditUser] = useState({
     fullName: '',
     email: '',
-    role: 'specialist' as UserRole
+    role: 'specialist' as UserRole,
+    position: ''
   });
 
   const roleLabels: Record<UserRole, string> = {
+    admin: 'Администратор',
     administrator: 'Администратор',
     specialist: 'Специалист',
     manager: 'Руководитель',
@@ -55,7 +58,8 @@ export const UserDirectory: React.FC = () => {
         fullName: '',
         email: '',
         password: '',
-        role: 'specialist'
+        role: 'specialist',
+        position: ''
       });
       setShowAddForm(false);
       alert('Пользователь успешно добавлен');
@@ -73,7 +77,8 @@ export const UserDirectory: React.FC = () => {
     setEditUser({
       fullName: user.fullName,
       email: user.email,
-      role: user.role
+      role: user.role,
+      position: user.position || ''
     });
     setEditingUser(user.id);
   };
@@ -167,32 +172,7 @@ export const UserDirectory: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Индикатор загрузки */}
-      {loading && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            <span className="text-blue-700">Загрузка пользователей из базы данных...</span>
-          </div>
-        </div>
-      )}
-
-      {/* Ошибка подключения */}
-      {error && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-start space-x-2">
-            <div className="text-yellow-600">⚠️</div>
-            <div>
-              <h3 className="text-sm font-medium text-yellow-800">
-                Проблема с подключением к базе данных
-              </h3>
-              <p className="text-sm text-yellow-700 mt-1">
-                {error}. Используются локальные данные.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Индикатор загрузки и ошибки удалены, так как их нет в AuthContextType */}
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -217,6 +197,8 @@ export const UserDirectory: React.FC = () => {
             <button
               onClick={() => setShowAddForm(false)}
               className="text-gray-400 hover:text-gray-600"
+              title="Закрыть"
+              aria-label="Закрыть"
             >
               <X className="w-5 h-5" />
             </button>
@@ -279,12 +261,29 @@ export const UserDirectory: React.FC = () => {
                 value={newUser.role}
                 onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value as UserRole }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                title="Роль пользователя"
+                aria-label="Роль пользователя"
               >
                 <option value="specialist">Специалист</option>
                 <option value="manager">Руководитель</option>
                 <option value="director">Менеджер</option>
                 <option value="administrator">Администратор</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Должность
+              </label>
+              <input
+                type="text"
+                value={newUser.position}
+                onChange={(e) => setNewUser(prev => ({ ...prev, position: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Введите должность"
+                title="Должность пользователя"
+                aria-label="Должность пользователя"
+              />
             </div>
           </div>
 
@@ -322,6 +321,9 @@ export const UserDirectory: React.FC = () => {
                   Роль
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Должность
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Пароль
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -339,6 +341,8 @@ export const UserDirectory: React.FC = () => {
                         value={editUser.fullName}
                         onChange={(e) => setEditUser(prev => ({ ...prev, fullName: e.target.value }))}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        title="Полное имя пользователя"
+                        aria-label="Полное имя пользователя"
                       />
                     ) : (
                       <div>
@@ -360,6 +364,8 @@ export const UserDirectory: React.FC = () => {
                         value={editUser.email}
                         onChange={(e) => setEditUser(prev => ({ ...prev, email: e.target.value }))}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        title="Email пользователя"
+                        aria-label="Email пользователя"
                       />
                     ) : (
                       <div className="text-sm text-gray-500">{user.email}</div>
@@ -371,6 +377,8 @@ export const UserDirectory: React.FC = () => {
                         value={editUser.role}
                         onChange={(e) => setEditUser(prev => ({ ...prev, role: e.target.value as UserRole }))}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        title="Роль пользователя"
+                        aria-label="Роль пользователя"
                       >
                         <option value="specialist">Специалист</option>
                         <option value="manager">Руководитель</option>
@@ -381,6 +389,21 @@ export const UserDirectory: React.FC = () => {
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                         {roleLabels[user.role]}
                       </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {editingUser === user.id ? (
+                      <input
+                        type="text"
+                        value={editUser.position}
+                        onChange={(e) => setEditUser(prev => ({ ...prev, position: e.target.value }))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Введите должность"
+                        title="Должность пользователя"
+                        aria-label="Должность пользователя"
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-500">{user.position || 'Не указана'}</div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -531,3 +554,5 @@ export const UserDirectory: React.FC = () => {
     </div>
   );
 };
+
+export default UserDirectory;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, BarChart3, Menu, X, HelpCircle, Database, Users, Building2, FolderOpen, Wrench } from 'lucide-react';
+import { LogOut, BarChart3, Menu, X, HelpCircle, Database, Users, Building2, FolderOpen, Wrench, Wifi, Shield, User, Key, Activity, Settings, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,20 +11,9 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) => {
   const { user, logout, hasAccess } = useAuth();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set());
 
   const navigation = [
-    {
-      name: 'Microclimat Analyzer',
-      key: 'analyzer',
-      icon: BarChart3,
-      access: 'analyzer' as const
-    },
-    {
-      name: 'Справка',
-      key: 'help',
-      icon: HelpCircle,
-      access: 'help' as const
-    },
     {
       name: 'Пользователи',
       key: 'users',
@@ -50,17 +39,98 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       access: 'analyzer' as const
     },
     {
-      name: 'Проверка БД',
-      key: 'database',
-      icon: Database,
-      access: 'analyzer' as const
+      name: 'Справка',
+      key: 'help',
+      icon: HelpCircle,
+      access: 'help' as const
+    },
+    {
+      name: 'Сервис',
+      key: 'service',
+      icon: Settings,
+      access: 'analyzer' as const,
+      children: [
+        {
+          name: 'Microclimat Analyzer',
+          key: 'analyzer',
+          icon: BarChart3,
+          access: 'analyzer' as const
+        },
+        {
+          name: 'Аудит',
+          key: 'audit_logs',
+          icon: Activity,
+          access: 'admin' as const
+        },
+        {
+          name: 'Проверка БД',
+          key: 'database',
+          icon: Database,
+          access: 'analyzer' as const
+        },
+        {
+          name: 'Тест Supabase',
+          key: 'supabase-test',
+          icon: Wifi,
+          access: 'analyzer' as const
+        },
+        {
+          name: 'RLS Manager',
+          key: 'rls-manager',
+          icon: Shield,
+          access: 'analyzer' as const
+        },
+        {
+          name: 'Storage RLS Manager',
+          key: 'storage-rls-manager',
+          icon: Shield,
+          access: 'analyzer' as const
+        },
+        {
+          name: 'Storage Diagnostic',
+          key: 'storage-diagnostic',
+          icon: Database,
+          access: 'analyzer' as const
+        },
+        {
+          name: 'Storage Auth Fix',
+          key: 'storage-auth-fix',
+          icon: User,
+          access: 'analyzer' as const
+        },
+        {
+          name: 'Supabase Auth Fix',
+          key: 'supabase-auth-init',
+          icon: Key,
+          access: 'analyzer' as const
+        },
+        {
+          name: 'Secure Auth Manager',
+          key: 'secure-auth-manager',
+          icon: Shield,
+          access: 'analyzer' as const
+        }
+      ]
     }
   ];
 
   const availableNavigation = navigation.filter(item => hasAccess(item.access));
 
+  const toggleMenu = (key: string) => {
+    setExpandedMenus(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+
   const getRoleLabel = (role: string) => {
     switch (role) {
+      case 'admin':
       case 'administrator': return 'Администратор';
       case 'specialist': return 'Специалист';
       case 'manager': return 'Руководитель';
@@ -84,6 +154,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
             <button
               onClick={() => setSidebarOpen(false)}
               className="text-gray-400 hover:text-gray-600"
+              title="Закрыть меню"
             >
               <X className="w-6 h-6" />
             </button>
@@ -91,6 +162,56 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
           <nav className="flex-1 px-4 py-4 space-y-2">
             {availableNavigation.map((item) => {
               const Icon = item.icon;
+              const hasChildren = item.children && item.children.length > 0;
+              const isExpanded = expandedMenus.has(item.key);
+              
+              if (hasChildren) {
+                return (
+                  <div key={item.key}>
+                    <button
+                      onClick={() => toggleMenu(item.key)}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <Icon className="w-5 h-5 mr-3" />
+                        {item.name}
+                      </div>
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </button>
+                    {isExpanded && item.children && (
+                      <div className="ml-4 mt-1 space-y-1">
+                        {item.children.filter(child => hasAccess(child.access)).map((child) => {
+                          const ChildIcon = child.icon;
+                          return (
+                            <button
+                              key={child.key}
+                              onClick={() => {
+                                onPageChange(child.key);
+                                setSidebarOpen(false);
+                              }}
+                              className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                currentPage === child.key
+                                  ? 'bg-indigo-100 text-indigo-700'
+                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                              }`}
+                            >
+                              <ChildIcon className="w-4 h-4 mr-3" />
+                              {child.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              
               return (
                 <button
                   key={item.key}
@@ -122,6 +243,53 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
           <nav className="flex-1 px-4 py-4 space-y-2">
             {availableNavigation.map((item) => {
               const Icon = item.icon;
+              const hasChildren = item.children && item.children.length > 0;
+              const isExpanded = expandedMenus.has(item.key);
+              
+              if (hasChildren) {
+                return (
+                  <div key={item.key}>
+                    <button
+                      onClick={() => toggleMenu(item.key)}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <Icon className="w-5 h-5 mr-3" />
+                        {item.name}
+                      </div>
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </button>
+                    {isExpanded && item.children && (
+                      <div className="ml-4 mt-1 space-y-1">
+                        {item.children.filter(child => hasAccess(child.access)).map((child) => {
+                          const ChildIcon = child.icon;
+                          return (
+                            <button
+                              key={child.key}
+                              onClick={() => onPageChange(child.key)}
+                              className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                currentPage === child.key
+                                  ? 'bg-indigo-100 text-indigo-700'
+                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                              }`}
+                            >
+                              <ChildIcon className="w-4 h-4 mr-3" />
+                              {child.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              
               return (
                 <button
                   key={item.key}
@@ -149,6 +317,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
             <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden text-gray-400 hover:text-gray-600"
+              title="Открыть меню"
             >
               <Menu className="w-6 h-6" />
             </button>

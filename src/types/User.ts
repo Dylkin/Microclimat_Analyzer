@@ -1,4 +1,4 @@
-export type UserRole = 'administrator' | 'specialist' | 'manager' | 'director';
+export type UserRole = 'admin' | 'administrator' | 'specialist' | 'manager' | 'director';
 
 export interface User {
   id: string;
@@ -6,6 +6,7 @@ export interface User {
   email: string;
   password: string;
   role: UserRole;
+  position?: string;
   isDefault?: boolean;
 }
 

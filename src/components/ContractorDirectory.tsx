@@ -8,7 +8,7 @@ import { ContractorMap } from './ContractorMap';
 import { QualificationObjectForm } from './QualificationObjectForm';
 import { QualificationObjectsTable } from './QualificationObjectsTable';
 
-export const ContractorDirectory: React.FC = () => {
+const ContractorDirectory: React.FC = () => {
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [filteredContractors, setFilteredContractors] = useState<Contractor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -259,7 +259,7 @@ export const ContractorDirectory: React.FC = () => {
   const handleAddQualificationObject = async (objectData: CreateQualificationObjectData) => {
     setOperationLoading(true);
     try {
-      const addedObject = await qualificationObjectService.addQualificationObject(objectData);
+      const addedObject = await qualificationObjectService.createQualificationObject(objectData);
       setQualificationObjects(prev => [...prev, addedObject]);
       setShowAddQualificationForm(false);
     } catch (error) {
@@ -276,27 +276,32 @@ export const ContractorDirectory: React.FC = () => {
   };
 
   // Сохранение изменений объекта квалификации
-  const handleSaveQualificationObject = async (objectData: CreateQualificationObjectData) => {
+  const handleSaveQualificationObject = async (objectData: CreateQualificationObjectData): Promise<QualificationObject> => {
     setOperationLoading(true);
     try {
+      let savedObject: QualificationObject;
+      
       if (editingQualificationObject) {
         // Обновляем существующий объект
-        const updatedObject = await qualificationObjectService.updateQualificationObject(
+        savedObject = await qualificationObjectService.updateQualificationObject(
           editingQualificationObject.id,
           objectData
         );
         setQualificationObjects(prev => prev.map(obj => 
-          obj.id === editingQualificationObject.id ? updatedObject : obj
+          obj.id === editingQualificationObject.id ? savedObject : obj
         ));
         setEditingQualificationObject(null);
       } else {
         // Добавляем новый объект
-        const addedObject = await qualificationObjectService.createQualificationObject(objectData);
-        setQualificationObjects(prev => [...prev, addedObject]);
+        savedObject = await qualificationObjectService.createQualificationObject(objectData);
+        setQualificationObjects(prev => [...prev, savedObject]);
       }
       setShowAddQualificationForm(false);
+      
+      return savedObject;
     } catch (error) {
       console.error('Ошибка сохранения объекта квалификации:', error);
+      throw error; // Пробрасываем ошибку дальше
     } finally {
       setOperationLoading(false);
     }
@@ -404,6 +409,8 @@ export const ContractorDirectory: React.FC = () => {
           <button
             onClick={onCancel}
             className="text-gray-400 hover:text-gray-600"
+            title="Закрыть"
+            aria-label="Закрыть"
           >
             <X className="w-5 h-5" />
           </button>
@@ -419,7 +426,7 @@ export const ContractorDirectory: React.FC = () => {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => setFormData((prev: any) => ({ ...prev, name: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Введите наименование контрагента"
               />
@@ -432,7 +439,7 @@ export const ContractorDirectory: React.FC = () => {
               <input
                 type="text"
                 value={formData.address}
-                onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                onChange={(e) => setFormData((prev: any) => ({ ...prev, address: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Введите адрес (будет геокодирован автоматически)"
               />
@@ -800,8 +807,11 @@ export const ContractorDirectory: React.FC = () => {
                     setShowAddQualificationForm(false);
                     setEditingQualificationObject(null);
                   }}
-                  loading={operationLoading}
-                  editingObject={editingQualificationObject}
+                  onPageChange={(page, data) => {
+                    console.log('ContractorDirectory: Переход на страницу', page, data);
+                    // В контексте ContractorDirectory переключение страниц не предусмотрено
+                    alert('Функция анализа данных доступна только в разделе "Управление проектами".\n\nДля анализа данных:\n1. Перейдите в "Управление проектами"\n2. Выберите проект\n3. Откройте объект квалификации\n4. Нажмите "Анализ данных"');
+                  }}
                 />
               </div>
             )}
@@ -823,7 +833,7 @@ export const ContractorDirectory: React.FC = () => {
               editingQualificationObject={editingQualificationObject}
               onSaveQualificationObject={async (objectData) => {
                 console.log('Saving qualification object:', objectData);
-                await handleSaveQualificationObject(objectData);
+                return await handleSaveQualificationObject(objectData);
               }}
               onCancelQualificationObjectEdit={() => setEditingQualificationObject(null)}
               contractorId={editingContractorData.id}
@@ -846,6 +856,8 @@ export const ContractorDirectory: React.FC = () => {
                 setQualificationSearchTerm('');
               }}
               className="text-gray-400 hover:text-gray-600"
+              title="Закрыть"
+              aria-label="Закрыть"
             >
               <X className="w-5 h-5" />
             </button>
@@ -946,3 +958,5 @@ export const ContractorDirectory: React.FC = () => {
     </div>
   );
 };
+
+export default ContractorDirectory;

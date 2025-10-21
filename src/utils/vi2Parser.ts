@@ -20,27 +20,27 @@ class VI2Parser {
    */
   async parse(fileName: string): Promise<ParsedFileData> {
     try {
-      console.log('Начинаем анализ VI2 файла:', fileName);
-      console.log('Размер файла:', this.buffer.byteLength, 'байт');
+      console.log('VI2Parser: Начинаем анализ VI2 файла:', fileName);
+      console.log('VI2Parser: Размер файла:', this.buffer.byteLength, 'байт');
 
       // Определяем тип устройства
       const deviceType = this.detectDeviceType();
-      console.log('Определен тип устройства:', deviceType);
+      console.log('VI2Parser: Определен тип устройства:', deviceType);
 
       // Выбираем и запускаем соответствующий парсер
       switch (deviceType) {
         case 1:
-          console.log('Запускаем парсер для одноканального устройства (Testo 174T)');
+          console.log('VI2Parser: Запускаем парсер для одноканального устройства (Testo 174T)');
           const parser174T = new Testo174TBinaryParser(this.buffer);
           return parser174T.parse(fileName);
           
         case 2:
-          console.log('Запускаем парсер для двухканального устройства (Testo 174H)');
+          console.log('VI2Parser: Запускаем парсер для двухканального устройства (Testo 174H)');
           const parser174H = new Testo174HBinaryParser(this.buffer);
           return parser174H.parse(fileName);
           
         default:
-          console.warn('Неизвестный тип устройства, используем парсер по умолчанию (двухканальный)');
+          console.warn('VI2Parser: Неизвестный тип устройства, используем парсер по умолчанию (двухканальный)');
           const defaultParser = new Testo174HBinaryParser(this.buffer);
           return defaultParser.parse(fileName);
       }
@@ -69,40 +69,43 @@ class VI2Parser {
    */
   private detectDeviceType(): number {
     try {
+      console.log('VI2Parser: Начинаем определение типа устройства');
+      
       // Ищем строку "DeviceType" в hex dump
       const deviceTypeOffset = this.findHexPattern('44 65 76 69 63 65 54 79 70 65 09');
       
       if (deviceTypeOffset === -1) {
-        console.warn('Паттерн DeviceType не найден, используем определение по умолчанию');
+        console.warn('VI2Parser: Паттерн DeviceType не найден, используем определение по умолчанию');
         return this.detectDeviceTypeByFallback();
       }
 
-      console.log('Найден паттерн DeviceType на смещении:', deviceTypeOffset.toString(16));
+      console.log('VI2Parser: Найден паттерн DeviceType на смещении:', deviceTypeOffset.toString(16));
 
       // Читаем значение после паттерна "DeviceType\t"
       const valueOffset = deviceTypeOffset + 11; // длина "DeviceType\t"
       
       if (valueOffset >= this.buffer.byteLength) {
-        console.warn('Смещение значения DeviceType выходит за границы файла');
+        console.warn('VI2Parser: Смещение значения DeviceType выходит за границы файла');
         return this.detectDeviceTypeByFallback();
       }
 
       // Читаем следующий байт как ASCII символ
       const deviceTypeByte = this.view.getUint8(valueOffset);
+      console.log('VI2Parser: Прочитан байт DeviceType:', deviceTypeByte.toString(16), '(ASCII:', String.fromCharCode(deviceTypeByte), ')');
       
       if (deviceTypeByte === 0x31) { // ASCII '1'
-        console.log('Обнаружен DeviceType = 1 (одноканальный)');
+        console.log('VI2Parser: Обнаружен DeviceType = 1 (одноканальный)');
         return 1;
       } else if (deviceTypeByte === 0x32) { // ASCII '2'
-        console.log('Обнаружен DeviceType = 2 (двухканальный)');
+        console.log('VI2Parser: Обнаружен DeviceType = 2 (двухканальный)');
         return 2;
       } else {
-        console.warn('Неожиданное значение DeviceType:', deviceTypeByte.toString(16));
+        console.warn('VI2Parser: Неожиданное значение DeviceType:', deviceTypeByte.toString(16));
         return this.detectDeviceTypeByFallback();
       }
 
     } catch (error) {
-      console.error('Ошибка определения типа устройства:', error);
+      console.error('VI2Parser: Ошибка определения типа устройства:', error);
       return this.detectDeviceTypeByFallback();
     }
   }
@@ -137,26 +140,33 @@ class VI2Parser {
    */
   private detectDeviceTypeByFallback(): number {
     try {
+      console.log('VI2Parser: Запускаем резервный метод определения типа устройства');
+      
       // Пытаемся найти строку "DeviceType" обычным поиском
       const deviceTypeStringOffset = this.findString('DeviceType');
       
       if (deviceTypeStringOffset !== -1) {
+        console.log('VI2Parser: Найдена строка DeviceType на смещении:', deviceTypeStringOffset);
         const valueStart = deviceTypeStringOffset + 11; // длина "DeviceType\t"
         const deviceTypeStr = this.readNullTerminatedString(valueStart);
         const deviceType = parseInt(deviceTypeStr);
         
+        console.log('VI2Parser: Прочитано значение DeviceType:', deviceTypeStr, '->', deviceType);
+        
         if (deviceType === 1 || deviceType === 2) {
-          console.log('Резервный метод: определен DeviceType =', deviceType);
+          console.log('VI2Parser: Резервный метод: определен DeviceType =', deviceType);
           return deviceType;
         }
+      } else {
+        console.log('VI2Parser: Строка DeviceType не найдена');
       }
 
       // Если ничего не найдено, пытаемся определить по структуре данных
-      console.log('Используем эвристический анализ структуры файла');
+      console.log('VI2Parser: Используем эвристический анализ структуры файла');
       return this.detectDeviceTypeByStructure();
 
     } catch (error) {
-      console.error('Ошибка резервного определения типа устройства:', error);
+      console.error('VI2Parser: Ошибка резервного определения типа устройства:', error);
       return 2; // По умолчанию двухканальный
     }
   }
@@ -166,12 +176,17 @@ class VI2Parser {
    */
   private detectDeviceTypeByStructure(): number {
     try {
+      console.log('VI2Parser: Начинаем анализ структуры данных');
+      
       // Анализируем область данных (обычно начинается с 0x0C00)
       const dataStartOffset = 0x0C00;
       
       if (dataStartOffset >= this.buffer.byteLength) {
+        console.log('VI2Parser: Смещение данных выходит за границы файла, используем двухканальный по умолчанию');
         return 2; // По умолчанию
       }
+
+      console.log('VI2Parser: Анализируем данные начиная с смещения:', dataStartOffset);
 
       // Проверяем несколько записей на предмет структуры
       let singleChannelCount = 0;
@@ -188,6 +203,10 @@ class VI2Parser {
         const tempValid = !isNaN(temp) && temp > -50 && temp < 100;
         const humidityValid = !isNaN(humidity) && humidity >= 0 && humidity <= 100;
         
+        if (i < 3) {
+          console.log(`VI2Parser: Запись ${i + 1}: temp=${temp} (valid: ${tempValid}), humidity=${humidity} (valid: ${humidityValid})`);
+        }
+        
         if (tempValid && humidityValid) {
           dualChannelCount++;
         } else if (tempValid && !humidityValid) {
@@ -195,17 +214,19 @@ class VI2Parser {
         }
       }
 
-      console.log('Анализ структуры: одноканальных записей =', singleChannelCount, ', двухканальных =', dualChannelCount);
+      console.log('VI2Parser: Анализ структуры: одноканальных записей =', singleChannelCount, ', двухканальных =', dualChannelCount);
 
       // Если больше одноканальных записей, то это одноканальное устройство
       if (singleChannelCount > dualChannelCount) {
+        console.log('VI2Parser: Определен тип устройства: 1 (одноканальный) по структуре данных');
         return 1;
       } else {
+        console.log('VI2Parser: Определен тип устройства: 2 (двухканальный) по структуре данных');
         return 2;
       }
 
     } catch (error) {
-      console.error('Ошибка анализа структуры:', error);
+      console.error('VI2Parser: Ошибка анализа структуры:', error);
       return 2; // По умолчанию двухканальный
     }
   }

@@ -1,19 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabaseClient';
 import { Contractor, ContractorContact, CreateContractorData, UpdateContractorData, GeocodeResult } from '../types/Contractor';
-
-// Получаем конфигурацию Supabase из переменных окружения
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-let supabase: any = null;
-
-// Инициализация Supabase клиента
-const initSupabase = () => {
-  if (!supabase && supabaseUrl && supabaseAnonKey) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-  }
-  return supabase;
-};
 
 interface DatabaseContractor {
   id: string;
@@ -39,7 +25,7 @@ class ContractorService {
   private supabase: any;
 
   constructor() {
-    this.supabase = initSupabase();
+    this.supabase = supabase;
   }
 
   // Проверка доступности Supabase
@@ -87,8 +73,8 @@ class ContractorService {
 
     try {
       // Проверяем подключение к Supabase
-      if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error('Переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY не настроены');
+      if (!this.supabase) {
+        throw new Error('Supabase клиент не инициализирован');
       }
 
       console.log('Загружаем контрагентов...');
@@ -121,7 +107,7 @@ class ContractorService {
       
       // Проверяем валидность UUID для всех контрагентов
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const invalidContractors = contractorsData?.filter(c => !uuidRegex.test(c.id)) || [];
+      const invalidContractors = contractorsData?.filter((c: any) => !uuidRegex.test(c.id)) || [];
       
       if (invalidContractors.length > 0) {
         console.warn('Найдены контрагенты с некорректными ID:', invalidContractors);
@@ -168,6 +154,71 @@ class ContractorService {
       }));
     } catch (error) {
       console.error('Ошибка при получении контрагентов:', error);
+      throw error;
+    }
+  }
+
+  // Получение контрагента по ID с контактами
+  async getContractorById(contractorId: string): Promise<Contractor> {
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
+    }
+
+    try {
+      console.log('Загружаем контрагента по ID:', contractorId);
+      
+      // Получаем контрагента
+      const { data: contractorData, error: contractorError } = await this.supabase
+        .from('contractors')
+        .select('*')
+        .eq('id', contractorId)
+        .single();
+
+      if (contractorError) {
+        console.error('Ошибка получения контрагента:', contractorError);
+        throw new Error(`Ошибка получения контрагента: ${contractorError.message}`);
+      }
+
+      if (!contractorData) {
+        throw new Error('Контрагент не найден');
+      }
+
+      // Получаем контакты контрагента
+      const { data: contactsData, error: contactsError } = await this.supabase
+        .from('contractor_contacts')
+        .select('*')
+        .eq('contractor_id', contractorId)
+        .order('employee_name', { ascending: true });
+
+      if (contactsError) {
+        console.error('Ошибка получения контактов:', contactsError);
+        // Не прерываем выполнение, просто логируем ошибку
+      }
+
+      // Преобразуем контакты
+      const contacts: ContractorContact[] = (contactsData || []).map((contact: DatabaseContractorContact) => ({
+        id: contact.id,
+        contractorId: contact.contractor_id,
+        employeeName: contact.employee_name,
+        phone: contact.phone || undefined,
+        comment: contact.comment || undefined,
+        createdAt: new Date(contact.created_at)
+      }));
+
+      // Формируем результат
+      return {
+        id: contractorData.id,
+        name: contractorData.name,
+        address: contractorData.address || undefined,
+        latitude: contractorData.latitude || undefined,
+        longitude: contractorData.longitude || undefined,
+        geocodedAt: contractorData.geocoded_at ? new Date(contractorData.geocoded_at) : undefined,
+        createdAt: new Date(contractorData.created_at),
+        updatedAt: new Date(contractorData.updated_at),
+        contacts: contacts
+      };
+    } catch (error) {
+      console.error('Ошибка при получении контрагента:', error);
       throw error;
     }
   }

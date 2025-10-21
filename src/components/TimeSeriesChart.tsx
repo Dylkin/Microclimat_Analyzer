@@ -276,23 +276,25 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     <div className="relative flex flex-col">
       {/* Легенда */}
       {showLegend && dataByFile.size > 1 && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+        <div className="mb-2 p-2 bg-gray-50 rounded-lg">
           <div className="text-sm text-gray-700">
-            <span className="font-medium">Файлы данных: </span>
+            <span className="font-medium">Логгеры: </span>
             {Array.from(dataByFile.keys()).map(fileId => {
-              const shortName = fileId.substring(0, 6);
               const color = fileColors.get(fileId);
               // Проверяем, является ли это внешним датчиком по zoneNumber
               const fileData = data.find(d => d.fileId === fileId);
-              const isExternal = fileData?.zoneNumber === 999;
+              const isExternal = fileData?.zoneNumber === 0;
               const displayColor = isExternal ? '#6B7280' : color;
+              // Используем название логгера, если оно есть, иначе fallback на fileId
+              const displayName = fileData?.loggerName || fileId;
               return (
                 <span key={fileId} className="inline-flex items-center space-x-1 mr-3">
                   <div 
                     className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: displayColor }}
+                    title={`Цвет для ${displayName}`}
                   ></div>
-                  <span>{shortName}{isExternal ? ' (Внешний)' : ''}</span>
+                  <span>{displayName}{isExternal ? ' (Внешний)' : ''}</span>
                 </span>
               );
             })}
@@ -304,7 +306,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
         ref={svgRef}
         width={width}
         height={height}
-        className="border border-gray-200 bg-white cursor-crosshair"
+        className="border border-gray-200 bg-white cursor-crosshair w-full max-w-full"
         onMouseMove={isSelecting ? handleMouseMoveSelection : handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onDoubleClick={handleDoubleClick}
@@ -348,7 +350,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           ))}
 
           {/* Вертикальные линии сетки */}
-          {xScale.ticks(15).map(tick => (
+          {xScale.ticks(8).map(tick => (
             <g key={tick.getTime()}>
               <line
                 x1={xScale(tick)}
@@ -415,7 +417,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             {marker.label && (
               <text
                 x={xScale(new Date(marker.timestamp))}
-                y={-5}
+                y={-10}
                 textAnchor="middle"
                 fontSize="12"
                 fill={marker.color || '#8b5cf6'}
@@ -437,7 +439,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           {Array.from(dataByFile.entries()).map(([fileId, fileData]) => {
             // Проверяем, является ли это внешним датчиком по zoneNumber
             const fileDataPoint = data.find(d => d.fileId === fileId);
-            const isExternal = fileDataPoint?.zoneNumber === 999;
+            const isExternal = fileDataPoint?.zoneNumber === 0;
             let pathColor = dataByFile.size > 1 ? fileColors.get(fileId) : color;
             
             // Для внешнего датчика всегда используем серый цвет
@@ -490,6 +492,8 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             top: tooltip.y - 60,
             transform: tooltip.x > width - 200 ? 'translateX(-100%)' : 'none'
           }}
+          role="tooltip"
+          aria-label="Информация о точке данных"
         >
           <div className="font-semibold">{new Date(tooltip.timestamp).toLocaleString('ru-RU', {
             day: '2-digit',

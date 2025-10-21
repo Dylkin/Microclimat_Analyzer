@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabaseClient';
 import { 
   Project, 
   ProjectStatus,
@@ -8,26 +8,13 @@ import {
   UpdateProjectData 
 } from '../types/Project';
 
-// Получаем конфигурацию Supabase из переменных окружения
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-let supabase: any = null;
-
-// Инициализация Supabase клиента
-const initSupabase = () => {
-  if (!supabase && supabaseUrl && supabaseAnonKey) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-  }
-  return supabase;
-};
-
 interface DatabaseProject {
   id: string;
   name: string;
   description: string | null;
   contractor_id: string;
   contract_number: string | null;
+  contract_date: string | null;
   status: ProjectStatus;
   created_by: string | null;
   created_at: string;
@@ -56,7 +43,7 @@ class ProjectService {
   private supabase: any;
 
   constructor() {
-    this.supabase = initSupabase();
+    this.supabase = supabase;
   }
 
   // UUID validation function
@@ -71,6 +58,65 @@ class ProjectService {
   }
 
   // Получение всех проектов с связанными данными
+  async getProjectById(id: string): Promise<Project> {
+    if (!this.supabase) {
+      throw new Error('Supabase не настроен');
+    }
+
+    try {
+      const { data: projectData, error: projectError } = await this.supabase
+        .from('projects')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (projectError) {
+        console.error('Ошибка получения проекта:', projectError);
+        throw new Error(`Ошибка получения проекта: ${projectError.message}`);
+      }
+
+      if (!projectData) {
+        throw new Error('Проект не найден');
+      }
+
+      // Преобразуем данные из базы в формат Project
+      console.log('ProjectService: Данные проекта из БД:', {
+        id: projectData.id,
+        name: projectData.name,
+        contract_number: projectData.contract_number,
+        contract_date: projectData.contract_date,
+        rawData: projectData
+      });
+
+      const project: Project = {
+        id: projectData.id,
+        name: projectData.name,
+        description: projectData.description,
+        contractorId: projectData.contractor_id,
+        contractNumber: projectData.contract_number,
+        contractDate: projectData.contract_date ? new Date(projectData.contract_date) : undefined,
+        status: projectData.status,
+        createdBy: projectData.created_by,
+        createdAt: new Date(projectData.created_at),
+        updatedAt: new Date(projectData.updated_at),
+        qualificationObjects: [],
+        stageAssignments: []
+      };
+
+      console.log('ProjectService: Преобразованный объект Project:', {
+        id: project.id,
+        name: project.name,
+        contractNumber: project.contractNumber,
+        contractDate: project.contractDate
+      });
+
+      return project;
+    } catch (error) {
+      console.error('Ошибка при получении проекта:', error);
+      throw error;
+    }
+  }
+
   async getAllProjects(): Promise<Project[]> {
     if (!this.supabase) {
       throw new Error('Supabase не настроен');
@@ -78,8 +124,8 @@ class ProjectService {
 
     try {
       // Проверяем подключение к Supabase
-      if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error('Переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY не настроены');
+      if (!this.supabase) {
+        throw new Error('Supabase клиент не инициализирован');
       }
 
       // Получаем проекты
@@ -153,8 +199,8 @@ class ProjectService {
       }
 
       // Создаем карты для быстрого поиска
-      const contractorsMap = new Map(contractorsData?.map(c => [c.id, c.name]) || []);
-      const usersMap = new Map(usersData?.map(u => [u.id, u.full_name]) || []);
+      const contractorsMap = new Map(contractorsData?.map((c: any) => [c.id, c.name]) || []);
+      const usersMap = new Map(usersData?.map((u: any) => [u.id, u.full_name]) || []);
       
       // Группируем объекты квалификации по проектам
       const qualificationObjectsByProject = new Map<string, ProjectQualificationObject[]>();
@@ -190,7 +236,7 @@ class ProjectService {
           projectId: assignment.project_id,
           stage: assignment.stage,
           assignedUserId: assignment.assigned_user_id || undefined,
-          assignedUserName: assignment.assigned_user_id ? usersMap.get(assignment.assigned_user_id) : undefined,
+          assignedUserName: assignment.assigned_user_id ? (usersMap.get(assignment.assigned_user_id) as string | undefined) : undefined,
           assignedAt: new Date(assignment.assigned_at),
           completedAt: assignment.completed_at ? new Date(assignment.completed_at) : undefined,
           notes: assignment.notes || undefined,
@@ -199,21 +245,47 @@ class ProjectService {
       });
 
       // Формируем результат
-      return projectsData.map((project: DatabaseProject) => ({
-        id: project.id,
-        name: project.name,
-        description: project.description || undefined,
-        contractorId: project.contractor_id,
-        contractorName: contractorsMap.get(project.contractor_id),
-        contractNumber: project.contract_number || undefined,
-        status: project.status,
-        createdBy: project.created_by || undefined,
-        createdByName: project.created_by ? usersMap.get(project.created_by) : undefined,
-        createdAt: new Date(project.created_at),
-        updatedAt: new Date(project.updated_at),
-        qualificationObjects: qualificationObjectsByProject.get(project.id) || [],
-        stageAssignments: stageAssignmentsByProject.get(project.id) || []
-      }));
+      const result = projectsData.map((project: DatabaseProject) => {
+        const mappedProject = {
+          id: project.id,
+          name: project.name,
+          description: project.description || undefined,
+          contractorId: project.contractor_id,
+          contractorName: contractorsMap.get(project.contractor_id),
+          contractNumber: project.contract_number || undefined,
+          contractDate: project.contract_date ? new Date(project.contract_date) : undefined,
+          status: project.status,
+          createdBy: project.created_by || undefined,
+          createdByName: project.created_by ? usersMap.get(project.created_by) : undefined,
+          createdAt: new Date(project.created_at),
+          updatedAt: new Date(project.updated_at),
+          qualificationObjects: qualificationObjectsByProject.get(project.id) || [],
+          stageAssignments: stageAssignmentsByProject.get(project.id) || []
+        };
+
+        // Логирование для диагностики конкретного проекта
+        if (project.id === '36b01543-0e89-4954-956a-77a370f78954') {
+          console.log('ProjectService: getAllProjects - маппинг проекта PharmDistri:', {
+            rawProject: {
+              id: project.id,
+              name: project.name,
+              contract_number: project.contract_number,
+              contract_date: project.contract_date
+            },
+            mappedProject: {
+              id: mappedProject.id,
+              name: mappedProject.name,
+              contractNumber: mappedProject.contractNumber,
+              contractDate: mappedProject.contractDate
+            }
+          });
+        }
+
+        return mappedProject;
+      });
+
+      console.log('ProjectService: getAllProjects - загружено проектов:', result.length);
+      return result;
     } catch (error) {
       console.error('Ошибка при получении проектов:', error);
       throw error;
@@ -326,15 +398,25 @@ class ProjectService {
     try {
       const updateData: any = {};
 
-      if (updates.name !== undefined) updateData.name = updates.name;
+      // name не может быть обновлен через UpdateProjectData
       if (updates.description !== undefined) updateData.description = updates.description;
       if (updates.contractNumber !== undefined) updateData.contract_number = updates.contractNumber;
+      if (updates.contractDate !== undefined) updateData.contract_date = updates.contractDate.toISOString().split('T')[0];
       if (updates.status !== undefined) updateData.status = updates.status;
 
-      const { error } = await this.supabase
+      console.log('ProjectService: Обновление проекта', {
+        projectId: id,
+        updates,
+        updateData
+      });
+
+      const { data, error } = await this.supabase
         .from('projects')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .select();
+
+      console.log('ProjectService: Результат обновления', { data, error });
 
       if (error) {
         console.error('Ошибка обновления проекта:', error);
@@ -367,12 +449,13 @@ class ProjectService {
       }
 
       // Возвращаем обновленный проект
-      const projects = await this.getAllProjects();
-      const updatedProject = projects.find(p => p.id === id);
-      
-      if (!updatedProject) {
-        throw new Error('Не удалось найти обновленный проект');
-      }
+      console.log('ProjectService: Загружаем обновленный проект из БД');
+      const updatedProject = await this.getProjectById(id);
+      console.log('ProjectService: Обновленный проект загружен:', {
+        id: updatedProject.id,
+        contractNumber: updatedProject.contractNumber,
+        contractDate: updatedProject.contractDate
+      });
 
       return updatedProject;
     } catch (error) {

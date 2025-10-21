@@ -165,9 +165,26 @@ export class DocxTemplateProcessor {
     chartElement: HTMLElement
   ): Promise<Blob> {
     try {
+      console.log('📄 Чтение файла шаблона:', templateFile.name);
+      console.log('  - Размер файла:', templateFile.size, 'байт');
+      console.log('  - Тип файла:', templateFile.type);
+      console.log('  - Дата изменения:', templateFile.lastModified);
+      
+      // Проверяем, что файл доступен для чтения
+      if (!templateFile || templateFile.size === 0) {
+        throw new Error('Файл шаблона пустой или недоступен');
+      }
       
       // Читаем шаблон как ArrayBuffer
-      const templateBuffer = await templateFile.arrayBuffer();
+      console.log('🔄 Начинаем чтение файла шаблона...');
+      let templateBuffer: ArrayBuffer;
+      try {
+        templateBuffer = await templateFile.arrayBuffer();
+        console.log('✅ Файл шаблона успешно прочитан, размер буфера:', templateBuffer.byteLength, 'байт');
+      } catch (readError) {
+        console.error('❌ Ошибка чтения файла шаблона:', readError);
+        throw new Error(`Не удалось прочитать файл шаблона "${templateFile.name}". Возможно, файл был удален, перемещен или у приложения нет прав на чтение. Попробуйте загрузить шаблон заново.`);
+      }
       
       // Создаем скриншот графика
       console.log('Создаем скриншот графика...');
@@ -179,6 +196,16 @@ export class DocxTemplateProcessor {
 
       // Читаем основной документ
       const documentXml = zip.files['word/document.xml'].asText();
+      
+      // Диагностика: проверяем содержимое документа сразу после загрузки
+      console.log('Document loaded, XML length:', documentXml.length);
+      const hasTableOnLoad = documentXml.includes('{Table}');
+      console.log('{Table} exists on document load:', hasTableOnLoad);
+      
+      // Найдем все плейсхолдеры в загруженном документе
+      const placeholderRegex = /\{[^}]+\}/g;
+      const initialPlaceholders = documentXml.match(placeholderRegex) || [];
+      console.log('Initial placeholders in loaded document:', initialPlaceholders);
       
       // Добавляем изображение в папку word/media
       const imageName = 'chart.png';
@@ -210,6 +237,10 @@ export class DocxTemplateProcessor {
         console.log('Плейсхолдер {chart} успешно заменен на XML изображения');
       }
       
+      // Проверяем, что другие плейсхолдеры не пострадали
+      const hasTableAfterChart = updatedDocumentXml.includes('{Table}');
+      console.log('{Table} placeholder exists after chart replacement:', hasTableAfterChart);
+      
       zip.file('word/document.xml', updatedDocumentXml);
 
       // Обрабатываем другие плейсхолдеры
@@ -218,6 +249,16 @@ export class DocxTemplateProcessor {
 
       // Обрабатываем плейсхолдеры в колонтитулах
       this.processHeaderFooterPlaceholders(zip, data);
+
+      // Валидация DOCX структуры
+      console.log('Валидация DOCX структуры...');
+      const validationErrors = this.validateDocxStructure(zip.files);
+      if (validationErrors.length > 0) {
+        console.warn('DOCX validation errors:', validationErrors);
+        // Не прерываем выполнение, но логируем ошибки
+      } else {
+        console.log('DOCX structure validation passed');
+      }
 
       // Генерируем итоговый DOCX файл
       console.log('Генерируем итоговый DOCX файл...');
@@ -231,6 +272,298 @@ export class DocxTemplateProcessor {
       
       return buffer;
     } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Добавление полного отчета в конец существующего документа
+   */
+  async appendFullReportToExisting(
+    existingReportBlob: Blob,
+    newReportBlob: Blob
+  ): Promise<Blob> {
+    try {
+      console.log('Добавляем полный отчет в конец существующего документа...');
+      
+      // Загружаем существующий отчет
+      const existingZip = new PizZip(await existingReportBlob.arrayBuffer());
+      const existingDocumentXml = existingZip.files['word/document.xml'].asText();
+      
+      // Загружаем новый отчет
+      const newZip = new PizZip(await newReportBlob.arrayBuffer());
+      const newDocumentXml = newZip.files['word/document.xml'].asText();
+      
+      // Извлекаем содержимое body из нового отчета
+      const newBodyContent = this.extractBodyContent(newDocumentXml);
+      
+      // Проверяем, что в новом отчете нет необработанных плейсхолдеров
+      const unprocessedPlaceholders = this.findUnprocessedPlaceholders(newBodyContent);
+      if (unprocessedPlaceholders.length > 0) {
+        console.warn('Обнаружены необработанные плейсхолдеры в новом отчете:', unprocessedPlaceholders);
+        console.warn('Содержимое нового отчета:', newBodyContent.substring(0, 500) + '...');
+      }
+      
+      // Проверяем на наличие нежелательного текста
+      if (newBodyContent.includes('Дополнительный анализ')) {
+        console.warn('Обнаружен нежелательный текст "Дополнительный анализ" в новом отчете');
+        console.warn('Содержимое нового отчета:', newBodyContent.substring(0, 1000) + '...');
+      }
+      
+      // Добавляем содержимое нового отчета в конец существующего
+      const updatedDocumentXml = this.appendBodyContentToDocument(existingDocumentXml, newBodyContent);
+      
+      // Обновляем document.xml в существующем файле
+      existingZip.file('word/document.xml', updatedDocumentXml);
+      
+      // Копируем медиафайлы из нового отчета в существующий
+      await this.copyMediaFiles(newZip, existingZip);
+      
+      // Генерируем обновленный DOCX файл
+      const buffer = existingZip.generate({ 
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
+      
+      console.log('Полный отчет успешно добавлен в конец существующего документа');
+      return buffer;
+      
+    } catch (error) {
+      console.error('Ошибка при добавлении полного отчета:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Извлечение содержимого body из XML документа
+   */
+  private extractBodyContent(documentXml: string): string {
+    const bodyStart = documentXml.indexOf('<w:body>');
+    const bodyEnd = documentXml.lastIndexOf('</w:body>');
+    
+    if (bodyStart === -1 || bodyEnd === -1) {
+      throw new Error('Не удалось найти теги body в документе');
+    }
+    
+    return documentXml.substring(bodyStart + 8, bodyEnd);
+  }
+
+  /**
+   * Добавление содержимого body в конец документа
+   */
+  private appendBodyContentToDocument(documentXml: string, bodyContent: string): string {
+    const bodyEndIndex = documentXml.lastIndexOf('</w:body>');
+    if (bodyEndIndex === -1) {
+      throw new Error('Не удалось найти закрывающий тег body в документе');
+    }
+    
+    const beforeBody = documentXml.substring(0, bodyEndIndex);
+    const afterBody = documentXml.substring(bodyEndIndex);
+    
+    return beforeBody + bodyContent + afterBody;
+  }
+
+  /**
+   * Поиск необработанных плейсхолдеров в содержимом
+   */
+  private findUnprocessedPlaceholders(content: string): string[] {
+    const placeholderPattern = /\{[^}]+\}/g;
+    const matches = content.match(placeholderPattern);
+    return matches || [];
+  }
+
+  /**
+   * Копирование медиафайлов из нового отчета в существующий
+   */
+  private async copyMediaFiles(sourceZip: any, targetZip: any): Promise<void> {
+    try {
+      // Получаем список всех файлов в исходном архиве
+      const sourceFiles = Object.keys(sourceZip.files);
+      
+      // Копируем медиафайлы
+      for (const fileName of sourceFiles) {
+        if (fileName.startsWith('word/media/')) {
+          const file = sourceZip.files[fileName];
+          if (file && !file.dir) {
+            // Генерируем уникальное имя файла
+            const timestamp = Date.now();
+            const fileExtension = fileName.split('.').pop();
+            const newFileName = `word/media/image_${timestamp}.${fileExtension}`;
+            
+            // Копируем файл
+            targetZip.file(newFileName, file.asArrayBuffer());
+            console.log(`Скопирован медиафайл: ${fileName} -> ${newFileName}`);
+          }
+        }
+      }
+      
+      console.log('Медиафайлы успешно скопированы');
+    } catch (error) {
+      console.error('Ошибка при копировании медиафайлов:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Создание нового отчета с дополнительным контентом из предыдущих данных
+   */
+  async createNewReportWithAppendedContent(
+    templateFile: File,
+    newData: TemplateReportData,
+    chartElement: HTMLElement,
+    previousReportData: any
+  ): Promise<Blob> {
+    try {
+      console.log('Создаем новый отчет с дополнительным контентом...');
+      
+      // Сначала создаем обычный новый отчет
+      const newReportBlob = await this.processTemplate(templateFile, newData, chartElement);
+      
+      // Если есть предыдущие данные, добавляем их в конец
+      if (previousReportData && previousReportData.analysisResults) {
+        console.log('Добавляем данные из предыдущего отчета...');
+        
+        // Загружаем созданный отчет
+        const zip = new PizZip(await newReportBlob.arrayBuffer());
+        const documentXml = zip.files['word/document.xml'].asText();
+        
+        // Создаем дополнительный контент из предыдущих данных
+        const additionalContent = await this.createAdditionalContentFromPreviousData(previousReportData);
+        
+        // Добавляем дополнительный контент в конец документа
+        const updatedDocumentXml = this.appendContentToDocument(documentXml, additionalContent);
+        
+        // Обновляем document.xml
+        zip.file('word/document.xml', updatedDocumentXml);
+        
+        // Генерируем обновленный DOCX файл
+        const buffer = zip.generate({ 
+          type: 'blob',
+          compression: 'DEFLATE',
+          compressionOptions: { level: 6 }
+        });
+        
+        console.log('Новый отчет с дополнительным контентом создан успешно');
+        return buffer;
+      }
+      
+      return newReportBlob;
+      
+    } catch (error) {
+      console.error('Ошибка при создании нового отчета с дополнительным контентом:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Создание дополнительного контента из предыдущих данных
+   */
+  private async createAdditionalContentFromPreviousData(previousData: any): Promise<string> {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('ru-RU');
+    const timeStr = now.toLocaleTimeString('ru-RU');
+    
+    // Создаем заголовок для дополнительного раздела
+    const sectionHeader = `
+      <w:p>
+        <w:pPr>
+          <w:pStyle w:val="Heading1"/>
+          <w:spacing w:before="240" w:after="120"/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:b/>
+            <w:sz w:val="28"/>
+            <w:szCs w:val="28"/>
+          </w:rPr>
+          <w:t>Предыдущий анализ (${dateStr} ${timeStr})</w:t>
+        </w:r>
+      </w:p>`;
+
+    // Создаем таблицу из предыдущих данных
+    const previousTable = this.createResultsTableXml(previousData.analysisResults, previousData.dataType);
+    
+    // Создаем выводы если есть
+    let previousConclusions = '';
+    if (previousData.conclusions && previousData.conclusions.trim()) {
+      previousConclusions = `
+        <w:p>
+          <w:pPr>
+            <w:spacing w:before="240" w:after="120"/>
+          </w:pPr>
+          <w:r>
+            <w:rPr>
+              <w:b/>
+              <w:sz w:val="24"/>
+              <w:szCs w:val="24"/>
+            </w:rPr>
+            <w:t>Предыдущие выводы:</w:t>
+          </w:r>
+        </w:p>
+        <w:p>
+          <w:pPr>
+            <w:spacing w:before="0" w:after="240"/>
+          </w:pPr>
+          <w:r>
+            <w:t>${this.escapeXml(previousData.conclusions)}</w:t>
+          </w:r>
+        </w:p>`;
+    }
+
+    return sectionHeader + previousTable + previousConclusions;
+  }
+
+  /**
+   * Добавление данных в конец существующего DOCX файла
+   */
+  async appendToExistingDocx(
+    existingDocxBlob: Blob,
+    newData: TemplateReportData,
+    chartElement: HTMLElement
+  ): Promise<Blob> {
+    try {
+      console.log('Добавляем данные в существующий DOCX файл...');
+      
+      // Загружаем существующий DOCX файл
+      const existingZip = new PizZip(await existingDocxBlob.arrayBuffer());
+      
+      // Создаем скриншот нового графика
+      console.log('Создаем скриншот нового графика...');
+      const chartImage = await this.createRotatedScreenshot(chartElement);
+      
+      // Добавляем новое изображение в существующий файл
+      const imageId = `chart_${Date.now()}`;
+      const imageFilename = `word/media/${imageId}.png`;
+      existingZip.file(imageFilename, chartImage);
+      
+      // Получаем текущий document.xml
+      const currentDocumentXml = existingZip.files['word/document.xml'].asText();
+      
+      // Создаем новый контент для добавления
+      const newContent = await this.createNewContent(newData, imageId);
+      
+      // Добавляем новый контент в конец документа
+      const updatedDocumentXml = this.appendContentToDocument(currentDocumentXml, newContent);
+      
+      // Обновляем document.xml
+      existingZip.file('word/document.xml', updatedDocumentXml);
+      
+      // Обновляем связи
+      await this.updateDocumentRelations(existingZip, imageId);
+      
+      // Генерируем обновленный DOCX файл
+      const buffer = existingZip.generate({ 
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
+      
+      console.log('DOCX файл обновлен успешно, размер:', buffer.size, 'байт');
+      return buffer;
+      
+    } catch (error) {
+      console.error('Ошибка при добавлении в существующий DOCX:', error);
       throw error;
     }
   }
@@ -475,11 +808,23 @@ export class DocxTemplateProcessor {
     // Более надежная замена плейсхолдера с учетом возможных разрывов в XML
     let result = documentXml;
     
+    // Диагностика: проверяем наличие {Table} до нормализации
+    const hasTableBefore = result.includes('{Table}');
+    console.log('{Table} exists before chart replacement:', hasTableBefore);
+    
     // Сначала нормализуем возможные разбитые плейсхолдеры
     result = this.normalizePlaceholders(result);
     
+    // Диагностика: проверяем наличие {Table} после нормализации
+    const hasTableAfterNormalization = result.includes('{Table}');
+    console.log('{Table} exists after normalization:', hasTableAfterNormalization);
+    
     // Заменяем плейсхолдер на XML изображения
     result = result.replace(/{chart}/g, imageXml);
+    
+    // Диагностика: проверяем наличие {Table} после замены chart
+    const hasTableAfterChart = result.includes('{Table}');
+    console.log('{Table} exists after chart replacement:', hasTableAfterChart);
     
     console.log('Плейсхолдер {chart} заменен на XML изображения');
     return result;
@@ -494,8 +839,17 @@ export class DocxTemplateProcessor {
    console.log('Processing text placeholders, data.dataType:', data.dataType);
     let result = documentXml;
 
+    // Диагностика: найдем все плейсхолдеры в документе до обработки
+    const placeholderRegex = /\{[^}]+\}/g;
+    const initialPlaceholders = documentXml.match(placeholderRegex) || [];
+    console.log('Initial placeholders in document:', initialPlaceholders);
+
     // Сначала нормализуем XML, объединяя разбитые плейсхолдеры
     result = this.normalizePlaceholders(result);
+    
+    // Диагностика: найдем все плейсхолдеры после нормализации
+    const normalizedPlaceholders = result.match(placeholderRegex) || [];
+    console.log('Placeholders after normalization:', normalizedPlaceholders);
 
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
@@ -504,7 +858,7 @@ export class DocxTemplateProcessor {
       result = result.replace(/{Result}/g, '');
     }
 
-    // Обработка плейсхолдера {Object} для объекта исследования
+    // Обработка плейсхолдера {Object} для наименования объекта квалификации
     if (data.researchObject) {
       result = result.replace(/{Object}/g, this.escapeXml(data.researchObject));
     } else {
@@ -548,10 +902,38 @@ export class DocxTemplateProcessor {
       result = result.replace(/{Executor}/g, '');
     }
     
-    // Обработка плейсхолдера {TestDate} для даты испытания
+    // Обработка плейсхолдера {TestDate} для даты испытания (только дата без времени)
     if (data.testDate) {
-      console.log('Replacing {TestDate} with:', data.testDate);
-      result = result.replace(/{TestDate}/g, this.escapeXml(data.testDate));
+      console.log('🔍 DEBUG TestDate processing:');
+      console.log('  - Original data.testDate:', data.testDate);
+      console.log('  - data.testDate type:', typeof data.testDate);
+      console.log('  - data.testDate length:', data.testDate.length);
+      
+      // Убеждаемся, что передается только дата без времени
+      let dateOnly = data.testDate;
+      
+      // Если testDate содержит время, извлекаем только дату
+      if (dateOnly.includes(' ')) {
+        dateOnly = dateOnly.split(' ')[0];
+      }
+      
+      // Если это ISO строка, конвертируем в локальную дату
+      if (dateOnly.includes('T') || dateOnly.includes('-')) {
+        try {
+          const date = new Date(dateOnly);
+          if (!isNaN(date.getTime())) {
+            dateOnly = date.toLocaleDateString('ru-RU');
+          }
+        } catch (error) {
+          console.warn('Ошибка парсинга даты:', error);
+        }
+      }
+      
+      console.log('  - Final dateOnly:', dateOnly);
+      console.log('  - dateOnly type:', typeof dateOnly);
+      console.log('  - dateOnly length:', dateOnly.length);
+      console.log('Replacing {TestDate} with date only:', dateOnly);
+      result = result.replace(/{TestDate}/g, this.escapeXml(dateOnly));
     } else {
       console.log('testDate is empty or undefined:', data.testDate, 'replacing {TestDate} with empty string');
       result = result.replace(/{TestDate}/g, '');
@@ -575,7 +957,30 @@ export class DocxTemplateProcessor {
       result = result.replace(/{ReportDate}/g, '');
     }
     
-    // Обработка плейсхолдера таблицы результатов
+    // Обработка плейсхолдера {title} для заголовка отчета
+    if (data.title) {
+      console.log('Replacing {title} with:', data.title);
+      result = result.replace(/{title}/g, this.escapeXml(data.title));
+    } else {
+      console.log('title is empty or undefined:', data.title, 'replacing {title} with empty string');
+      result = result.replace(/{title}/g, '');
+    }
+    
+    // Обработка плейсхолдера {date} для даты создания отчета
+    if (data.date) {
+      console.log('Replacing {date} with:', data.date);
+      result = result.replace(/{date}/g, this.escapeXml(data.date));
+    } else {
+      console.log('date is empty or undefined:', data.date, 'replacing {date} with empty string');
+      result = result.replace(/{date}/g, '');
+    }
+    
+    // Исправляем неправильные плейсхолдеры с двойными скобками перед обработкой
+    result = result.replace(/\{\{Table\}\}/g, '{Table}');
+    result = result.replace(/\{\{Table\}/g, '{Table}');
+    result = result.replace(/\{Table\}\}/g, '{Table}');
+    
+    // Обработка плейсхолдера {Table}
     result = this.processTablePlaceholder(result, data);
     
     console.log('Final result after placeholder processing contains {NameTest}:', result.includes('{NameTest}'));
@@ -584,61 +989,171 @@ export class DocxTemplateProcessor {
     console.log('Final result after placeholder processing contains {TestDate}:', result.includes('{TestDate}'));
     console.log('Final result after placeholder processing contains {ReportNo}:', result.includes('{ReportNo}'));
     console.log('Final result after placeholder processing contains {ReportDate}:', result.includes('{ReportDate}'));
+    
+    // Финальная проверка XML валидности
+    if (result.includes('&')) {
+      const unescapedAmpersands = result.match(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g);
+      if (unescapedAmpersands && unescapedAmpersands.length > 0) {
+        console.warn('Final XML contains unescaped ampersands:', unescapedAmpersands);
+        // Исправляем неэкранированные амперсанды
+        result = result.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;');
+        console.log('Fixed unescaped ampersands in final XML');
+      }
+    }
+    
     return result;
   }
 
   /**
-   * Нормализация плейсхолдеров - объединение разбитых плейсхолдеров
+   * Нормализация плейсхолдеров - исправление поврежденных плейсхолдеров
    */
   private normalizePlaceholders(xml: string): string {
-    // Список плейсхолдеров для нормализации
-    const placeholders = [
-      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'resultsTable', 'Limits', 'Executor', 'TestDate', 'ReportNo', 'ReportDate'
-    ];
+    console.log('Starting placeholder normalization...');
     
     let result = xml;
     
+    // 1. Исправляем поврежденные плейсхолдеры с XML тегами
+    // Удаляем XML теги вокруг плейсхолдеров
+    result = result.replace(
+      /<w:t[^>]*>(\s*{([^}]+)}\s*)<\/w:t>/g, 
+      '<w:t>{$2}</w:t>'
+    );
+    
+    // 2. Исправляем плейсхолдеры, разбитые XML тегами
+    const placeholders = [
+      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'Table', 'Limits', 'Executor', 'TestDate', 'ReportNo', 'ReportDate', 'title', 'date'
+    ];
+    
     placeholders.forEach(placeholder => {
-      // Более простой подход - ищем разбитые плейсхолдеры
-      const simpleRegex = new RegExp(`\\{[^}]*${placeholder}[^}]*\\}`, 'gi');
-      result = result.replace(simpleRegex, `{${placeholder}}`);
-      
-      // Также обрабатываем случаи с XML тегами внутри плейсхолдера
-      const complexRegex = new RegExp(
-        `\\{(?:<[^>]*>)*${placeholder.split('').map(char => 
+      // Ищем плейсхолдеры, разбитые XML тегами
+      const brokenPattern = new RegExp(
+        `\\{[^}]*${placeholder.split('').map(char => 
           `${char}(?:<[^>]*>)*`
-        ).join('')}(?:<[^>]*>)*\\}`,
+        ).join('')}(?:<[^>]*>)*[^}]*\\}`,
         'gi'
       );
-      result = result.replace(complexRegex, `{${placeholder}}`);
+      result = result.replace(brokenPattern, `{${placeholder}}`);
+      
+      // Ищем простые разбитые плейсхолдеры
+      const simplePattern = new RegExp(`\\{[^}]*${placeholder}[^}]*\\}`, 'gi');
+      result = result.replace(simplePattern, `{${placeholder}}`);
     });
     
-    console.log('Нормализация плейсхолдеров завершена');
+    // 3. Специальная обработка для Table
+    // Ищем случаи, где Table может быть в XML тегах без фигурных скобок
+    const tableInXml = /<w:t[^>]*>Table<\/w:t>/gi;
+    result = result.replace(tableInXml, '<w:t>{Table}</w:t>');
+    
+    // Ищем случаи, где Table может быть просто "Table" без фигурных скобок
+    const tableNoBrackets = /(?<!\{)Table(?!\})/gi;
+    result = result.replace(tableNoBrackets, '{Table}');
+    
+    // 4. Исправляем двойные скобки
+    result = result.replace(/\{\{([^}]+)\}\}/g, '{$1}');
+    result = result.replace(/\{\{([^}]+)\}/g, '{$1}');
+    result = result.replace(/\{([^}]+)\}\}/g, '{$1}');
+    
+    // 5. Очищаем пробелы вокруг плейсхолдеров
+    result = result.replace(/\{\s+([^}]+)\s+\}/g, '{$1}');
+    
+    console.log('Placeholder normalization completed');
     return result;
   }
 
   /**
-   * Обработка плейсхолдера {resultsTable} для вставки таблицы результатов анализа
+   * Обработка плейсхолдера {Table} для вставки таблицы результатов анализа
    */
   private processTablePlaceholder(documentXml: string, data: TemplateReportData): string {
-    // Проверяем наличие плейсхолдера {resultsTable}
-    if (!documentXml.includes('{resultsTable}')) {
+    console.log('Processing {Table} placeholder...');
+    console.log('Document contains {Table}:', documentXml.includes('{Table}'));
+    console.log('Analysis results count:', data.analysisResults?.length || 0);
+    
+    // Диагностика: найдем все плейсхолдеры в документе
+    const placeholderRegex = /\{[^}]+\}/g;
+    const foundPlaceholders = documentXml.match(placeholderRegex) || [];
+    console.log('Found placeholders in document:', foundPlaceholders);
+    
+    // Проверяем наличие плейсхолдера {Table} (включая разбитые варианты)
+    let hasTable = documentXml.includes('{Table}');
+
+    // Если не найден, попробуем найти разбитые варианты
+    if (!hasTable) {
+      // Ищем разбитые плейсхолдеры
+      const tableVariants = [
+        '{Table}',
+        'Table'
+      ];
+
+      for (const variant of tableVariants) {
+        if (documentXml.includes(variant)) {
+          console.log(`Found potential Table variant: ${variant}`);
+          hasTable = true;
+          break;
+        }
+      }
+
+      // Также проверим, есть ли части плейсхолдера в разных местах
+      const hasTableText = documentXml.includes('Table');
+      console.log('Contains "Table":', hasTableText);
+    }
+
+    if (!hasTable) {
+      console.log('{Table} placeholder not found in document');
+      console.log('Available placeholders:', foundPlaceholders);
+
+      // Дополнительная диагностика: покажем фрагменты документа, содержащие "Table"
+      const tableMatches = documentXml.match(/[^<]*Table[^<]*/gi) || [];
+      console.log('Document fragments containing "Table":', tableMatches.slice(0, 5));
+
       return documentXml;
     }
 
     // Создаем XML структуру таблицы
     const tableXml = this.createResultsTableXml(data.analysisResults, data.dataType);
+    console.log('Generated table XML length:', tableXml.length);
+    console.log('Table XML preview:', tableXml.substring(0, 200) + '...');
     
     // Заменяем плейсхолдер на таблицу
-    return documentXml.replace(/{resultsTable}/g, tableXml);
+    const result = documentXml.replace(/{Table}/g, tableXml);
+    console.log('{Table} placeholder replaced successfully');
+    
+    // Проверяем, что XML валиден
+    if (result.includes('&')) {
+      console.warn('XML contains ampersands, checking for unescaped ones...');
+      // Проверяем наличие неэкранированных амперсандов
+      const unescapedAmpersands = result.match(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g);
+      if (unescapedAmpersands && unescapedAmpersands.length > 0) {
+        console.warn('Found unescaped ampersands:', unescapedAmpersands);
+        // Исправляем неэкранированные амперсанды
+        const fixedResult = result.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;');
+        console.log('Fixed unescaped ampersands');
+        return fixedResult;
+      } else {
+        console.log('All ampersands are properly escaped');
+      }
+    }
+    
+    return result;
   }
 
   /**
    * Создание XML структуры таблицы результатов анализа
    */
-  private createResultsTableXml(results: any[], dataType: 'temperature' | 'humidity'): string {
+  public createResultsTableXml(results: any[], dataType: 'temperature' | 'humidity'): string {
+    console.log('Creating results table XML...');
+    console.log('Results count:', results?.length || 0);
+    console.log('DataType:', dataType);
+    console.log('Results data:', results);
+    
+    if (!results || results.length === 0) {
+      console.log('No results to create table');
+      return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
+    }
+    
     // Находим глобальные минимальные и максимальные значения (исключая внешние датчики)
     const nonExternalResults = results.filter(result => !result.isExternal);
+    console.log('Non-external results count:', nonExternalResults.length);
+    
     const minTempValues = nonExternalResults
       .map(result => parseFloat(result.minTemp))
       .filter(val => !isNaN(val));
@@ -648,6 +1163,22 @@ export class DocxTemplateProcessor {
     
     const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
     const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
+    
+    console.log('Global min temp:', globalMinTemp);
+    console.log('Global max temp:', globalMaxTemp);
+
+    // Функция для экранирования XML символов
+    const escapeXml = (text: string): string => {
+      if (!text) return '';
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;')
+        .replace(/°C/g, '&#176;C') // Специальная обработка для °C
+        .replace(/\u00B0/g, '&#176;'); // Символ градуса
+    };
 
     // Заголовок таблицы
     const headerRow = `
@@ -805,7 +1336,7 @@ export class DocxTemplateProcessor {
             </w:tcPr>
             <w:p>
               <w:pPr><w:jc w:val="center"/></w:pPr>
-              <w:r><w:t>${this.escapeXml(result.zoneNumber.toString())}</w:t></w:r>
+              <w:r><w:t>${escapeXml(result.zoneNumber.toString() === '0' ? 'Внешний' : result.zoneNumber.toString())}</w:t></w:r>
             </w:p>
           </w:tc>
           <w:tc>
@@ -819,7 +1350,7 @@ export class DocxTemplateProcessor {
             </w:tcPr>
             <w:p>
               <w:pPr><w:jc w:val="center"/></w:pPr>
-              <w:r><w:t>${this.escapeXml(result.measurementLevel.toString())}</w:t></w:r>
+              <w:r><w:t>${escapeXml(result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ','))}</w:t></w:r>
             </w:p>
           </w:tc>
           <w:tc>
@@ -833,7 +1364,7 @@ export class DocxTemplateProcessor {
             </w:tcPr>
             <w:p>
               <w:pPr><w:jc w:val="center"/></w:pPr>
-              <w:r><w:t>${this.escapeXml(result.loggerName)}</w:t></w:r>
+              <w:r><w:t>${escapeXml(result.loggerName)}</w:t></w:r>
             </w:p>
           </w:tc>
           <w:tc>
@@ -847,7 +1378,7 @@ export class DocxTemplateProcessor {
             </w:tcPr>
             <w:p>
               <w:pPr><w:jc w:val="center"/></w:pPr>
-              <w:r><w:t>${this.escapeXml(result.serialNumber)}</w:t></w:r>
+              <w:r><w:t>${escapeXml(result.serialNumber)}</w:t></w:r>
             </w:p>
           </w:tc>
           <w:tc>
@@ -862,7 +1393,7 @@ export class DocxTemplateProcessor {
             </w:tcPr>
             <w:p>
               <w:pPr><w:jc w:val="center"/></w:pPr>
-              <w:r><w:t>${this.escapeXml(result.minTemp.toString())}</w:t></w:r>
+              <w:r><w:t>${escapeXml(result.minTemp.toString())}</w:t></w:r>
             </w:p>
           </w:tc>
           <w:tc>
@@ -877,7 +1408,7 @@ export class DocxTemplateProcessor {
             </w:tcPr>
             <w:p>
               <w:pPr><w:jc w:val="center"/></w:pPr>
-              <w:r><w:t>${this.escapeXml(result.maxTemp.toString())}</w:t></w:r>
+              <w:r><w:t>${escapeXml(result.maxTemp.toString())}</w:t></w:r>
             </w:p>
           </w:tc>
           <w:tc>
@@ -891,7 +1422,7 @@ export class DocxTemplateProcessor {
             </w:tcPr>
             <w:p>
               <w:pPr><w:jc w:val="center"/></w:pPr>
-              <w:r><w:t>${this.escapeXml(result.avgTemp.toString())}</w:t></w:r>
+              <w:r><w:t>${escapeXml(result.avgTemp.toString())}</w:t></w:r>
             </w:p>
           </w:tc>
           <w:tc>
@@ -906,14 +1437,14 @@ export class DocxTemplateProcessor {
             </w:tcPr>
             <w:p>
               <w:pPr><w:jc w:val="center"/></w:pPr>
-              <w:r><w:t>${this.escapeXml(result.meetsLimits)}</w:t></w:r>
+              <w:r><w:t>${escapeXml(result.meetsLimits)}</w:t></w:r>
             </w:p>
           </w:tc>
         </w:tr>`;
     }).join('');
 
     // Полная структура таблицы
-    return `
+    const fullTableXml = `
       <w:tbl>
         <w:tblPr>
           <w:tblW w:w="0" w:type="auto"/>
@@ -925,20 +1456,38 @@ export class DocxTemplateProcessor {
             <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
             <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
           </w:tblBorders>
+          <w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>
         </w:tblPr>
         <w:tblGrid>
-          <w:gridCol w:w="1000"/>
-          <w:gridCol w:w="1200"/>
-          <w:gridCol w:w="1000"/>
-          <w:gridCol w:w="1200"/>
-          <w:gridCol w:w="1000"/>
-          <w:gridCol w:w="1000"/>
-          <w:gridCol w:w="1000"/>
-          <w:gridCol w:w="1200"/>
+          <w:gridCol w:w="2000"/>
+          <w:gridCol w:w="2000"/>
+          <w:gridCol w:w="2000"/>
+          <w:gridCol w:w="2000"/>
+          <w:gridCol w:w="2000"/>
+          <w:gridCol w:w="2000"/>
+          <w:gridCol w:w="2000"/>
+          <w:gridCol w:w="2000"/>
         </w:tblGrid>
         ${headerRow}
         ${dataRows}
       </w:tbl>`;
+    
+    console.log('Generated full table XML length:', fullTableXml.length);
+    console.log('Table XML ends with:', fullTableXml.substring(fullTableXml.length - 100));
+    
+    // Дополнительная проверка XML валидности
+    if (fullTableXml.includes('&')) {
+      const unescapedAmpersands = fullTableXml.match(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g);
+      if (unescapedAmpersands && unescapedAmpersands.length > 0) {
+        console.warn('Table XML contains unescaped ampersands:', unescapedAmpersands);
+        // Исправляем неэкранированные амперсанды
+        const fixedXml = fullTableXml.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;');
+        console.log('Fixed unescaped ampersands in table XML');
+        return fixedXml;
+      }
+    }
+    
+    return fullTableXml;
   }
 
   /**
@@ -1020,13 +1569,260 @@ export class DocxTemplateProcessor {
   /**
    * Экранирование XML символов
    */
-  private escapeXml(text: string): string {
+  public escapeXml(text: string): string {
+    if (!text) return '';
     return text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+      .replace(/'/g, '&apos;')
+      .replace(/°C/g, '&#176;C') // Специальная обработка для °C
+      .replace(/\u00B0/g, '&#176;'); // Символ градуса
+  }
+
+  /**
+   * Исправление кодировки и специальных символов в XML
+   */
+  private fixXmlEncoding(xml: string): string {
+    return xml
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
+      .replace(/°C/g, '&#176;C') // Специальная обработка для °C
+      .replace(/\u00B0/g, '&#176;'); // Символ градуса
+  }
+
+  /**
+   * Создание нового контента для добавления в существующий документ
+   */
+  private async createNewContent(data: TemplateReportData, imageId: string): Promise<string> {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('ru-RU');
+    const timeStr = now.toLocaleTimeString('ru-RU');
+    
+    // Создаем заголовок для нового раздела
+    const sectionHeader = `
+      <w:p>
+        <w:pPr>
+          <w:pStyle w:val="Heading1"/>
+          <w:spacing w:before="240" w:after="120"/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:b/>
+            <w:sz w:val="28"/>
+            <w:szCs w:val="28"/>
+          </w:rPr>
+          <w:t>Дополнительный анализ от ${dateStr} ${timeStr}</w:t>
+        </w:r>
+      </w:p>`;
+
+    // Создаем изображение графика
+    const chartImage = `
+      <w:p>
+        <w:pPr>
+          <w:spacing w:before="120" w:after="120"/>
+          <w:jc w:val="center"/>
+        </w:pPr>
+        <w:r>
+          <w:drawing>
+            <wp:inline distT="0" distB="0" distL="0" distR="0">
+              <wp:extent cx="9144000" cy="6858000"/>
+              <wp:effectExtent l="0" t="0" r="0" b="0"/>
+              <wp:docPr id="1" name="Chart"/>
+              <wp:cNvGraphicFramePr/>
+              <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                    <pic:nvPicPr>
+                      <pic:cNvPr id="1" name="Chart"/>
+                      <pic:cNvPicPr/>
+                    </pic:nvPicPr>
+                    <pic:blipFill>
+                      <a:blip r:embed="rId${imageId}"/>
+                      <a:stretch>
+                        <a:fillRect/>
+                      </a:stretch>
+                    </pic:blipFill>
+                    <pic:spPr>
+                      <a:xfrm>
+                        <a:off x="0" y="0"/>
+                        <a:ext cx="9144000" cy="6858000"/>
+                      </a:xfrm>
+                      <a:prstGeom prst="rect">
+                        <a:avLst/>
+                      </a:prstGeom>
+                    </pic:spPr>
+                  </pic:pic>
+                </a:graphicData>
+              </a:graphic>
+            </wp:inline>
+          </w:drawing>
+        </w:r>
+      </w:p>`;
+
+    // Создаем таблицу результатов анализа
+    const resultsTable = this.createResultsTableXml(data.analysisResults, data.dataType);
+    
+    // Создаем выводы если есть
+    let conclusions = '';
+    if (data.conclusions && data.conclusions.trim()) {
+      conclusions = `
+        <w:p>
+          <w:pPr>
+            <w:spacing w:before="240" w:after="120"/>
+          </w:pPr>
+          <w:r>
+            <w:rPr>
+              <w:b/>
+              <w:sz w:val="24"/>
+              <w:szCs w:val="24"/>
+            </w:rPr>
+            <w:t>Выводы:</w:t>
+          </w:r>
+        </w:p>
+        <w:p>
+          <w:pPr>
+            <w:spacing w:before="0" w:after="240"/>
+          </w:pPr>
+          <w:r>
+            <w:t>${this.escapeXml(data.conclusions)}</w:t>
+          </w:r>
+        </w:p>`;
+    }
+
+    return sectionHeader + chartImage + resultsTable + conclusions;
+  }
+
+
+  /**
+   * Обновление связей документа для нового изображения
+   */
+  private async updateDocumentRelations(zip: any, imageId: string): Promise<void> {
+    try {
+      // Получаем текущие связи
+      const relsFile = 'word/_rels/document.xml.rels';
+      let relsXml = '';
+      
+      if (zip.files[relsFile]) {
+        relsXml = zip.files[relsFile].asText();
+      } else {
+        // Создаем файл связей если его нет
+        relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`;
+      }
+      
+      // Добавляем новую связь для изображения
+      const newRelationship = `  <Relationship Id="rId${imageId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageId}.png"/>
+`;
+      
+      // Вставляем перед закрывающим тегом
+      const insertIndex = relsXml.lastIndexOf('</Relationships>');
+      if (insertIndex !== -1) {
+        relsXml = relsXml.substring(0, insertIndex) + newRelationship + relsXml.substring(insertIndex);
+      }
+      
+      zip.file(relsFile, relsXml);
+      console.log('Связи документа обновлены для изображения:', imageId);
+      
+    } catch (error) {
+      console.error('Ошибка обновления связей документа:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Валидация DOCX структуры
+   */
+  private validateDocxStructure(files: any): string[] {
+    const requiredFiles = [
+      '[Content_Types].xml',
+      'word/document.xml',
+      'word/_rels/document.xml.rels'
+    ];
+    
+    const errors: string[] = [];
+    
+    // Проверяем наличие обязательных файлов
+    requiredFiles.forEach(file => {
+      if (!files[file]) {
+        errors.push(`Missing required file: ${file}`);
+      }
+    });
+    
+    // Проверка XML валидности
+    if (files['word/document.xml']) {
+      try {
+        const xmlContent = files['word/document.xml'].asText();
+        
+        // Проверяем на неэкранированные амперсанды
+        const unescapedAmpersands = xmlContent.match(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g);
+        if (unescapedAmpersands && unescapedAmpersands.length > 0) {
+          errors.push(`Invalid XML: unescaped ampersands found: ${unescapedAmpersands.join(', ')}`);
+        }
+        
+        // Проверяем на неэкранированные угловые скобки
+        if (xmlContent.includes('<') && !xmlContent.includes('&lt;')) {
+          const unescapedBrackets = xmlContent.match(/<(?![^>]*>)/g);
+          if (unescapedBrackets && unescapedBrackets.length > 0) {
+            errors.push('Invalid XML: unescaped angle brackets found');
+          }
+        }
+        
+      } catch (e) {
+        errors.push('Failed to parse document.xml');
+      }
+    }
+    
+    return errors;
+  }
+
+  /**
+   * Анализ содержимого DOCX шаблона для диагностики плейсхолдеров
+   */
+  async analyzeTemplateContent(templateFile: File): Promise<{ placeholders: string[]; hasTable: boolean; content: string }> {
+    try {
+      const zip = new PizZip(await templateFile.arrayBuffer());
+      const documentXml = zip.files['word/document.xml'].asText();
+      
+      console.log('Analyzing template content...');
+      console.log('Document XML length:', documentXml.length);
+      
+      // Найдем все плейсхолдеры
+      const placeholderRegex = /\{[^}]+\}/g;
+      const placeholders = documentXml.match(placeholderRegex) || [];
+      console.log('Found placeholders in template:', placeholders);
+      
+      // Проверим наличие Table в различных формах
+      const hasTableExact = documentXml.includes('{Table}');
+      const hasTableNoBrackets = documentXml.includes('Table');
+      
+      console.log('{Table} exact match:', hasTableExact);
+      console.log('Table without brackets:', hasTableNoBrackets);
+      
+      const hasTable = hasTableExact || hasTableNoBrackets;
+      
+      // Дополнительная диагностика: найдем фрагменты с "Table"
+      const tableMatches = documentXml.match(/[^<]*Table[^<]*/gi) || [];
+      console.log('Fragments containing "Table":', tableMatches.slice(0, 3));
+      
+      return {
+        placeholders,
+        hasTable,
+        content: documentXml.substring(0, 1000) // Первые 1000 символов для анализа
+      };
+    } catch (error) {
+      console.error('Ошибка анализа шаблона:', error);
+      return {
+        placeholders: [],
+        hasTable: false,
+        content: ''
+      };
+    }
   }
 
   /**
