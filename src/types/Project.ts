@@ -1,8 +1,7 @@
 export type ProjectStatus = 
   | 'contract_negotiation'
-  | 'protocol_preparation'
   | 'testing_execution'
-  | 'report_preparation'
+  | 'creating_report'
   | 'report_approval'
   | 'report_printing'
   | 'completed';
@@ -14,6 +13,7 @@ export interface Project {
   contractorId: string;
   contractorName?: string;
   contractNumber?: string;
+  contractDate?: Date;
   status: ProjectStatus;
   createdBy?: string;
   createdByName?: string;
@@ -59,15 +59,15 @@ export interface CreateProjectData {
 export interface UpdateProjectData {
   description?: string;
   contractNumber?: string;
+  contractDate?: Date;
   status?: ProjectStatus;
   qualificationObjectIds?: string[];
 }
 
 export const ProjectStatusLabels: Record<ProjectStatus, string> = {
   'contract_negotiation': 'Согласование договора',
-  'protocol_preparation': 'Подготовка протокола',
   'testing_execution': 'Проведение испытаний',
-  'report_preparation': 'Подготовка отчета',
+  'creating_report': 'Создание отчета',
   'report_approval': 'Согласование отчета',
   'report_printing': 'Печать отчета',
   'completed': 'Завершен'
@@ -75,9 +75,8 @@ export const ProjectStatusLabels: Record<ProjectStatus, string> = {
 
 export const ProjectStatusColors: Record<ProjectStatus, string> = {
   'contract_negotiation': 'bg-yellow-100 text-yellow-800',
-  'protocol_preparation': 'bg-blue-100 text-blue-800',
   'testing_execution': 'bg-purple-100 text-purple-800',
-  'report_preparation': 'bg-orange-100 text-orange-800',
+  'creating_report': 'bg-orange-100 text-orange-800',
   'report_approval': 'bg-indigo-100 text-indigo-800',
   'report_printing': 'bg-green-100 text-green-800',
   'completed': 'bg-gray-100 text-gray-800'

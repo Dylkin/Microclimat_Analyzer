@@ -12,11 +12,10 @@ interface QualificationObjectsTableProps {
   loading?: boolean;
   hideAddButton?: boolean;
   editingQualificationObject?: QualificationObject | null;
-  onSaveQualificationObject?: (object: QualificationObject) => Promise<void>;
+  onSaveQualificationObject?: (object: QualificationObject) => Promise<QualificationObject>;
   onCancelQualificationObjectEdit?: () => void;
   contractorId?: string;
   contractorAddress?: string;
-  readOnlyTestingPeriods?: boolean;
 }
 
 export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps> = ({
@@ -32,7 +31,6 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
   onCancelQualificationObjectEdit,
   contractorId,
   contractorAddress,
-  readOnlyTestingPeriods = false
 }) => {
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -90,6 +88,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             {obj.measurementZones && obj.measurementZones.length > 0 && (
               <div>📍 Зон измерения: {obj.measurementZones.length}</div>
             )}
+            {/* Климатическая установка не отображается для холодильника и морозильника */}
           </div>
         );
       default:
@@ -166,7 +165,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                           {obj.name || obj.vin || obj.serialNumber || 'Без названия'}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Создан: {obj.createdAt.toLocaleDateString('ru-RU')}
+                          Создан: {obj.createdAt?.toLocaleDateString('ru-RU') || 'Неизвестно'}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -239,8 +238,9 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                                 initialData={editingQualificationObject}
                                 onSubmit={async (objectData) => {
                                   if (onSaveQualificationObject) {
-                                    await onSaveQualificationObject(objectData as any);
+                                    return await onSaveQualificationObject(objectData as any);
                                   }
+                                  throw new Error('onSaveQualificationObject не определен');
                                 }}
                                 onCancel={() => {
                                   if (onCancelQualificationObjectEdit) {
@@ -248,7 +248,11 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                                   }
                                 }}
                                 hideTypeSelection={true}
-                                readOnlyTestingPeriods={readOnlyTestingPeriods}
+                                onPageChange={(page, data) => {
+                                  console.log('QualificationObjectsTable: Переход на страницу', page, data);
+                                  // В контексте таблицы объектов переключение страниц не предусмотрено
+                                  alert('Функция анализа данных доступна только в разделе "Управление проектами".\n\nДля анализа данных:\n1. Перейдите в "Управление проектами"\n2. Выберите проект\n3. Откройте объект квалификации\n4. Нажмите "Анализ данных"');
+                                }}
                               />
                             </div>
                           </div>

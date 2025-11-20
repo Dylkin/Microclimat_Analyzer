@@ -1,5 +1,5 @@
 import React from 'react';
-import { Upload, Download, Trash2, CheckCircle, Clock, X } from 'lucide-react';
+import { Upload, Download, Trash2, CheckCircle, X } from 'lucide-react';
 import { ProjectDocument } from '../../utils/projectDocumentService';
 
 interface DocumentUploadProps {
@@ -61,7 +61,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
   const handleApprove = () => {
     if (document && onApprove) {
-      onApprove(document);
+      onApprove(document.id);
     }
   };
 
@@ -74,7 +74,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const canDelete = () => {
     if (!document) return false;
     // Администраторы могут удалять любые документы
-    if (userRole === 'administrator') return true;
+    if (userRole === 'admin' || userRole === 'administrator') return true;
     // Остальные роли не могут удалять согласованные документы
     return !approvalInfo?.isApproved;
   };
@@ -131,7 +131,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
               <div className="text-sm text-green-800">
                 <div className="font-medium">Согласовано:</div>
                 <div className="text-xs mt-1">
-                  {approvalInfo.approvedAt.toLocaleString('ru-RU')} • {approvalInfo.approvedBy} • {approvalInfo.approvedByRole}
+                  {approvalInfo.approvedAt.toLocaleString('ru-RU', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })} • {approvalInfo.approvedBy} • {approvalInfo.approvedByRole}
                 </div>
               </div>
             </div>

@@ -5,6 +5,10 @@ export interface TimeSeriesPoint {
   fileId: string;
   originalIndex: number;
   zoneNumber?: number;
+  measurementLevel?: number;
+  deviceSerialNumber?: string;
+  serialNumber?: string; // Серийный номер из справочника оборудования
+  loggerName?: string;
 }
 
 export interface ProcessedTimeSeriesData {

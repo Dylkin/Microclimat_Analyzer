@@ -28,7 +28,7 @@ interface MicroclimatAnalyzerProps {
   } | null;
 }
 
-export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({ 
+const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({ 
   showVisualization = false, 
   onShowVisualization,
   selectedProject
@@ -66,7 +66,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
     const loadContractors = async () => {
-      if (!contractorService.isAvailable()) return;
+      // Убрана проверка isAvailable - API клиент всегда доступен
       
       try {
         const data = await contractorService.getAllContractors();
@@ -113,7 +113,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   // Загрузка объектов квалификации при выборе контрагента
   React.useEffect(() => {
     const loadQualificationObjects = async () => {
-      if (!selectedContractor || !qualificationObjectService.isAvailable()) {
+      if (!selectedContractor) {
         setQualificationObjects([]);
         setSelectedQualificationObject('');
         return;
@@ -693,6 +693,8 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
           multiple
           onChange={handleFileUpload}
           className="hidden"
+          title="Загрузить файлы VI2"
+          aria-label="Загрузить файлы VI2"
         />
 
         {uploadedFiles.length > 0 ? (
@@ -735,6 +737,8 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                           onClick={() => moveFile(file.id, 'up')}
                           disabled={index === 0}
                           className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Переместить вверх"
+                          aria-label="Переместить вверх"
                         >
                           <ChevronUp className="w-4 h-4" />
                         </button>
@@ -742,6 +746,8 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                           onClick={() => moveFile(file.id, 'down')}
                           disabled={index === sortedFiles.length - 1}
                           className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Переместить вниз"
+                          aria-label="Переместить вниз"
                         >
                           <ChevronDown className="w-4 h-4" />
                         </button>
@@ -790,13 +796,15 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                           onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
                           className="w-16 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                           autoFocus
+                          title="Номер зоны измерения"
+                          aria-label="Номер зоны измерения"
                         />
                       ) : (
                         <div
                           onClick={() => setEditingField({ fileId: file.id, field: 'zoneNumber' })}
                           className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
                         >
-                          {file.zoneNumber || 'Нажмите для ввода'}
+                          {file.zoneNumber === 0 ? 'Внешний' : (file.zoneNumber || 'Нажмите для ввода')}
                         </div>
                       )}
                     </td>
@@ -810,6 +818,8 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
                           onKeyDown={(e) => e.key === 'Enter' && setEditingField(null)}
                           className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                           autoFocus
+                          title="Уровень измерения"
+                          aria-label="Уровень измерения"
                         />
                       ) : (
                         <div
@@ -865,7 +875,7 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       {uploadedFiles.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-600 text-sm font-medium">
-            <strong>Примечание:</strong> Для внешнего датчика указать № зоны измерения 999.
+            <strong>Примечание:</strong> Для внешнего датчика указать № зоны измерения 0.
           </p>
         </div>
       )}
@@ -873,3 +883,5 @@ export const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
     </div>
   );
 };
+
+export default MicroclimatAnalyzer;

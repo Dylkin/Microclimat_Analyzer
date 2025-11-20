@@ -11,14 +11,17 @@ const isValidUUID = (uuid: string): boolean => {
 interface AuthContextType {
   user: AuthUser | null;
   users: User[];
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  addUser: (user: Omit<User, 'id'>) => void;
-  updateUser: (id: string, user: Partial<User>) => void;
-  deleteUser: (id: string) => void;
-  changePassword: (userId: string, oldPassword: string, newPassword: string) => boolean;
-  resetPassword: (userId: string, newPassword: string) => boolean;
-  hasAccess: (page: 'analyzer' | 'help' | 'database' | 'users') => boolean;
+  addUser: (user: Omit<User, 'id'>) => Promise<void>;
+  updateUser: (id: string, user: Partial<User>) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+  changePassword: (userId: string, oldPassword: string, newPassword: string) => Promise<boolean>;
+  resetPassword: (userId: string, newPassword: string) => Promise<boolean>;
+  sendPasswordResetEmail: (email: string) => Promise<void>;
+  updatePasswordWithToken: (newPassword: string) => Promise<void>;
+  hasAccess: (page: 'analyzer' | 'help' | 'database' | 'users' | 'admin') => boolean;
+  reloadUsers: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,17 +51,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Загрузка пользователей из базы данных
   const loadUsers = async () => {
-    if (!userService.isAvailable()) {
-      console.warn('Supabase не настроен, используем локальные данные');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
       const dbUsers = await userService.getAllUsers();
-      setUsers(dbUsers);
+      
+      // Проверяем, есть ли пользователь по умолчанию в списке
+      const hasDefaultUser = dbUsers.some((u: User) => u.isDefault);
+      
+      // Если пользователя по умолчанию нет, добавляем его
+      if (!hasDefaultUser) {
+        console.log('Пользователь по умолчанию не найден в БД, добавляем локально');
+        setUsers([defaultUser, ...dbUsers]);
+      } else {
+        setUsers(dbUsers);
+      }
+      
       console.log('Пользователи загружены из базы данных:', dbUsers.length);
     } catch (error) {
       console.error('Ошибка загрузки пользователей из БД:', error);
@@ -79,6 +88,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Ошибка парсинга пользователей из localStorage:', parseError);
           setUsers([defaultUser]);
         }
+      } else {
+        // Если нет данных ни в БД, ни в localStorage, используем только пользователя по умолчанию
+        setUsers([defaultUser]);
       }
     } finally {
       setLoading(false);
@@ -96,10 +108,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Проверка доступа к страницам
-  const hasAccess = (page: 'analyzer' | 'help' | 'database' | 'users'): boolean => {
+  const hasAccess = (page: 'analyzer' | 'help' | 'database' | 'users' | 'admin'): boolean => {
     if (!user) return false;
 
+    console.log('hasAccess: проверка доступа для пользователя:', { 
+      user: user.email, 
+      role: user.role, 
+      page 
+    });
+
     switch (user.role) {
+      case 'admin':
       case 'administrator':
         return true; // Полный доступ
       case 'specialist':
@@ -108,6 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'director':
         return page === 'analyzer' || page === 'help' || page === 'database';
       default:
+        console.log('hasAccess: неизвестная роль:', user.role);
         return false;
     }
   };
@@ -117,16 +137,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       let foundUser: User | null = null;
 
-      // Сначала пытаемся найти в базе данных
+      // Сначала пытаемся авторизоваться через Supabase Auth
       if (userService.isAvailable()) {
         try {
           foundUser = await userService.getUserByCredentials(email, password);
         } catch (error) {
-          console.error('Ошибка авторизации через БД:', error);
+          console.error('Ошибка авторизации через Supabase Auth:', error);
         }
       }
 
-      // Если не найден в БД, ищем в локальных данных
+      // Если не найден через Supabase Auth, ищем в локальных данных (fallback)
       if (!foundUser) {
         foundUser = users.find(u => u.email === email && u.password === password) || null;
       }
@@ -280,7 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Сброс пароля (только для администраторов)
   const resetPassword = async (userId: string, newPassword: string): Promise<boolean> => {
     try {
-      if (user?.role !== 'administrator') return false;
+      if (user?.role !== 'admin' && user?.role !== 'administrator') return false;
       
       const targetUser = users.find(u => u.id === userId);
       if (!targetUser) return false;
@@ -307,24 +327,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Отправка письма для сброса пароля
+  const sendPasswordResetEmail = async (email: string): Promise<void> => {
+    try {
+      if (userService.isAvailable()) {
+        await userService.sendPasswordResetEmail(email);
+      } else {
+        throw new Error('Сервис сброса пароля недоступен');
+      }
+    } catch (error) {
+      console.error('Ошибка отправки письма для сброса пароля:', error);
+      throw error;
+    }
+  };
+
+  // Обновление пароля через токен сброса
+  const updatePasswordWithToken = async (newPassword: string): Promise<void> => {
+    try {
+      if (userService.isAvailable()) {
+        await userService.updatePasswordWithToken(newPassword);
+      } else {
+        throw new Error('Сервис обновления пароля недоступен');
+      }
+    } catch (error) {
+      console.error('Ошибка обновления пароля через токен:', error);
+      throw error;
+    }
+  };
+
   // Восстановление сессии при загрузке
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        // Проверяем, что ID пользователя является валидным UUID
-        if (parsedUser.id && isValidUUID(parsedUser.id)) {
-          setUser(parsedUser);
-        } else {
-          console.warn('Невалидный UUID пользователя в localStorage, очищаем сессию');
+    const restoreSession = async () => {
+      const savedUser = localStorage.getItem('currentUser');
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          // Проверяем, что ID пользователя является валидным UUID
+          if (parsedUser.id && isValidUUID(parsedUser.id)) {
+            // Проверяем, существует ли пользователь в БД
+            try {
+              const dbUsers = await userService.getAllUsers();
+              const userExists = dbUsers.some(u => u.id === parsedUser.id);
+              
+              if (userExists) {
+                // Пользователь существует в БД, восстанавливаем сессию
+                setUser(parsedUser);
+              } else {
+                // Пользователь не найден в БД, очищаем localStorage
+                console.warn('Пользователь из localStorage не найден в БД, очищаем сессию');
+                localStorage.removeItem('currentUser');
+              }
+            } catch (error) {
+              // Если не удалось проверить в БД, все равно восстанавливаем сессию
+              // (на случай, если БД временно недоступна)
+              console.warn('Не удалось проверить пользователя в БД, восстанавливаем сессию из localStorage');
+              setUser(parsedUser);
+            }
+          } else {
+            console.warn('Невалидный UUID пользователя в localStorage, очищаем сессию');
+            localStorage.removeItem('currentUser');
+          }
+        } catch (error) {
+          console.error('Ошибка парсинга пользователя из localStorage:', error);
           localStorage.removeItem('currentUser');
         }
-      } catch (error) {
-        console.error('Ошибка парсинга пользователя из localStorage:', error);
-        localStorage.removeItem('currentUser');
       }
-    }
+    };
+    
+    restoreSession();
   }, []);
 
   const value = {
@@ -339,6 +409,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     deleteUser,
     changePassword,
     resetPassword,
+    sendPasswordResetEmail,
+    updatePasswordWithToken,
     hasAccess,
     reloadUsers: loadUsers
   };

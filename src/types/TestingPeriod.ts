@@ -14,6 +14,9 @@ export interface TestingPeriod {
   createdAt: Date;
   updatedAt: Date;
   documents?: TestingPeriodDocument[];
+  // Новые поля для периода проведения испытаний
+  testingStartDate?: Date;
+  testingEndDate?: Date;
 }
 
 export interface TestingPeriodDocument {
@@ -35,6 +38,9 @@ export interface CreateTestingPeriodData {
   actualEndDate?: Date;
   status?: TestingPeriodStatus;
   notes?: string;
+  // Новые поля для периода проведения испытаний
+  testingStartDate?: Date;
+  testingEndDate?: Date;
 }
 
 export interface UpdateTestingPeriodData {
@@ -44,6 +50,9 @@ export interface UpdateTestingPeriodData {
   actualEndDate?: Date;
   status?: TestingPeriodStatus;
   notes?: string;
+  // Новые поля для периода проведения испытаний
+  testingStartDate?: Date;
+  testingEndDate?: Date;
 }
 
 export const TestingPeriodStatusLabels: Record<TestingPeriodStatus, string> = {

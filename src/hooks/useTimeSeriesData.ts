@@ -5,9 +5,11 @@ import { databaseService } from '../utils/database';
 
 interface UseTimeSeriesDataProps {
   files: UploadedFile[];
+  qualificationObjectId?: string;
+  projectId?: string;
 }
 
-export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
+export const useTimeSeriesData = ({ files, qualificationObjectId, projectId }: UseTimeSeriesDataProps) => {
   const [data, setData] = useState<ProcessedTimeSeriesData | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -38,8 +40,109 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
     }
   }, []);
 
+  // Загрузка данных из базы данных
+  const loadDataFromDatabase = useCallback(async () => {
+    if (!qualificationObjectId || !projectId) {
+      console.log('useTimeSeriesData: Missing qualificationObjectId or projectId');
+      return;
+    }
+
+    console.log('useTimeSeriesData: Loading data from database', { qualificationObjectId, projectId });
+
+    try {
+      // Импортируем loggerDataService динамически, чтобы избежать циклических зависимостей
+      const { loggerDataService } = await import('../utils/loggerDataService');
+      
+      // Загружаем сводные данные
+      const summaries = await loggerDataService.getLoggerDataSummary(projectId, qualificationObjectId);
+      console.log('useTimeSeriesData: Loaded summaries:', summaries);
+      
+      if (!summaries || summaries.length === 0) {
+        console.warn('useTimeSeriesData: No logger data summaries found for the specified object');
+        setData(null);
+        return;
+      }
+
+      // Загружаем детальные данные для каждого файла
+      const allPoints: TimeSeriesPoint[] = [];
+      
+      for (const summary of summaries) {
+        const records = await loggerDataService.getLoggerData(projectId, qualificationObjectId, summary.zone_number, summary.measurement_level);
+        
+        if (records && records.length > 0) {
+          const points: TimeSeriesPoint[] = records.map((record: any, index: number) => ({
+            timestamp: new Date(record.timestamp).getTime(),
+            temperature: record.temperature,
+            humidity: record.humidity,
+            fileId: `zone-${summary.zone_number}-level-${summary.measurement_level}`,
+            originalIndex: index,
+            zoneNumber: summary.zone_number,
+            measurementLevel: summary.measurement_level,
+            deviceSerialNumber: record.device_serial_number || 'Unknown',
+            serialNumber: (summary.serial_number && !summary.serial_number.startsWith('XLS-Logger-')) ? summary.serial_number : 'Не указан', // Серийный номер из справочника оборудования
+            loggerName: summary.logger_name || `Логгер зона ${summary.zone_number} уровень ${summary.measurement_level}`
+          }));
+          
+          allPoints.push(...points);
+        }
+      }
+
+      if (allPoints.length === 0) {
+        console.warn('No measurement records found');
+        setData(null);
+        return;
+      }
+
+      // Обрабатываем данные так же, как и файлы
+      // Сортируем по времени
+      allPoints.sort((a, b) => a.timestamp - b.timestamp);
+
+      console.log(`Всего загружено точек данных из БД: ${allPoints.length}`);
+      
+      // Вычисляем диапазоны и проверяем наличие данных
+      const temperatures = allPoints.filter(p => p.temperature !== undefined).map(p => p.temperature!);
+      const humidities = allPoints.filter(p => p.humidity !== undefined).map(p => p.humidity!);
+      const timestamps = allPoints.map(p => p.timestamp);
+
+      const hasTemperature = temperatures.length > 0;
+      const hasHumidity = humidities.length > 0;
+
+      const processedData: ProcessedTimeSeriesData = {
+        points: allPoints,
+        temperatureRange: hasTemperature ? 
+          [Math.min(...temperatures), Math.max(...temperatures)] : [0, 100],
+        humidityRange: hasHumidity ? 
+          [Math.min(...humidities), Math.max(...humidities)] : [0, 100],
+        timeRange: [Math.min(...timestamps), Math.max(...timestamps)],
+        hasTemperature,
+        hasHumidity
+      };
+
+      console.log('Time range:', new Date(processedData.timeRange[0]), 'to', new Date(processedData.timeRange[1]));
+      console.log('Temperature range:', processedData.temperatureRange);
+      console.log('Humidity range:', processedData.humidityRange);
+      console.log('Has temperature:', hasTemperature);
+      console.log('Has humidity:', hasHumidity);
+
+      console.log('useTimeSeriesData: Setting processed data from database:', processedData);
+      setData(processedData);
+      
+    } catch (error) {
+      console.error('Error loading data from database:', error);
+      setError(error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  }, [qualificationObjectId, projectId]);
+
   const loadData = useCallback(async () => {
-    if (files.length === 0) {
+    console.log('useTimeSeriesData: loadData called', { 
+      filesCount: files.length, 
+      qualificationObjectId, 
+      projectId 
+    });
+
+    // Если нет файлов и нет данных для загрузки из базы, очищаем данные
+    if (files.length === 0 && (!qualificationObjectId || !projectId)) {
+      console.log('useTimeSeriesData: No files and no database params, clearing data');
       setData(null);
       return;
     }
@@ -49,6 +152,14 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
     setError(null);
 
     try {
+      // Если есть qualificationObjectId и projectId, загружаем данные из базы
+      if (qualificationObjectId && projectId) {
+        console.log('useTimeSeriesData: Loading from database');
+        await loadDataFromDatabase();
+        return;
+      }
+
+      // Иначе обрабатываем файлы как обычно
       const allPoints: TimeSeriesPoint[] = [];
       const completedFiles = files.filter(f => f.parsingStatus === 'completed');
 
@@ -111,7 +222,7 @@ export const useTimeSeriesData = ({ files }: UseTimeSeriesDataProps) => {
       setLoading(false);
       setProgress(100);
     }
-  }, [files, processFileData]);
+  }, [files, processFileData, qualificationObjectId, projectId, loadDataFromDatabase]);
 
   // Автоматическая загрузка при изменении файлов
   useEffect(() => {

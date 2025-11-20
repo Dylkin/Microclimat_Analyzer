@@ -84,7 +84,7 @@ export const ContractorMap: React.FC<ContractorMapProps> = ({ contractor, onBack
           <ArrowLeft className="w-6 h-6" />
         </button>
         <MapPin className="w-8 h-8 text-indigo-600" />
-        <h1 className="text-2xl font-bold text-gray-900">Карта контрагента</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Адрес контрагента</h1>
       </div>
 
       {/* Contractor Info */}

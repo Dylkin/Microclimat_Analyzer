@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Database, CheckCircle, XCircle, Loader, AlertTriangle, Settings } from 'lucide-react';
-import { SupabaseConnectionTest } from './SupabaseConnectionTest';
+import SupabaseConnectionTest from './SupabaseConnectionTest';
 
 interface TableInfo {
   name: string;
@@ -9,7 +9,7 @@ interface TableInfo {
   rowCount?: number;
 }
 
-export const DatabaseTest: React.FC = () => {
+const DatabaseTest: React.FC = () => {
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [showConnectionTest, setShowConnectionTest] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -314,3 +314,5 @@ export const DatabaseTest: React.FC = () => {
     </div>
   );
 };
+
+export default DatabaseTest;

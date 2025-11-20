@@ -1,23 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
-
-// Получаем конфигурацию Supabase из переменных окружения
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-let supabase: any = null;
-
-// Инициализация Supabase клиента
-const initSupabase = () => {
-  if (!supabase && supabaseUrl && supabaseAnonKey) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-  }
-  return supabase;
-};
+import { supabase } from './supabaseClient';
+import { sanitizeFileName } from './fileNameUtils';
+import { getMimeType } from './mimeTypeUtils';
 
 export interface ProjectDocument {
   id: string;
   projectId: string;
-  documentType: 'commercial_offer' | 'contract';
+  documentType: 'commercial_offer' | 'contract' | 'qualification_protocol';
   fileName: string;
   fileSize: number;
   fileUrl: string;
@@ -29,7 +17,7 @@ export interface ProjectDocument {
 interface DatabaseProjectDocument {
   id: string;
   project_id: string;
-  document_type: 'commercial_offer' | 'contract';
+  document_type: 'commercial_offer' | 'contract' | 'qualification_protocol';
   file_name: string;
   file_size: number;
   file_url: string;
@@ -43,7 +31,7 @@ class ProjectDocumentService {
   private supabase: any;
 
   constructor() {
-    this.supabase = initSupabase();
+    this.supabase = supabase;
   }
 
   // Проверка доступности Supabase
@@ -69,17 +57,25 @@ class ProjectDocumentService {
         throw new Error(`Ошибка получения документов: ${error.message}`);
       }
 
-      return data.map((doc: DatabaseProjectDocument) => ({
-        id: doc.id,
-        projectId: doc.project_id,
-        documentType: doc.document_type,
-        fileName: doc.file_name,
-        fileSize: doc.file_size,
-        fileUrl: doc.file_url,
-        mimeType: doc.mime_type,
-        uploadedBy: doc.uploaded_by,
-        uploadedAt: new Date(doc.uploaded_at)
-      }));
+      return data.map((doc: DatabaseProjectDocument) => {
+        // Определяем тип документа: если в имени файла есть qualification_protocol, то это протокол
+        let documentType = doc.document_type;
+        if (doc.file_name.includes('qualification_protocol')) {
+          documentType = 'qualification_protocol';
+        }
+        
+        return {
+          id: doc.id,
+          projectId: doc.project_id,
+          documentType: documentType as 'commercial_offer' | 'contract' | 'qualification_protocol',
+          fileName: doc.file_name,
+          fileSize: doc.file_size,
+          fileUrl: doc.file_url,
+          mimeType: doc.mime_type,
+          uploadedBy: doc.uploaded_by,
+          uploadedAt: new Date(doc.uploaded_at)
+        };
+      });
     } catch (error) {
       console.error('Ошибка при получении документов проекта:', error);
       throw error;
@@ -89,7 +85,7 @@ class ProjectDocumentService {
   // Загрузка документа
   async uploadDocument(
     projectId: string, 
-    documentType: 'commercial_offer' | 'contract', 
+    documentType: 'commercial_offer' | 'contract' | 'qualification_protocol', 
     file: File,
     userId?: string
   ): Promise<ProjectDocument> {
@@ -97,18 +93,28 @@ class ProjectDocumentService {
       throw new Error('Supabase не настроен');
     }
 
+    // Проверяем аутентификацию пользователя
+    const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('Требуется аутентификация для загрузки файлов. Пожалуйста, войдите в систему.');
+    }
+
     try {
+     
       // Генерируем уникальное имя файла
-      const fileExt = file.name.split('.').pop();
+      const sanitizedOriginalName = sanitizeFileName(file.name);
+      const fileExt = sanitizedOriginalName.split('.').pop();
       const fileName = `${projectId}_${documentType}_${Date.now()}.${fileExt}`;
       const filePath = `project-documents/${fileName}`;
 
       console.log('Загружаем файл в Storage:', { fileName, filePath, fileSize: file.size });
 
       // Загружаем файл в Supabase Storage
+      const mimeType = getMimeType(file.name);
       const { data: uploadData, error: uploadError } = await this.supabase.storage
         .from('documents')
         .upload(filePath, file, {
+          contentType: mimeType,
           cacheControl: '3600',
           upsert: true
         });
@@ -149,7 +155,7 @@ class ProjectDocumentService {
         .from('project_documents')
         .upsert({
           project_id: projectId,
-          document_type: documentType,
+          document_type: documentType, // Используем маппированный тип для базы данных
           file_name: file.name,
           file_size: file.size,
           file_url: urlData.publicUrl,
@@ -169,7 +175,7 @@ class ProjectDocumentService {
       return {
         id: docData.id,
         projectId: docData.project_id,
-        documentType: docData.document_type,
+        documentType: documentType, // Возвращаем оригинальный тип документа
         fileName: docData.file_name,
         fileSize: docData.file_size,
         fileUrl: docData.file_url,

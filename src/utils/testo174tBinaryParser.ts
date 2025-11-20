@@ -219,3 +219,6 @@ class Testo174TParsingService {
     });
   }
 }
+
+// Экспорт сервиса парсинга
+export const testo174TParsingService = new Testo174TParsingService();

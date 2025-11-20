@@ -41,13 +41,17 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
     actualEndDate: string;
     status: TestingPeriodStatus;
     notes: string;
+    testingStartDate: string;
+    testingEndDate: string;
   }>({
     plannedStartDate: '',
     plannedEndDate: '',
     actualStartDate: '',
     actualEndDate: '',
     status: 'planned',
-    notes: ''
+    notes: '',
+    testingStartDate: '',
+    testingEndDate: ''
   });
 
   // Загрузка периодов испытаний
@@ -96,7 +100,9 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
       actualStartDate: period.actualStartDate?.toISOString().split('T')[0] || '',
       actualEndDate: period.actualEndDate?.toISOString().split('T')[0] || '',
       status: period.status,
-      notes: period.notes || ''
+      notes: period.notes || '',
+      testingStartDate: period.testingStartDate?.toISOString().split('T')[0] || '',
+      testingEndDate: period.testingEndDate?.toISOString().split('T')[0] || ''
     });
     setEditingPeriod(period.id);
   };
@@ -123,7 +129,9 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
         actualStartDate: editPeriod.actualStartDate ? new Date(editPeriod.actualStartDate) : undefined,
         actualEndDate: editPeriod.actualEndDate ? new Date(editPeriod.actualEndDate) : undefined,
         status: editPeriod.status,
-        notes: editPeriod.notes || undefined
+        notes: editPeriod.notes || undefined,
+        testingStartDate: editPeriod.testingStartDate ? new Date(editPeriod.testingStartDate) : undefined,
+        testingEndDate: editPeriod.testingEndDate ? new Date(editPeriod.testingEndDate) : undefined
       };
 
       const updatedPeriod = await testingPeriodService.updateTestingPeriod(editingPeriod!, updateData);
@@ -203,18 +211,18 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
   };
 
   // Скачивание документа
-  const handleDownloadDocument = (document: TestingPeriodDocument) => {
+  const handleDownloadDocument = (doc: TestingPeriodDocument) => {
     const link = document.createElement('a');
-    link.href = document.fileUrl;
-    link.download = document.fileName;
+    link.href = doc.fileUrl;
+    link.download = doc.fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   // Просмотр документа
-  const handleViewDocument = (document: TestingPeriodDocument) => {
-    window.open(document.fileUrl, '_blank');
+  const handleViewDocument = (doc: TestingPeriodDocument) => {
+    window.open(doc.fileUrl, '_blank');
   };
 
   // Форматирование размера файла
@@ -295,6 +303,7 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
                         }`}
                         disabled={readOnlyMode}
                         required
+                        title="Планируемая дата начала"
                       />
                     </div>
                     <div>
@@ -308,6 +317,29 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
                         }`}
                         disabled={readOnlyMode}
                         required
+                        title="Планируемая дата окончания"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Период проведения испытаний (с даты)</label>
+                      <input
+                        type="date"
+                        value={editPeriod.testingStartDate}
+                        onChange={(e) => setEditPeriod(prev => ({ ...prev, testingStartDate: e.target.value }))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        placeholder="Дата начала испытаний"
+                        title="Период проведения испытаний (с даты)"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Период проведения испытаний (по дату)</label>
+                      <input
+                        type="date"
+                        value={editPeriod.testingEndDate}
+                        onChange={(e) => setEditPeriod(prev => ({ ...prev, testingEndDate: e.target.value }))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        placeholder="Дата окончания испытаний"
+                        title="Период проведения испытаний (по дату)"
                       />
                     </div>
                     <div>
@@ -317,6 +349,7 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
                         value={editPeriod.actualStartDate}
                         onChange={(e) => setEditPeriod(prev => ({ ...prev, actualStartDate: e.target.value }))}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        title="Фактическая дата начала"
                       />
                     </div>
                     <div>
@@ -326,6 +359,7 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
                         value={editPeriod.actualEndDate}
                         onChange={(e) => setEditPeriod(prev => ({ ...prev, actualEndDate: e.target.value }))}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        title="Фактическая дата окончания"
                       />
                     </div>
                   </div>
@@ -337,6 +371,7 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
                         value={editPeriod.status}
                         onChange={(e) => setEditPeriod(prev => ({ ...prev, status: e.target.value as TestingPeriodStatus }))}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        title="Статус периода испытаний"
                       >
                         {Object.entries(TestingPeriodStatusLabels).map(([value, label]) => (
                           <option key={value} value={value}>{label}</option>
@@ -391,6 +426,17 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
                           {period.plannedStartDate.toLocaleDateString('ru-RU')} - {period.plannedEndDate.toLocaleDateString('ru-RU')}
                         </div>
                       </div>
+                      
+                      {(period.testingStartDate || period.testingEndDate) && (
+                        <div>
+                          <div className="text-gray-600">
+                            <strong>Период проведения испытаний:</strong>
+                          </div>
+                          <div className="text-gray-900">
+                            {period.testingStartDate?.toLocaleDateString('ru-RU') || '—'} - {period.testingEndDate?.toLocaleDateString('ru-RU') || '—'}
+                          </div>
+                        </div>
+                      )}
                       
                       {(period.actualStartDate || period.actualEndDate) && (
                         <div>

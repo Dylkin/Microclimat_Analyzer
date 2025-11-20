@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { HelpCircle, Info, BookOpen, Code, AlertTriangle } from 'lucide-react';
 
-export const Help: React.FC = () => {
+const Help: React.FC = () => {
 
   return (
     <div className="space-y-6">
@@ -186,7 +186,22 @@ export const Help: React.FC = () => {
                   <div>
                     <p><strong>Основные:</strong></p>
                     <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
-                    <p>• <code>{'{resultsTable}'}</code> - таблица результатов анализа</p>
+                    <p>• <code>{'{Table}'}</code> - таблица результатов анализа</p>
+                    <p>• <code>{'{Result}'}</code> - текст выводов из поля "Выводы"</p>
+                    <p>• <code>{'{Object}'}</code> - наименование объекта квалификации</p>
+                    <p>• <code>{'{ConditioningSystem}'}</code> - климатическая установка</p>
+                    <p>• <code>{'{System}'}</code> - климатическая установка (альтернативный)</p>
+                    <p>• <code>{'{NameTest}'}</code> - тип испытания</p>
+                  </div>
+                  <div>
+                    <p><strong>Дополнительные:</strong></p>
+                    <p>• <code>{'{Limits}'}</code> - установленные лимиты с единицами измерения</p>
+                    <p>• <code>{'{Executor}'}</code> - ФИО исполнителя (текущий пользователь)</p>
+                    <p>• <code>{'{TestDate}'}</code> - дата испытания (текущая дата)</p>
+                    <p>• <code>{'{ReportNo}'}</code> - номер договора из настроек анализа</p>
+                    <p>• <code>{'{ReportDate}'}</code> - дата договора из настроек анализа</p>
+                    <p>• <code>{'{title}'}</code> - заголовок отчета</p>
+                    <p>• <code>{'{date}'}</code> - дата создания отчета</p>
                   </div>
                 </div>
                 <div className="mt-3 p-2 bg-blue-100 rounded">
@@ -269,12 +284,14 @@ export const Help: React.FC = () => {
 
           <div className="border-l-4 border-orange-500 pl-4">
             <h3 className="font-semibold text-gray-800">Какие плейсхолдеры поддерживаются в шаблонах?</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Основные: {'{chart}'} (изображение), {'{title}'}, {'{date}'}, {'{dataType}'}. Статистические: {'{totalSensors}'}, {'{internalSensors}'}, {'{externalSensors}'}, {'{compliantSensors}'}. Для таблиц: {'{#results}'}...{'{/results}'}.
-            </p>
+        <p className="text-sm text-gray-600 mt-1">
+          Основные: {'{chart}'} (изображение), {'{Table}'} (таблица), {'{Result}'} (выводы), {'{Object}'} (наименование объекта квалификации), {'{NameTest}'} (тип испытания). Дополнительные: {'{Limits}'} (лимиты), {'{Executor}'} (исполнитель), {'{TestDate}'} (дата), {'{ReportNo}'} (номер договора), {'{ReportDate}'} (дата договора).
+        </p>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+export default Help;
