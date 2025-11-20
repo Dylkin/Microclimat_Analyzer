@@ -139,7 +139,7 @@ class TenderService {
         searchSettings: {
           ...data.searchSettings,
           purchaseItems: data.searchSettings.purchaseItems || [],
-          organizationInns: data.searchSettings.organizationInns || []
+          organizationUnps: data.searchSettings.organizationUnps || []
         }
       };
     } catch (error: any) {

@@ -2,8 +2,10 @@ import { apiClient } from './apiClient';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { sanitizeFileName } from './fileNameUtils';
 import { getMimeType } from './mimeTypeUtils';
+import { supabase } from './supabaseClient';
 
 class QualificationObjectService {
+  private supabase = supabase;
   isAvailable(): boolean {
     return !!apiClient;
   }
@@ -356,7 +358,7 @@ class QualificationObjectService {
 
       if (files && files.length > 0) {
         // Удаляем все файлы в папке
-        const filePaths = files.map(file => `${folderPath}/${file.name}`);
+        const filePaths = files.map((file: any) => `${folderPath}/${file.name}`);
         const { error: deleteError } = await this.supabase!.storage
           .from('qualification-objects')
           .remove(filePaths);
@@ -396,7 +398,7 @@ class QualificationObjectService {
       const filesMap: { [key: string]: { name: string; url: string; size: number; lastModified: string } } = {};
 
       if (data && data.length > 0) {
-        console.log('QualificationObjectService: Найдены папки в Storage:', data.map(f => f.name));
+        console.log('QualificationObjectService: Найдены папки в Storage:', data.map((f: any) => f.name));
         
         for (const folder of data) {
           console.log('QualificationObjectService: Обрабатываем папку:', folder.name);
@@ -412,7 +414,7 @@ class QualificationObjectService {
                 sortBy: { column: 'created_at', order: 'desc' }
               });
 
-            console.log('QualificationObjectService: Файлы в папке', folder.name, ':', zoneFiles?.map(f => f.name) || [], 'Ошибка:', zoneError);
+            console.log('QualificationObjectService: Файлы в папке', folder.name, ':', zoneFiles?.map((f: any) => f.name) || [], 'Ошибка:', zoneError);
 
             if (!zoneError && zoneFiles && zoneFiles.length > 0) {
               // Берем самый новый файл из папки
