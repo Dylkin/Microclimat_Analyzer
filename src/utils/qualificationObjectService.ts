@@ -2,10 +2,28 @@ import { apiClient } from './apiClient';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { sanitizeFileName } from './fileNameUtils';
 import { getMimeType } from './mimeTypeUtils';
+import { supabase } from './supabaseClient';
+
+type StorageFileObject = {
+  name: string;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  last_accessed_at?: string;
+  metadata?: {
+    size?: number;
+  };
+};
 
 class QualificationObjectService {
+  private supabase: typeof supabase | null = null;
+
+  constructor() {
+    this.supabase = supabase;
+  }
+
   isAvailable(): boolean {
-    return !!apiClient;
+    return this.supabase !== null;
   }
 
   async getAllQualificationObjects(): Promise<QualificationObject[]> {
@@ -264,48 +282,48 @@ class QualificationObjectService {
     return this.mapFromApi(data);
   }
 
-  private mapToDatabase(data: Partial<QualificationObject> | CreateQualificationObjectData): any {
-    const dbData: any = {};
-    
-    if (data.contractorId !== undefined) dbData.contractor_id = data.contractorId;
-    if (data.type !== undefined) dbData.type = data.type;
-    if (data.name !== undefined) dbData.name = data.name;
-    if (data.manufacturer !== undefined) dbData.manufacturer = data.manufacturer;
-    if (data.climateSystem !== undefined) dbData.climate_system = data.climateSystem;
-    
-    // Поля, которые есть только в QualificationObject
-    if ('planFileUrl' in data && data.planFileUrl !== undefined) dbData.plan_file_url = data.planFileUrl;
-    if ('planFileName' in data && data.planFileName !== undefined) dbData.plan_file_name = data.planFileName;
-    if ('geocodedAt' in data && data.geocodedAt !== undefined) dbData.geocoded_at = data.geocodedAt?.toISOString();
-    if ('testDataFileUrl' in data && data.testDataFileUrl !== undefined) dbData.test_data_file_url = data.testDataFileUrl;
-    if ('testDataFileName' in data && data.testDataFileName !== undefined) dbData.test_data_file_name = data.testDataFileName;
-    
-    if (data.address !== undefined) dbData.address = data.address;
-    if (data.latitude !== undefined) dbData.latitude = data.latitude;
-    if (data.longitude !== undefined) dbData.longitude = data.longitude;
-    if (data.area !== undefined) dbData.area = data.area;
-    if (data.vin !== undefined) dbData.vin = data.vin;
-    if (data.registrationNumber !== undefined) dbData.registration_number = data.registrationNumber;
-    if (data.bodyVolume !== undefined) dbData.body_volume = data.bodyVolume;
-    if (data.inventoryNumber !== undefined) dbData.inventory_number = data.inventoryNumber;
-    if (data.chamberVolume !== undefined) dbData.chamber_volume = data.chamberVolume;
-    if (data.serialNumber !== undefined) dbData.serial_number = data.serialNumber;
-    
-    // Обработка measurementZones с генерацией ID
-    if (data.measurementZones !== undefined) {
-      const zonesWithIds = data.measurementZones.map((zone: any) => ({
-        ...zone,
-        id: zone.id || `zone-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        measurementLevels: zone.measurementLevels.map((level: any) => ({
-          ...level,
-          id: level.id || `level-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        }))
-      }));
-      dbData.measurement_zones = JSON.stringify(zonesWithIds);
-    }
+    private mapToDatabase(data: Partial<QualificationObject> | CreateQualificationObjectData): any {
+      const dbData: any = {};
+      
+      if (data.contractorId !== undefined) dbData.contractor_id = data.contractorId;
+      if (data.type !== undefined) dbData.type = data.type;
+      if (data.name !== undefined) dbData.name = data.name;
+      if (data.manufacturer !== undefined) dbData.manufacturer = data.manufacturer;
+      if (data.climateSystem !== undefined) dbData.climate_system = data.climateSystem;
+      
+      // Поля, которые есть только в QualificationObject
+      if ('planFileUrl' in data && data.planFileUrl !== undefined) dbData.plan_file_url = data.planFileUrl;
+      if ('planFileName' in data && data.planFileName !== undefined) dbData.plan_file_name = data.planFileName;
+      if ('geocodedAt' in data && data.geocodedAt !== undefined) dbData.geocoded_at = data.geocodedAt?.toISOString();
+      if ('testDataFileUrl' in data && data.testDataFileUrl !== undefined) dbData.test_data_file_url = data.testDataFileUrl;
+      if ('testDataFileName' in data && data.testDataFileName !== undefined) dbData.test_data_file_name = data.testDataFileName;
+      
+      if (data.address !== undefined) dbData.address = data.address;
+      if (data.latitude !== undefined) dbData.latitude = data.latitude;
+      if (data.longitude !== undefined) dbData.longitude = data.longitude;
+      if (data.area !== undefined) dbData.area = data.area;
+      if (data.vin !== undefined) dbData.vin = data.vin;
+      if (data.registrationNumber !== undefined) dbData.registration_number = data.registrationNumber;
+      if (data.bodyVolume !== undefined) dbData.body_volume = data.bodyVolume;
+      if (data.inventoryNumber !== undefined) dbData.inventory_number = data.inventoryNumber;
+      if (data.chamberVolume !== undefined) dbData.chamber_volume = data.chamberVolume;
+      if (data.serialNumber !== undefined) dbData.serial_number = data.serialNumber;
+      
+      // Обработка measurementZones с генерацией ID
+      if (data.measurementZones !== undefined) {
+        const zonesWithIds = data.measurementZones.map((zone: any) => ({
+          ...zone,
+          id: zone.id || `zone-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          measurementLevels: zone.measurementLevels.map((level: any) => ({
+            ...level,
+            id: level.id || `level-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          }))
+        }));
+        dbData.measurement_zones = JSON.stringify(zonesWithIds);
+      }
 
-    return dbData;
-  }
+      return dbData;
+    }
 
   async uploadLoggerRemovalFile(objectId: string, zoneNumber: number, level: number, file: File): Promise<string> {
     if (!this.isAvailable()) {
@@ -349,25 +367,26 @@ class QualificationObjectService {
         .from('qualification-objects')
         .list(folderPath);
 
-      if (listError) {
-        console.error('Ошибка получения списка файлов для удаления:', listError);
-        return;
-      }
-
-      if (files && files.length > 0) {
-        // Удаляем все файлы в папке
-        const filePaths = files.map(file => `${folderPath}/${file.name}`);
-        const { error: deleteError } = await this.supabase!.storage
-          .from('qualification-objects')
-          .remove(filePaths);
-
-        if (deleteError) {
-          console.error('Ошибка удаления файлов из Storage:', deleteError);
-          throw new Error(`Ошибка удаления файлов: ${deleteError.message}`);
+        if (listError) {
+          console.error('Ошибка получения списка файлов для удаления:', listError);
+          return;
         }
 
-        console.log(`Удалены файлы из Storage: ${filePaths.join(', ')}`);
-      }
+        const fileEntries: StorageFileObject[] = files ? (files as StorageFileObject[]) : [];
+
+        if (fileEntries.length > 0) {
+          const filePaths = fileEntries.map((file: StorageFileObject) => `${folderPath}/${file.name}`);
+          const { error: deleteError } = await this.supabase!.storage
+            .from('qualification-objects')
+            .remove(filePaths);
+
+          if (deleteError) {
+            console.error('Ошибка удаления файлов из Storage:', deleteError);
+            throw new Error(`Ошибка удаления файлов: ${deleteError.message}`);
+          }
+
+          console.log(`Удалены файлы из Storage: ${filePaths.join(', ')}`);
+        }
     } catch (error) {
       console.error('Ошибка при удалении файла снятия логгеров:', error);
       throw error;
@@ -393,56 +412,65 @@ class QualificationObjectService {
         return {};
       }
 
-      const filesMap: { [key: string]: { name: string; url: string; size: number; lastModified: string } } = {};
+        const filesMap: { [key: string]: { name: string; url: string; size: number; lastModified: string } } = {};
 
-      if (data && data.length > 0) {
-        console.log('QualificationObjectService: Найдены папки в Storage:', data.map(f => f.name));
-        
-        for (const folder of data) {
-          console.log('QualificationObjectService: Обрабатываем папку:', folder.name);
+        const storageFolders: StorageFileObject[] = data ? (data as StorageFileObject[]) : [];
+
+        if (storageFolders.length > 0) {
+          console.log('QualificationObjectService: Найдены папки в Storage:', storageFolders.map((f: StorageFileObject) => f.name));
           
-          if (folder.name.startsWith('zone-') && folder.name.includes('-level-')) {
-            console.log('QualificationObjectService: Папка соответствует паттерну зоны:', folder.name);
+          for (const folder of storageFolders) {
+            console.log('QualificationObjectService: Обрабатываем папку:', folder.name);
             
-            // Получаем файлы в папке зоны
-            const { data: zoneFiles, error: zoneError } = await this.supabase!.storage
-              .from('qualification-objects')
-              .list(`logger-removal/${objectId}/${folder.name}`, {
-                limit: 10,
-                sortBy: { column: 'created_at', order: 'desc' }
-              });
-
-            console.log('QualificationObjectService: Файлы в папке', folder.name, ':', zoneFiles?.map(f => f.name) || [], 'Ошибка:', zoneError);
-
-            if (!zoneError && zoneFiles && zoneFiles.length > 0) {
-              // Берем самый новый файл из папки
-              const latestFile = zoneFiles[0];
-              const fileKey = folder.name; // zone-1-level-0
+            if (folder.name.startsWith('zone-') && folder.name.includes('-level-')) {
+              console.log('QualificationObjectService: Папка соответствует паттерну зоны:', folder.name);
               
-              console.log('QualificationObjectService: Выбран файл для папки', folder.name, ':', latestFile.name);
-              
-              const { data: urlData } = this.supabase!.storage
+              const { data: zoneFiles, error: zoneError } = await this.supabase!.storage
                 .from('qualification-objects')
-                .getPublicUrl(`logger-removal/${objectId}/${folder.name}/${latestFile.name}`);
+                .list(`logger-removal/${objectId}/${folder.name}`, {
+                  limit: 10,
+                  sortBy: { column: 'created_at', order: 'desc' }
+                });
 
-              filesMap[fileKey] = {
-                name: latestFile.name,
-                url: urlData.publicUrl,
-                size: latestFile.metadata?.size || 0,
-                lastModified: latestFile.updated_at || latestFile.created_at
-              };
-              
-              console.log('QualificationObjectService: Добавлен файл в карту:', fileKey, latestFile.name);
+              const zoneFileEntries: StorageFileObject[] = zoneFiles ? (zoneFiles as StorageFileObject[]) : [];
+
+              console.log(
+                'QualificationObjectService: Файлы в папке',
+                folder.name,
+                ':',
+                zoneFileEntries.map((f: StorageFileObject) => f.name) || [],
+                'Ошибка:',
+                zoneError
+              );
+
+              if (!zoneError && zoneFileEntries.length > 0) {
+                const latestFile = zoneFileEntries[0];
+                const fileKey = folder.name; // zone-1-level-0
+                
+                console.log('QualificationObjectService: Выбран файл для папки', folder.name, ':', latestFile.name);
+                
+                const { data: urlData } = this.supabase!.storage
+                  .from('qualification-objects')
+                  .getPublicUrl(`logger-removal/${objectId}/${folder.name}/${latestFile.name}`);
+
+                filesMap[fileKey] = {
+                  name: latestFile.name,
+                  url: urlData.publicUrl,
+                  size: latestFile.metadata?.size || 0,
+                  lastModified: latestFile.updated_at || latestFile.created_at || new Date().toISOString()
+                };
+                
+                console.log('QualificationObjectService: Добавлен файл в карту:', fileKey, latestFile.name);
+              } else {
+                console.log('QualificationObjectService: Нет файлов в папке', folder.name, 'или ошибка:', zoneError);
+              }
             } else {
-              console.log('QualificationObjectService: Нет файлов в папке', folder.name, 'или ошибка:', zoneError);
+              console.log('QualificationObjectService: Папка не соответствует паттерну зоны:', folder.name);
             }
-          } else {
-            console.log('QualificationObjectService: Папка не соответствует паттерну зоны:', folder.name);
           }
+        } else {
+          console.log('QualificationObjectService: Нет папок в Storage для объекта:', objectId);
         }
-      } else {
-        console.log('QualificationObjectService: Нет папок в Storage для объекта:', objectId);
-      }
 
       return filesMap;
     } catch (error) {

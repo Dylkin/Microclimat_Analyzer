@@ -133,15 +133,15 @@ class TenderService {
         errorMessage: history.errorMessage
       });
       
-      return {
-        ...data,
-        searchDate: new Date(data.searchDate),
-        searchSettings: {
-          ...data.searchSettings,
-          purchaseItems: data.searchSettings.purchaseItems || [],
-          organizationInns: data.searchSettings.organizationInns || []
-        }
-      };
+        return {
+          ...data,
+          searchDate: new Date(data.searchDate),
+          searchSettings: {
+            ...data.searchSettings,
+            purchaseItems: data.searchSettings.purchaseItems || [],
+            organizationUnps: data.searchSettings.organizationUnps || []
+          }
+        };
     } catch (error: any) {
       console.error('Ошибка сохранения истории поиска:', error);
       throw new Error(`Ошибка сохранения истории поиска: ${error.message || 'Неизвестная ошибка'}`);
