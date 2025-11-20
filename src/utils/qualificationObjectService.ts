@@ -2,10 +2,13 @@ import { apiClient } from './apiClient';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { sanitizeFileName } from './fileNameUtils';
 import { getMimeType } from './mimeTypeUtils';
+import { supabase as supabaseClient } from './supabaseClient';
 
 class QualificationObjectService {
+  private supabase = supabaseClient;
+
   isAvailable(): boolean {
-    return !!apiClient;
+    return this.supabase !== null;
   }
 
   async getAllQualificationObjects(): Promise<QualificationObject[]> {
@@ -354,20 +357,20 @@ class QualificationObjectService {
         return;
       }
 
-      if (files && files.length > 0) {
-        // Удаляем все файлы в папке
-        const filePaths = files.map(file => `${folderPath}/${file.name}`);
-        const { error: deleteError } = await this.supabase!.storage
-          .from('qualification-objects')
-          .remove(filePaths);
+        if (files && files.length > 0) {
+          // Удаляем все файлы в папке
+          const filePaths = files.map((file: any) => `${folderPath}/${file.name}`);
+          const { error: deleteError } = await this.supabase!.storage
+            .from('qualification-objects')
+            .remove(filePaths);
 
-        if (deleteError) {
-          console.error('Ошибка удаления файлов из Storage:', deleteError);
-          throw new Error(`Ошибка удаления файлов: ${deleteError.message}`);
+          if (deleteError) {
+            console.error('Ошибка удаления файлов из Storage:', deleteError);
+            throw new Error(`Ошибка удаления файлов: ${deleteError.message}`);
+          }
+
+          console.log(`Удалены файлы из Storage: ${filePaths.join(', ')}`);
         }
-
-        console.log(`Удалены файлы из Storage: ${filePaths.join(', ')}`);
-      }
     } catch (error) {
       console.error('Ошибка при удалении файла снятия логгеров:', error);
       throw error;
@@ -395,54 +398,54 @@ class QualificationObjectService {
 
       const filesMap: { [key: string]: { name: string; url: string; size: number; lastModified: string } } = {};
 
-      if (data && data.length > 0) {
-        console.log('QualificationObjectService: Найдены папки в Storage:', data.map(f => f.name));
-        
-        for (const folder of data) {
-          console.log('QualificationObjectService: Обрабатываем папку:', folder.name);
+        if (data && data.length > 0) {
+          console.log('QualificationObjectService: Найдены папки в Storage:', data.map((folder: any) => folder.name));
           
-          if (folder.name.startsWith('zone-') && folder.name.includes('-level-')) {
-            console.log('QualificationObjectService: Папка соответствует паттерну зоны:', folder.name);
+          for (const folder of data) {
+            console.log('QualificationObjectService: Обрабатываем папку:', folder.name);
             
-            // Получаем файлы в папке зоны
-            const { data: zoneFiles, error: zoneError } = await this.supabase!.storage
-              .from('qualification-objects')
-              .list(`logger-removal/${objectId}/${folder.name}`, {
-                limit: 10,
-                sortBy: { column: 'created_at', order: 'desc' }
-              });
-
-            console.log('QualificationObjectService: Файлы в папке', folder.name, ':', zoneFiles?.map(f => f.name) || [], 'Ошибка:', zoneError);
-
-            if (!zoneError && zoneFiles && zoneFiles.length > 0) {
-              // Берем самый новый файл из папки
-              const latestFile = zoneFiles[0];
-              const fileKey = folder.name; // zone-1-level-0
+            if (folder.name.startsWith('zone-') && folder.name.includes('-level-')) {
+              console.log('QualificationObjectService: Папка соответствует паттерну зоны:', folder.name);
               
-              console.log('QualificationObjectService: Выбран файл для папки', folder.name, ':', latestFile.name);
-              
-              const { data: urlData } = this.supabase!.storage
+              // Получаем файлы в папке зоны
+              const { data: zoneFiles, error: zoneError } = await this.supabase!.storage
                 .from('qualification-objects')
-                .getPublicUrl(`logger-removal/${objectId}/${folder.name}/${latestFile.name}`);
+                .list(`logger-removal/${objectId}/${folder.name}`, {
+                  limit: 10,
+                  sortBy: { column: 'created_at', order: 'desc' }
+                });
 
-              filesMap[fileKey] = {
-                name: latestFile.name,
-                url: urlData.publicUrl,
-                size: latestFile.metadata?.size || 0,
-                lastModified: latestFile.updated_at || latestFile.created_at
-              };
-              
-              console.log('QualificationObjectService: Добавлен файл в карту:', fileKey, latestFile.name);
+              console.log('QualificationObjectService: Файлы в папке', folder.name, ':', zoneFiles?.map((file: any) => file.name) || [], 'Ошибка:', zoneError);
+
+              if (!zoneError && zoneFiles && zoneFiles.length > 0) {
+                // Берем самый новый файл из папки
+                const latestFile = zoneFiles[0];
+                const fileKey = folder.name; // zone-1-level-0
+                
+                console.log('QualificationObjectService: Выбран файл для папки', folder.name, ':', latestFile.name);
+                
+                const { data: urlData } = this.supabase!.storage
+                  .from('qualification-objects')
+                  .getPublicUrl(`logger-removal/${objectId}/${folder.name}/${latestFile.name}`);
+
+                filesMap[fileKey] = {
+                  name: latestFile.name,
+                  url: urlData.publicUrl,
+                  size: latestFile.metadata?.size || 0,
+                  lastModified: latestFile.updated_at || latestFile.created_at
+                };
+                
+                console.log('QualificationObjectService: Добавлен файл в карту:', fileKey, latestFile.name);
+              } else {
+                console.log('QualificationObjectService: Нет файлов в папке', folder.name, 'или ошибка:', zoneError);
+              }
             } else {
-              console.log('QualificationObjectService: Нет файлов в папке', folder.name, 'или ошибка:', zoneError);
+              console.log('QualificationObjectService: Папка не соответствует паттерну зоны:', folder.name);
             }
-          } else {
-            console.log('QualificationObjectService: Папка не соответствует паттерну зоны:', folder.name);
           }
+        } else {
+          console.log('QualificationObjectService: Нет папок в Storage для объекта:', objectId);
         }
-      } else {
-        console.log('QualificationObjectService: Нет папок в Storage для объекта:', objectId);
-      }
 
       return filesMap;
     } catch (error) {
