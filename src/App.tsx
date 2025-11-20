@@ -25,6 +25,7 @@ const CreatingReport = lazy(() => import('./components/CreatingReport'));
 const DataAnalysis = lazy(() => import('./components/DataAnalysis'));
 const AuditLogs = lazy(() => import('./components/AuditLogs'));
 const ResetPassword = lazy(() => import('./components/ResetPassword'));
+const TenderSearch = lazy(() => import('./components/TenderSearch'));
 
 // Loading component
 const LoadingSpinner: React.FC = () => (
@@ -175,6 +176,8 @@ const AppContent: React.FC = () => {
         return wrapWithSuspense(<SupabaseAuthInit />);
       case 'secure-auth-manager':
         return wrapWithSuspense(<SecureAuthManager />);
+      case 'tender-search':
+        return hasAccess('analyzer') ? wrapWithSuspense(<TenderSearch />) : <div>Доступ запрещен</div>;
       default:
         return wrapWithSuspense(
           <MicroclimatAnalyzer 

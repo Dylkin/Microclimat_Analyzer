@@ -43,10 +43,7 @@ const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onBack, on
 
   // Загрузка данных контрагента
   const loadContractor = async () => {
-    if (!contractorService.isAvailable()) {
-      setError('Supabase не настроен для работы с контрагентами');
-      return;
-    }
+    // Убрана проверка isAvailable - API клиент всегда доступен
 
     setLoading(true);
     setError(null);

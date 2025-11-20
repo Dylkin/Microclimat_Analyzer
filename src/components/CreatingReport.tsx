@@ -43,11 +43,6 @@ const CreatingReport: React.FC<CreatingReportProps> = ({ project, onBack, onPage
 
   // Загрузка данных контрагента
   const loadContractor = async () => {
-    if (!contractorService.isAvailable()) {
-      setError('Supabase не настроен для работы с контрагентами');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 

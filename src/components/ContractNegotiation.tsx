@@ -83,11 +83,7 @@ const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBa
 
   // Загрузка данных контрагента
   const loadContractor = async () => {
-    if (!contractorService.isAvailable()) {
-      console.warn('ContractorService не доступен');
-      return;
-    }
-
+    // Убрана проверка isAvailable - API клиент всегда доступен
     try {
       const contractorData = await contractorService.getContractorById(currentProject.contractorId);
       setContractor(contractorData);

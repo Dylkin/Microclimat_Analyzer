@@ -51,17 +51,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Загрузка пользователей из базы данных
   const loadUsers = async () => {
-    if (!userService.isAvailable()) {
-      console.warn('Supabase не настроен, используем локальные данные');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
       const dbUsers = await userService.getAllUsers();
-      setUsers(dbUsers);
+      
+      // Проверяем, есть ли пользователь по умолчанию в списке
+      const hasDefaultUser = dbUsers.some((u: User) => u.isDefault);
+      
+      // Если пользователя по умолчанию нет, добавляем его
+      if (!hasDefaultUser) {
+        console.log('Пользователь по умолчанию не найден в БД, добавляем локально');
+        setUsers([defaultUser, ...dbUsers]);
+      } else {
+        setUsers(dbUsers);
+      }
+      
       console.log('Пользователи загружены из базы данных:', dbUsers.length);
     } catch (error) {
       console.error('Ошибка загрузки пользователей из БД:', error);
@@ -82,6 +88,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Ошибка парсинга пользователей из localStorage:', parseError);
           setUsers([defaultUser]);
         }
+      } else {
+        // Если нет данных ни в БД, ни в localStorage, используем только пользователя по умолчанию
+        setUsers([defaultUser]);
       }
     } finally {
       setLoading(false);
@@ -348,22 +357,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Восстановление сессии при загрузке
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        // Проверяем, что ID пользователя является валидным UUID
-        if (parsedUser.id && isValidUUID(parsedUser.id)) {
-          setUser(parsedUser);
-        } else {
-          console.warn('Невалидный UUID пользователя в localStorage, очищаем сессию');
+    const restoreSession = async () => {
+      const savedUser = localStorage.getItem('currentUser');
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          // Проверяем, что ID пользователя является валидным UUID
+          if (parsedUser.id && isValidUUID(parsedUser.id)) {
+            // Проверяем, существует ли пользователь в БД
+            try {
+              const dbUsers = await userService.getAllUsers();
+              const userExists = dbUsers.some(u => u.id === parsedUser.id);
+              
+              if (userExists) {
+                // Пользователь существует в БД, восстанавливаем сессию
+                setUser(parsedUser);
+              } else {
+                // Пользователь не найден в БД, очищаем localStorage
+                console.warn('Пользователь из localStorage не найден в БД, очищаем сессию');
+                localStorage.removeItem('currentUser');
+              }
+            } catch (error) {
+              // Если не удалось проверить в БД, все равно восстанавливаем сессию
+              // (на случай, если БД временно недоступна)
+              console.warn('Не удалось проверить пользователя в БД, восстанавливаем сессию из localStorage');
+              setUser(parsedUser);
+            }
+          } else {
+            console.warn('Невалидный UUID пользователя в localStorage, очищаем сессию');
+            localStorage.removeItem('currentUser');
+          }
+        } catch (error) {
+          console.error('Ошибка парсинга пользователя из localStorage:', error);
           localStorage.removeItem('currentUser');
         }
-      } catch (error) {
-        console.error('Ошибка парсинга пользователя из localStorage:', error);
-        localStorage.removeItem('currentUser');
       }
-    }
+    };
+    
+    restoreSession();
   }, []);
 
   const value = {

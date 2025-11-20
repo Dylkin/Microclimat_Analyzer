@@ -29,7 +29,7 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
   // Загрузка оборудования при инициализации
   useEffect(() => {
     const loadEquipment = async () => {
-      if (!equipmentService.isAvailable()) return;
+      // Убрана проверка isAvailable - API клиент всегда доступен
       
       setEquipmentLoading(true);
       try {
@@ -206,10 +206,7 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
 
   // Сохранение зон измерения в базу данных
   const handleSave = async () => {
-    if (!qualificationObjectService.isAvailable()) {
-      setSaveError('Сервис базы данных недоступен');
-      return;
-    }
+    // Убрана проверка isAvailable - API клиент всегда доступен
 
     setSaving(true);
     setSaveError(null);

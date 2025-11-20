@@ -66,7 +66,7 @@ const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   // Загрузка контрагентов при инициализации
   React.useEffect(() => {
     const loadContractors = async () => {
-      if (!contractorService.isAvailable()) return;
+      // Убрана проверка isAvailable - API клиент всегда доступен
       
       try {
         const data = await contractorService.getAllContractors();
@@ -113,7 +113,7 @@ const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
   // Загрузка объектов квалификации при выборе контрагента
   React.useEffect(() => {
     const loadQualificationObjects = async () => {
-      if (!selectedContractor || !qualificationObjectService.isAvailable()) {
+      if (!selectedContractor) {
         setQualificationObjects([]);
         setSelectedQualificationObject('');
         return;

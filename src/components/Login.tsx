@@ -66,7 +66,7 @@ export const Login: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
             {showForgotPassword ? 'Сброс пароля' : 'Вход в систему'}
           </h1>
-          <p className="text-gray-600">Microclimat Analyzer</p>
+          <p className="text-gray-600">ComSystem Office</p>
         </div>
 
         {!showForgotPassword ? (

@@ -58,10 +58,7 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
 
   // Загрузка данных контрагента
   const loadContractor = async () => {
-    if (!contractorService.isAvailable()) {
-      setError('Supabase не настроен для работы с контрагентами');
-      return;
-    }
+    // Убрана проверка isAvailable - API клиент всегда доступен
 
     const currentProject = fullProject || project;
     console.log('DataAnalysis: project data:', currentProject);
@@ -84,10 +81,7 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
 
   // Загрузка конкретного объекта квалификации
   const loadSelectedQualificationObject = async () => {
-    if (!qualificationObjectService.isAvailable()) {
-      setError('Supabase не настроен для работы с объектами квалификации');
-      return;
-    }
+    // Убрана проверка isAvailable - API клиент всегда доступен
 
     if (!analysisData?.qualificationObjectId) {
       setError('Не указан ID объекта квалификации для анализа');

@@ -858,3 +858,4 @@ sudo tail -f /var/log/nginx/error.log
 **Версия:** 1.0.0  
 **Автор:** Microclimat Analyzer Team
 
+

@@ -1,126 +1,44 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from './apiClient';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { sanitizeFileName } from './fileNameUtils';
 import { getMimeType } from './mimeTypeUtils';
 
 class QualificationObjectService {
-  private supabase;
-
-  constructor() {
-    this.supabase = supabase;
-  }
-
-
   isAvailable(): boolean {
-    return !!this.supabase;
+    return !!apiClient;
   }
 
   async getAllQualificationObjects(): Promise<QualificationObject[]> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
+    try {
+      const data = await apiClient.get<any[]>('/qualification-objects');
+      return data.map(this.mapFromApi);
+    } catch (error: any) {
+      console.error('Ошибка загрузки объектов квалификации:', error);
+      throw new Error(`Ошибка загрузки объектов квалификации: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    // Проверяем подключение к Supabase
-    if (!this.supabase) {
-      throw new Error('Supabase клиент не инициализирован');
-    }
-
-    const { data, error } = await this.supabase!
-      .from('qualification_objects')
-      .select(`
-        *,
-        contractor:contractors(name)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      // Специальная обработка ошибок подключения
-      if (error.message?.includes('fetch') || error.message?.includes('network')) {
-        throw new Error('Ошибка сети при подключении к Supabase. Проверьте URL проекта.');
-      }
-      if (error.message?.includes('Invalid API key') || error.message?.includes('unauthorized')) {
-        throw new Error('Неверный ключ API Supabase. Проверьте VITE_SUPABASE_ANON_KEY.');
-      }
-      
-      throw new Error(`Ошибка загрузки объектов квалификации: ${error.message}`);
-    }
-
-    if (!data) {
-      console.warn('Получен null/undefined ответ от Supabase для объектов квалификации');
-      return [];
-    }
-
-    return data.map(this.mapFromDatabase);
   }
 
   async getQualificationObjectsByContractor(contractorId: string): Promise<QualificationObject[]> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
+    try {
+      const data = await apiClient.get<any[]>(`/qualification-objects?contractor_id=${contractorId}`);
+      return data.map(this.mapFromApi);
+    } catch (error: any) {
+      console.error('Ошибка загрузки объектов квалификации контрагента:', error);
+      throw new Error(`Ошибка загрузки объектов квалификации: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    // Проверяем подключение к Supabase
-    if (!this.supabase) {
-      throw new Error('Supabase клиент не инициализирован');
-    }
-
-    const { data, error } = await this.supabase!
-      .from('qualification_objects')
-      .select(`
-        *,
-        contractor:contractors(name)
-      `)
-      .eq('contractor_id', contractorId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      // Специальная обработка ошибок подключения
-      if (error.message?.includes('fetch') || error.message?.includes('network')) {
-        throw new Error('Ошибка сети при подключении к Supabase. Проверьте URL проекта.');
-      }
-      if (error.message?.includes('Invalid API key') || error.message?.includes('unauthorized')) {
-        throw new Error('Неверный ключ API Supabase. Проверьте VITE_SUPABASE_ANON_KEY.');
-      }
-      
-      throw new Error(`Ошибка загрузки объектов квалификации: ${error.message}`);
-    }
-
-    if (!data) {
-      console.warn('Получен null/undefined ответ от Supabase для объектов квалификации контрагента');
-      return [];
-    }
-
-    return data.map(this.mapFromDatabase);
   }
 
   async getQualificationObjectById(id: string): Promise<QualificationObject> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
-    console.log('Загрузка объекта квалификации по ID:', id);
-
-    const { data, error } = await this.supabase!
-      .from('qualification_objects')
-      .select(`
-        *,
-        contractor:contractors(name)
-      `)
-      .eq('id', id)
-      .single();
-
-    if (error) {
+    try {
+      console.log('Загрузка объекта квалификации по ID:', id);
+      const data = await apiClient.get<any>(`/qualification-objects/${id}`);
+      return this.mapFromApi(data);
+    } catch (error: any) {
       console.error('Ошибка загрузки объекта квалификации:', error);
-      throw new Error(`Ошибка получения объекта квалификации: ${error.message}`);
+      throw new Error(`Ошибка загрузки объекта квалификации: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    if (!data) {
-      console.error('Объект квалификации не найден для ID:', id);
-      throw new Error('Объект квалификации не найден');
-    }
-
-    console.log('Объект квалификации загружен:', data);
-    return this.mapFromDatabase(data);
   }
+
 
   async createQualificationObject(qualificationObject: CreateQualificationObjectData): Promise<QualificationObject> {
     if (!this.isAvailable()) {
@@ -295,71 +213,55 @@ class QualificationObjectService {
     return urlData.publicUrl;
   }
 
-  private mapFromDatabase(data: any): QualificationObject {
-    // Безопасная обработка measurement_zones для JSONB поля
+  // Маппинг данных из API в QualificationObject
+  private mapFromApi(data: any): QualificationObject {
+    // Обработка measurement_zones из JSONB
     let measurementZones = [];
     try {
-      const measurementZonesData = data.measurement_zones;
-      console.log('Обработка measurement_zones из БД:', {
-        objectId: data.id,
-        rawData: measurementZonesData,
-        dataType: typeof measurementZonesData,
-        isArray: Array.isArray(measurementZonesData)
-      });
-      
+      const measurementZonesData = data.measurementZones || data.measurement_zones;
       if (measurementZonesData) {
-        // JSONB поля уже возвращаются как объекты/массивы
         if (Array.isArray(measurementZonesData)) {
           measurementZones = measurementZonesData;
-          console.log('measurement_zones загружен как массив:', measurementZones);
-        } else if (typeof measurementZonesData === 'string' && measurementZonesData.trim() !== '') {
-          // Если все же пришла строка, парсим её
+        } else if (typeof measurementZonesData === 'string') {
           measurementZones = JSON.parse(measurementZonesData);
-          if (!Array.isArray(measurementZones)) {
-            console.warn('measurement_zones не является массивом после парсинга, используем пустой массив');
-            measurementZones = [];
-          }
-        } else {
-          console.warn('measurement_zones имеет неожиданный тип:', typeof measurementZonesData);
-          measurementZones = [];
         }
-      } else {
-        // Если поле пустое или null - используем пустой массив
-        console.log('measurement_zones пустое или null');
-        measurementZones = [];
       }
     } catch (error) {
-      // Логируем ошибку и используем пустой массив как fallback
-      console.error('Ошибка обработки measurement_zones для объекта:', data.id, error);
+      console.error('Ошибка обработки measurement_zones:', error);
       measurementZones = [];
     }
 
     return {
       id: data.id,
-      contractorId: data.contractor_id,
-      type: data.type,
+      contractorId: data.contractorId || data.contractor_id || '',
+      type: (data.objectType || data.type || 'помещение') as any,
       name: data.name || '',
       manufacturer: data.manufacturer || '',
-      climateSystem: data.climate_system || '',
-      planFileUrl: data.plan_file_url || '',
-      planFileName: data.plan_file_name || '',
+      climateSystem: data.climateSystem || data.climate_system || '',
+      planFileUrl: data.planFileUrl || data.plan_file_url || '',
+      planFileName: data.planFileName || data.plan_file_name || '',
       address: data.address || '',
       latitude: data.latitude ? parseFloat(data.latitude) : undefined,
       longitude: data.longitude ? parseFloat(data.longitude) : undefined,
-      geocodedAt: data.geocoded_at ? new Date(data.geocoded_at) : undefined,
+      geocodedAt: data.geocodedAt ? new Date(data.geocodedAt) : (data.geocoded_at ? new Date(data.geocoded_at) : undefined),
       area: data.area ? parseFloat(data.area) : undefined,
       vin: data.vin || '',
-      registrationNumber: data.registration_number || '',
-      bodyVolume: data.body_volume ? parseFloat(data.body_volume) : undefined,
-      inventoryNumber: data.inventory_number || '',
-      chamberVolume: data.chamber_volume ? parseFloat(data.chamber_volume) : undefined,
-      serialNumber: data.serial_number || '',
-      testDataFileUrl: data.test_data_file_url || '',
-      testDataFileName: data.test_data_file_name || '',
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
+      registrationNumber: data.registrationNumber || data.registration_number || '',
+      bodyVolume: data.bodyVolume ? parseFloat(data.bodyVolume) : (data.body_volume ? parseFloat(data.body_volume) : undefined),
+      inventoryNumber: data.inventoryNumber || data.inventory_number || '',
+      chamberVolume: data.chamberVolume ? parseFloat(data.chamberVolume) : (data.chamber_volume ? parseFloat(data.chamber_volume) : undefined),
+      serialNumber: data.serialNumber || data.serial_number || '',
+      testDataFileUrl: data.testDataFileUrl || data.test_data_file_url || '',
+      testDataFileName: data.testDataFileName || data.test_data_file_name || '',
+      createdAt: data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date()),
+      updatedAt: data.updatedAt ? new Date(data.updatedAt) : (data.updated_at ? new Date(data.updated_at) : new Date()),
       measurementZones: measurementZones
     };
+  }
+
+  // Старый метод для обратной совместимости
+  private mapFromDatabase(data: any): QualificationObject {
+    return this.mapFromApi(data);
   }
 
   private mapToDatabase(data: Partial<QualificationObject> | CreateQualificationObjectData): any {

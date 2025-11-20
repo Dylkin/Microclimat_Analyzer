@@ -1,35 +1,10 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from './apiClient';
 import { Equipment, EquipmentType, CreateEquipmentData, UpdateEquipmentData, EquipmentVerification } from '../types/Equipment';
 
-interface DatabaseEquipment {
-  id: string;
-  type: EquipmentType;
-  name: string;
-  serial_number: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface DatabaseEquipmentVerification {
-  id: string;
-  equipment_id: string;
-  verification_start_date: string;
-  verification_end_date: string;
-  verification_file_url: string | null;
-  verification_file_name: string | null;
-  created_at: string;
-}
-
 class EquipmentService {
-  private supabase: any;
-
-  constructor() {
-    this.supabase = supabase;
-  }
-
-  // Проверка доступности Supabase
+  // Проверка доступности API
   isAvailable(): boolean {
-    return !!this.supabase;
+    return !!apiClient;
   }
 
   // Получение всего оборудования с пагинацией
@@ -38,133 +13,68 @@ class EquipmentService {
     total: number;
     totalPages: number;
   }> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      let query = this.supabase
-        .from('measurement_equipment')
-        .select(`
-          *,
-          equipment_verifications (
-            id,
-            verification_start_date,
-            verification_end_date,
-            verification_file_url,
-            verification_file_name,
-            created_at
-          )
-        `, { count: 'exact' });
-
-      // Применяем поиск если указан
-      if (searchTerm && searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        query = query.or(`name.ilike.%${searchLower}%,serial_number.ilike.%${searchLower}%`);
-      }
-
-      // Применяем пагинацию
-      const from = (page - 1) * limit;
-      const to = from + limit - 1;
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        sortOrder: sortOrder
+      });
       
-      const { data, error, count } = await query
-        .order('name', { ascending: sortOrder === 'asc' })
-        .range(from, to);
-
-      if (error) {
-        console.error('Ошибка получения оборудования:', error);
-        throw new Error(`Ошибка получения оборудования: ${error.message}`);
+      if (searchTerm) {
+        params.append('search', searchTerm);
       }
-
-      const equipment = data.map((item: DatabaseEquipment) => ({
-        id: item.id,
-        type: item.type,
-        name: item.name,
-        serialNumber: item.serial_number,
-        createdAt: new Date(item.created_at),
-        updatedAt: new Date(item.updated_at),
-        verifications: (item as any).equipment_verifications?.map((verification: DatabaseEquipmentVerification) => ({
-          id: verification.id,
-          equipmentId: verification.equipment_id,
-          verificationStartDate: new Date(verification.verification_start_date),
-          verificationEndDate: new Date(verification.verification_end_date),
-          verificationFileUrl: verification.verification_file_url || undefined,
-          verificationFileName: verification.verification_file_name || undefined,
-          createdAt: new Date(verification.created_at)
-        })) || []
-      }));
-
+      
+      const data = await apiClient.get<{
+        equipment: any[];
+        total: number;
+        totalPages: number;
+      }>(`/equipment?${params.toString()}`);
+      
       return {
-        equipment,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit)
+        equipment: data.equipment.map(this.mapFromApi),
+        total: data.total,
+        totalPages: data.totalPages
       };
-    } catch (error) {
-      console.error('Ошибка при получении оборудования:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('Ошибка получения оборудования:', error);
+      throw new Error(`Ошибка получения оборудования: ${error.message || 'Неизвестная ошибка'}`);
+    }
+  }
+
+  // Получение оборудования по ID
+  async getEquipmentById(id: string): Promise<Equipment> {
+    try {
+      const data = await apiClient.get<any>(`/equipment/${id}`);
+      return this.mapFromApi(data);
+    } catch (error: any) {
+      console.error('Ошибка получения оборудования:', error);
+      throw new Error(`Ошибка получения оборудования: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
   // Добавление нового оборудования
   async addEquipment(equipmentData: CreateEquipmentData): Promise<Equipment> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
       console.log('Добавляем оборудование:', equipmentData);
 
-      const { data, error } = await this.supabase
-        .from('measurement_equipment')
-        .insert({
-          type: equipmentData.type,
-          name: equipmentData.name,
-          serial_number: equipmentData.serialNumber
-        })
-        .select()
-        .single();
+      const equipment = await apiClient.post<any>('/equipment', {
+        type: equipmentData.type,
+        name: equipmentData.name,
+        serialNumber: equipmentData.serialNumber
+      });
 
-      if (error) {
-        console.error('Ошибка добавления оборудования:', error);
-        
-        if (error.code === '23505') {
-          if (error.message.includes('serial_number')) {
-            throw new Error('Оборудование с таким серийным номером уже существует');
-          }
-          if (error.message.includes('name')) {
-            throw new Error('Оборудование с таким наименованием уже существует');
-          }
-          throw new Error('Оборудование с такими данными уже существует');
-        }
-        
-        throw new Error(`Ошибка добавления оборудования: ${error.message}`);
-      }
-
-      console.log('Оборудование успешно добавлено:', data);
-
-      const newEquipment = {
-        id: data.id,
-        type: data.type,
-        name: data.name,
-        serialNumber: data.serial_number,
-        createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at),
-        verifications: []
-      };
-
-      // Добавляем аттестации если они есть
+      // Добавляем верификации если они есть
       if (equipmentData.verifications && equipmentData.verifications.length > 0) {
         for (const verification of equipmentData.verifications) {
-          await this.addVerification(data.id, verification);
+          await this.addVerification(equipment.id, verification);
         }
         
-        // Перезагружаем оборудование с аттестациями
-        const result = await this.getAllEquipment(1, 1, data.name);
-        return result.equipment[0] || newEquipment;
+        // Перезагружаем оборудование с верификациями
+        return await this.getEquipmentById(equipment.id);
       }
 
-      return newEquipment;
-    } catch (error) {
+      return this.mapFromApi(equipment);
+    } catch (error: any) {
       console.error('Ошибка при добавлении оборудования:', error);
       throw error;
     }
@@ -172,70 +82,15 @@ class EquipmentService {
 
   // Обновление оборудования
   async updateEquipment(id: string, updates: UpdateEquipmentData): Promise<Equipment> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      const updateData: any = {};
-      
-      if (updates.type !== undefined) updateData.type = updates.type;
-      if (updates.name !== undefined) updateData.name = updates.name;
-      if (updates.serialNumber !== undefined) updateData.serial_number = updates.serialNumber;
+      const equipment = await apiClient.put<any>(`/equipment/${id}`, {
+        type: updates.type,
+        name: updates.name,
+        serialNumber: updates.serialNumber
+      });
 
-      const { data, error } = await this.supabase
-        .from('measurement_equipment')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Ошибка обновления оборудования:', error);
-        
-        if (error.code === '23505') {
-          if (error.message.includes('serial_number')) {
-            throw new Error('Оборудование с таким серийным номером уже существует');
-          }
-          if (error.message.includes('name')) {
-            throw new Error('Оборудование с таким наименованием уже существует');
-          }
-          throw new Error('Оборудование с такими данными уже существует');
-        }
-        
-        throw new Error(`Ошибка обновления оборудования: ${error.message}`);
-      }
-
-      const updatedEquipment = {
-        id: data.id,
-        type: data.type,
-        name: data.name,
-        serialNumber: data.serial_number,
-        createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at),
-        verifications: []
-      };
-
-      // Обновляем аттестации если они есть
-      if (updates.verifications !== undefined) {
-        // Удаляем старые аттестации
-        await this.supabase
-          .from('equipment_verifications')
-          .delete()
-          .eq('equipment_id', id);
-
-        // Добавляем новые аттестации
-        for (const verification of updates.verifications) {
-          await this.addVerification(id, verification);
-        }
-        
-        // Перезагружаем оборудование с аттестациями
-        const result = await this.getAllEquipment(1, 1, data.name);
-        return result.equipment[0] || updatedEquipment;
-      }
-
-      return updatedEquipment;
-    } catch (error) {
+      return this.mapFromApi(equipment);
+    } catch (error: any) {
       console.error('Ошибка при обновлении оборудования:', error);
       throw error;
     }
@@ -243,21 +98,9 @@ class EquipmentService {
 
   // Удаление оборудования
   async deleteEquipment(id: string): Promise<void> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      const { error } = await this.supabase
-        .from('measurement_equipment')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('Ошибка удаления оборудования:', error);
-        throw new Error(`Ошибка удаления оборудования: ${error.message}`);
-      }
-    } catch (error) {
+      await apiClient.delete(`/equipment/${id}`);
+    } catch (error: any) {
       console.error('Ошибка при удалении оборудования:', error);
       throw error;
     }
@@ -268,114 +111,73 @@ class EquipmentService {
     total: number;
     byType: Record<EquipmentType, number>;
   }> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      const { data, error } = await this.supabase
-        .from('measurement_equipment')
-        .select('type');
-
-      if (error) {
-        console.error('Ошибка получения статистики:', error);
-        throw new Error(`Ошибка получения статистики: ${error.message}`);
-      }
-
-      const stats = {
-        total: data.length,
-        byType: {
-          '-': 0,
-          'Testo 174T': 0,
-          'Testo 174H': 0
-        } as Record<EquipmentType, number>
-      };
-
-      data.forEach((item: { type: EquipmentType }) => {
-        stats.byType[item.type] = (stats.byType[item.type] || 0) + 1;
-      });
-
+      const stats = await apiClient.get<{
+        total: number;
+        byType: Record<EquipmentType, number>;
+      }>('/equipment/stats');
+      
       return stats;
-    } catch (error) {
-      console.error('Ошибка при получении статистики:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('Ошибка получения статистики:', error);
+      throw new Error(`Ошибка получения статистики: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
   // Добавление аттестации
   async addVerification(equipmentId: string, verification: Omit<EquipmentVerification, 'id' | 'equipmentId' | 'createdAt'>): Promise<EquipmentVerification> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      const { data, error } = await this.supabase
-        .from('equipment_verifications')
-        .insert({
-          equipment_id: equipmentId,
-          verification_start_date: verification.verificationStartDate.toISOString().split('T')[0],
-          verification_end_date: verification.verificationEndDate.toISOString().split('T')[0],
-          verification_file_url: verification.verificationFileUrl || null,
-          verification_file_name: verification.verificationFileName || null
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Ошибка добавления аттестации:', error);
-        throw new Error(`Ошибка добавления аттестации: ${error.message}`);
-      }
-
+      const result = await apiClient.post<EquipmentVerification>(`/equipment/${equipmentId}/verifications`, {
+        verificationStartDate: verification.verificationStartDate,
+        verificationEndDate: verification.verificationEndDate,
+        verificationFileUrl: verification.verificationFileUrl,
+        verificationFileName: verification.verificationFileName
+      });
+      
       return {
-        id: data.id,
-        equipmentId: data.equipment_id,
-        verificationStartDate: new Date(data.verification_start_date),
-        verificationEndDate: new Date(data.verification_end_date),
-        verificationFileUrl: data.verification_file_url || undefined,
-        verificationFileName: data.verification_file_name || undefined,
-        createdAt: new Date(data.created_at)
+        id: result.id,
+        equipmentId: result.equipmentId,
+        verificationStartDate: new Date(result.verificationStartDate),
+        verificationEndDate: new Date(result.verificationEndDate),
+        verificationFileUrl: result.verificationFileUrl,
+        verificationFileName: result.verificationFileName,
+        createdAt: new Date(result.createdAt)
       };
-    } catch (error) {
-      console.error('Ошибка при добавлении аттестации:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('Ошибка при добавлении верификации:', error);
+      throw new Error(`Ошибка добавления верификации: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
-  // Загрузка файла аттестации
-  async uploadVerificationFile(equipmentId: string, verificationId: string, file: File): Promise<string> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
+  // Удаление аттестации
+  async deleteVerification(equipmentId: string, verificationId: string): Promise<void> {
     try {
-      const fileName = `verifications/${equipmentId}/${verificationId}/${Date.now()}-${file.name}`;
-      
-      const { data, error } = await this.supabase.storage
-        .from('equipment-files')
-        .upload(fileName, file);
-
-      if (error) {
-        throw new Error(`Ошибка загрузки файла: ${error.message}`);
-      }
-
-      const { data: urlData } = this.supabase.storage
-        .from('equipment-files')
-        .getPublicUrl(fileName);
-
-      // Обновляем запись аттестации с URL файла
-      await this.supabase
-        .from('equipment_verifications')
-        .update({
-          verification_file_url: urlData.publicUrl,
-          verification_file_name: file.name
-        })
-        .eq('id', verificationId);
-
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Ошибка при загрузке файла аттестации:', error);
-      throw error;
+      await apiClient.delete(`/equipment/${equipmentId}/verifications/${verificationId}`);
+    } catch (error: any) {
+      console.error('Ошибка при удалении верификации:', error);
+      throw new Error(`Ошибка удаления верификации: ${error.message || 'Неизвестная ошибка'}`);
     }
+  }
+
+  // Маппинг данных из API в Equipment
+  private mapFromApi(data: any): Equipment {
+    return {
+      id: data.id,
+      type: data.type as EquipmentType,
+      name: data.name,
+      serialNumber: data.serialNumber || data.serial_number,
+      createdAt: data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date()),
+      updatedAt: data.updatedAt ? new Date(data.updatedAt) : (data.updated_at ? new Date(data.updated_at) : new Date()),
+      verifications: (data.verifications || []).map((v: any) => ({
+        id: v.id,
+        equipmentId: v.equipmentId || v.equipment_id,
+        verificationStartDate: v.verificationStartDate ? new Date(v.verificationStartDate) : new Date(v.verification_start_date),
+        verificationEndDate: v.verificationEndDate ? new Date(v.verificationEndDate) : new Date(v.verification_end_date),
+        verificationFileUrl: v.verificationFileUrl || v.verification_file_url || undefined,
+        verificationFileName: v.verificationFileName || v.verification_file_name || undefined,
+        createdAt: v.createdAt ? new Date(v.createdAt) : new Date(v.created_at)
+      }))
+    };
   }
 }
 

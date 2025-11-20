@@ -50,11 +50,6 @@ const ContractorDirectory: React.FC = () => {
 
   // Загрузка контрагентов
   const loadContractors = async () => {
-    if (!contractorService.isAvailable()) {
-      setError('Supabase не настроен. Проверьте переменные окружения.');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
@@ -110,10 +105,7 @@ const ContractorDirectory: React.FC = () => {
 
   // Загрузка объектов квалификации для контрагента
   const loadQualificationObjects = async (contractorId: string) => {
-    if (!qualificationObjectService.isAvailable()) {
-      setError('Supabase не настроен для работы с объектами квалификации');
-      return;
-    }
+    // Убрана проверка isAvailable - API клиент всегда доступен
 
     setLoading(true);
     try {

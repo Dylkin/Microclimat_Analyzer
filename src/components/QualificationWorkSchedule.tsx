@@ -211,10 +211,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
   // Загрузка уже сохраненных файлов снятия логгеров
   const loadLoggerRemovalFiles = async () => {
-    if (!qualificationObjectService.isAvailable()) {
-      console.warn('Сервис объектов квалификации недоступен');
-      return;
-    }
+    // Убрана проверка isAvailable - API клиент всегда доступен
 
     try {
       console.log('Загрузка файлов снятия логгеров для объекта:', qualificationObjectId);
@@ -307,10 +304,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
   // Загрузка зон измерения из объекта квалификации
   const loadMeasurementZones = async () => {
-    if (!qualificationObjectService.isAvailable()) {
-      console.warn('Сервис объектов квалификации недоступен');
-      return;
-    }
+    // Убрана проверка isAvailable - API клиент всегда доступен
 
     try {
       console.log('Загрузка зон измерения для объекта:', qualificationObjectId);

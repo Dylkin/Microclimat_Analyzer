@@ -267,6 +267,7 @@ const UserDirectory: React.FC = () => {
                 <option value="specialist">Специалист</option>
                 <option value="manager">Руководитель</option>
                 <option value="director">Менеджер</option>
+                <option value="admin">Администратор</option>
                 <option value="administrator">Администратор</option>
               </select>
             </div>
@@ -383,11 +384,12 @@ const UserDirectory: React.FC = () => {
                         <option value="specialist">Специалист</option>
                         <option value="manager">Руководитель</option>
                         <option value="director">Менеджер</option>
+                        <option value="admin">Администратор</option>
                         <option value="administrator">Администратор</option>
                       </select>
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        {roleLabels[user.role]}
+                        {roleLabels[user.role] || 'Неизвестная роль'}
                       </span>
                     )}
                   </td>
@@ -533,7 +535,7 @@ const UserDirectory: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">
-              {users.filter(u => u.role === 'administrator').length}
+              {users.filter(u => u.role === 'administrator' || u.role === 'admin').length}
             </div>
             <div className="text-sm text-gray-500">Администраторов</div>
           </div>

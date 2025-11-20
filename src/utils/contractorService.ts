@@ -1,36 +1,10 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from './apiClient';
 import { Contractor, ContractorContact, CreateContractorData, UpdateContractorData, GeocodeResult } from '../types/Contractor';
 
-interface DatabaseContractor {
-  id: string;
-  name: string;
-  address: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  geocoded_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface DatabaseContractorContact {
-  id: string;
-  contractor_id: string;
-  employee_name: string;
-  phone: string | null;
-  comment: string | null;
-  created_at: string;
-}
-
 class ContractorService {
-  private supabase: any;
-
-  constructor() {
-    this.supabase = supabase;
-  }
-
-  // Проверка доступности Supabase
+  // Проверка доступности API
   isAvailable(): boolean {
-    return !!this.supabase;
+    return !!apiClient;
   }
 
   // Геокодирование адреса через OpenStreetMap Nominatim API
@@ -67,168 +41,31 @@ class ContractorService {
 
   // Получение всех контрагентов с контактами
   async getAllContractors(): Promise<Contractor[]> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      // Проверяем подключение к Supabase
-      if (!this.supabase) {
-        throw new Error('Supabase клиент не инициализирован');
-      }
-
       console.log('Загружаем контрагентов...');
-      // Получаем контрагентов
-      const { data: contractorsData, error: contractorsError } = await this.supabase
-        .from('contractors')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (contractorsError) {
-        console.error('Ошибка получения контрагентов:', contractorsError);
-        
-        // Специальная обработка ошибок подключения
-        if (contractorsError.message?.includes('fetch') || contractorsError.message?.includes('network')) {
-          throw new Error('Ошибка сети при подключении к Supabase. Проверьте URL проекта.');
-        }
-        if (contractorsError.message?.includes('Invalid API key') || contractorsError.message?.includes('unauthorized')) {
-          throw new Error('Неверный ключ API Supabase. Проверьте VITE_SUPABASE_ANON_KEY.');
-        }
-        
-        throw new Error(`Ошибка получения контрагентов: ${contractorsError.message}`);
-      }
-
-      if (!contractorsData) {
-        console.warn('Получен null/undefined ответ от Supabase для контрагентов');
-        return [];
-      }
-
-      console.log('Загружено контрагентов:', contractorsData?.length || 0);
-      
-      // Проверяем валидность UUID для всех контрагентов
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const invalidContractors = contractorsData?.filter((c: any) => !uuidRegex.test(c.id)) || [];
-      
-      if (invalidContractors.length > 0) {
-        console.warn('Найдены контрагенты с некорректными ID:', invalidContractors);
-      }
-
-      // Получаем все контакты
-      const { data: contactsData, error: contactsError } = await this.supabase
-        .from('contractor_contacts')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (contactsError) {
-        console.error('Ошибка получения контактов:', contactsError);
-        throw new Error(`Ошибка получения контактов: ${contactsError.message}`);
-      }
-
-      // Группируем контакты по контрагентам
-      const contactsByContractor = new Map<string, ContractorContact[]>();
-      contactsData?.forEach((contact: DatabaseContractorContact) => {
-        if (!contactsByContractor.has(contact.contractor_id)) {
-          contactsByContractor.set(contact.contractor_id, []);
-        }
-        contactsByContractor.get(contact.contractor_id)!.push({
-          id: contact.id,
-          contractorId: contact.contractor_id,
-          employeeName: contact.employee_name,
-          phone: contact.phone || undefined,
-          comment: contact.comment || undefined,
-          createdAt: new Date(contact.created_at)
-        });
-      });
-
-      // Формируем результат
-      return contractorsData.map((contractor: DatabaseContractor) => ({
-        id: contractor.id,
-        name: contractor.name,
-        address: contractor.address || undefined,
-        latitude: contractor.latitude || undefined,
-        longitude: contractor.longitude || undefined,
-        geocodedAt: contractor.geocoded_at ? new Date(contractor.geocoded_at) : undefined,
-        createdAt: new Date(contractor.created_at),
-        updatedAt: new Date(contractor.updated_at),
-        contacts: contactsByContractor.get(contractor.id) || []
-      }));
+      const contractors = await apiClient.get<Contractor[]>('/contractors');
+      console.log('Контрагенты загружены:', contractors.length);
+      return contractors;
     } catch (error) {
-      console.error('Ошибка при получении контрагентов:', error);
+      console.error('Ошибка получения контрагентов:', error);
       throw error;
     }
   }
 
   // Получение контрагента по ID с контактами
   async getContractorById(contractorId: string): Promise<Contractor> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
       console.log('Загружаем контрагента по ID:', contractorId);
-      
-      // Получаем контрагента
-      const { data: contractorData, error: contractorError } = await this.supabase
-        .from('contractors')
-        .select('*')
-        .eq('id', contractorId)
-        .single();
-
-      if (contractorError) {
-        console.error('Ошибка получения контрагента:', contractorError);
-        throw new Error(`Ошибка получения контрагента: ${contractorError.message}`);
-      }
-
-      if (!contractorData) {
-        throw new Error('Контрагент не найден');
-      }
-
-      // Получаем контакты контрагента
-      const { data: contactsData, error: contactsError } = await this.supabase
-        .from('contractor_contacts')
-        .select('*')
-        .eq('contractor_id', contractorId)
-        .order('employee_name', { ascending: true });
-
-      if (contactsError) {
-        console.error('Ошибка получения контактов:', contactsError);
-        // Не прерываем выполнение, просто логируем ошибку
-      }
-
-      // Преобразуем контакты
-      const contacts: ContractorContact[] = (contactsData || []).map((contact: DatabaseContractorContact) => ({
-        id: contact.id,
-        contractorId: contact.contractor_id,
-        employeeName: contact.employee_name,
-        phone: contact.phone || undefined,
-        comment: contact.comment || undefined,
-        createdAt: new Date(contact.created_at)
-      }));
-
-      // Формируем результат
-      return {
-        id: contractorData.id,
-        name: contractorData.name,
-        address: contractorData.address || undefined,
-        latitude: contractorData.latitude || undefined,
-        longitude: contractorData.longitude || undefined,
-        geocodedAt: contractorData.geocoded_at ? new Date(contractorData.geocoded_at) : undefined,
-        createdAt: new Date(contractorData.created_at),
-        updatedAt: new Date(contractorData.updated_at),
-        contacts: contacts
-      };
+      const contractor = await apiClient.get<Contractor>(`/contractors/${contractorId}`);
+      return contractor;
     } catch (error) {
-      console.error('Ошибка при получении контрагента:', error);
+      console.error('Ошибка получения контрагента:', error);
       throw error;
     }
   }
 
   // Добавление нового контрагента
   async addContractor(contractorData: CreateContractorData): Promise<Contractor> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
       console.log('Добавляем контрагента:', contractorData);
 
@@ -238,67 +75,23 @@ class ContractorService {
         geocodeResult = await this.geocodeAddress(contractorData.address);
       }
 
-      // Добавляем контрагента
-      const { data: contractorResult, error: contractorError } = await this.supabase
-        .from('contractors')
-        .insert({
-          name: contractorData.name,
-          address: contractorData.address || null,
-          latitude: geocodeResult?.latitude || null,
-          longitude: geocodeResult?.longitude || null,
-          geocoded_at: geocodeResult ? new Date().toISOString() : null
-        })
-        .select()
-        .single();
+      const contractor = await apiClient.post<Contractor>('/contractors', {
+        name: contractorData.name,
+        address: contractorData.address || null,
+        contacts: contractorData.contacts || []
+      });
 
-      if (contractorError) {
-        console.error('Ошибка добавления контрагента:', contractorError);
-        throw new Error(`Ошибка добавления контрагента: ${contractorError.message}`);
+      // Если геокодирование выполнено, обновляем координаты
+      if (geocodeResult) {
+        return await this.updateContractor(contractor.id, {
+          latitude: geocodeResult.latitude,
+          longitude: geocodeResult.longitude,
+          geocodedAt: new Date()
+        });
       }
 
-      // Добавляем контакты
-      const contacts: ContractorContact[] = [];
-      if (contractorData.contacts.length > 0) {
-        const contactsToInsert = contractorData.contacts.map(contact => ({
-          contractor_id: contractorResult.id,
-          employee_name: contact.employeeName,
-          phone: contact.phone || null,
-          comment: contact.comment || null
-        }));
-
-        const { data: contactsResult, error: contactsError } = await this.supabase
-          .from('contractor_contacts')
-          .insert(contactsToInsert)
-          .select();
-
-        if (contactsError) {
-          console.error('Ошибка добавления контактов:', contactsError);
-          // Не прерываем выполнение, контрагент уже создан
-        } else {
-          contacts.push(...contactsResult.map((contact: DatabaseContractorContact) => ({
-            id: contact.id,
-            contractorId: contact.contractor_id,
-            employeeName: contact.employee_name,
-            phone: contact.phone || undefined,
-            comment: contact.comment || undefined,
-            createdAt: new Date(contact.created_at)
-          })));
-        }
-      }
-
-      console.log('Контрагент успешно добавлен:', contractorResult);
-
-      return {
-        id: contractorResult.id,
-        name: contractorResult.name,
-        address: contractorResult.address || undefined,
-        latitude: contractorResult.latitude || undefined,
-        longitude: contractorResult.longitude || undefined,
-        geocodedAt: contractorResult.geocoded_at ? new Date(contractorResult.geocoded_at) : undefined,
-        createdAt: new Date(contractorResult.created_at),
-        updatedAt: new Date(contractorResult.updated_at),
-        contacts
-      };
+      console.log('Контрагент успешно добавлен:', contractor);
+      return contractor;
     } catch (error) {
       console.error('Ошибка при добавлении контрагента:', error);
       throw error;
@@ -307,74 +100,19 @@ class ContractorService {
 
   // Обновление контрагента
   async updateContractor(id: string, updates: UpdateContractorData): Promise<Contractor> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      const updateData: any = {};
-
-      if (updates.name !== undefined) updateData.name = updates.name;
-      if (updates.address !== undefined) {
-        updateData.address = updates.address;
-        
-        // Если адрес изменился, выполняем геокодирование
-        if (updates.address) {
-          const geocodeResult = await this.geocodeAddress(updates.address);
-          if (geocodeResult) {
-            updateData.latitude = geocodeResult.latitude;
-            updateData.longitude = geocodeResult.longitude;
-            updateData.geocoded_at = new Date().toISOString();
-          }
-        } else {
-          updateData.latitude = null;
-          updateData.longitude = null;
-          updateData.geocoded_at = null;
+      // Если адрес изменился, выполняем геокодирование
+      if (updates.address !== undefined && updates.address) {
+        const geocodeResult = await this.geocodeAddress(updates.address);
+        if (geocodeResult) {
+          updates.latitude = geocodeResult.latitude;
+          updates.longitude = geocodeResult.longitude;
+          updates.geocodedAt = new Date();
         }
       }
-      if (updates.latitude !== undefined) updateData.latitude = updates.latitude;
-      if (updates.longitude !== undefined) updateData.longitude = updates.longitude;
-      if (updates.geocodedAt !== undefined) updateData.geocoded_at = updates.geocodedAt.toISOString();
 
-      const { data, error } = await this.supabase
-        .from('contractors')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Ошибка обновления контрагента:', error);
-        throw new Error(`Ошибка обновления контрагента: ${error.message}`);
-      }
-
-      // Получаем контакты
-      const { data: contactsData } = await this.supabase
-        .from('contractor_contacts')
-        .select('*')
-        .eq('contractor_id', id)
-        .order('created_at', { ascending: true });
-
-      const contacts = contactsData?.map((contact: DatabaseContractorContact) => ({
-        id: contact.id,
-        contractorId: contact.contractor_id,
-        employeeName: contact.employee_name,
-        phone: contact.phone || undefined,
-        comment: contact.comment || undefined,
-        createdAt: new Date(contact.created_at)
-      })) || [];
-
-      return {
-        id: data.id,
-        name: data.name,
-        address: data.address || undefined,
-        latitude: data.latitude || undefined,
-        longitude: data.longitude || undefined,
-        geocodedAt: data.geocoded_at ? new Date(data.geocoded_at) : undefined,
-        createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at),
-        contacts
-      };
+      const contractor = await apiClient.put<Contractor>(`/contractors/${id}`, updates);
+      return contractor;
     } catch (error) {
       console.error('Ошибка при обновлении контрагента:', error);
       throw error;
@@ -383,20 +121,8 @@ class ContractorService {
 
   // Удаление контрагента
   async deleteContractor(id: string): Promise<void> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      const { error } = await this.supabase
-        .from('contractors')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('Ошибка удаления контрагента:', error);
-        throw new Error(`Ошибка удаления контрагента: ${error.message}`);
-      }
+      await apiClient.delete(`/contractors/${id}`);
     } catch (error) {
       console.error('Ошибка при удалении контрагента:', error);
       throw error;
@@ -405,99 +131,23 @@ class ContractorService {
 
   // Добавление контакта к контрагенту
   async addContact(contractorId: string, contactData: Omit<ContractorContact, 'id' | 'contractorId' | 'createdAt'>): Promise<ContractorContact> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
-    try {
-      const { data, error } = await this.supabase
-        .from('contractor_contacts')
-        .insert({
-          contractor_id: contractorId,
-          employee_name: contactData.employeeName,
-          phone: contactData.phone || null,
-          comment: contactData.comment || null
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Ошибка добавления контакта:', error);
-        throw new Error(`Ошибка добавления контакта: ${error.message}`);
-      }
-
-      return {
-        id: data.id,
-        contractorId: data.contractor_id,
-        employeeName: data.employee_name,
-        phone: data.phone || undefined,
-        comment: data.comment || undefined,
-        createdAt: new Date(data.created_at)
-      };
-    } catch (error) {
-      console.error('Ошибка при добавлении контакта:', error);
-      throw error;
-    }
+    // Пока не реализовано на backend, возвращаем заглушку
+    console.warn('addContact не реализован на backend');
+    throw new Error('Функция добавления контакта не реализована на backend');
   }
 
   // Обновление контакта
   async updateContact(id: string, updates: Partial<Omit<ContractorContact, 'id' | 'contractorId' | 'createdAt'>>): Promise<ContractorContact> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
-    try {
-      const updateData: any = {};
-      if (updates.employeeName !== undefined) updateData.employee_name = updates.employeeName;
-      if (updates.phone !== undefined) updateData.phone = updates.phone || null;
-      if (updates.comment !== undefined) updateData.comment = updates.comment || null;
-
-      const { data, error } = await this.supabase
-        .from('contractor_contacts')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Ошибка обновления контакта:', error);
-        throw new Error(`Ошибка обновления контакта: ${error.message}`);
-      }
-
-      return {
-        id: data.id,
-        contractorId: data.contractor_id,
-        employeeName: data.employee_name,
-        phone: data.phone || undefined,
-        comment: data.comment || undefined,
-        createdAt: new Date(data.created_at)
-      };
-    } catch (error) {
-      console.error('Ошибка при обновлении контакта:', error);
-      throw error;
-    }
+    // Пока не реализовано на backend, возвращаем заглушку
+    console.warn('updateContact не реализован на backend');
+    throw new Error('Функция обновления контакта не реализована на backend');
   }
 
   // Удаление контакта
   async deleteContact(id: string): Promise<void> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
-    try {
-      const { error } = await this.supabase
-        .from('contractor_contacts')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('Ошибка удаления контакта:', error);
-        throw new Error(`Ошибка удаления контакта: ${error.message}`);
-      }
-    } catch (error) {
-      console.error('Ошибка при удалении контакта:', error);
-      throw error;
-    }
+    // Пока не реализовано на backend, возвращаем заглушку
+    console.warn('deleteContact не реализован на backend');
+    throw new Error('Функция удаления контакта не реализована на backend');
   }
 }
 

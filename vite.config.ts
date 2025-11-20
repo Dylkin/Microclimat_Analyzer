@@ -15,9 +15,13 @@ export default defineConfig({
       'd3-selection',
       'd3-time-format',
       'd3-zoom',
-      'pizzip',
-      'docxtemplater'
+      'pizzip'
     ],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
   },
   build: {
     rollupOptions: {
@@ -34,7 +38,7 @@ export default defineConfig({
             if (id.includes('d3-')) {
               return 'd3-vendor';
             }
-            if (id.includes('pizzip') || id.includes('docxtemplater')) {
+            if (id.includes('pizzip')) {
               return 'docx-vendor';
             }
             if (id.includes('lucide-react')) {

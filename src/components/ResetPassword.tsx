@@ -107,7 +107,7 @@ const ResetPassword: React.FC = () => {
             <Lock className="w-8 h-8 text-indigo-600" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Установка нового пароля</h1>
-          <p className="text-gray-600">Microclimat Analyzer</p>
+          <p className="text-gray-600">ComSystem Office</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

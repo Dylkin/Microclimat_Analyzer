@@ -54,10 +54,7 @@ const EquipmentDirectory: React.FC = () => {
 
   // Загрузка оборудования
   const loadEquipment = async (page: number = 1, search?: string, sort: 'asc' | 'desc' = 'asc') => {
-    if (!equipmentService.isAvailable()) {
-      setError('Supabase не настроен. Проверьте переменные окружения.');
-      return;
-    }
+    // Убрана проверка isAvailable - API клиент всегда доступен
 
     setLoading(true);
     setError(null);
@@ -82,7 +79,7 @@ const EquipmentDirectory: React.FC = () => {
 
   // Загрузка статистики
   const loadStats = async () => {
-    if (!equipmentService.isAvailable()) return;
+    // Убрана проверка isAvailable - API клиент всегда доступен
 
     try {
       const statsData = await equipmentService.getEquipmentStats();

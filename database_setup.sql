@@ -1,12 +1,30 @@
 -- ================================================
 -- Microclimat Analyzer Database Setup
 -- ================================================
--- Выполните этот скрипт в Supabase SQL Editor
+-- Выполните этот скрипт в стандартном PostgreSQL (psql или любой клиент)
 -- ================================================
 
 -- Включение расширений
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- ================================================
+-- 0. СОЗДАНИЕ ENUM ТИПОВ
+-- ================================================
+
+-- Тип статуса проекта
+DO $$ BEGIN
+  CREATE TYPE project_status AS ENUM ('draft', 'active', 'completed', 'archived');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+-- Тип типа документа
+DO $$ BEGIN
+  CREATE TYPE document_type AS ENUM ('contract', 'plan', 'protocol', 'report', 'qualification_protocol', 'other');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
 -- ================================================
 -- 1. СОЗДАНИЕ ТАБЛИЦ
@@ -17,8 +35,10 @@ CREATE TABLE IF NOT EXISTS public.users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email TEXT UNIQUE NOT NULL,
   full_name TEXT,
+  password TEXT, -- Хешированный пароль для аутентификации
   role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user', 'viewer')),
   position TEXT,
+  is_default BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -37,12 +57,22 @@ CREATE TABLE IF NOT EXISTS public.contractors (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Таблица контактов подрядчиков
+CREATE TABLE IF NOT EXISTS public.contractor_contacts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  contractor_id UUID REFERENCES public.contractors(id) ON DELETE CASCADE,
+  employee_name TEXT NOT NULL,
+  phone TEXT,
+  comment TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Таблица проектов
 CREATE TABLE IF NOT EXISTS public.projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   description TEXT,
-  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived')),
+  status project_status DEFAULT 'draft',
   contract_number TEXT,
   contract_date DATE,
   contractor_id UUID REFERENCES public.contractors(id),
@@ -167,7 +197,7 @@ CREATE TABLE IF NOT EXISTS public.analysis_reports (
 CREATE TABLE IF NOT EXISTS public.project_documents (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
-  document_type TEXT NOT NULL CHECK (document_type IN ('contract', 'plan', 'protocol', 'report', 'other')),
+  document_type document_type NOT NULL,
   file_name TEXT NOT NULL,
   file_path TEXT NOT NULL,
   file_size INTEGER,
@@ -215,6 +245,40 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Таблица расписания квалификационных работ
+CREATE TABLE IF NOT EXISTS public.qualification_work_schedule (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  qualification_object_id UUID REFERENCES public.qualification_objects(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+  stage_name TEXT NOT NULL,
+  stage_description TEXT,
+  start_date DATE,
+  end_date DATE,
+  is_completed BOOLEAN DEFAULT FALSE,
+  completed_at TIMESTAMP WITH TIME ZONE,
+  completed_by UUID REFERENCES public.users(id),
+  cancelled_at TIMESTAMP WITH TIME ZONE,
+  cancelled_by UUID REFERENCES public.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Таблица протоколов квалификации
+CREATE TABLE IF NOT EXISTS public.qualification_protocols (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  qualification_object_id UUID REFERENCES public.qualification_objects(id) ON DELETE SET NULL,
+  object_type TEXT NOT NULL,
+  object_name TEXT,
+  protocol_document_id UUID NOT NULL REFERENCES public.project_documents(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  approved_by UUID REFERENCES public.users(id),
+  approved_at TIMESTAMP WITH TIME ZONE,
+  rejection_reason TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- ================================================
 -- 2. СОЗДАНИЕ ИНДЕКСОВ
 -- ================================================
@@ -222,6 +286,12 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 -- Индексы для users
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON public.users(role);
+
+-- Индексы для contractors
+CREATE INDEX IF NOT EXISTS idx_contractors_name ON public.contractors(name);
+
+-- Индексы для contractor_contacts
+CREATE INDEX IF NOT EXISTS idx_contractor_contacts_contractor ON public.contractor_contacts(contractor_id);
 
 -- Индексы для projects
 CREATE INDEX IF NOT EXISTS idx_projects_status ON public.projects(status);
@@ -272,171 +342,30 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON public.audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON public.audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON public.audit_logs(created_at);
 
--- ================================================
--- 3. НАСТРОЙКА ROW LEVEL SECURITY (RLS)
--- ================================================
+-- Индексы для qualification_work_schedule
+CREATE INDEX IF NOT EXISTS idx_qualification_work_schedule_object ON public.qualification_work_schedule(qualification_object_id);
+CREATE INDEX IF NOT EXISTS idx_qualification_work_schedule_project ON public.qualification_work_schedule(project_id);
+CREATE INDEX IF NOT EXISTS idx_qualification_work_schedule_dates ON public.qualification_work_schedule(start_date, end_date);
 
--- Включение RLS для всех таблиц
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.contractors ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.qualification_objects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.equipment ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.testing_periods ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.uploaded_files ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.logger_data_summary ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.logger_data ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.analysis_reports ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.project_documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.document_approval ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.documentation_checks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
-
--- Политики для users
-CREATE POLICY "Users can view all users" ON public.users
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can update own profile" ON public.users
-  FOR UPDATE USING (auth.uid() = id);
-
--- Политики для contractors
-CREATE POLICY "Authenticated users can view contractors" ON public.contractors
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can insert contractors" ON public.contractors
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can update contractors" ON public.contractors
-  FOR UPDATE USING (auth.role() = 'authenticated');
-
--- Политики для projects
-CREATE POLICY "Authenticated users can view projects" ON public.projects
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can insert projects" ON public.projects
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can update projects" ON public.projects
-  FOR UPDATE USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can delete projects" ON public.projects
-  FOR DELETE USING (auth.role() = 'authenticated');
-
--- Политики для qualification_objects
-CREATE POLICY "Authenticated users can view qualification objects" ON public.qualification_objects
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can insert qualification objects" ON public.qualification_objects
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can update qualification objects" ON public.qualification_objects
-  FOR UPDATE USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can delete qualification objects" ON public.qualification_objects
-  FOR DELETE USING (auth.role() = 'authenticated');
-
--- Политики для equipment
-CREATE POLICY "Authenticated users can view equipment" ON public.equipment
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can manage equipment" ON public.equipment
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- Политики для testing_periods
-CREATE POLICY "Authenticated users can view testing periods" ON public.testing_periods
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can manage testing periods" ON public.testing_periods
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- Политики для uploaded_files
-CREATE POLICY "Authenticated users can view uploaded files" ON public.uploaded_files
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can manage uploaded files" ON public.uploaded_files
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- Политики для logger_data_summary
-CREATE POLICY "Authenticated users can view logger data summary" ON public.logger_data_summary
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can manage logger data summary" ON public.logger_data_summary
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- Политики для logger_data
-CREATE POLICY "Authenticated users can view logger data" ON public.logger_data
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can manage logger data" ON public.logger_data
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- Политики для analysis_reports
-CREATE POLICY "Authenticated users can view reports" ON public.analysis_reports
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can manage reports" ON public.analysis_reports
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- Политики для project_documents
-CREATE POLICY "Authenticated users can view documents" ON public.project_documents
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can manage documents" ON public.project_documents
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- Политики для document_approval
-CREATE POLICY "Authenticated users can view approvals" ON public.document_approval
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can manage approvals" ON public.document_approval
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- Политики для documentation_checks
-CREATE POLICY "Authenticated users can view checks" ON public.documentation_checks
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can manage checks" ON public.documentation_checks
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- Политики для audit_logs
-CREATE POLICY "Authenticated users can view audit logs" ON public.audit_logs
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can insert audit logs" ON public.audit_logs
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+-- Индексы для qualification_protocols
+CREATE INDEX IF NOT EXISTS idx_qualification_protocols_project ON public.qualification_protocols(project_id);
+CREATE INDEX IF NOT EXISTS idx_qualification_protocols_object ON public.qualification_protocols(qualification_object_id);
+CREATE INDEX IF NOT EXISTS idx_qualification_protocols_status ON public.qualification_protocols(status);
+CREATE INDEX IF NOT EXISTS idx_qualification_protocols_document ON public.qualification_protocols(protocol_document_id);
 
 -- ================================================
--- 4. НАСТРОЙКА STORAGE
+-- 3. НАСТРОЙКА БЕЗОПАСНОСТИ (опционально)
 -- ================================================
 
--- Создание bucket для файлов проекта
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('project-files', 'project-files', false)
-ON CONFLICT (id) DO NOTHING;
-
--- Политики для storage
-CREATE POLICY "Authenticated users can upload files"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (bucket_id = 'project-files');
-
-CREATE POLICY "Authenticated users can view files"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (bucket_id = 'project-files');
-
-CREATE POLICY "Authenticated users can update files"
-ON storage.objects FOR UPDATE
-TO authenticated
-USING (bucket_id = 'project-files');
-
-CREATE POLICY "Authenticated users can delete files"
-ON storage.objects FOR DELETE
-TO authenticated
-USING (bucket_id = 'project-files');
+/*
+В Supabase на этом месте создавались политики RLS и правила для storage,
+использующие функции auth.uid()/auth.role() и схему storage.*. В чистом
+PostgreSQL эти зависимости отсутствуют, поэтому блок удалён. При необходимости
+настройте собственные механизмы аутентификации и добавьте политики вручную.
+*/
 
 -- ================================================
--- 5. СОЗДАНИЕ ТРИГГЕРОВ
+-- 4. СОЗДАНИЕ ТРИГГЕРОВ
 -- ================================================
 
 -- Функция для автоматического обновления updated_at
@@ -485,6 +414,12 @@ CREATE TRIGGER update_document_approval_updated_at BEFORE UPDATE ON public.docum
 CREATE TRIGGER update_documentation_checks_updated_at BEFORE UPDATE ON public.documentation_checks
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+CREATE TRIGGER update_qualification_work_schedule_updated_at BEFORE UPDATE ON public.qualification_work_schedule
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_qualification_protocols_updated_at BEFORE UPDATE ON public.qualification_protocols
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
 -- ================================================
 -- 6. ВСТАВКА ТЕСТОВЫХ ДАННЫХ (опционально)
 -- ================================================
@@ -515,4 +450,5 @@ SELECT tablename, policyname
 FROM pg_policies 
 WHERE schemaname = 'public' 
 ORDER BY tablename, policyname;
+
 

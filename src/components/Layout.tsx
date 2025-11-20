@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, BarChart3, Menu, X, HelpCircle, Database, Users, Building2, FolderOpen, Wrench, Wifi, Shield, User, Key, Activity, Settings, ChevronDown, ChevronRight } from 'lucide-react';
+import { LogOut, BarChart3, Menu, X, HelpCircle, Database, Users, Building2, FolderOpen, Wrench, Wifi, Shield, User, Key, Activity, Settings, ChevronDown, ChevronRight, Search } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -109,6 +109,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
           key: 'secure-auth-manager',
           icon: Shield,
           access: 'analyzer' as const
+        },
+        {
+          name: 'Поиск тендеров',
+          key: 'tender-search',
+          icon: Search,
+          access: 'analyzer' as const
         }
       ]
     }
@@ -150,7 +156,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white">
           <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200">
-            <h1 className="text-lg font-semibold text-gray-900">Microclimat</h1>
+            <h1 className="text-lg font-semibold text-gray-900">ComSystem Office</h1>
             <button
               onClick={() => setSidebarOpen(false)}
               className="text-gray-400 hover:text-gray-600"
@@ -238,7 +244,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-white border-r border-gray-200">
           <div className="flex h-16 items-center px-4 border-b border-gray-200">
-            <h1 className="text-lg font-semibold text-gray-900">Microclimat Analyzer</h1>
+            <h1 className="text-lg font-semibold text-gray-900">ComSystem Office</h1>
           </div>
           <nav className="flex-1 px-4 py-4 space-y-2">
             {availableNavigation.map((item) => {

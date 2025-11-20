@@ -342,3 +342,4 @@ sudo systemctl restart nginx
 
 **Готовы к развертыванию? Начните с [`deploy.sh`](./deploy.sh) или [`QUICK_DEPLOY.md`](./QUICK_DEPLOY.md)!** 🚀
 
+
