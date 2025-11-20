@@ -132,14 +132,14 @@ class TenderService {
         parsingStatus: history.parsingStatus,
         errorMessage: history.errorMessage
       });
-      
+
       return {
         ...data,
         searchDate: new Date(data.searchDate),
         searchSettings: {
           ...data.searchSettings,
           purchaseItems: data.searchSettings.purchaseItems || [],
-          organizationInns: data.searchSettings.organizationInns || []
+          organizationUnps: data.searchSettings.organizationUnps || []
         }
       };
     } catch (error: any) {
