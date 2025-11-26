@@ -15,7 +15,10 @@ export default defineConfig({
       'd3-selection',
       'd3-time-format',
       'd3-zoom',
-      'pizzip'
+      'pizzip',
+      'html2canvas',
+      'react',
+      'react-dom'
     ],
     esbuildOptions: {
       define: {

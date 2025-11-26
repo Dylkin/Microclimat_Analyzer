@@ -59,11 +59,6 @@ const CreatingReport: React.FC<CreatingReportProps> = ({ project, onBack, onPage
 
   // Загрузка протоколов квалификации
   const loadQualificationProtocols = async () => {
-    if (!qualificationProtocolService.isAvailable()) {
-      console.warn('Supabase не настроен для работы с протоколами квалификации');
-      return;
-    }
-
     try {
       const protocols = await qualificationProtocolService.getProjectProtocols(project.id);
       setQualificationProtocols(protocols);
@@ -91,7 +86,7 @@ const CreatingReport: React.FC<CreatingReportProps> = ({ project, onBack, onPage
           <ArrowLeft className="w-6 h-6" />
         </button>
         <FileText className="w-8 h-8 text-orange-600" />
-        <h1 className="text-2xl font-bold text-gray-900">Создание отчета</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Подготовка отчета</h1>
       </div>
 
       {/* Error Display */}

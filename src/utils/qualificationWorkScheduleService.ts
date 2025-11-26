@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from './apiClient';
 import { qualificationObjectService } from './qualificationObjectService';
 
 export interface QualificationWorkStage {
@@ -19,280 +19,208 @@ export interface QualificationWorkStage {
 }
 
 class QualificationWorkScheduleService {
-  private supabase;
-
-  constructor() {
-    this.supabase = supabase;
+  isAvailable(): boolean {
+    return true; // API всегда доступен
   }
 
-  isAvailable(): boolean {
-    return !!this.supabase;
+  private mapFromApi(data: any): QualificationWorkStage {
+    return {
+      id: data.id,
+      qualificationObjectId: data.qualificationObjectId || data.qualification_object_id,
+      projectId: data.projectId || data.project_id,
+      stageName: data.stageName || data.stage_name,
+      stageDescription: data.stageDescription || data.stage_description,
+      startDate: data.startDate || data.start_date,
+      endDate: data.endDate || data.end_date,
+      isCompleted: data.isCompleted || data.is_completed || false,
+      completedAt: data.completedAt || data.completed_at,
+      completedBy: data.completedBy || data.completed_by,
+      cancelledAt: data.cancelledAt || data.cancelled_at,
+      cancelledBy: data.cancelledBy || data.cancelled_by,
+      createdAt: data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date()),
+      updatedAt: data.updatedAt ? new Date(data.updatedAt) : (data.updated_at ? new Date(data.updated_at) : new Date())
+    };
   }
 
   async getWorkSchedule(qualificationObjectId: string, projectId?: string): Promise<QualificationWorkStage[]> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
-    let query = this.supabase!
-      .from('qualification_work_schedule')
-      .select('*')
-      .eq('qualification_object_id', qualificationObjectId);
-
-    // Если передан projectId, пытаемся фильтровать по проекту
-    // Если поле project_id не существует, это не критично - просто игнорируем фильтр
-    if (projectId) {
-      try {
-        query = query.eq('project_id', projectId);
-      } catch (error) {
-        console.warn('QualificationWorkScheduleService: Поле project_id не найдено в таблице, используем фильтр только по qualification_object_id');
-        // Продолжаем без фильтра по project_id
+    try {
+      let url = `/qualification-work-schedule?qualification_object_id=${qualificationObjectId}`;
+      if (projectId) {
+        url += `&project_id=${projectId}`;
       }
-    }
 
-    const { data, error } = await query.order('created_at', { ascending: true });
-
-    if (error) {
-      throw new Error(`Ошибка загрузки расписания: ${error.message}`);
-    }
-
-    if (!data) {
-      return [];
-    }
-
-    console.log('QualificationWorkScheduleService: Сырые данные из БД:', data);
-    const mappedData = data.map(this.mapFromDatabase);
-    console.log('QualificationWorkScheduleService: Преобразованные данные:', mappedData);
-    
-    // Проверяем, есть ли этап "Расстановка логгеров" и создаем зону "Внешний датчик" если нужно
-    const hasLoggerPlacementStage = mappedData.some(stage => stage.stageName === 'Расстановка логгеров');
-    if (hasLoggerPlacementStage) {
-      console.log('QualificationWorkScheduleService: Найден этап "Расстановка логгеров", проверяем зону "Внешний датчик"');
-      try {
-        await this.createExternalSensorZone(qualificationObjectId);
-      } catch (error) {
-        console.error('QualificationWorkScheduleService: Ошибка при создании зоны "Внешний датчик":', error);
-        // Не прерываем выполнение из-за ошибки создания зоны
+      const data = await apiClient.get<any[]>(url);
+      if (!data) {
+        return [];
       }
+
+      console.log('QualificationWorkScheduleService: Сырые данные из БД:', data);
+      const mappedData = data.map(this.mapFromApi);
+      console.log('QualificationWorkScheduleService: Преобразованные данные:', mappedData);
+      
+      // Проверяем, есть ли этап "Расстановка логгеров" и создаем зону "Внешний датчик" если нужно
+      const hasLoggerPlacementStage = mappedData.some(stage => stage.stageName === 'Расстановка логгеров');
+      if (hasLoggerPlacementStage) {
+        console.log('QualificationWorkScheduleService: Найден этап "Расстановка логгеров", проверяем зону "Внешний датчик"');
+        try {
+          await this.createExternalSensorZone(qualificationObjectId);
+        } catch (error) {
+          console.error('QualificationWorkScheduleService: Ошибка при создании зоны "Внешний датчик":', error);
+          // Не прерываем выполнение из-за ошибки создания зоны
+        }
+      }
+      
+      return mappedData;
+    } catch (error: any) {
+      console.error('Ошибка загрузки расписания:', error);
+      throw new Error(`Ошибка загрузки расписания: ${error.message || 'Неизвестная ошибка'}`);
     }
-    
-    return mappedData;
   }
 
   async saveWorkSchedule(qualificationObjectId: string, stages: Omit<QualificationWorkStage, 'id' | 'qualificationObjectId' | 'createdAt' | 'updatedAt'>[], projectId?: string): Promise<QualificationWorkStage[]> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      // Сначала удаляем существующие записи для этого объекта и проекта
-      let deleteQuery = this.supabase!
-        .from('qualification_work_schedule')
-        .delete()
-        .eq('qualification_object_id', qualificationObjectId);
-
-      // Если передан projectId, добавляем фильтр по проекту
-      if (projectId) {
-        try {
-          deleteQuery = deleteQuery.eq('project_id', projectId);
-        } catch (error) {
-          console.warn('QualificationWorkScheduleService: Поле project_id не найдено в таблице, удаляем только по qualification_object_id');
-        }
-      }
-
-      const { error: deleteError } = await deleteQuery;
-
-      if (deleteError) {
-        throw new Error(`Ошибка удаления старых записей: ${deleteError.message}`);
-      }
-
-      // Подготавливаем данные для вставки
-      const stagesToInsert = stages.map(stage => {
-        const insertData: any = {
-          qualification_object_id: qualificationObjectId,
-          stage_name: stage.stageName,
-          stage_description: stage.stageDescription,
-          start_date: stage.startDate || null,
-          end_date: stage.endDate || null,
-          is_completed: stage.isCompleted,
-          completed_at: stage.completedAt || null,
-          completed_by: stage.completedBy || null,
-          cancelled_at: stage.cancelledAt || null,
-          cancelled_by: stage.cancelledBy || null
-        };
-
-        // Добавляем project_id, если он передан
-        if (projectId) {
-          insertData.project_id = projectId;
-        }
-
-        return insertData;
+      const data = await apiClient.post<any[]>('/qualification-work-schedule', {
+        qualificationObjectId,
+        projectId,
+        stages: stages.map(stage => ({
+          stageName: stage.stageName,
+          stageDescription: stage.stageDescription,
+          startDate: stage.startDate,
+          endDate: stage.endDate,
+          isCompleted: stage.isCompleted,
+          completedAt: stage.completedAt,
+          completedBy: stage.completedBy,
+          cancelledAt: stage.cancelledAt,
+          cancelledBy: stage.cancelledBy
+        }))
       });
-
-      // Вставляем новые записи
-      const { data, error } = await this.supabase!
-        .from('qualification_work_schedule')
-        .insert(stagesToInsert)
-        .select('*');
-
-      if (error) {
-        throw new Error(`Ошибка сохранения расписания: ${error.message}`);
-      }
 
       if (!data) {
         return [];
       }
 
-      return data.map(this.mapFromDatabase);
-    } catch (error) {
+      return data.map(this.mapFromApi);
+    } catch (error: any) {
       console.error('Ошибка сохранения расписания:', error);
-      throw error;
+      throw new Error(`Ошибка сохранения расписания: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
   async deleteWorkSchedule(qualificationObjectId: string): Promise<void> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
-    const { error } = await this.supabase!
-      .from('qualification_work_schedule')
-      .delete()
-      .eq('qualification_object_id', qualificationObjectId);
-
-    if (error) {
-      throw new Error(`Ошибка удаления расписания: ${error.message}`);
+    try {
+      // Получаем все записи для удаления
+      const schedules = await this.getWorkSchedule(qualificationObjectId);
+      // Удаляем через сохранение пустого массива
+      await this.saveWorkSchedule(qualificationObjectId, []);
+    } catch (error: any) {
+      throw new Error(`Ошибка удаления расписания: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
   async createWorkStage(qualificationObjectId: string, stageData: Omit<QualificationWorkStage, 'id' | 'qualificationObjectId' | 'createdAt' | 'updatedAt'>): Promise<QualificationWorkStage> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
+    try {
+      // Получаем текущее расписание
+      const currentSchedule = await this.getWorkSchedule(qualificationObjectId);
+      // Добавляем новый этап
+      const newStages = [...currentSchedule.map(s => ({
+        stageName: s.stageName,
+        stageDescription: s.stageDescription,
+        startDate: s.startDate,
+        endDate: s.endDate,
+        isCompleted: s.isCompleted,
+        completedAt: s.completedAt,
+        completedBy: s.completedBy,
+        cancelledAt: s.cancelledAt,
+        cancelledBy: s.cancelledBy
+      })), stageData];
+      
+      // Сохраняем обновленное расписание
+      const saved = await this.saveWorkSchedule(qualificationObjectId, newStages);
+      const createdStage = saved.find(s => s.stageName === stageData.stageName && !s.id);
+      
+      if (!createdStage) {
+        throw new Error('Не удалось создать этап');
+      }
+      
+      // Если создан этап "Расстановка логгеров", автоматически создаем зону "Внешний датчик"
+      if (stageData.stageName === 'Расстановка логгеров') {
+        console.log('QualificationWorkScheduleService: Создан этап "Расстановка логгеров", создаем зону "Внешний датчик"');
+        await this.createExternalSensorZone(qualificationObjectId);
+      }
+
+      return createdStage;
+    } catch (error: any) {
+      throw new Error(`Ошибка создания этапа: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    const { data, error } = await this.supabase!
-      .from('qualification_work_schedule')
-      .insert({
-        qualification_object_id: qualificationObjectId,
-        stage_name: stageData.stageName,
-        stage_description: stageData.stageDescription,
-        start_date: stageData.startDate || null,
-        end_date: stageData.endDate || null,
-        is_completed: stageData.isCompleted,
-        completed_at: stageData.completedAt || null,
-        completed_by: stageData.completedBy || null,
-        cancelled_at: stageData.cancelledAt || null,
-        cancelled_by: stageData.cancelledBy || null
-      })
-      .select('*')
-      .single();
-
-    if (error) {
-      throw new Error(`Ошибка создания этапа: ${error.message}`);
-    }
-
-    const createdStage = this.mapFromDatabase(data);
-    
-    // Если создан этап "Расстановка логгеров", автоматически создаем зону "Внешний датчик"
-    if (stageData.stageName === 'Расстановка логгеров') {
-      console.log('QualificationWorkScheduleService: Создан этап "Расстановка логгеров", создаем зону "Внешний датчик"');
-      await this.createExternalSensorZone(qualificationObjectId);
-    }
-
-    return createdStage;
   }
 
-  async updateWorkStage(qualificationObjectId: string, stageId: string, stageData: Omit<QualificationWorkStage, 'id' | 'qualificationObjectId' | 'createdAt' | 'updatedAt'>): Promise<QualificationWorkStage> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
-    console.log('QualificationWorkScheduleService: updateWorkStage - данные для сохранения:', {
-      stageId,
-      qualificationObjectId,
-      stageData: {
-        stageName: stageData.stageName,
-        startDate: stageData.startDate,
-        endDate: stageData.endDate,
-        isCompleted: stageData.isCompleted,
-        completedAt: stageData.completedAt,
-        completedBy: stageData.completedBy,
-        cancelledAt: stageData.cancelledAt,
-        cancelledBy: stageData.cancelledBy
+  async updateWorkStage(qualificationObjectId: string, stageId: string, stageData: Omit<QualificationWorkStage, 'id' | 'qualificationObjectId' | 'createdAt' | 'updatedAt'>, projectId?: string): Promise<QualificationWorkStage> {
+    try {
+      console.log('QualificationWorkScheduleService: updateWorkStage вызван', {
+        qualificationObjectId,
+        stageId,
+        stageData,
+        projectId
+      });
+      
+      // Получаем текущее расписание с учетом projectId
+      const currentSchedule = await this.getWorkSchedule(qualificationObjectId, projectId);
+      console.log('QualificationWorkScheduleService: Текущее расписание:', currentSchedule);
+      
+      // Находим этап по ID или по имени (на случай, если ID изменился после пересоздания)
+      const stageToUpdate = currentSchedule.find(s => s.id === stageId || s.stageName === stageData.stageName);
+      
+      if (!stageToUpdate) {
+        console.error('QualificationWorkScheduleService: Этап не найден', { stageId, stageName: stageData.stageName, currentSchedule });
+        throw new Error(`Этап не найден: ${stageData.stageName}`);
       }
-    });
-
-    const updateData = {
-      stage_name: stageData.stageName,
-      stage_description: stageData.stageDescription,
-      start_date: stageData.startDate || null,
-      end_date: stageData.endDate || null,
-      is_completed: stageData.isCompleted,
-      completed_at: stageData.completedAt || null,
-      completed_by: stageData.completedBy || null,
-      cancelled_at: stageData.cancelledAt || null,
-      cancelled_by: stageData.cancelledBy || null
-    };
-
-    console.log('QualificationWorkScheduleService: updateWorkStage - данные для UPDATE:', updateData);
-
-    const { data, error } = await this.supabase!
-      .from('qualification_work_schedule')
-      .update(updateData)
-      .eq('id', stageId)
-      .eq('qualification_object_id', qualificationObjectId)
-      .select('*')
-      .single();
-
-    if (error) {
+      
+      console.log('QualificationWorkScheduleService: Найден этап для обновления:', stageToUpdate);
+      
+      // Обновляем нужный этап
+      const updatedStages = currentSchedule.map(s => 
+        (s.id === stageId || s.stageName === stageData.stageName)
+          ? { ...s, ...stageData }
+          : s
+      );
+      
+      console.log('QualificationWorkScheduleService: Обновленные этапы перед сохранением:', updatedStages);
+      
+      // Сохраняем обновленное расписание с учетом projectId
+      const saved = await this.saveWorkSchedule(
+        qualificationObjectId, 
+        updatedStages.map(s => ({
+          stageName: s.stageName,
+          stageDescription: s.stageDescription,
+          startDate: s.startDate,
+          endDate: s.endDate,
+          isCompleted: s.isCompleted,
+          completedAt: s.completedAt,
+          completedBy: s.completedBy,
+          cancelledAt: s.cancelledAt,
+          cancelledBy: s.cancelledBy
+        })),
+        projectId
+      );
+      
+      console.log('QualificationWorkScheduleService: Сохраненные этапы:', saved);
+      
+      // Ищем обновленный этап по имени (так как ID могут измениться после пересоздания)
+      const updated = saved.find(s => s.stageName === stageData.stageName);
+      if (!updated) {
+        console.error('QualificationWorkScheduleService: Обновленный этап не найден после сохранения', {
+          stageName: stageData.stageName,
+          savedStages: saved.map(s => ({ id: s.id, name: s.stageName }))
+        });
+        throw new Error(`Не удалось найти обновленный этап: ${stageData.stageName}`);
+      }
+      
+      console.log('QualificationWorkScheduleService: Этап успешно обновлен:', updated);
+      return updated;
+    } catch (error: any) {
       console.error('QualificationWorkScheduleService: updateWorkStage - ошибка:', error);
-      throw new Error(`Ошибка обновления этапа: ${error.message}`);
+      throw new Error(`Ошибка обновления этапа: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    console.log('QualificationWorkScheduleService: updateWorkStage - результат UPDATE:', data);
-    return this.mapFromDatabase(data);
-  }
-
-  private mapFromDatabase(data: any): QualificationWorkStage {
-    const mapped = {
-      id: data.id,
-      qualificationObjectId: data.qualification_object_id,
-      projectId: data.project_id || undefined, // Добавляем project_id, если он существует
-      stageName: data.stage_name,
-      stageDescription: data.stage_description,
-      startDate: data.start_date,
-      endDate: data.end_date,
-      isCompleted: data.is_completed,
-      completedAt: data.completed_at,
-      completedBy: data.completed_by,
-      cancelledAt: data.cancelled_at,
-      cancelledBy: data.cancelled_by,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
-    };
-    
-    console.log('QualificationWorkScheduleService: mapFromDatabase для этапа:', data.stage_name, {
-      raw: {
-        start_date: data.start_date,
-        end_date: data.end_date,
-        is_completed: data.is_completed,
-        completed_at: data.completed_at,
-        completed_by: data.completed_by,
-        cancelled_at: data.cancelled_at,
-        cancelled_by: data.cancelled_by
-      },
-      mapped: {
-        startDate: mapped.startDate,
-        endDate: mapped.endDate,
-        isCompleted: mapped.isCompleted,
-        completedAt: mapped.completedAt,
-        completedBy: mapped.completedBy,
-        cancelledAt: mapped.cancelledAt,
-        cancelledBy: mapped.cancelledBy
-      }
-    });
-    
-    return mapped;
   }
 
   /**
@@ -345,10 +273,6 @@ class QualificationWorkScheduleService {
    * Создание всех этапов квалификационных работ для объекта
    */
   async createAllStages(qualificationObjectId: string, projectId?: string): Promise<QualificationWorkStage[]> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
     // Определяем все этапы квалификационных работ (7 этапов)
     const allStages = [
       {
@@ -422,16 +346,34 @@ class QualificationWorkScheduleService {
         return stageData;
       });
 
-      const { data, error } = await this.supabase!
-        .from('qualification_work_schedule')
-        .insert(stagesToInsert)
-        .select('*');
-
-      if (error) {
-        throw new Error(`Ошибка создания этапов: ${error.message}`);
-      }
-
-      console.log('QualificationWorkScheduleService: Созданы недостающие этапы:', data?.length);
+      // Сохраняем новые этапы через saveWorkSchedule
+      const currentStages = existingStages.map(s => ({
+        stageName: s.stageName,
+        stageDescription: s.stageDescription,
+        startDate: s.startDate,
+        endDate: s.endDate,
+        isCompleted: s.isCompleted,
+        completedAt: s.completedAt,
+        completedBy: s.completedBy,
+        cancelledAt: s.cancelledAt,
+        cancelledBy: s.cancelledBy
+      }));
+      
+      const stagesToSave = [...currentStages, ...stagesToCreate.map(stage => ({
+        stageName: stage.name,
+        stageDescription: stage.description,
+        startDate: undefined,
+        endDate: undefined,
+        isCompleted: false,
+        completedAt: undefined,
+        completedBy: undefined,
+        cancelledAt: undefined,
+        cancelledBy: undefined
+      }))];
+      
+      const saved = await this.saveWorkSchedule(qualificationObjectId, stagesToSave, projectId);
+      
+      console.log('QualificationWorkScheduleService: Созданы недостающие этапы:', saved.length - existingStages.length);
       
       // Проверяем, был ли создан этап "Расстановка логгеров"
       const loggerPlacementCreated = stagesToCreate.some(stage => stage.name === 'Расстановка логгеров');
@@ -443,8 +385,7 @@ class QualificationWorkScheduleService {
       }
       
       // Возвращаем все этапы (существующие + новые)
-      const newStages = data ? data.map(this.mapFromDatabase) : [];
-      const allStagesResult = [...existingStages, ...newStages];
+      const allStagesResult = saved;
       
       console.log('QualificationWorkScheduleService: Итого этапов:', allStagesResult.length);
       return allStagesResult;

@@ -1,15 +1,18 @@
 export type ProjectStatus = 
   | 'contract_negotiation'
   | 'testing_execution'
-  | 'creating_report'
+  | 'report_preparation'
   | 'report_approval'
   | 'report_printing'
   | 'completed';
+
+export type ProjectType = 'qualification' | 'sale' | 'other';
 
 export interface Project {
   id: string;
   name: string;
   description?: string;
+  type: ProjectType;
   contractorId: string;
   contractorName?: string;
   contractNumber?: string;
@@ -21,6 +24,21 @@ export interface Project {
   updatedAt: Date;
   qualificationObjects: ProjectQualificationObject[];
   stageAssignments: ProjectStageAssignment[];
+  items?: ProjectItem[];
+}
+
+export interface ProjectItem {
+  id: string;
+  projectId: string;
+  name: string;
+  quantity: number;
+  declaredPrice: number;
+  supplierId?: string;
+  supplierName?: string;
+  supplierPrice?: number;
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ProjectQualificationObject {
@@ -47,8 +65,12 @@ export interface ProjectStageAssignment {
 export interface CreateProjectData {
   name?: string;
   description?: string;
+  type?: ProjectType;
   contractorId: string;
+  tenderLink?: string;
+  tenderDate?: Date;
   qualificationObjectIds: string[];
+  items?: Omit<ProjectItem, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>[];
   stageAssignments?: {
     stage: ProjectStatus;
     assignedUserId?: string;
@@ -67,7 +89,7 @@ export interface UpdateProjectData {
 export const ProjectStatusLabels: Record<ProjectStatus, string> = {
   'contract_negotiation': 'Согласование договора',
   'testing_execution': 'Проведение испытаний',
-  'creating_report': 'Создание отчета',
+  'report_preparation': 'Подготовка отчета',
   'report_approval': 'Согласование отчета',
   'report_printing': 'Печать отчета',
   'completed': 'Завершен'
@@ -76,8 +98,14 @@ export const ProjectStatusLabels: Record<ProjectStatus, string> = {
 export const ProjectStatusColors: Record<ProjectStatus, string> = {
   'contract_negotiation': 'bg-yellow-100 text-yellow-800',
   'testing_execution': 'bg-purple-100 text-purple-800',
-  'creating_report': 'bg-orange-100 text-orange-800',
+  'report_preparation': 'bg-orange-100 text-orange-800',
   'report_approval': 'bg-indigo-100 text-indigo-800',
   'report_printing': 'bg-green-100 text-green-800',
   'completed': 'bg-gray-100 text-gray-800'
+};
+
+export const ProjectTypeLabels: Record<ProjectType, string> = {
+  'qualification': 'Квалификация',
+  'sale': 'Продажа',
+  'other': 'Другое'
 };

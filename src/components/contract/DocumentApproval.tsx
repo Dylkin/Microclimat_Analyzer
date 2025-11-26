@@ -8,6 +8,7 @@ import { ContractFields } from './ContractFields';
 import { documentApprovalService } from '../../utils/documentApprovalService';
 import { DocumentApprovalStatus } from '../../types/DocumentApproval';
 import { Project } from '../../types/Project';
+import { objectTypeMapping, reverseObjectTypeMapping } from '../../utils/objectTypeMapping';
 
 interface DocumentApprovalProps {
   project?: Project;
@@ -82,13 +83,9 @@ export const DocumentApproval: React.FC<DocumentApprovalProps> = ({
     results.forEach(({ documentId, status }) => {
       if (status) {
         statusMap.set(documentId, status);
-        console.log(`DocumentApproval: Загружен статус для документа ${documentId}:`, status);
-      } else {
-        console.log(`DocumentApproval: Статус для документа ${documentId} не найден`);
       }
     });
 
-    console.log('DocumentApproval: Итоговая карта статусов:', statusMap);
     setDocumentStatuses(statusMap);
     
     // Передаем статусы в родительский компонент
@@ -98,16 +95,30 @@ export const DocumentApproval: React.FC<DocumentApprovalProps> = ({
   };
 
   // Загружаем статусы при изменении документов
+  // Используем useMemo для стабильных значений массивов
+  const qualificationProtocolIds = useMemo(() => {
+    return Array.isArray(qualificationProtocols) 
+      ? qualificationProtocols.map(p => p.id).join(',')
+      : '';
+  }, [qualificationProtocols]);
+
+  const selectedObjectIds = useMemo(() => {
+    return selectedQualificationObjects?.map(obj => obj.id).join(',') || '';
+  }, [selectedQualificationObjects]);
+
+  // Логирование для диагностики
   useEffect(() => {
-    console.log('DocumentApproval: Загружаем статусы документов', {
-      commercialOfferDoc: commercialOfferDoc?.id,
-      contractDoc: contractDoc?.id,
-      qualificationProtocols: Array.isArray(qualificationProtocols) ? qualificationProtocols.length : 'Map',
-      selectedQualificationObjects: selectedQualificationObjects?.length || 0,
-      protocols: Array.isArray(qualificationProtocols) ? qualificationProtocols.map(p => ({ id: p.id, objectType: p.objectType })) : []
+    console.log('DocumentApproval: selectedQualificationObjects:', {
+      count: selectedQualificationObjects?.length || 0,
+      objects: selectedQualificationObjects,
+      ids: selectedObjectIds
     });
+  }, [selectedQualificationObjects, selectedObjectIds]);
+
+  useEffect(() => {
     loadDocumentStatuses();
-  }, [commercialOfferDoc?.id, contractDoc?.id, qualificationProtocols, selectedQualificationObjects]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commercialOfferDoc?.id, contractDoc?.id, qualificationProtocolIds, selectedObjectIds]);
 
   // Вычисляем прогресс согласования
   const progressData = useMemo(() => {
@@ -254,12 +265,6 @@ export const DocumentApproval: React.FC<DocumentApprovalProps> = ({
     // Определяем текущий статус: приоритет у данных из базы, затем у локального состояния
     const currentStatus = dbStatus?.status || (isApproved ? 'approved' : 'pending');
     
-    console.log(`DocumentApproval: Статус для ${title} (${document?.id}):`, {
-      dbStatus: dbStatus?.status,
-      isApproved,
-      currentStatus,
-      hasDocument: !!document
-    });
 
     return (
       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -378,12 +383,6 @@ export const DocumentApproval: React.FC<DocumentApprovalProps> = ({
     // Определяем текущий статус: приоритет у данных из базы, затем у локального состояния
     const currentStatus = dbStatus?.status || (isApproved ? 'approved' : 'pending');
     
-    console.log(`DocumentApproval: Статус для ${title} (${document?.id}):`, {
-      dbStatus: dbStatus?.status,
-      isApproved,
-      currentStatus,
-      hasDocument: !!document
-    });
 
     return (
       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -534,9 +533,32 @@ export const DocumentApproval: React.FC<DocumentApprovalProps> = ({
         <div className="border-t border-gray-200 pt-6">
           <h4 className="text-md font-semibold text-gray-900 mb-4">Протоколы квалификации</h4>
           <div className="space-y-4">
-            {selectedQualificationObjects.length > 0 ? (
+            {(() => {
+              console.log('DocumentApproval: Рендер протоколов квалификации:', {
+                selectedQualificationObjectsCount: selectedQualificationObjects?.length || 0,
+                selectedQualificationObjects: selectedQualificationObjects,
+                qualificationProtocolsCount: Array.isArray(qualificationProtocols) ? qualificationProtocols.length : 0,
+                qualificationProtocols: qualificationProtocols
+              });
+              return null;
+            })()}
+            {selectedQualificationObjects && selectedQualificationObjects.length > 0 ? (
               selectedQualificationObjects.map((obj) => {
-                const protocol = Array.isArray(qualificationProtocols) ? qualificationProtocols.find(p => p.objectType === obj.type) : undefined;
+                // Преобразуем русский тип объекта в английский для сравнения с протоколами из БД
+                const englishType = objectTypeMapping[obj.type] || obj.type;
+                // Протоколы из БД имеют objectType в английском формате (room, vehicle, etc.)
+                // Объекты квалификации имеют type в русском формате (помещение, автомобиль, etc.)
+                // Сравниваем оба варианта для совместимости
+                const protocol = Array.isArray(qualificationProtocols) 
+                  ? qualificationProtocols.find(p => {
+                      const protocolEnglishType = p.objectType;
+                      const protocolRussianType = reverseObjectTypeMapping[protocolEnglishType] || protocolEnglishType;
+                      return protocolEnglishType === englishType || 
+                             protocolEnglishType === obj.type ||
+                             protocolRussianType === obj.type ||
+                             reverseObjectTypeMapping[protocolEnglishType] === obj.type;
+                    }) 
+                  : undefined;
                 const protocolDoc = protocol?.document;
                 return (
                   <div key={obj.id} className="border border-gray-200 rounded-lg p-4">

@@ -8,6 +8,8 @@ import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
 import { reportService, ReportData } from '../utils/reportService';
+import { qualificationObjectService } from '../utils/qualificationObjectService';
+import { qualificationObjectTypeService } from '../utils/qualificationObjectTypeService';
 import PizZip from 'pizzip';
 
 interface TimeSeriesAnalyzerProps {
@@ -74,6 +76,24 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     reportFilename: null
   });
 
+  // Состояние для объекта квалификации с зонами измерения
+  const [qualificationObject, setQualificationObject] = useState<any>(null);
+
+  // Состояние для шаблона из справочника
+  const [templateFromDirectory, setTemplateFromDirectory] = useState<{
+    url: string;
+    filename: string;
+    loaded: boolean;
+    loading: boolean;
+    error: string | null;
+  }>({
+    url: '',
+    filename: '',
+    loaded: false,
+    loading: false,
+    error: null
+  });
+
   // Состояние для сохраненных отчетов
   const [savedReports, setSavedReports] = useState<ReportData[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
@@ -135,10 +155,143 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   // Загружаем отчеты при инициализации
   useEffect(() => {
-    loadSavedReports();
-    loadTrialReport();
+    if (projectId && qualificationObjectId) {
+      loadSavedReports();
+      loadTrialReport();
+    }
   }, [projectId, qualificationObjectId, dataType]);
 
+  // Загрузка объекта квалификации с зонами измерения
+  useEffect(() => {
+    const loadQualificationObject = async () => {
+      if (!qualificationObjectId) {
+        return;
+      }
+
+      try {
+        const obj = await qualificationObjectService.getQualificationObjectById(qualificationObjectId);
+        console.log('Загружен объект квалификации с зонами:', obj);
+        setQualificationObject(obj);
+      } catch (error) {
+        console.error('Ошибка загрузки объекта квалификации:', error);
+      }
+    };
+
+    loadQualificationObject();
+  }, [qualificationObjectId]);
+
+  // Загрузка шаблона из справочника объектов квалификации
+  useEffect(() => {
+    const loadTemplateFromDirectory = async () => {
+      if (!qualificationObjectId) {
+        return;
+      }
+
+      setTemplateFromDirectory(prev => ({ ...prev, loading: true, error: null }));
+
+      try {
+        // 1. Загружаем объект квалификации
+        const qualificationObject = await qualificationObjectService.getQualificationObjectById(qualificationObjectId);
+        console.log('Загружен объект квалификации:', qualificationObject);
+
+        // 2. Получаем тип объекта квалификации из справочника
+        const objectType = qualificationObject.type;
+        if (!objectType) {
+          throw new Error('Тип объекта квалификации не указан');
+        }
+
+        // 3. Находим тип объекта квалификации в справочнике
+        const objectTypeInfo = await qualificationObjectTypeService.getTypeByKey(objectType);
+        console.log('Найден тип объекта квалификации в справочнике:', objectTypeInfo);
+
+        // 4. Проверяем наличие шаблона отчета
+        if (!objectTypeInfo.report_template_url) {
+          setTemplateFromDirectory(prev => ({
+            ...prev,
+            loading: false,
+            error: 'Шаблон отчета не загружен в справочник для данного типа объекта квалификации'
+          }));
+          return;
+        }
+
+        // 5. Загружаем шаблон отчета
+        const templateUrl = objectTypeInfo.report_template_url;
+        const templateFilename = objectTypeInfo.report_template_filename || 'template.docx';
+        
+        console.log('Загрузка шаблона из:', templateUrl);
+        
+        // Загружаем файл
+        const response = await fetch(templateUrl);
+        if (!response.ok) {
+          throw new Error(`Ошибка загрузки шаблона: ${response.statusText}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const blob = new Blob([arrayBuffer], {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
+        const file = new File([blob], templateFilename, {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
+
+        // Устанавливаем шаблон в состояние
+        setReportStatus(prev => ({
+          ...prev,
+          templateFile: file,
+          templateValidation: null
+        }));
+
+        // Валидируем шаблон
+        validateTemplate(file);
+
+        setTemplateFromDirectory({
+          url: templateUrl,
+          filename: templateFilename,
+          loaded: true,
+          loading: false,
+          error: null
+        });
+
+        console.log('Шаблон успешно загружен из справочника:', templateFilename);
+      } catch (error) {
+        console.error('Ошибка загрузки шаблона из справочника:', error);
+        setTemplateFromDirectory(prev => ({
+          ...prev,
+          loading: false,
+          error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+        }));
+      }
+    };
+
+    loadTemplateFromDirectory();
+  }, [qualificationObjectId]);
+
+
+  // Функция для поиска наименования логгера по зоне и уровню измерения
+  const getLoggerNameForZoneAndLevel = useCallback((zoneNumber: number, measurementLevel: number | string): string | null => {
+    if (!qualificationObject?.measurementZones) {
+      return null;
+    }
+
+    // Нормализуем measurementLevel к числу
+    const normalizedLevel = typeof measurementLevel === 'string' ? parseFloat(measurementLevel) : measurementLevel;
+    
+    // Ищем зону с нужным номером
+    const zone = qualificationObject.measurementZones.find((z: any) => z.zoneNumber === zoneNumber);
+    if (!zone) {
+      return null;
+    }
+
+    // Ищем уровень измерения с нужным значением level
+    const level = zone.measurementLevels.find((l: any) => {
+      const levelValue = typeof l.level === 'string' ? parseFloat(l.level) : l.level;
+      // Сравниваем с небольшой погрешностью для чисел с плавающей точкой
+      return Math.abs(levelValue - normalizedLevel) < 0.01;
+    });
+
+    // Возвращаем equipmentName, если он есть
+    return level?.equipmentName || null;
+  }, [qualificationObject]);
 
   // Generate analysis results table data
   const analysisResults = useMemo(() => {
@@ -147,7 +300,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       pointsLength: data?.points?.length || 0,
       filesLength: files.length,
       qualificationObjectId,
-      projectId
+      projectId,
+      hasQualificationObject: !!qualificationObject,
+      measurementZonesCount: qualificationObject?.measurementZones?.length || 0
     });
     
     if (!data || !data.points.length) {
@@ -180,37 +335,80 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       console.log('TimeSeriesAnalyzer: Grouped points:', Object.keys(groupedPoints).length, 'groups');
 
       return Object.entries(groupedPoints).map(([key, points]) => {
-        const zoneNumber = points[0]?.zoneNumber !== undefined ? points[0].zoneNumber : 'unknown';
-        const measurementLevel = points[0]?.measurementLevel || 'unknown';
+        // Нормализуем zoneNumber: null/undefined -> 0 (зона "Внешний датчик")
+        const zoneNumber = points[0]?.zoneNumber !== null && points[0]?.zoneNumber !== undefined 
+          ? points[0].zoneNumber 
+          : 0;
+        
+        // Нормализуем measurementLevel: null/undefined -> 'unknown'
+        const measurementLevel = points[0]?.measurementLevel !== null && points[0]?.measurementLevel !== undefined
+          ? points[0].measurementLevel
+          : 'unknown';
         
         // Calculate temperature statistics
         const temperatures = points
-          .filter(p => p.temperature !== undefined)
+          .filter(p => p.temperature !== undefined && p.temperature !== null && !isNaN(p.temperature) && isFinite(p.temperature))
           .map(p => p.temperature!);
         
+        console.log(`TimeSeriesAnalyzer: Processing zone ${zoneNumber} level ${measurementLevel}`, {
+          totalPoints: points.length,
+          validTemperaturePoints: temperatures.length,
+          sampleTemps: temperatures.slice(0, 5)
+        });
+        
         const humidities = points
-          .filter(p => p.humidity !== undefined)
+          .filter(p => p.humidity !== undefined && p.humidity !== null)
           .map(p => p.humidity!);
 
         let tempStats = { min: '-', max: '-', avg: '-' };
         let humidityStats = { min: '-', max: '-', avg: '-' };
         
         if (temperatures.length > 0) {
-          const min = Math.min(...temperatures);
-          const max = Math.max(...temperatures);
-          const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+          // Используем итеративный подход для больших массивов
+          let min = Infinity;
+          let max = -Infinity;
+          let sum = 0;
+          let validCount = 0;
           
-          tempStats = {
-            min: (Math.round(min * 10) / 10).toString(),
-            max: (Math.round(max * 10) / 10).toString(),
-            avg: (Math.round(avg * 10) / 10).toString()
-          };
+          for (const t of temperatures) {
+            if (!isNaN(t) && isFinite(t)) {
+              if (t < min) min = t;
+              if (t > max) max = t;
+              sum += t;
+              validCount++;
+            }
+          }
+          
+          if (validCount > 0) {
+            const avg = sum / validCount;
+            
+            if (isFinite(min) && isFinite(max) && isFinite(avg)) {
+              tempStats = {
+                min: (Math.round(min * 10) / 10).toString(),
+                max: (Math.round(max * 10) / 10).toString(),
+                avg: (Math.round(avg * 10) / 10).toString()
+              };
+            } else {
+              console.warn('TimeSeriesAnalyzer: Invalid temperature stats', { min, max, avg, validCount, temperaturesLength: temperatures.length });
+            }
+          } else {
+            console.warn('TimeSeriesAnalyzer: No valid temperature values', { temperaturesLength: temperatures.length, temperatures: temperatures.slice(0, 10) });
+          }
+        } else {
+          console.warn('TimeSeriesAnalyzer: No temperature data for zone', { zoneNumber, measurementLevel, pointsLength: points.length });
         }
         
         if (humidities.length > 0) {
-          const min = Math.min(...humidities);
-          const max = Math.max(...humidities);
-          const avg = humidities.reduce((sum, h) => sum + h, 0) / humidities.length;
+          // Используем итеративный подход для больших массивов
+          let min = Infinity;
+          let max = -Infinity;
+          let sum = 0;
+          for (const h of humidities) {
+            if (h < min) min = h;
+            if (h > max) max = h;
+            sum += h;
+          }
+          const avg = sum / humidities.length;
           
           humidityStats = {
             min: (Math.round(min * 10) / 10).toString(),
@@ -232,10 +430,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           }
         }
 
+        // Получаем наименование логгера из объекта квалификации
+        const normalizedMeasurementLevel = typeof measurementLevel === 'string' ? parseFloat(measurementLevel) : measurementLevel;
+        const equipmentName = getLoggerNameForZoneAndLevel(zoneNumber, normalizedMeasurementLevel);
+        
+        // Используем equipmentName, если он есть, иначе используем данные из точек
+        const loggerName = equipmentName || (points[0] as any)?.loggerName || (points[0] as any)?.deviceModel || 'Unknown';
+
         return {
-          zoneNumber: zoneNumber === 0 ? 'Внешний' : zoneNumber.toString(),
-          measurementLevel: measurementLevel.toString(),
-          loggerName: points[0]?.loggerName || 'Unknown',
+          zoneNumber: zoneNumber === 0 ? 'Внешний' : (zoneNumber !== null && zoneNumber !== undefined ? zoneNumber.toString() : 'Неизвестно'),
+          zoneNumberRaw: zoneNumber, // Сохраняем исходный номер для сортировки
+          measurementLevel: measurementLevel !== null && measurementLevel !== undefined ? measurementLevel.toString() : 'Неизвестно',
+          loggerName: loggerName,
           serialNumber: (points[0]?.serialNumber && !points[0]?.serialNumber.startsWith('XLS-Logger-')) ? points[0]?.serialNumber : 'Не указан',
           minTemp: tempStats.min,
           maxTemp: tempStats.max,
@@ -246,6 +452,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           meetsLimits,
           isExternal: zoneNumber === 0
         };
+      }).sort((a, b) => {
+        // Сортируем: сначала зоны от 1 и выше (по возрастанию), затем зона 0 (Внешний) в конце
+        if (a.zoneNumberRaw === 0 && b.zoneNumberRaw === 0) return 0;
+        if (a.zoneNumberRaw === 0) return 1; // Зона 0 всегда в конце
+        if (b.zoneNumberRaw === 0) return -1; // Зона 0 всегда в конце
+        return a.zoneNumberRaw - b.zoneNumberRaw; // Остальные зоны по возрастанию
       });
     }
 
@@ -256,11 +468,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Find data points for this file
       const filePoints = filteredPoints.filter(point => point.fileId === file.name);
       
+      // Получаем наименование логгера из объекта квалификации для файлов
+      const fileZoneNumber = file.zoneNumber || 0;
+      const fileMeasurementLevel = file.measurementLevel ? (typeof file.measurementLevel === 'string' ? parseFloat(file.measurementLevel) : file.measurementLevel) : 0;
+      const fileEquipmentName = getLoggerNameForZoneAndLevel(fileZoneNumber, fileMeasurementLevel);
+      
       if (filePoints.length === 0) {
+        // Используем equipmentName, если он есть, иначе используем данные из файла
+        const loggerName = fileEquipmentName || file.parsedData?.deviceMetadata?.deviceModel || file.name;
+        
         return {
           zoneNumber: file.zoneNumber === 0 ? 'Внешний' : (file.zoneNumber || '-'),
+          zoneNumberRaw: file.zoneNumber || 0, // Сохраняем исходный номер для сортировки
           measurementLevel: file.measurementLevel || '-',
-          loggerName: file.parsedData?.deviceMetadata?.deviceModel || file.name,
+          loggerName: loggerName,
           serialNumber: (file.parsedData?.deviceMetadata?.serialNumber && !file.parsedData?.deviceMetadata?.serialNumber.startsWith('XLS-Logger-')) ? file.parsedData?.deviceMetadata?.serialNumber : 'Не указан',
           minTemp: '-',
           maxTemp: '-',
@@ -268,7 +489,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           minHumidity: '-',
           maxHumidity: '-',
           avgHumidity: '-',
-          meetsLimits: '-'
+          meetsLimits: '-',
+          isExternal: file.zoneNumber === 0
         };
       }
 
@@ -285,21 +507,51 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       let humidityStats = { min: '-', max: '-', avg: '-' };
       
       if (temperatures.length > 0) {
-        const min = Math.min(...temperatures);
-        const max = Math.max(...temperatures);
-        const avg = temperatures.reduce((sum, t) => sum + t, 0) / temperatures.length;
+        // Используем итеративный подход для больших массивов
+        let min = Infinity;
+        let max = -Infinity;
+        let sum = 0;
+        let validCount = 0;
         
-        tempStats = {
-          min: (Math.round(min * 10) / 10).toString(),
-          max: (Math.round(max * 10) / 10).toString(),
-          avg: (Math.round(avg * 10) / 10).toString()
-        };
+        for (const t of temperatures) {
+          if (!isNaN(t) && isFinite(t)) {
+            if (t < min) min = t;
+            if (t > max) max = t;
+            sum += t;
+            validCount++;
+          }
+        }
+        
+        if (validCount > 0) {
+          const avg = sum / validCount;
+          
+          if (isFinite(min) && isFinite(max) && isFinite(avg)) {
+            tempStats = {
+              min: (Math.round(min * 10) / 10).toString(),
+              max: (Math.round(max * 10) / 10).toString(),
+              avg: (Math.round(avg * 10) / 10).toString()
+            };
+          } else {
+            console.warn('TimeSeriesAnalyzer: Invalid temperature stats for file', { min, max, avg, validCount, file: file.name });
+          }
+        } else {
+          console.warn('TimeSeriesAnalyzer: No valid temperature values for file', { file: file.name, temperaturesLength: temperatures.length });
+        }
+      } else {
+        console.warn('TimeSeriesAnalyzer: No temperature data for file', { file: file.name, filePointsLength: filePoints.length });
       }
       
       if (humidities.length > 0) {
-        const min = Math.min(...humidities);
-        const max = Math.max(...humidities);
-        const avg = humidities.reduce((sum, h) => sum + h, 0) / humidities.length;
+        // Используем итеративный подход для больших массивов
+        let min = Infinity;
+        let max = -Infinity;
+        let sum = 0;
+        for (const h of humidities) {
+          if (h < min) min = h;
+          if (h > max) max = h;
+          sum += h;
+        }
+        const avg = sum / humidities.length;
         
         humidityStats = {
           min: (Math.round(min * 10) / 10).toString(),
@@ -314,8 +566,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       if (file.zoneNumber === 0) {
         meetsLimits = '-';
       } else if (limits.temperature && temperatures.length > 0) {
-        const min = Math.min(...temperatures);
-        const max = Math.max(...temperatures);
+        // Используем итеративный подход для больших массивов
+        let min = Infinity;
+        let max = -Infinity;
+        for (const t of temperatures) {
+          if (t < min) min = t;
+          if (t > max) max = t;
+        }
         
         if (limits.temperature.min !== undefined && min < limits.temperature.min) {
           meetsLimits = 'Нет';
@@ -325,10 +582,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         }
       }
 
+      // Используем equipmentName, если он есть, иначе используем данные из файла
+      const fileLoggerName = fileEquipmentName || file.parsedData?.deviceMetadata?.deviceModel || file.name;
+      
       return {
           zoneNumber: file.zoneNumber === 0 ? 'Внешний' : (file.zoneNumber || '-'),
+        zoneNumberRaw: file.zoneNumber || 0, // Сохраняем исходный номер для сортировки
         measurementLevel: file.measurementLevel || '-',
-        loggerName: file.parsedData?.deviceMetadata?.deviceModel || file.name, // Полное название логгера
+        loggerName: fileLoggerName, // Наименование логгера из объекта квалификации или из файла
         serialNumber: file.parsedData?.deviceMetadata?.serialNumber || 'Unknown',
         minTemp: tempStats.min,
         maxTemp: tempStats.max,
@@ -339,8 +600,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         meetsLimits,
         isExternal: file.zoneNumber === 0
       };
+    }).sort((a, b) => {
+      // Сортируем: сначала зоны от 1 и выше (по возрастанию), затем зона 0 (Внешний) в конце
+      if (a.zoneNumberRaw === 0 && b.zoneNumberRaw === 0) return 0;
+      if (a.zoneNumberRaw === 0) return 1; // Зона 0 всегда в конце
+      if (b.zoneNumberRaw === 0) return -1; // Зона 0 всегда в конце
+      return a.zoneNumberRaw - b.zoneNumberRaw; // Остальные зоны по возрастанию
     });
-  }, [data, files, limits, zoomState, qualificationObjectId, projectId]); // Добавляем zoomState, qualificationObjectId и projectId в зависимости
+  }, [data, files, limits, zoomState, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel]); // Добавляем qualificationObject и getLoggerNameForZoneAndLevel в зависимости
 
   // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
   const { globalMinTemp, globalMaxTemp } = useMemo(() => {
@@ -352,9 +619,29 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       .map(result => parseFloat(result.maxTemp))
       .filter(val => !isNaN(val));
     
+    // Используем итеративный подход для больших массивов
+    let globalMinTemp: number | null = null;
+    let globalMaxTemp: number | null = null;
+    
+    if (minTempValues.length > 0) {
+      let min = Infinity;
+      for (const val of minTempValues) {
+        if (val < min) min = val;
+      }
+      globalMinTemp = min === Infinity ? null : min;
+    }
+    
+    if (maxTempValues.length > 0) {
+      let max = -Infinity;
+      for (const val of maxTempValues) {
+        if (val > max) max = val;
+      }
+      globalMaxTemp = max === -Infinity ? null : max;
+    }
+    
     return {
-      globalMinTemp: minTempValues.length > 0 ? Math.min(...minTempValues) : null,
-      globalMaxTemp: maxTempValues.length > 0 ? Math.max(...maxTempValues) : null
+      globalMinTemp,
+      globalMaxTemp
     };
   }, [analysisResults]);
 
@@ -550,7 +837,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         dataType,
         analysisResults,
         conclusions,
-        researchObject: getQualificationObjectDisplayName() || '',
+        researchObject: qualificationObject?.name || 'Не указан',
         conditioningSystem: qualificationObject?.climateSystem || '',
        testType: convertedTestType || '',
         limits: limits,
@@ -932,36 +1219,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     setConclusions(conclusionText);
   };
 
-  // Состояние для данных объекта квалификации
-  const [qualificationObject, setQualificationObject] = useState<any>(null);
-
-  // Загрузка данных объекта квалификации
-  useEffect(() => {
-    const loadQualificationObject = async () => {
-      if (qualificationObjectId) {
-        try {
-          const { qualificationObjectService } = await import('../utils/qualificationObjectService');
-          const service = qualificationObjectService;
-          const objectData = await service.getQualificationObjectById(qualificationObjectId);
-          setQualificationObject(objectData);
-        } catch (error) {
-          console.error('Ошибка загрузки объекта квалификации:', error);
-        }
-      }
-    };
-
-    loadQualificationObject();
-  }, [qualificationObjectId]);
-
-  // Функция для получения названия объекта квалификации
-  const getQualificationObjectDisplayName = (): string => {
-    if (qualificationObject?.name) {
-      return qualificationObject.name;
-    }
-    
-    return 'Не указан';
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1295,7 +1552,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               {analysisResults.map((result, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {result.zoneNumber === '0' ? 'Внешний' : result.zoneNumber}
+                    {result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешняя температура' : result.zoneNumber}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ',')}
@@ -1323,7 +1580,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     {result.maxTemp}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {result.avgTemp}
+                    {result.avgTemp === '-' || !result.avgTemp ? '-' : parseFloat(result.avgTemp).toFixed(1).replace('.', ',')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -1404,44 +1661,60 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             Формирование приложения к отчету с результатами испытаний
           </h2>
           
-          {/* Загрузка шаблона DOCX */}
+          {/* Шаблон из справочника объектов квалификации */}
           <div className="w-full max-w-md">
             <h3 className="text-lg font-medium text-gray-700 mb-4 text-center">
-              Использование пользовательского шаблона с плейсхолдером {'{chart}'}
+              Шаблон отчета из справочника объектов квалификации
             </h3>
             
-            {!reportStatus.templateFile ? (
+            {templateFromDirectory.loading ? (
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <input
-                  type="file"
-                  accept=".docx"
-                  onChange={handleTemplateUpload}
-                  className="hidden"
-                  id="template-upload"
-                  title="Загрузить DOCX шаблон"
-                  aria-label="Загрузить DOCX шаблон"
-                />
-                <label
-                  htmlFor="template-upload"
-                  className="cursor-pointer flex flex-col items-center space-y-2"
-                >
-                  <FileText className="w-8 h-8 text-gray-400" />
-                  <span className="text-sm text-gray-600">
-                    Загрузить DOCX шаблон
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    Должен содержать плейсхолдер {'{chart}'} для вставки графика
-                  </span>
-                </label>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                <span className="text-sm text-gray-600">
+                  Загрузка шаблона из справочника...
+                </span>
               </div>
-            ) : (
-              <div className="bg-gray-50 rounded-lg p-4">
+            ) : templateFromDirectory.error ? (
+              <div className="border-2 border-dashed border-red-300 rounded-lg p-6 text-center bg-red-50">
+                <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                <span className="text-sm text-red-600 mb-2 block">
+                  {templateFromDirectory.error}
+                </span>
+                <span className="text-xs text-gray-500">
+                  Вы можете загрузить шаблон вручную
+                </span>
+                <div className="mt-4">
+                  <input
+                    type="file"
+                    accept=".docx"
+                    onChange={handleTemplateUpload}
+                    className="hidden"
+                    id="template-upload-fallback"
+                    title="Загрузить DOCX шаблон"
+                    aria-label="Загрузить DOCX шаблон"
+                  />
+                  <label
+                    htmlFor="template-upload-fallback"
+                    className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Загрузить шаблон вручную
+                  </label>
+                </div>
+              </div>
+            ) : templateFromDirectory.loaded && reportStatus.templateFile ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
                     <FileText className="w-5 h-5 text-green-600" />
-                    <span className="text-sm font-medium text-gray-900">
-                      {reportStatus.templateFile.name}
-                    </span>
+                    <div>
+                      <span className="text-sm font-medium text-gray-900 block">
+                        {reportStatus.templateFile.name}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Загружен из справочника объектов квалификации
+                      </span>
+                    </div>
                   </div>
                   <button
                     onClick={handleRemoveTemplate}
@@ -1479,6 +1752,30 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     )}
                   </div>
                 )}
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept=".docx"
+                  onChange={handleTemplateUpload}
+                  className="hidden"
+                  id="template-upload"
+                  title="Загрузить DOCX шаблон"
+                  aria-label="Загрузить DOCX шаблон"
+                />
+                <label
+                  htmlFor="template-upload"
+                  className="cursor-pointer flex flex-col items-center space-y-2"
+                >
+                  <FileText className="w-8 h-8 text-gray-400" />
+                  <span className="text-sm text-gray-600">
+                    Загрузить DOCX шаблон вручную
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Должен содержать плейсхолдер {'{chart}'} для вставки графика
+                  </span>
+                </label>
               </div>
             )}
           </div>

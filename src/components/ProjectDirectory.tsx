@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, Building2, CheckCircle, Clock, AlertCircle, Play, FileText, AlertTriangle, Calendar, Printer, Eye } from 'lucide-react';
-import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors } from '../types/Project';
+import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, ProjectType, ProjectTypeLabels } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
 import { projectService } from '../utils/projectService';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { useAuth } from '../contexts/AuthContext';
+import { SaleProjectForm } from './SaleProjectForm';
 // import { QualificationObjectForm } from './QualificationObjectForm';
 
 // UUID validation function
@@ -39,6 +40,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     description: string;
     contractorId: string;
     qualificationObjectIds: string[];
+    type?: 'qualification' | 'sale';
   }>({
     description: '',
     contractorId: '',
@@ -61,11 +63,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     setError(null);
 
     try {
-      // Проверяем доступность сервисов
-      if (!projectService.isAvailable()) {
-        throw new Error('Supabase не настроен. Проверьте переменные окружения VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY');
-      }
-
       // Загружаем проекты
       try {
         const projectsData = await projectService.getAllProjects();
@@ -110,11 +107,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
       const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-      setError(errorMessage);
       
-      // Если ошибка связана с подключением к Supabase, показываем специальное сообщение
+      // Формируем понятное сообщение об ошибке
       if (errorMessage.includes('fetch') || errorMessage.includes('JSON') || errorMessage.includes('network')) {
-        setError('Ошибка подключения к базе данных. Проверьте настройки Supabase в разделе "Проверка БД".');
+        setError('Ошибка подключения к серверу. Проверьте, что сервер запущен и доступен.');
+      } else {
+        setError(errorMessage);
       }
     } finally {
       setLoading(false);
@@ -335,6 +333,13 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       case 'contract_negotiation':
       case 'report_approval':
         return <Clock className="w-4 h-4 text-yellow-600" />;
+      // case 'protocol_preparation': // Удалено - статус больше не используется
+      case 'report_preparation':
+        return <FileText className="w-4 h-4 text-blue-600" />;
+      case 'testing_execution':
+        return <Play className="w-4 h-4 text-purple-600" />;
+      case 'report_printing':
+        return <Printer className="w-4 h-4 text-green-600" />;
       default:
         return <AlertCircle className="w-4 h-4 text-blue-600" />;
     }
@@ -355,9 +360,9 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
           page: 'testing_execution',
           icon: Play
         };
-      case 'creating_report':
+      case 'report_preparation':
         return {
-          label: 'Создание отчета',
+          label: 'Подготовка отчета',
           page: 'creating_report',
           icon: FileText
         };
@@ -412,15 +417,30 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <FolderOpen className="w-8 h-8 text-indigo-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Проекты квалификации</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Проекты</h1>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Создать проект</span>
-        </button>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => {
+              setNewProject({ description: '', contractorId: '', qualificationObjectIds: [], type: 'qualification' });
+              setShowAddForm(true);
+            }}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Квалификация</span>
+          </button>
+          <button
+            onClick={() => {
+              setNewProject({ description: '', contractorId: '', qualificationObjectIds: [], type: 'sale' });
+              setShowAddForm(true);
+            }}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Продажа</span>
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -430,13 +450,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
             <div>
               <h3 className="text-sm font-medium text-red-800">Ошибка загрузки данных</h3>
               <p className="text-sm text-red-700 mt-1">{error}</p>
-              {error.includes('Supabase') && (
-                <div className="mt-2">
-                  <p className="text-xs text-red-600">
-                    Перейдите в раздел "Проверка БД" для диагностики подключения к базе данных.
-                  </p>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -462,10 +475,33 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       </div>
 
       {/* Add Project Form */}
-      {showAddForm && (
+      {showAddForm && newProject.type === 'sale' ? (
+        <SaleProjectForm
+          contractors={contractors}
+          onSave={async (projectData) => {
+            setOperationLoading(true);
+            try {
+              const addedProject = await projectService.addProject(projectData, user?.id);
+              setProjects(prev => [...prev, addedProject]);
+              setNewProject({ description: '', contractorId: '', qualificationObjectIds: [], type: undefined });
+              setShowAddForm(false);
+            } catch (error: any) {
+              console.error('Ошибка создания проекта:', error);
+              setError(error?.message || 'Ошибка создания проекта');
+            } finally {
+              setOperationLoading(false);
+            }
+          }}
+          onCancel={() => {
+            setNewProject({ description: '', contractorId: '', qualificationObjectIds: [], type: undefined });
+            setShowAddForm(false);
+          }}
+          loading={operationLoading}
+        />
+      ) : showAddForm ? (
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Создать проект</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Квалификация</h2>
             <button
               onClick={() => setShowAddForm(false)}
               className="text-gray-400 hover:text-gray-600"
@@ -587,12 +623,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 disabled={operationLoading}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {operationLoading ? 'Создание...' : 'Создать проект'}
+                {operationLoading ? 'Создание...' : 'Создать'}
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Projects List */}
       <div className="bg-white rounded-lg shadow">
@@ -614,6 +650,9 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Проект
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Тип
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Контрагент
@@ -651,7 +690,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                         />
                       ) : (
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{project.name}</div>
+                          <div 
+                            className="text-sm font-medium text-gray-900 cursor-help" 
+                            title={project.name}
+                          >
+                            {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
+                          </div>
                           {project.description && (
                             <div className="text-xs text-gray-500 mt-1">{project.description}</div>
                           )}
@@ -659,9 +703,21 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                        {ProjectTypeLabels[project.type || 'qualification']}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
                         <Building2 className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">{project.contractorName}</span>
+                        <span
+                          className="text-sm text-gray-900 cursor-help"
+                          title={project.contractorName || ''}
+                        >
+                          {project.contractorName && project.contractorName.length > 30
+                            ? `${project.contractorName.substring(0, 30)}...`
+                            : project.contractorName || ''}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -762,7 +818,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
             ) : (
               <>
                 <p>Проекты не найдены</p>
-                <p className="text-sm">Нажмите кнопку "Создать проект" для создания первого проекта</p>
+                <p className="text-sm">Нажмите кнопку "Квалификация" для создания первого проекта</p>
               </>
             )}
           </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, BarChart3, Menu, X, HelpCircle, Database, Users, Building2, FolderOpen, Wrench, Wifi, Shield, User, Key, Activity, Settings, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { LogOut, BarChart3, Menu, X, HelpCircle, Users, Building2, FolderOpen, Wrench, Activity, Settings, ChevronDown, ChevronRight, Search, Package } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -39,6 +39,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       access: 'analyzer' as const
     },
     {
+      name: 'Объекты квалификации',
+      key: 'qualification-objects',
+      icon: Package,
+      access: 'analyzer' as const
+    },
+    {
       name: 'Справка',
       key: 'help',
       icon: HelpCircle,
@@ -61,54 +67,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
           key: 'audit_logs',
           icon: Activity,
           access: 'admin' as const
-        },
-        {
-          name: 'Проверка БД',
-          key: 'database',
-          icon: Database,
-          access: 'analyzer' as const
-        },
-        {
-          name: 'Тест Supabase',
-          key: 'supabase-test',
-          icon: Wifi,
-          access: 'analyzer' as const
-        },
-        {
-          name: 'RLS Manager',
-          key: 'rls-manager',
-          icon: Shield,
-          access: 'analyzer' as const
-        },
-        {
-          name: 'Storage RLS Manager',
-          key: 'storage-rls-manager',
-          icon: Shield,
-          access: 'analyzer' as const
-        },
-        {
-          name: 'Storage Diagnostic',
-          key: 'storage-diagnostic',
-          icon: Database,
-          access: 'analyzer' as const
-        },
-        {
-          name: 'Storage Auth Fix',
-          key: 'storage-auth-fix',
-          icon: User,
-          access: 'analyzer' as const
-        },
-        {
-          name: 'Supabase Auth Fix',
-          key: 'supabase-auth-init',
-          icon: Key,
-          access: 'analyzer' as const
-        },
-        {
-          name: 'Secure Auth Manager',
-          key: 'secure-auth-manager',
-          icon: Shield,
-          access: 'analyzer' as const
         },
         {
           name: 'Поиск тендеров',

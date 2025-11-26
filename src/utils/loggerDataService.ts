@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from './apiClient';
 import { ParsedFileData, MeasurementRecord } from '../types/FileData';
 
 interface LoggerDataRecord {
@@ -40,14 +40,8 @@ interface LoggerDataSummary {
 }
 
 class LoggerDataService {
-  private supabase: any = null;
-
-  constructor() {
-    this.supabase = supabase;
-  }
-
   isAvailable(): boolean {
-    return this.supabase !== null;
+    return true; // API всегда доступен
   }
 
   /**
@@ -61,10 +55,6 @@ class LoggerDataService {
     loggerName: string,
     parsedData: ParsedFileData
   ): Promise<{ success: boolean; error?: string; recordCount?: number }> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
       console.log('Сохранение данных логгера:', {
         projectId,
@@ -76,97 +66,30 @@ class LoggerDataService {
         recordCount: parsedData.recordCount
       });
 
-      // Сначала сохраняем сводную информацию о файле
-      const summaryData: LoggerDataSummary = {
-        project_id: projectId,
-        qualification_object_id: qualificationObjectId,
-        zone_number: zoneNumber,
-        measurement_level: measurementLevel,
-        logger_name: loggerName,
-        file_name: parsedData.fileName,
-        device_type: parsedData.deviceMetadata.deviceType,
-        device_model: parsedData.deviceMetadata.deviceModel,
-        serial_number: parsedData.deviceMetadata.serialNumber,
-        start_date: parsedData.startDate,
-        end_date: parsedData.endDate,
-        record_count: parsedData.recordCount,
-        parsing_status: parsedData.parsingStatus,
-        error_message: parsedData.errorMessage
-      };
-
-      console.log('LoggerDataService: Сохраняем сводную информацию с статусом:', {
-        file_name: parsedData.fileName,
-        parsing_status: parsedData.parsingStatus,
-        record_count: parsedData.recordCount,
-        zone_number: zoneNumber,
-        measurement_level: measurementLevel
+      const result = await apiClient.post<{ success: boolean; error?: string; recordCount?: number }>('/logger-data/save', {
+        projectId,
+        qualificationObjectId,
+        zoneNumber,
+        measurementLevel,
+        loggerName,
+        parsedData: {
+          fileName: parsedData.fileName,
+          deviceMetadata: parsedData.deviceMetadata,
+          startDate: parsedData.startDate,
+          endDate: parsedData.endDate,
+          recordCount: parsedData.recordCount,
+          parsingStatus: parsedData.parsingStatus,
+          errorMessage: parsedData.errorMessage,
+          measurements: parsedData.measurements
+        }
       });
 
-      const { data: summaryResult, error: summaryError } = await this.supabase
-        .from('logger_data_summary')
-        .insert([summaryData])
-        .select()
-        .single();
-
-      if (summaryError) {
-        console.error('Ошибка сохранения сводной информации:', summaryError);
-        throw new Error(`Ошибка сохранения сводной информации: ${summaryError.message}`);
-      }
-
-      console.log('Сводная информация сохранена:', summaryResult);
-
-      // Если парсинг завершился успешно, сохраняем детальные данные
-      if (parsedData.parsingStatus === 'completed' && parsedData.measurements.length > 0) {
-        const batchSize = 1000; // Размер пакета для вставки
-        const totalBatches = Math.ceil(parsedData.measurements.length / batchSize);
-        
-        console.log(`Сохранение ${parsedData.measurements.length} записей в ${totalBatches} пакетах`);
-
-        for (let i = 0; i < totalBatches; i++) {
-          const startIndex = i * batchSize;
-          const endIndex = Math.min(startIndex + batchSize, parsedData.measurements.length);
-          const batch = parsedData.measurements.slice(startIndex, endIndex);
-
-          const batchData: LoggerDataRecord[] = batch.map(measurement => ({
-            project_id: projectId,
-            qualification_object_id: qualificationObjectId,
-            zone_number: zoneNumber,
-            measurement_level: measurementLevel,
-            logger_name: loggerName,
-            file_name: parsedData.fileName,
-            device_type: parsedData.deviceMetadata.deviceType,
-            device_model: parsedData.deviceMetadata.deviceModel,
-            serial_number: parsedData.deviceMetadata.serialNumber,
-            timestamp: measurement.timestamp,
-            temperature: measurement.temperature,
-            humidity: measurement.humidity,
-            is_valid: measurement.isValid,
-            validation_errors: measurement.validationErrors
-          }));
-
-          const { error: batchError } = await this.supabase
-            .from('logger_data_records')
-            .insert(batchData);
-
-          if (batchError) {
-            console.error(`Ошибка сохранения пакета ${i + 1}:`, batchError);
-            throw new Error(`Ошибка сохранения пакета ${i + 1}: ${batchError.message}`);
-          }
-
-          console.log(`Пакет ${i + 1}/${totalBatches} сохранен (${batch.length} записей)`);
-        }
-      }
-
-      return {
-        success: true,
-        recordCount: parsedData.recordCount
-      };
-
-    } catch (error) {
+      return result;
+    } catch (error: any) {
       console.error('Ошибка сохранения данных логгера:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+        error: error.message || 'Неизвестная ошибка'
       };
     }
   }
@@ -177,35 +100,25 @@ class LoggerDataService {
   async getLoggerData(
     projectId: string,
     qualificationObjectId: string,
-    zoneNumber?: number,
-    measurementLevel?: number
+    zoneNumber?: number | null,
+    measurementLevel?: number | null
   ): Promise<LoggerDataRecord[]> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
+    try {
+      const params = new URLSearchParams();
+      params.append('project_id', projectId);
+      params.append('qualification_object_id', qualificationObjectId);
+      if (zoneNumber !== undefined && zoneNumber !== null) {
+        params.append('zone_number', zoneNumber.toString());
+      }
+      if (measurementLevel !== undefined && measurementLevel !== null) {
+        params.append('measurement_level', measurementLevel.toString());
+      }
+
+      const data = await apiClient.get<LoggerDataRecord[]>(`/logger-data?${params.toString()}`);
+      return data || [];
+    } catch (error: any) {
+      throw new Error(`Ошибка получения данных логгера: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    let query = this.supabase
-      .from('logger_data_records')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('qualification_object_id', qualificationObjectId)
-      .order('timestamp', { ascending: true });
-
-    if (zoneNumber !== undefined) {
-      query = query.eq('zone_number', zoneNumber);
-    }
-
-    if (measurementLevel !== undefined) {
-      query = query.eq('measurement_level', measurementLevel);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      throw new Error(`Ошибка получения данных логгера: ${error.message}`);
-    }
-
-    return data || [];
   }
 
   /**
@@ -215,26 +128,20 @@ class LoggerDataService {
     projectId: string,
     qualificationObjectId: string
   ): Promise<LoggerDataSummary[]> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
+    try {
+      console.log('LoggerDataService: запрос к logger_data_summary с параметрами:', { projectId, qualificationObjectId });
+      
+      const params = new URLSearchParams();
+      params.append('project_id', projectId);
+      params.append('qualification_object_id', qualificationObjectId);
+
+      const data = await apiClient.get<LoggerDataSummary[]>(`/logger-data/summary?${params.toString()}`);
+      
+      console.log('LoggerDataService: результат запроса:', { count: data?.length || 0 });
+      return data || [];
+    } catch (error: any) {
+      throw new Error(`Ошибка получения сводной информации: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    console.log('LoggerDataService: запрос к logger_data_summary с параметрами:', { projectId, qualificationObjectId });
-    
-    const { data, error } = await this.supabase
-      .from('logger_data_summary')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('qualification_object_id', qualificationObjectId)
-      .order('created_at', { ascending: false });
-
-    console.log('LoggerDataService: результат запроса:', { data, error });
-
-    if (error) {
-      throw new Error(`Ошибка получения сводной информации: ${error.message}`);
-    }
-
-    return data || [];
   }
 
   /**
@@ -245,42 +152,19 @@ class LoggerDataService {
     qualificationObjectId: string,
     fileName: string
   ): Promise<{ success: boolean; error?: string }> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      // Удаляем детальные записи
-      const { error: recordsError } = await this.supabase
-        .from('logger_data_records')
-        .delete()
-        .eq('project_id', projectId)
-        .eq('qualification_object_id', qualificationObjectId)
-        .eq('file_name', fileName);
+      const params = new URLSearchParams();
+      params.append('project_id', projectId);
+      params.append('qualification_object_id', qualificationObjectId);
+      params.append('file_name', fileName);
 
-      if (recordsError) {
-        throw new Error(`Ошибка удаления записей: ${recordsError.message}`);
-      }
-
-      // Удаляем сводную информацию
-      const { error: summaryError } = await this.supabase
-        .from('logger_data_summary')
-        .delete()
-        .eq('project_id', projectId)
-        .eq('qualification_object_id', qualificationObjectId)
-        .eq('file_name', fileName);
-
-      if (summaryError) {
-        throw new Error(`Ошибка удаления сводной информации: ${summaryError.message}`);
-      }
-
-      return { success: true };
-
-    } catch (error) {
+      const result = await apiClient.delete<{ success: boolean; error?: string }>(`/logger-data?${params.toString()}`);
+      return result;
+    } catch (error: any) {
       console.error('Ошибка удаления данных логгера:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+        error: error.message || 'Неизвестная ошибка'
       };
     }
   }

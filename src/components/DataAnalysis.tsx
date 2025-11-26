@@ -14,6 +14,7 @@ interface DataAnalysisProps {
   analysisData?: {
     qualificationObjectId?: string;
     projectId?: string;
+    project?: Project;
   };
   onBack: () => void;
 }
@@ -29,15 +30,16 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
   // Загрузка полной информации о проекте
   const loadFullProject = async () => {
     if (!projectService.isAvailable()) {
-      setError('Supabase не настроен для работы с проектами');
+      setError('Сервис проектов недоступен');
       return;
     }
 
     console.log('DataAnalysis: received project:', project);
     console.log('DataAnalysis: received analysisData:', analysisData);
-    console.log('DataAnalysis: project.id:', project.id);
+    console.log('DataAnalysis: project.id:', project?.id);
 
-    const projectId = project.id || analysisData?.projectId;
+    // Пытаемся получить projectId из разных источников
+    const projectId = project?.id || analysisData?.projectId || analysisData?.project?.id;
     console.log('DataAnalysis: using projectId:', projectId);
 
     if (!projectId) {
@@ -52,7 +54,7 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
       console.log('DataAnalysis: full project data loaded:', fullProjectData);
     } catch (error) {
       console.error('Ошибка загрузки полной информации о проекте:', error);
-      setError('Не удалось загрузить полную информацию о проекте');
+      setError(`Не удалось загрузить полную информацию о проекте: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     }
   };
 
@@ -155,7 +157,7 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
     };
 
     loadData();
-  }, [project.id, analysisData?.projectId]);
+  }, [project?.id, analysisData?.projectId, analysisData?.project?.id]);
 
   // Загрузка контрагента и объекта квалификации после загрузки полной информации о проекте
   useEffect(() => {

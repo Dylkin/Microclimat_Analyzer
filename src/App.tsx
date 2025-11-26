@@ -5,19 +5,11 @@ import { Layout } from './components/Layout';
 import './index.css';
 
 // Lazy load components for code splitting
-const MicroclimatAnalyzer = lazy(() => import('./components/analyzer').then(m => ({ default: m.MicroclimatAnalyzer })));
+const MicroclimatAnalyzer = lazy(() => import('./components/MicroclimatAnalyzer'));
 const Help = lazy(() => import('./components/Help'));
-const DatabaseTest = lazy(() => import('./components/DatabaseTest'));
-const SupabaseConnectionTest = lazy(() => import('./components/SupabaseConnectionTest'));
-const RLSManager = lazy(() => import('./components/RLSManager'));
-const StorageRLSManager = lazy(() => import('./components/StorageRLSManager'));
-const StorageDiagnostic = lazy(() => import('./components/StorageDiagnostic'));
-const StorageAuthFix = lazy(() => import('./components/StorageAuthFix'));
-const SupabaseAuthInit = lazy(() => import('./components/SupabaseAuthInit'));
-const SecureAuthManager = lazy(() => import('./components/SecureAuthManager'));
 const UserDirectory = lazy(() => import('./components/admin-panels').then(m => ({ default: m.UserDirectory })));
 const ContractorDirectory = lazy(() => import('./components/admin-panels').then(m => ({ default: m.ContractorDirectory })));
-const ProjectDirectory = lazy(() => import('./components/project-management').then(m => ({ default: m.ProjectDirectory })));
+const ProjectDirectory = lazy(() => import('./components/ProjectDirectory'));
 const EquipmentDirectory = lazy(() => import('./components/equipment-management').then(m => ({ default: m.EquipmentDirectory })));
 const ContractNegotiation = lazy(() => import('./components/ContractNegotiation'));
 const TestingExecution = lazy(() => import('./components/testing-management').then(m => ({ default: m.TestingExecution })));
@@ -26,6 +18,7 @@ const DataAnalysis = lazy(() => import('./components/DataAnalysis'));
 const AuditLogs = lazy(() => import('./components/AuditLogs'));
 const ResetPassword = lazy(() => import('./components/ResetPassword'));
 const TenderSearch = lazy(() => import('./components/TenderSearch'));
+const QualificationObjectTypes = lazy(() => import('./components/QualificationObjectTypes'));
 
 // Loading component
 const LoadingSpinner: React.FC = () => (
@@ -70,18 +63,20 @@ const AppContent: React.FC = () => {
     console.log('App: handlePageChange вызван:', {
       page,
       projectData: projectData ? {
-        id: projectData.id,
-        name: projectData.name,
-        contractNumber: projectData.contractNumber,
-        contractDate: projectData.contractDate,
-        fullProject: projectData  // Добавляем полный объект для диагностики
+        id: projectData.id || projectData.project?.id,
+        name: projectData.name || projectData.project?.name,
+        contractNumber: projectData.contractNumber || projectData.project?.contractNumber,
+        contractDate: projectData.contractDate || projectData.project?.contractDate,
+        fullProject: projectData.project || projectData  // Используем project из данных, если есть
       } : null
     });
     
     setCurrentPage(page);
     if (projectData) {
-      setSelectedProject(projectData);
-      setPageData(projectData);
+      // Если в projectData есть вложенный объект project, используем его
+      const projectToSet = projectData.project || projectData;
+      setSelectedProject(projectToSet);
+      setPageData(projectData); // Сохраняем полные данные для доступа к analysisData
     } else {
       setSelectedProject(null);
       setPageData(null);
@@ -137,9 +132,11 @@ const AppContent: React.FC = () => {
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;
       case 'data_analysis':
-        return hasAccess('analyzer') && selectedProject ? wrapWithSuspense(
+        // Используем project из pageData, если он есть, иначе selectedProject
+        const projectForAnalysis = pageData?.project || selectedProject;
+        return hasAccess('analyzer') && projectForAnalysis ? wrapWithSuspense(
           <DataAnalysis 
-            project={selectedProject}
+            project={projectForAnalysis}
             analysisData={pageData}
             onBack={() => {
               // Если в pageData есть полный объект проекта, используем его
@@ -160,22 +157,8 @@ const AppContent: React.FC = () => {
         return hasAccess('analyzer') ? wrapWithSuspense(<ProjectDirectory onPageChange={handlePageChange} />) : <div>Доступ запрещен</div>;
       case 'equipment':
         return hasAccess('analyzer') ? wrapWithSuspense(<EquipmentDirectory />) : <div>Доступ запрещен</div>;
-      case 'database':
-        return hasAccess('database') ? wrapWithSuspense(<DatabaseTest />) : <div>Доступ запрещен</div>;
-      case 'supabase-test':
-        return wrapWithSuspense(<SupabaseConnectionTest />);
-      case 'rls-manager':
-        return wrapWithSuspense(<RLSManager />);
-      case 'storage-rls-manager':
-        return wrapWithSuspense(<StorageRLSManager />);
-      case 'storage-diagnostic':
-        return wrapWithSuspense(<StorageDiagnostic />);
-      case 'storage-auth-fix':
-        return wrapWithSuspense(<StorageAuthFix />);
-      case 'supabase-auth-init':
-        return wrapWithSuspense(<SupabaseAuthInit />);
-      case 'secure-auth-manager':
-        return wrapWithSuspense(<SecureAuthManager />);
+      case 'qualification-objects':
+        return hasAccess('analyzer') ? wrapWithSuspense(<QualificationObjectTypes />) : <div>Доступ запрещен</div>;
       case 'tender-search':
         return hasAccess('analyzer') ? wrapWithSuspense(<TenderSearch />) : <div>Доступ запрещен</div>;
       default:

@@ -9,14 +9,40 @@ interface EquipmentPlacementProps {
   qualificationObjectId: string;
   initialZones?: MeasurementZone[];
   onZonesChange?: (zones: MeasurementZone[]) => void;
+  readOnly?: boolean;
 }
 
 export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
   qualificationObjectId,
   initialZones = [],
-  onZonesChange
+  onZonesChange,
+  readOnly = false
 }) => {
-  const [measurementZones, setMeasurementZones] = useState<MeasurementZone[]>(initialZones);
+  // Инициализируем с зоной 0 (Внешняя температура), если зон нет
+  const initializeZones = (zones: MeasurementZone[]): MeasurementZone[] => {
+    if (zones.length === 0) {
+      // Если зон нет, создаем зону 0 (Внешняя температура)
+      return [{
+        id: `zone-0-${Date.now()}`,
+        zoneNumber: 0,
+        measurementLevels: []
+      }];
+    }
+    // Проверяем, есть ли зона 0
+    const hasZone0 = zones.some(z => z.zoneNumber === 0);
+    if (!hasZone0) {
+      // Если зоны есть, но нет зоны 0, добавляем её в начало
+      return [{
+        id: `zone-0-${Date.now()}`,
+        zoneNumber: 0,
+        measurementLevels: []
+      }, ...zones];
+    }
+    // Если зона 0 есть, просто возвращаем зоны, отсортированные по номеру
+    return [...zones].sort((a, b) => a.zoneNumber - b.zoneNumber);
+  };
+  
+  const [measurementZones, setMeasurementZones] = useState<MeasurementZone[]>(initializeZones(initialZones));
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [equipmentLoading, setEquipmentLoading] = useState(false);
   const [equipmentSearchTerms, setEquipmentSearchTerms] = useState<{ [levelId: string]: string }>({});
@@ -52,7 +78,8 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
     const zonesChanged = JSON.stringify(initialZones) !== JSON.stringify(prevZones);
     
     if (zonesChanged) {
-      setMeasurementZones(initialZones);
+      const initializedZones = initializeZones(initialZones);
+      setMeasurementZones(initializedZones);
       prevInitialZonesRef.current = initialZones;
     }
   }, [initialZones]);
@@ -85,11 +112,23 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
 
   // Добавление зоны измерения
   const addMeasurementZone = () => {
-    // Получаем максимальный номер зоны, исключая зону 0 (Внешний датчик)
+    // Проверяем, есть ли зона 0 (Внешняя температура)
+    const hasZone0 = measurementZones.some(z => z.zoneNumber === 0);
+    
+    // Получаем максимальный номер зоны, исключая зону 0 (Внешняя температура)
     const userZones = measurementZones.filter(z => z.zoneNumber !== 0);
-    const nextZoneNumber = userZones.length > 0 
-      ? Math.max(...userZones.map(z => z.zoneNumber)) + 1 
-      : 1;
+    let nextZoneNumber: number;
+    
+    if (userZones.length > 0) {
+      // Если есть пользовательские зоны, берем максимальный номер + 1
+      nextZoneNumber = Math.max(...userZones.map(z => z.zoneNumber)) + 1;
+    } else if (!hasZone0) {
+      // Если зон нет вообще, создаем зону 0
+      nextZoneNumber = 0;
+    } else {
+      // Если есть только зона 0, следующая зона будет 1
+      nextZoneNumber = 1;
+    }
     
     // Копируем уровни из предыдущей пользовательской зоны, если она существует
     let measurementLevels: MeasurementLevel[] = [];
@@ -109,18 +148,41 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
       zoneNumber: nextZoneNumber,
       measurementLevels: measurementLevels
     };
-    setMeasurementZones(prev => [...prev, newZone]);
+    
+    // Если это зона 0, добавляем её в начало, иначе в конец
+    if (nextZoneNumber === 0) {
+      setMeasurementZones(prev => [newZone, ...prev]);
+    } else {
+      setMeasurementZones(prev => [...prev, newZone].sort((a, b) => a.zoneNumber - b.zoneNumber));
+    }
   };
 
   // Удаление зоны измерения
   const removeMeasurementZone = (zoneId: string) => {
     setMeasurementZones(prev => {
+      const zoneToRemove = prev.find(z => z.id === zoneId);
+      // Не позволяем удалять зону 0 (Внешняя температура)
+      if (zoneToRemove && zoneToRemove.zoneNumber === 0) {
+        return prev;
+      }
+      
       const updated = prev.filter(zone => zone.id !== zoneId);
-      // Перенумеровываем зоны
-      return updated.map((zone, index) => ({
-        ...zone,
-        zoneNumber: index + 1
-      }));
+      // Сортируем зоны по номеру и перенумеровываем пользовательские зоны, сохраняя зону 0
+      const sortedZones = updated.sort((a, b) => a.zoneNumber - b.zoneNumber);
+      return sortedZones.map((zone) => {
+        // Зона 0 всегда остается с номером 0
+        if (zone.zoneNumber === 0) {
+          return zone;
+        }
+        // Остальные зоны перенумеровываем последовательно, начиная с 1
+        // (зона 0 всегда остается с номером 0)
+        const userZones = sortedZones.filter(z => z.zoneNumber !== 0);
+        const userZoneIndex = userZones.indexOf(zone);
+        return {
+          ...zone,
+          zoneNumber: userZoneIndex + 1 // Нумерация пользовательских зон начинается с 1
+        };
+      });
     });
   };
 
@@ -267,27 +329,32 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
                 <div className="flex items-center space-x-2">
                   <MapPin className="w-5 h-5 text-indigo-600" />
                   <h4 className="text-md font-medium text-gray-900">
-                    {zone.zoneNumber === 0 ? 'Внешний датчик' : `Зона измерения № ${zone.zoneNumber}`}
+                    {zone.zoneNumber === 0 ? 'Внешняя температура' : `Зона №${zone.zoneNumber}`}
                   </h4>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => addMeasurementLevel(zone.id)}
-                    className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Добавить уровень</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeMeasurementZone(zone.id)}
-                    className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Удалить зону</span>
-                  </button>
-                </div>
+                {!readOnly && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => addMeasurementLevel(zone.id)}
+                      className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Добавить уровень</span>
+                    </button>
+                    {/* Не показываем кнопку удаления для зоны 0 (Внешняя температура) */}
+                    {zone.zoneNumber !== 0 && (
+                      <button
+                        type="button"
+                        onClick={() => removeMeasurementZone(zone.id)}
+                        className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Удалить зону</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Уровни измерения */}
@@ -304,14 +371,16 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
                         <label className="text-sm font-medium text-gray-700">
                           Уровень {levelIndex + 1}
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => removeMeasurementLevel(zone.id, level.id)}
-                          className="text-red-600 hover:text-red-800 transition-colors"
-                          title="Удалить уровень"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => removeMeasurementLevel(zone.id, level.id)}
+                            className="text-red-600 hover:text-red-800 transition-colors"
+                            title="Удалить уровень"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                       
                       {/* Поле высоты */}
@@ -324,7 +393,11 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
                           max="10"
                           value={level.level}
                           onChange={(e) => updateMeasurementLevel(zone.id, level.id, parseFloat(e.target.value) || 0)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center"
+                          disabled={readOnly}
+                          readOnly={readOnly}
+                          className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center ${
+                            readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                          }`}
                           placeholder="0.0"
                         />
                         <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
@@ -338,17 +411,27 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
                         <div className="relative">
                           <input
                             type="text"
-                            value={equipmentSearchTerms[level.id] || ''}
+                            value={equipmentSearchTerms[level.id] || level.equipmentName || ''}
                             onChange={(e) => {
-                              setEquipmentSearchTerms(prev => ({ ...prev, [level.id]: e.target.value }));
-                              setShowEquipmentDropdowns(prev => ({ ...prev, [level.id]: true }));
+                              if (!readOnly) {
+                                setEquipmentSearchTerms(prev => ({ ...prev, [level.id]: e.target.value }));
+                                setShowEquipmentDropdowns(prev => ({ ...prev, [level.id]: true }));
+                              }
                             }}
-                            onFocus={() => setShowEquipmentDropdowns(prev => ({ ...prev, [level.id]: true }))}
+                            onFocus={() => {
+                              if (!readOnly) {
+                                setShowEquipmentDropdowns(prev => ({ ...prev, [level.id]: true }));
+                              }
+                            }}
+                            disabled={readOnly}
+                            readOnly={readOnly}
                             placeholder={level.equipmentName || "Поиск оборудования..."}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm ${
+                              readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                            }`}
                           />
                           
-                          {showEquipmentDropdowns[level.id] && (
+                          {!readOnly && showEquipmentDropdowns[level.id] && (
                             <div className="equipment-dropdown absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
                               <div className="p-2">
                                 <button
@@ -401,32 +484,36 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
         </div>
       )}
 
-      {/* Кнопки управления */}
-      <div className="mt-6 flex items-center justify-center space-x-4">
-        <button
-          type="button"
-          onClick={addMeasurementZone}
-          className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Добавить зону измерения</span>
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving || measurementZones.length === 0}
-          className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
-          <Save className="w-4 h-4" />
-          <span>{saving ? 'Сохранение...' : 'Сохранить'}</span>
-        </button>
-      </div>
+      {/* Кнопки управления - скрыты в режиме просмотра */}
+      {!readOnly && (
+        <div className="mt-6 flex items-center justify-center space-x-4">
+          <button
+            type="button"
+            onClick={addMeasurementZone}
+            className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Добавить зону измерения</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || measurementZones.length === 0}
+            className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            <Save className="w-4 h-4" />
+            <span>{saving ? 'Сохранение...' : 'Сохранить'}</span>
+          </button>
+        </div>
+      )}
 
       {/* Информация о расстановке */}
       <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
         <h4 className="text-sm font-medium text-gray-900 mb-2">Информация о расстановке оборудования:</h4>
         <ul className="text-sm text-gray-700 space-y-1">
-          <li>• Номера зон измерения присваиваются автоматически по формуле n+1</li>
+          <li>• При создании таблицы автоматически создается зона с номером 0, ей присваивается наименование "Внешняя температура"</li>
+          <li>• Всем добавленным пользователем зонам присваивается номер по формуле N+1 (где N - последний номер зоны)</li>
+          <li>• Номер зоны включается в название зоны: "Зона №N"</li>
           <li>• При добавлении новой зоны автоматически копируются уровни измерения из предыдущей зоны</li>
           <li>• Для каждой зоны можно добавить несколько уровней измерения</li>
           <li>• Уровень измерения указывается в метрах с точностью до 0.1 м</li>

@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from './apiClient';
 import { UploadedFile } from '../types/FileData';
 import { QualificationObjectType } from '../types/QualificationObject';
 
@@ -8,25 +8,6 @@ const isValidUUID = (uuid: string): boolean => {
   return uuidRegex.test(uuid);
 };
 
-interface DatabaseUploadedFile {
-  id: string;
-  user_id: string | null;
-  name: string;
-  original_name: string;
-  upload_date: string;
-  parsing_status: string;
-  error_message: string | null;
-  record_count: number;
-  period_start: string | null;
-  period_end: string | null;
-  zone_number: number | null;
-  measurement_level: string | null;
-  file_order: number;
-  object_type: QualificationObjectType | null;
-  created_at: string;
-  updated_at: string;
-}
-
 interface SaveFileData {
   projectId: string;
   qualificationObjectId: string;
@@ -35,23 +16,12 @@ interface SaveFileData {
 }
 
 class UploadedFileService {
-  private supabase: any;
-
-  constructor() {
-    this.supabase = supabase;
-  }
-
-  // Проверка доступности Supabase
   isAvailable(): boolean {
-    return !!this.supabase;
+    return true; // API всегда доступен
   }
 
   // Сохранение файлов в связке с проектом
   async saveProjectFiles(saveData: SaveFileData, userId: string | null): Promise<void> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     if (!userId || !isValidUUID(userId)) {
       throw new Error('Невалидный ID пользователя');
     }
@@ -77,38 +47,16 @@ class UploadedFileService {
         object_type: saveData.objectType
       }));
 
-      // Используем upsert для обновления существующих записей или создания новых
-      const { error } = await this.supabase
-        .from('uploaded_files')
-        .upsert(filesToInsert, { 
-          onConflict: 'id',
-          ignoreDuplicates: false 
-        });
-
-      if (error) {
-        console.error('Ошибка сохранения файлов:', error);
-        console.error('Детали ошибки:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        throw new Error(`Ошибка сохранения файлов: ${error.message}`);
-      }
-
+      await apiClient.post('/uploaded-files', { files: filesToInsert });
       console.log('Файлы успешно сохранены в базе данных');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при сохранении файлов проекта:', error);
-      throw error;
+      throw new Error(`Ошибка сохранения файлов: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
   // Получение файлов проекта
   async getProjectFiles(projectId: string, userId: string | null): Promise<UploadedFile[]> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     // Проверяем валидность userId
     if (!userId || !isValidUUID(userId)) {
       console.warn('Невалидный или отсутствующий userId, возвращаем пустой массив');
@@ -118,45 +66,11 @@ class UploadedFileService {
     try {
       console.log('Загружаем файлы проекта:', projectId);
 
-      // Получаем файлы пользователя, которые могут быть связаны с проектом
-      // Пока используем простую логику - файлы пользователя за последние 30 дней
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const params = new URLSearchParams();
+      params.append('user_id', userId);
+      if (projectId) params.append('project_id', projectId);
 
-      const { data, error } = await this.supabase
-        .from('uploaded_files')
-        .select(`
-          id,
-          user_id,
-          name,
-          original_name,
-          upload_date,
-          parsing_status,
-          error_message,
-          record_count,
-          period_start,
-          period_end,
-          zone_number,
-          measurement_level,
-          file_order,
-          object_type,
-          created_at,
-          updated_at
-        `)
-        .eq('user_id', userId)
-        .gte('upload_date', thirtyDaysAgo.toISOString())
-        .order('file_order', { ascending: true });
-
-      if (error) {
-        console.error('Ошибка получения файлов проекта:', error);
-        console.error('Детали ошибки:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        throw new Error(`Ошибка получения файлов проекта: ${error.message}`);
-      }
+      const data = await apiClient.get<any[]>(`/uploaded-files?${params.toString()}`);
 
       if (!data || data.length === 0) {
         console.log('Файлы проекта не найдены');
@@ -164,9 +78,9 @@ class UploadedFileService {
       }
 
       // Преобразуем данные из базы в формат UploadedFile
-      const uploadedFiles: UploadedFile[] = data.map((dbFile: DatabaseUploadedFile) => ({
+      const uploadedFiles: UploadedFile[] = data.map((dbFile: any) => ({
         id: dbFile.id,
-        name: dbFile.name,
+        name: dbFile.name || dbFile.original_name,
         uploadDate: new Date(dbFile.upload_date).toLocaleString('ru-RU'),
         parsingStatus: dbFile.parsing_status as any,
         errorMessage: dbFile.error_message || undefined,
@@ -181,31 +95,19 @@ class UploadedFileService {
 
       console.log('Загружено файлов проекта:', uploadedFiles.length);
       return uploadedFiles;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при получении файлов проекта:', error);
-      throw error;
+      throw new Error(`Ошибка получения файлов проекта: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
   // Удаление файла из базы данных
   async deleteFile(fileId: string): Promise<void> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      const { error } = await this.supabase
-        .from('uploaded_files')
-        .delete()
-        .eq('id', fileId);
-
-      if (error) {
-        console.error('Ошибка удаления файла:', error);
-        throw new Error(`Ошибка удаления файла: ${error.message}`);
-      }
-    } catch (error) {
+      await apiClient.delete(`/uploaded-files/${fileId}`);
+    } catch (error: any) {
       console.error('Ошибка при удалении файла:', error);
-      throw error;
+      throw new Error(`Ошибка удаления файла: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
@@ -215,29 +117,17 @@ class UploadedFileService {
     measurementLevel?: string;
     fileOrder?: number;
   }): Promise<void> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
       const updateData: any = {};
       
-      if (updates.zoneNumber !== undefined) updateData.zone_number = updates.zoneNumber;
-      if (updates.measurementLevel !== undefined) updateData.measurement_level = updates.measurementLevel;
-      if (updates.fileOrder !== undefined) updateData.file_order = updates.fileOrder;
+      if (updates.zoneNumber !== undefined) updateData.zoneNumber = updates.zoneNumber;
+      if (updates.measurementLevel !== undefined) updateData.measurementLevel = updates.measurementLevel;
+      if (updates.fileOrder !== undefined) updateData.fileOrder = updates.fileOrder;
 
-      const { error } = await this.supabase
-        .from('uploaded_files')
-        .update(updateData)
-        .eq('id', fileId);
-
-      if (error) {
-        console.error('Ошибка обновления метаданных файла:', error);
-        throw new Error(`Ошибка обновления метаданных файла: ${error.message}`);
-      }
-    } catch (error) {
+      await apiClient.patch(`/uploaded-files/${fileId}`, updateData);
+    } catch (error: any) {
       console.error('Ошибка при обновлении метаданных файла:', error);
-      throw error;
+      throw new Error(`Ошибка обновления метаданных файла: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 }

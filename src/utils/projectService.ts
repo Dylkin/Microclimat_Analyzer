@@ -4,6 +4,7 @@ import {
   ProjectQualificationObject,
   ProjectStageAssignment,
   ProjectStatus,
+  ProjectType,
   CreateProjectData,
   UpdateProjectData,
 } from '../types/Project';
@@ -12,6 +13,7 @@ type ProjectDto = {
   id: string;
   name: string;
   description?: string | null;
+  type?: ProjectType | null;
   contractorId?: string | null;
   contractor_id?: string | null;
   contractorName?: string | null;
@@ -78,21 +80,42 @@ const mapStageAssignments = (
     createdAt: toDate(item.createdAt) || new Date(),
   }));
 
-const mapProject = (dto: ProjectDto): Project => ({
-  id: dto.id,
-  name: dto.name,
-  description: dto.description || undefined,
-  contractorId: dto.contractorId || dto.contractor_id || '',
-  contractorName: dto.contractorName || undefined,
-  contractNumber: dto.contractNumber || dto.contract_number || undefined,
-  contractDate: toDate(dto.contractDate || dto.contract_date),
-  status: dto.status,
-  createdBy: dto.createdBy || dto.created_by || undefined,
-  createdAt: toDate(dto.createdAt || dto.created_at) || new Date(),
-  updatedAt: toDate(dto.updatedAt || dto.updated_at) || new Date(),
-  qualificationObjects: mapQualificationObjects(dto.qualificationObjects),
-  stageAssignments: mapStageAssignments(dto.stageAssignments),
-});
+const mapProject = (dto: ProjectDto): Project => {
+  // Валидация и нормализация статуса
+  const validStatuses: ProjectStatus[] = [
+    'contract_negotiation',
+    'testing_execution',
+    'report_preparation',
+    'report_approval',
+    'report_printing',
+    'completed'
+  ];
+  
+  let status: ProjectStatus = dto.status as ProjectStatus;
+  
+  // Если статус не валиден, используем значение по умолчанию
+  if (!validStatuses.includes(status)) {
+    console.warn(`Неизвестный статус проекта: ${dto.status}, используем 'contract_negotiation'`);
+    status = 'contract_negotiation';
+  }
+  
+  return {
+    id: dto.id,
+    name: dto.name,
+    description: dto.description || undefined,
+    type: (dto.type || 'qualification') as ProjectType,
+    contractorId: dto.contractorId || dto.contractor_id || '',
+    contractorName: dto.contractorName || undefined,
+    contractNumber: dto.contractNumber || dto.contract_number || undefined,
+    contractDate: toDate(dto.contractDate || dto.contract_date),
+    status: status,
+    createdBy: dto.createdBy || dto.created_by || undefined,
+    createdAt: toDate(dto.createdAt || dto.created_at) || new Date(),
+    updatedAt: toDate(dto.updatedAt || dto.updated_at) || new Date(),
+    qualificationObjects: mapQualificationObjects(dto.qualificationObjects),
+    stageAssignments: mapStageAssignments(dto.stageAssignments),
+  };
+};
 
 class ProjectService {
   isAvailable(): boolean {
@@ -113,8 +136,12 @@ class ProjectService {
     const payload = {
       name: project.name,
       description: project.description,
+      type: project.type || 'qualification',
       contractorId: project.contractorId,
+      tenderLink: project.tenderLink,
+      tenderDate: project.tenderDate,
       qualificationObjectIds: project.qualificationObjectIds,
+      items: project.items,
       stageAssignments: project.stageAssignments,
       createdBy: userId,
     };

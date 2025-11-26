@@ -3,15 +3,26 @@ import { QualificationObject, CreateQualificationObjectData } from '../types/Qua
 import { sanitizeFileName } from './fileNameUtils';
 import { getMimeType } from './mimeTypeUtils';
 
+type StorageFileObject = {
+  name: string;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  last_accessed_at?: string;
+  metadata?: {
+    size?: number;
+  };
+};
+
 class QualificationObjectService {
   isAvailable(): boolean {
-    return !!apiClient;
+    return true; // API всегда доступен
   }
 
   async getAllQualificationObjects(): Promise<QualificationObject[]> {
     try {
       const data = await apiClient.get<any[]>('/qualification-objects');
-      return data.map(this.mapFromApi);
+      return data.map(item => this.mapFromApi(item));
     } catch (error: any) {
       console.error('Ошибка загрузки объектов квалификации:', error);
       throw new Error(`Ошибка загрузки объектов квалификации: ${error.message || 'Неизвестная ошибка'}`);
@@ -21,7 +32,7 @@ class QualificationObjectService {
   async getQualificationObjectsByContractor(contractorId: string): Promise<QualificationObject[]> {
     try {
       const data = await apiClient.get<any[]>(`/qualification-objects?contractor_id=${contractorId}`);
-      return data.map(this.mapFromApi);
+      return data.map(item => this.mapFromApi(item));
     } catch (error: any) {
       console.error('Ошибка загрузки объектов квалификации контрагента:', error);
       throw new Error(`Ошибка загрузки объектов квалификации: ${error.message || 'Неизвестная ошибка'}`);
@@ -41,176 +52,121 @@ class QualificationObjectService {
 
 
   async createQualificationObject(qualificationObject: CreateQualificationObjectData): Promise<QualificationObject> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
+    try {
+      const dbData = this.mapToDatabase(qualificationObject);
+      const data = await apiClient.post<any>('/qualification-objects', dbData);
+      return this.mapFromApi(data);
+    } catch (error: any) {
+      console.error('Ошибка создания объекта квалификации:', error);
+      throw new Error(`Ошибка создания объекта квалификации: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    const dbData = this.mapToDatabase(qualificationObject);
-    
-    const { data, error } = await this.supabase!
-      .from('qualification_objects')
-      .insert(dbData)
-      .select(`
-        *,
-        contractor:contractors(name)
-      `)
-      .single();
-
-    if (error) {
-      throw new Error(`Ошибка создания объекта квалификации: ${error.message}`);
-    }
-
-    return this.mapFromDatabase(data);
   }
 
   async updateQualificationObject(id: string, updates: Partial<QualificationObject> | CreateQualificationObjectData): Promise<QualificationObject> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
+    try {
+      const dbUpdates = this.mapToDatabase(updates);
+      const data = await apiClient.put<any>(`/qualification-objects/${id}`, dbUpdates);
+      return this.mapFromApi(data);
+    } catch (error: any) {
+      console.error('Ошибка обновления объекта квалификации:', error);
+      throw new Error(`Ошибка обновления объекта квалификации: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    const dbUpdates = this.mapToDatabase(updates);
-    
-    const { data, error } = await this.supabase!
-      .from('qualification_objects')
-      .update(dbUpdates)
-      .eq('id', id)
-      .select(`
-        *,
-        contractor:contractors(name)
-      `)
-      .single();
-
-    if (error) {
-      throw new Error(`Ошибка обновления объекта квалификации: ${error.message}`);
-    }
-
-    return this.mapFromDatabase(data);
   }
 
   // Обновление зон измерения для объекта квалификации
   async updateMeasurementZones(objectId: string, measurementZones: any[]): Promise<QualificationObject> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
+    try {
+      console.log('Сохранение зон измерения:', {
+        objectId,
+        zonesCount: measurementZones.length,
+        zones: measurementZones
+      });
 
-    console.log('Сохранение зон измерения:', {
-      objectId,
-      zonesCount: measurementZones.length,
-      zones: measurementZones
-    });
+      const data = await apiClient.patch<any>(`/qualification-objects/${objectId}`, {
+        measurementZones: measurementZones
+      });
 
-    // Для JSONB поля передаем объект напрямую, а не строку
-    const { data, error } = await this.supabase!
-      .from('qualification_objects')
-      .update({ 
-        measurement_zones: measurementZones, // Передаем объект напрямую для JSONB
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', objectId)
-      .select(`
-        *,
-        contractor:contractors(name)
-      `)
-      .single();
-
-    if (error) {
+      console.log('Зоны измерения успешно сохранены:', data);
+      return this.mapFromApi(data);
+    } catch (error: any) {
       console.error('Ошибка обновления зон измерения:', error);
-      throw new Error(`Ошибка обновления зон измерения: ${error.message}`);
+      throw new Error(`Ошибка обновления зон измерения: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    console.log('Зоны измерения успешно сохранены:', data);
-    return this.mapFromDatabase(data);
   }
 
   async deleteQualificationObject(id: string): Promise<void> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
-    const { error } = await this.supabase!
-      .from('qualification_objects')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      throw new Error(`Ошибка удаления объекта квалификации: ${error.message}`);
+    try {
+      await apiClient.delete(`/qualification-objects/${id}`);
+    } catch (error: any) {
+      console.error('Ошибка удаления объекта квалификации:', error);
+      throw new Error(`Ошибка удаления объекта квалификации: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
   async uploadPlanFile(objectId: string, file: File): Promise<string> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
+    try {
+      // Очищаем имя файла от недопустимых символов
+      const sanitizedFileName = sanitizeFileName(file.name);
+      const fileName = `plans/${objectId}/${Date.now()}-${sanitizedFileName}`;
 
-    // Очищаем имя файла от недопустимых символов
-    const sanitizedFileName = sanitizeFileName(file.name);
-    const fileName = `plans/${objectId}/${Date.now()}-${sanitizedFileName}`;
-    const mimeType = getMimeType(file.name);
-    
-    const { data, error } = await this.supabase!.storage
-      .from('qualification-objects')
-      .upload(fileName, file, {
-        contentType: mimeType,
-        cacheControl: '3600',
-        upsert: false
+      // Загружаем файл через API
+      const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
+        bucket: 'qualification-objects',
+        path: fileName
       });
 
-    if (error) {
-      throw new Error(`Ошибка загрузки файла плана: ${error.message}`);
+      const publicUrl = uploadResult.data?.publicUrl || `/uploads/qualification-objects/${fileName}`;
+
+      // Обновляем объект с URL файла
+      await apiClient.patch(`/qualification-objects/${objectId}`, {
+        planFileUrl: publicUrl,
+        planFileName: file.name
+      });
+
+      return publicUrl;
+    } catch (error: any) {
+      console.error('Ошибка загрузки файла плана:', error);
+      throw new Error(`Ошибка загрузки файла плана: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    const { data: urlData } = this.supabase!.storage
-      .from('qualification-objects')
-      .getPublicUrl(fileName);
-
-    // Обновляем объект с URL файла
-    await this.supabase!
-      .from('qualification_objects')
-      .update({
-        plan_file_url: urlData.publicUrl,
-        plan_file_name: file.name
-      })
-      .eq('id', objectId);
-
-    return urlData.publicUrl;
   }
 
   async uploadTestDataFile(objectId: string, file: File): Promise<string> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
+    try {
+      // Очищаем имя файла от недопустимых символов
+      const sanitizedFileName = sanitizeFileName(file.name);
+      const fileName = `test-data/${objectId}/${Date.now()}-${sanitizedFileName}`;
 
-    // Очищаем имя файла от недопустимых символов
-    const sanitizedFileName = sanitizeFileName(file.name);
-    const fileName = `test-data/${objectId}/${Date.now()}-${sanitizedFileName}`;
-    const mimeType = getMimeType(file.name);
-    
-    const { data, error } = await this.supabase!.storage
-      .from('qualification-objects')
-      .upload(fileName, file, {
-        contentType: mimeType,
-        cacheControl: '3600',
-        upsert: false
+      // Загружаем файл через API
+      const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
+        bucket: 'qualification-objects',
+        path: fileName
       });
 
-    if (error) {
-      throw new Error(`Ошибка загрузки файла данных испытаний: ${error.message}`);
+      const publicUrl = uploadResult.data?.publicUrl || `/uploads/qualification-objects/${fileName}`;
+
+      // Обновляем объект с URL файла
+      await apiClient.patch(`/qualification-objects/${objectId}`, {
+        testDataFileUrl: publicUrl,
+        testDataFileName: file.name
+      });
+
+      return publicUrl;
+    } catch (error: any) {
+      console.error('Ошибка загрузки файла данных испытаний:', error);
+      throw new Error(`Ошибка загрузки файла данных испытаний: ${error.message || 'Неизвестная ошибка'}`);
     }
+  }
 
-    const { data: urlData } = this.supabase!.storage
-      .from('qualification-objects')
-      .getPublicUrl(fileName);
-
-    // Обновляем объект с URL файла
-    await this.supabase!
-      .from('qualification_objects')
-      .update({
-        test_data_file_url: urlData.publicUrl,
-        test_data_file_name: file.name
-      })
-      .eq('id', objectId);
-
-    return urlData.publicUrl;
+  // Маппинг типов объектов из английского в русский (из базы данных)
+  private mapObjectTypeFromDatabase(type: string): string {
+    const typeMap: Record<string, string> = {
+      'room': 'помещение',
+      'vehicle': 'автомобиль',
+      'cold_chamber': 'холодильная_камера',
+      'refrigerator': 'холодильник',
+      'freezer': 'морозильник'
+    };
+    return typeMap[type] || type;
   }
 
   // Маппинг данных из API в QualificationObject
@@ -231,10 +187,14 @@ class QualificationObjectService {
       measurementZones = [];
     }
 
+    // Маппим тип объекта из английского в русский
+    const objectType = data.objectType || data.type || 'room';
+    const mappedType = this.mapObjectTypeFromDatabase(objectType);
+
     return {
       id: data.id,
       contractorId: data.contractorId || data.contractor_id || '',
-      type: (data.objectType || data.type || 'помещение') as any,
+      type: mappedType as any,
       name: data.name || '',
       manufacturer: data.manufacturer || '',
       climateSystem: data.climateSystem || data.climate_system || '',
@@ -264,177 +224,231 @@ class QualificationObjectService {
     return this.mapFromApi(data);
   }
 
-  private mapToDatabase(data: Partial<QualificationObject> | CreateQualificationObjectData): any {
-    const dbData: any = {};
-    
-    if (data.contractorId !== undefined) dbData.contractor_id = data.contractorId;
-    if (data.type !== undefined) dbData.type = data.type;
-    if (data.name !== undefined) dbData.name = data.name;
-    if (data.manufacturer !== undefined) dbData.manufacturer = data.manufacturer;
-    if (data.climateSystem !== undefined) dbData.climate_system = data.climateSystem;
-    
-    // Поля, которые есть только в QualificationObject
-    if ('planFileUrl' in data && data.planFileUrl !== undefined) dbData.plan_file_url = data.planFileUrl;
-    if ('planFileName' in data && data.planFileName !== undefined) dbData.plan_file_name = data.planFileName;
-    if ('geocodedAt' in data && data.geocodedAt !== undefined) dbData.geocoded_at = data.geocodedAt?.toISOString();
-    if ('testDataFileUrl' in data && data.testDataFileUrl !== undefined) dbData.test_data_file_url = data.testDataFileUrl;
-    if ('testDataFileName' in data && data.testDataFileName !== undefined) dbData.test_data_file_name = data.testDataFileName;
-    
-    if (data.address !== undefined) dbData.address = data.address;
-    if (data.latitude !== undefined) dbData.latitude = data.latitude;
-    if (data.longitude !== undefined) dbData.longitude = data.longitude;
-    if (data.area !== undefined) dbData.area = data.area;
-    if (data.vin !== undefined) dbData.vin = data.vin;
-    if (data.registrationNumber !== undefined) dbData.registration_number = data.registrationNumber;
-    if (data.bodyVolume !== undefined) dbData.body_volume = data.bodyVolume;
-    if (data.inventoryNumber !== undefined) dbData.inventory_number = data.inventoryNumber;
-    if (data.chamberVolume !== undefined) dbData.chamber_volume = data.chamberVolume;
-    if (data.serialNumber !== undefined) dbData.serial_number = data.serialNumber;
-    
-    // Обработка measurementZones с генерацией ID
-    if (data.measurementZones !== undefined) {
-      const zonesWithIds = data.measurementZones.map((zone: any) => ({
-        ...zone,
-        id: zone.id || `zone-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        measurementLevels: zone.measurementLevels.map((level: any) => ({
-          ...level,
-          id: level.id || `level-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        }))
-      }));
-      dbData.measurement_zones = JSON.stringify(zonesWithIds);
+    // Маппинг типов объектов из русского в английский (для базы данных)
+    private mapObjectTypeToDatabase(type: string): string {
+      const typeMap: Record<string, string> = {
+        'помещение': 'room',
+        'автомобиль': 'vehicle',
+        'холодильная_камера': 'cold_chamber',
+        'холодильник': 'refrigerator',
+        'морозильник': 'freezer'
+      };
+      return typeMap[type] || type;
     }
 
-    return dbData;
-  }
+    private mapToDatabase(data: Partial<QualificationObject> | CreateQualificationObjectData): any {
+      const dbData: any = {};
+      
+      // Базовые поля
+      if (data.contractorId !== undefined) dbData.contractorId = data.contractorId;
+      if (data.type !== undefined) {
+        // Маппим русский тип в английский для базы данных
+        dbData.objectType = this.mapObjectTypeToDatabase(data.type);
+      }
+      if ('objectType' in data && data.objectType !== undefined) {
+        // Если уже передан objectType (английский), используем его
+        dbData.objectType = data.objectType;
+      }
+      if (data.name !== undefined) dbData.name = data.name;
+      if (data.manufacturer !== undefined) dbData.manufacturer = data.manufacturer;
+      if (data.climateSystem !== undefined) dbData.climateSystem = data.climateSystem;
+      
+      // Поля проекта (если есть projectId)
+      if ('projectId' in data && data.projectId !== undefined) {
+        dbData.projectId = data.projectId;
+      } else if ('project' in data && data.project && typeof data.project === 'object' && 'id' in data.project && data.project.id) {
+        dbData.projectId = data.project.id;
+      }
+      
+      // Поля контрагента (если есть contractorId)
+      if (data.contractorId !== undefined) {
+        dbData.contractorId = data.contractorId;
+      }
+      
+      // Поля, которые есть только в QualificationObject
+      if ('planFileUrl' in data && data.planFileUrl !== undefined) dbData.planFileUrl = data.planFileUrl;
+      if ('planFileName' in data && data.planFileName !== undefined) dbData.planFileName = data.planFileName;
+      if ('geocodedAt' in data && data.geocodedAt !== undefined) dbData.geocodedAt = data.geocodedAt?.toISOString();
+      if ('testDataFileUrl' in data && data.testDataFileUrl !== undefined) dbData.testDataFileUrl = data.testDataFileUrl;
+      if ('testDataFileName' in data && data.testDataFileName !== undefined) dbData.testDataFileName = data.testDataFileName;
+      
+      // Дополнительные поля
+      if (data.address !== undefined) dbData.address = data.address;
+      if (data.latitude !== undefined) dbData.latitude = data.latitude;
+      if (data.longitude !== undefined) dbData.longitude = data.longitude;
+      if (data.area !== undefined) dbData.area = data.area;
+      if (data.vin !== undefined) dbData.vin = data.vin;
+      if (data.registrationNumber !== undefined) dbData.registrationNumber = data.registrationNumber;
+      if (data.bodyVolume !== undefined) dbData.bodyVolume = data.bodyVolume;
+      if (data.inventoryNumber !== undefined) dbData.inventoryNumber = data.inventoryNumber;
+      if (data.chamberVolume !== undefined) dbData.chamberVolume = data.chamberVolume;
+      if (data.serialNumber !== undefined) dbData.serialNumber = data.serialNumber;
+      
+      // JSONB поля - передаем как объекты, API сам сериализует
+      if (data.measurementZones !== undefined) {
+        const zonesWithIds = data.measurementZones.map((zone: any) => ({
+          ...zone,
+          id: zone.id || `zone-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          measurementLevels: (zone.measurementLevels || []).map((level: any) => ({
+            ...level,
+            id: level.id || `level-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          }))
+        }));
+        dbData.measurementZones = zonesWithIds; // Передаем объект, не строку
+      }
+      
+      if ('temperatureLimits' in data && data.temperatureLimits !== undefined) {
+        dbData.temperatureLimits = data.temperatureLimits;
+      }
+      
+      if ('humidityLimits' in data && data.humidityLimits !== undefined) {
+        dbData.humidityLimits = data.humidityLimits;
+      }
+      
+      if ('workSchedule' in data && data.workSchedule !== undefined) {
+        dbData.workSchedule = data.workSchedule;
+      }
+
+      return dbData;
+    }
 
   async uploadLoggerRemovalFile(objectId: string, zoneNumber: number, level: number, file: File): Promise<string> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
+    try {
+      // Сохраняем оригинальное имя файла для .vi2 файлов
+      const originalFileName = file.name;
+      const fileName = `logger-removal/${objectId}/zone-${zoneNumber}-level-${level}/${originalFileName}`;
 
-    // Сохраняем оригинальное имя файла для .vi2 файлов
-    const originalFileName = file.name;
-    const fileName = `logger-removal/${objectId}/zone-${zoneNumber}-level-${level}/${originalFileName}`;
-    const mimeType = getMimeType(file.name);
-    
-    const { data, error } = await this.supabase!.storage
-      .from('qualification-objects')
-      .upload(fileName, file, {
-        contentType: mimeType,
-        cacheControl: '3600',
-        upsert: true // Разрешаем перезапись файла с тем же именем
+      // Загружаем файл через API
+      const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
+        bucket: 'qualification-objects',
+        path: fileName
       });
 
-    if (error) {
-      throw new Error(`Ошибка загрузки файла снятия логгеров: ${error.message}`);
+      const publicUrl = uploadResult.data?.publicUrl || `/uploads/qualification-objects/${fileName}`;
+      return publicUrl;
+    } catch (error: any) {
+      console.error('Ошибка загрузки файла снятия логгеров:', error);
+      throw new Error(`Ошибка загрузки файла снятия логгеров: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    const { data: urlData } = this.supabase!.storage
-      .from('qualification-objects')
-      .getPublicUrl(fileName);
-
-    return urlData.publicUrl;
   }
 
   // Удаление файла снятия логгеров из Storage
   async deleteLoggerRemovalFile(objectId: string, zoneNumber: number, level: number): Promise<void> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
+      // Преобразуем дробные значения уровня в строку с точкой для совместимости
+      const levelStr = level.toString();
       // Получаем список файлов в папке для данной зоны и уровня
-      const folderPath = `logger-removal/${objectId}/zone-${zoneNumber}-level-${level}`;
-      const { data: files, error: listError } = await this.supabase!.storage
-        .from('qualification-objects')
-        .list(folderPath);
+      const folderPath = `logger-removal/${objectId}/zone-${zoneNumber}-level-${levelStr}`;
+      
+      console.log('Удаление файлов из Storage:', { objectId, zoneNumber, level, levelStr, folderPath });
+      
+      const listResult = await apiClient.post<{ data: StorageFileObject[] }>('/storage/list', {
+        bucket: 'qualification-objects',
+        prefix: folderPath
+      });
 
-      if (listError) {
-        console.error('Ошибка получения списка файлов для удаления:', listError);
-        return;
-      }
+      const fileEntries: StorageFileObject[] = listResult.data || [];
+      console.log('Найдено файлов для удаления:', fileEntries.length);
 
-      if (files && files.length > 0) {
-        // Удаляем все файлы в папке
-        const filePaths = files.map(file => `${folderPath}/${file.name}`);
-        const { error: deleteError } = await this.supabase!.storage
-          .from('qualification-objects')
-          .remove(filePaths);
+      if (fileEntries.length > 0) {
+        const filePaths = fileEntries
+          .filter(file => file.id) // Только файлы, не папки
+          .map((file: StorageFileObject) => {
+            // Если file.name уже содержит полный путь, используем его, иначе добавляем folderPath
+            if (file.name.startsWith(folderPath)) {
+              return file.name;
+            }
+            return `${folderPath}/${file.name}`;
+          });
 
-        if (deleteError) {
-          console.error('Ошибка удаления файлов из Storage:', deleteError);
-          throw new Error(`Ошибка удаления файлов: ${deleteError.message}`);
+        if (filePaths.length > 0) {
+          console.log('Удаление файлов:', filePaths);
+          await apiClient.post('/storage/remove', {
+            bucket: 'qualification-objects',
+            paths: filePaths
+          });
+
+          console.log(`Удалены файлы из Storage: ${filePaths.join(', ')}`);
+        } else {
+          console.log('Нет файлов для удаления (все записи являются папками)');
         }
-
-        console.log(`Удалены файлы из Storage: ${filePaths.join(', ')}`);
+      } else {
+        console.log('Файлы не найдены в Storage для удаления');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при удалении файла снятия логгеров:', error);
-      throw error;
+      throw new Error(`Ошибка удаления файлов: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
   // Получение списка файлов снятия логгеров из Storage
   async getLoggerRemovalFiles(objectId: string): Promise<{ [key: string]: { name: string; url: string; size: number; lastModified: string } }> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      const { data, error } = await this.supabase!.storage
-        .from('qualification-objects')
-        .list(`logger-removal/${objectId}`, {
-          limit: 100,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
-
-      if (error) {
-        console.error('Ошибка получения списка файлов из Storage:', error);
-        return {};
-      }
+      const prefix = `logger-removal/${objectId}`;
+      const listResult = await apiClient.post<{ data: StorageFileObject[] }>('/storage/list', {
+        bucket: 'qualification-objects',
+        prefix: prefix
+      });
 
       const filesMap: { [key: string]: { name: string; url: string; size: number; lastModified: string } } = {};
+      const storageFolders: StorageFileObject[] = listResult.data || [];
 
-      if (data && data.length > 0) {
-        console.log('QualificationObjectService: Найдены папки в Storage:', data.map(f => f.name));
+      if (storageFolders.length > 0) {
+        console.log('QualificationObjectService: Найдены папки в Storage:', storageFolders.map((f: StorageFileObject) => f.name));
         
-        for (const folder of data) {
+        for (const folder of storageFolders) {
+          // Пропускаем файлы, обрабатываем только папки
+          if (folder.id) continue;
+
           console.log('QualificationObjectService: Обрабатываем папку:', folder.name);
           
           if (folder.name.startsWith('zone-') && folder.name.includes('-level-')) {
             console.log('QualificationObjectService: Папка соответствует паттерну зоны:', folder.name);
             
-            // Получаем файлы в папке зоны
-            const { data: zoneFiles, error: zoneError } = await this.supabase!.storage
-              .from('qualification-objects')
-              .list(`logger-removal/${objectId}/${folder.name}`, {
-                limit: 10,
-                sortBy: { column: 'created_at', order: 'desc' }
+            const zoneListResult = await apiClient.post<{ data: StorageFileObject[] }>('/storage/list', {
+              bucket: 'qualification-objects',
+              prefix: `${prefix}/${folder.name}`
+            });
+
+            const zoneFileEntries: StorageFileObject[] = zoneListResult.data || [];
+
+            console.log(
+              'QualificationObjectService: Файлы в папке',
+              folder.name,
+              ':',
+              zoneFileEntries.map((f: StorageFileObject) => f.name) || []
+            );
+
+            // Сортируем файлы по дате создания (новые первыми) и берем первый
+            const sortedFiles = zoneFileEntries
+              .filter(f => f.id) // Только файлы
+              .sort((a, b) => {
+                const dateA = new Date(a.created_at || a.updated_at || 0).getTime();
+                const dateB = new Date(b.created_at || b.updated_at || 0).getTime();
+                return dateB - dateA;
               });
 
-            console.log('QualificationObjectService: Файлы в папке', folder.name, ':', zoneFiles?.map(f => f.name) || [], 'Ошибка:', zoneError);
-
-            if (!zoneError && zoneFiles && zoneFiles.length > 0) {
-              // Берем самый новый файл из папки
-              const latestFile = zoneFiles[0];
+            if (sortedFiles.length > 0) {
+              const latestFile = sortedFiles[0];
               const fileKey = folder.name; // zone-1-level-0
               
               console.log('QualificationObjectService: Выбран файл для папки', folder.name, ':', latestFile.name);
               
-              const { data: urlData } = this.supabase!.storage
-                .from('qualification-objects')
-                .getPublicUrl(`logger-removal/${objectId}/${folder.name}/${latestFile.name}`);
+              const urlResult = await apiClient.post<{ data: { publicUrl: string } }>('/storage/get-public-url', {
+                bucket: 'qualification-objects',
+                path: `${prefix}/${folder.name}/${latestFile.name}`
+              });
 
               filesMap[fileKey] = {
                 name: latestFile.name,
-                url: urlData.publicUrl,
+                url: urlResult.data?.publicUrl || `/uploads/qualification-objects/${prefix}/${folder.name}/${latestFile.name}`,
                 size: latestFile.metadata?.size || 0,
-                lastModified: latestFile.updated_at || latestFile.created_at
+                lastModified: latestFile.updated_at || latestFile.created_at || new Date().toISOString()
               };
               
               console.log('QualificationObjectService: Добавлен файл в карту:', fileKey, latestFile.name);
             } else {
-              console.log('QualificationObjectService: Нет файлов в папке', folder.name, 'или ошибка:', zoneError);
+              console.log('QualificationObjectService: Нет файлов в папке', folder.name);
             }
           } else {
             console.log('QualificationObjectService: Папка не соответствует паттерну зоны:', folder.name);
@@ -445,7 +459,7 @@ class QualificationObjectService {
       }
 
       return filesMap;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка получения файлов снятия логгеров:', error);
       return {};
     }

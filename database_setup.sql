@@ -14,14 +14,21 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Тип статуса проекта
 DO $$ BEGIN
-  CREATE TYPE project_status AS ENUM ('draft', 'active', 'completed', 'archived');
+  CREATE TYPE project_status AS ENUM (
+    'contract_negotiation',
+    'testing_execution',
+    'report_preparation',
+    'report_approval',
+    'report_printing',
+    'completed'
+  );
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
 -- Тип типа документа
 DO $$ BEGIN
-  CREATE TYPE document_type AS ENUM ('contract', 'plan', 'protocol', 'report', 'qualification_protocol', 'other');
+  CREATE TYPE document_type AS ENUM ('commercial_offer', 'contract', 'plan', 'protocol', 'report', 'qualification_protocol', 'other');
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
@@ -72,7 +79,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   description TEXT,
-  status project_status DEFAULT 'draft',
+  status project_status DEFAULT 'contract_negotiation',
   contract_number TEXT,
   contract_date DATE,
   contractor_id UUID REFERENCES public.contractors(id),
@@ -87,13 +94,30 @@ CREATE TABLE IF NOT EXISTS public.projects (
 CREATE TABLE IF NOT EXISTS public.qualification_objects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+  contractor_id UUID REFERENCES public.contractors(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   object_type TEXT NOT NULL CHECK (object_type IN ('cold_chamber', 'freezer', 'refrigerator', 'vehicle', 'room')),
   climate_system TEXT,
   temperature_limits JSONB DEFAULT '{"min": null, "max": null}',
   humidity_limits JSONB DEFAULT '{"min": null, "max": null}',
-  measurement_zones INTEGER DEFAULT 0,
+  measurement_zones JSONB DEFAULT '[]'::jsonb,
   work_schedule JSONB DEFAULT '[]',
+  plan_file_url TEXT,
+  plan_file_name TEXT,
+  test_data_file_url TEXT,
+  test_data_file_name TEXT,
+  address TEXT,
+  latitude NUMERIC(10,8),
+  longitude NUMERIC(11,8),
+  geocoded_at TIMESTAMP WITH TIME ZONE,
+  area NUMERIC(10,2),
+  vin TEXT,
+  registration_number TEXT,
+  body_volume NUMERIC(10,2),
+  inventory_number TEXT,
+  chamber_volume NUMERIC(10,2),
+  serial_number TEXT,
+  manufacturer TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -199,11 +223,13 @@ CREATE TABLE IF NOT EXISTS public.project_documents (
   project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
   document_type document_type NOT NULL,
   file_name TEXT NOT NULL,
-  file_path TEXT NOT NULL,
+  file_url TEXT, -- URL файла в хранилище (может быть NULL если используется file_path)
+  file_path TEXT, -- Путь к файлу (может быть NULL если используется file_url)
   file_size INTEGER,
   mime_type TEXT,
   approval_status TEXT DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
   uploaded_by UUID REFERENCES public.users(id),
+  uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), -- Дата загрузки
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -223,11 +249,11 @@ CREATE TABLE IF NOT EXISTS public.document_approval (
 CREATE TABLE IF NOT EXISTS public.documentation_checks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
-  check_type TEXT NOT NULL,
-  status TEXT DEFAULT 'not_checked' CHECK (status IN ('not_checked', 'compliant', 'non_compliant')),
-  notes TEXT,
+  qualification_object_id UUID REFERENCES public.qualification_objects(id) ON DELETE CASCADE,
+  items JSONB DEFAULT '[]'::jsonb,
   checked_by UUID REFERENCES public.users(id),
-  checked_at TIMESTAMP WITH TIME ZONE,
+  checked_by_name TEXT,
+  checked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -256,9 +282,9 @@ CREATE TABLE IF NOT EXISTS public.qualification_work_schedule (
   end_date DATE,
   is_completed BOOLEAN DEFAULT FALSE,
   completed_at TIMESTAMP WITH TIME ZONE,
-  completed_by UUID REFERENCES public.users(id),
+  completed_by TEXT,
   cancelled_at TIMESTAMP WITH TIME ZONE,
-  cancelled_by UUID REFERENCES public.users(id),
+  cancelled_by TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

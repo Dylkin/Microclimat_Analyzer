@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from './apiClient';
 
 export interface ProjectPeriod {
   projectId: string;
@@ -9,31 +9,20 @@ export interface ProjectPeriod {
 }
 
 class ProjectPeriodService {
-  private supabase;
-
-  constructor() {
-    this.supabase = supabase;
-  }
-
   isAvailable(): boolean {
-    return !!this.supabase;
+    return true; // API всегда доступен
   }
 
   async getProjectPeriod(projectId: string): Promise<ProjectPeriod | null> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      // Получаем все объекты квалификации для проекта
-      const { data: qualificationObjects, error: objectsError } = await this.supabase!
-        .from('qualification_objects')
-        .select('id')
-        .eq('contractor_id', (await this.getContractorIdByProject(projectId)));
-
-      if (objectsError) {
-        throw new Error(`Ошибка загрузки объектов квалификации: ${objectsError.message}`);
+      // Получаем проект для получения contractor_id
+      const project = await apiClient.get<any>(`/projects/${projectId}`);
+      if (!project) {
+        throw new Error('Проект не найден');
       }
+
+      // Получаем все объекты квалификации для проекта
+      const qualificationObjects = await apiClient.get<any[]>(`/qualification-objects?project_id=${projectId}`);
 
       if (!qualificationObjects || qualificationObjects.length === 0) {
         return {
@@ -48,16 +37,19 @@ class ProjectPeriodService {
       const objectIds = qualificationObjects.map(obj => obj.id);
 
       // Получаем все расписания для объектов квалификации
-      const { data: schedules, error: schedulesError } = await this.supabase!
-        .from('qualification_work_schedule')
-        .select('start_date, end_date, is_completed')
-        .in('qualification_object_id', objectIds);
-
-      if (schedulesError) {
-        throw new Error(`Ошибка загрузки расписаний: ${schedulesError.message}`);
+      const allSchedules: any[] = [];
+      for (const objectId of objectIds) {
+        try {
+          const schedules = await apiClient.get<any[]>(`/qualification-work-schedule?qualification_object_id=${objectId}&project_id=${projectId}`);
+          if (schedules) {
+            allSchedules.push(...schedules);
+          }
+        } catch (error) {
+          console.warn(`Ошибка загрузки расписания для объекта ${objectId}:`, error);
+        }
       }
 
-      if (!schedules || schedules.length === 0) {
+      if (allSchedules.length === 0) {
         return {
           projectId,
           earliestDate: null,
@@ -73,29 +65,34 @@ class ProjectPeriodService {
       let totalStages = 0;
       let completedStages = 0;
 
-      schedules.forEach(schedule => {
+      allSchedules.forEach(schedule => {
         totalStages++;
-        if (schedule.is_completed) {
+        if (schedule.isCompleted || schedule.is_completed) {
           completedStages++;
         }
 
+        const startDate = schedule.startDate || schedule.start_date;
+        const endDate = schedule.endDate || schedule.end_date;
+
         // Проверяем дату начала
-        if (schedule.start_date) {
-          if (!earliestDate || schedule.start_date < earliestDate) {
-            earliestDate = schedule.start_date;
+        if (startDate) {
+          const startDateStr = typeof startDate === 'string' ? startDate : new Date(startDate).toISOString().split('T')[0];
+          if (!earliestDate || startDateStr < earliestDate) {
+            earliestDate = startDateStr;
           }
-          if (!latestDate || schedule.start_date > latestDate) {
-            latestDate = schedule.start_date;
+          if (!latestDate || startDateStr > latestDate) {
+            latestDate = startDateStr;
           }
         }
 
         // Проверяем дату окончания
-        if (schedule.end_date) {
-          if (!earliestDate || schedule.end_date < earliestDate) {
-            earliestDate = schedule.end_date;
+        if (endDate) {
+          const endDateStr = typeof endDate === 'string' ? endDate : new Date(endDate).toISOString().split('T')[0];
+          if (!earliestDate || endDateStr < earliestDate) {
+            earliestDate = endDateStr;
           }
-          if (!latestDate || schedule.end_date > latestDate) {
-            latestDate = schedule.end_date;
+          if (!latestDate || endDateStr > latestDate) {
+            latestDate = endDateStr;
           }
         }
       });
@@ -107,32 +104,10 @@ class ProjectPeriodService {
         totalStages,
         completedStages
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка получения периода проекта:', error);
-      throw error;
+      throw new Error(`Ошибка получения периода проекта: ${error.message || 'Неизвестная ошибка'}`);
     }
-  }
-
-  private async getContractorIdByProject(projectId: string): Promise<string> {
-    if (!this.isAvailable()) {
-      throw new Error('Supabase не настроен');
-    }
-
-    const { data: project, error } = await this.supabase!
-      .from('projects')
-      .select('contractor_id')
-      .eq('id', projectId)
-      .single();
-
-    if (error) {
-      throw new Error(`Ошибка загрузки проекта: ${error.message}`);
-    }
-
-    if (!project) {
-      throw new Error('Проект не найден');
-    }
-
-    return project.contractor_id;
   }
 
   formatPeriod(period: ProjectPeriod): string {

@@ -3,7 +3,7 @@ import { CheckCircle, X, Clock, User, Calendar } from 'lucide-react';
 import { documentApprovalService } from '../../utils/documentApprovalService';
 import { auditService } from '../../utils/auditService';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../utils/supabaseClient';
+import { apiClient } from '../../utils/apiClient';
 
 interface ApprovalRecord {
   id: string;
@@ -38,49 +38,30 @@ export const DocumentApprovalActions: React.FC<DocumentApprovalActionsProps> = (
 
   // Функция для получения ФИО пользователей
   const loadUserNames = async (userIds: string[]) => {
-    if (!supabase || userIds.length === 0) return;
+    if (userIds.length === 0) return;
 
     try {
       console.log('Загружаем ФИО для пользователей:', userIds);
       
-      // Сначала пробуем загрузить из public.users
-      let query = supabase.from('users').select('id, full_name');
-      
-      if (userIds.length === 1) {
-        query = query.eq('id', userIds[0]);
-      } else {
-        query = query.in('id', userIds);
-      }
-      
-      const { data, error } = await query;
-
-      if (error) {
-        console.warn('Ошибка загрузки ФИО из public.users:', error);
-        console.warn('Детали ошибки:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        
-        console.log('Используем fallback - отображаем email из истории согласований');
-        return; // Не устанавливаем userNames, будет использоваться userName из записи
-      }
-
-      console.log('Загружены ФИО пользователей из public.users:', data);
-
-      // Если данные пустые, используем fallback
-      if (!data || data.length === 0) {
-        console.log('Данные из public.users пустые, используем fallback - отображаем email из истории согласований');
-        return;
-      }
-
       const nameMap = new Map<string, string>();
-      data?.forEach(user => {
-        nameMap.set(user.id, user.full_name);
-      });
+      
+      // Загружаем каждого пользователя через API
+      for (const userId of userIds) {
+        try {
+          const userData = await apiClient.get<any>(`/users/${userId}`);
+          const fullName = userData.fullName || userData.full_name || userData.email || 'Пользователь';
+          nameMap.set(userId, fullName);
+        } catch (error) {
+          console.warn(`Не удалось загрузить данные пользователя ${userId}:`, error);
+        }
+      }
 
-      setUserNames(nameMap);
+      if (nameMap.size > 0) {
+        console.log('Загружены ФИО пользователей:', nameMap);
+        setUserNames(nameMap);
+      } else {
+        console.log('Не удалось загрузить ФИО пользователей, используем fallback');
+      }
     } catch (error) {
       console.warn('Ошибка при получении ФИО пользователей:', error);
     }

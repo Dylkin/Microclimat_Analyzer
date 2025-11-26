@@ -56,11 +56,6 @@ export const TestingPeriodsCRUD: React.FC<TestingPeriodsCRUDProps> = ({
 
   // Загрузка периодов испытаний
   const loadTestingPeriods = async () => {
-    if (!testingPeriodService.isAvailable()) {
-      setError('Supabase не настроен для работы с периодами испытаний');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
