@@ -66,7 +66,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       // Загружаем проекты
       try {
         const projectsData = await projectService.getAllProjects();
-        // Сортируем проекты по дате создания (новые сверху)
+        // Сортируем проекты по дате создания (от более поздних к более ранним, новые сверху)
         const sortedProjects = projectsData.sort((a, b) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
@@ -142,7 +142,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       );
     });
 
-    // Сохраняем сортировку по дате создания (новые сверху)
+    // Сохраняем сортировку по дате создания (от более поздних к более ранним, новые сверху)
     const sortedFiltered = filtered.sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
@@ -330,6 +330,8 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     switch (status) {
       case 'completed':
         return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'documents_submission':
+        return <FileText className="w-4 h-4 text-blue-600" />;
       case 'contract_negotiation':
       case 'report_approval':
         return <Clock className="w-4 h-4 text-yellow-600" />;
@@ -348,6 +350,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   // Получение действия для статуса проекта
   const getProjectAction = (status: ProjectStatus) => {
     switch (status) {
+      case 'documents_submission':
+        return {
+          label: 'Подача документов',
+          page: 'documents_submission',
+          icon: FileText
+        };
       case 'contract_negotiation':
         return {
           label: 'Согласование договора',
@@ -400,9 +408,10 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         description: project.description,
         contractorId: project.contractorId,
         contractorName: project.contractorName,
-        contractNumber: project.contractNumber,  // ✅ Добавлено
-        contractDate: project.contractDate,      // ✅ Добавлено
+        contractNumber: project.contractNumber,
+        contractDate: project.contractDate,
         qualificationObjects: project.qualificationObjects,
+        items: project.items,
         status: project.status,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt
@@ -456,23 +465,25 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       )}
 
       {/* Search */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Поиск по проектам..."
-          />
-        </div>
-        {searchTerm && (
-          <div className="mt-2 text-sm text-gray-600">
-            Найдено: {filteredProjects.length} из {projects.length} проектов
+      {!showAddForm && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Поиск по проектам..."
+            />
           </div>
-        )}
-      </div>
+          {searchTerm && (
+            <div className="mt-2 text-sm text-gray-600">
+              Найдено: {filteredProjects.length} из {projects.length} проектов
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add Project Form */}
       {showAddForm && newProject.type === 'sale' ? (
@@ -631,6 +642,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       ) : null}
 
       {/* Projects List */}
+      {!showAddForm && (
       <div className="bg-white rounded-lg shadow">
         {loading ? (
           <div className="text-center py-8">
@@ -659,9 +671,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Статус
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Объекты
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Действия
@@ -742,15 +751,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {project.qualificationObjects.length} объект(ов)
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {project.qualificationObjects.slice(0, 2).map(obj => obj.qualificationObjectName).join(', ')}
-                        {project.qualificationObjects.length > 2 && '...'}
-                      </div>
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       {editingProject === project.id ? (
                         <div className="flex justify-end space-x-2">
@@ -824,6 +824,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
           </div>
         )}
       </div>
+      )}
 
       {/* Statistics */}
       <div className="bg-white rounded-lg shadow p-6">

@@ -1,6 +1,7 @@
 import { apiClient } from './apiClient';
 import {
   Project,
+  ProjectItem,
   ProjectQualificationObject,
   ProjectStageAssignment,
   ProjectStatus,
@@ -28,6 +29,26 @@ type ProjectDto = {
   createdAt?: string;
   updated_at: string;
   updatedAt?: string;
+  items?: Array<{
+    id: string;
+    projectId?: string;
+    project_id?: string;
+    name: string;
+    quantity: number;
+    declaredPrice?: number;
+    declared_price?: number | string;
+    supplierId?: string | null;
+    supplier_id?: string | null;
+    supplierName?: string | null;
+    supplier_name?: string | null;
+    supplierPrice?: number | null;
+    supplier_price?: number | string | null;
+    description?: string | null;
+    createdAt?: string;
+    created_at?: string;
+    updatedAt?: string;
+    updated_at?: string;
+  }>;
   qualificationObjects?: Array<{
     id: string;
     name?: string;
@@ -80,9 +101,36 @@ const mapStageAssignments = (
     createdAt: toDate(item.createdAt) || new Date(),
   }));
 
+const mapItems = (items?: ProjectDto['items']): ProjectItem[] =>
+  (items || []).map((item) => ({
+    id: item.id,
+    projectId: item.projectId || item.project_id || '',
+    name: item.name,
+    quantity: item.quantity,
+    declaredPrice: Number(
+      item.declaredPrice ?? item.declared_price ?? 0,
+    ),
+    supplierId:
+      (item.supplierId ?? item.supplier_id ?? undefined) || undefined,
+    supplierName:
+      (item.supplierName ?? item.supplier_name ?? undefined) || undefined,
+    supplierPrice:
+      item.supplierPrice !== undefined && item.supplierPrice !== null
+        ? Number(item.supplierPrice)
+        : item.supplier_price != null
+        ? Number(item.supplier_price)
+        : undefined,
+    description: item.description || undefined,
+    createdAt:
+      toDate(item.createdAt || item.created_at) || new Date(),
+    updatedAt:
+      toDate(item.updatedAt || item.updated_at) || new Date(),
+  }));
+
 const mapProject = (dto: ProjectDto): Project => {
   // Валидация и нормализация статуса
   const validStatuses: ProjectStatus[] = [
+    'documents_submission',
     'contract_negotiation',
     'testing_execution',
     'report_preparation',
@@ -114,6 +162,7 @@ const mapProject = (dto: ProjectDto): Project => {
     updatedAt: toDate(dto.updatedAt || dto.updated_at) || new Date(),
     qualificationObjects: mapQualificationObjects(dto.qualificationObjects),
     stageAssignments: mapStageAssignments(dto.stageAssignments),
+    items: mapItems(dto.items),
   };
 };
 

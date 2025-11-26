@@ -329,7 +329,8 @@ router.post('/', async (req, res) => {
       ? 'INSERT INTO projects (name, description, type, contractor_id, contract_number, contract_date, tender_link, tender_date, status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, name, description, type, contractor_id, contract_number, contract_date, tender_link, tender_date, status, created_by, created_at, updated_at'
       : 'INSERT INTO projects (name, description, type, contractor_id, contract_number, contract_date, status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, name, description, type, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at';
     
-    const initialStatus = status || 'contract_negotiation';
+    // Начальный статус по умолчанию — "Подача документов"
+    const initialStatus = status || 'documents_submission';
     
     const insertValues = hasTenderFields
       ? [name, description || null, type || 'qualification', contractorId, contractNumber || null, contractDate || null, tenderLink || null, tenderDate || null, initialStatus, createdBy || null]
@@ -378,6 +379,47 @@ router.post('/', async (req, res) => {
           } catch (updateError: any) {
             console.error(`Ошибка обновления объекта ${objectId}:`, updateError);
             // Продолжаем с другими объектами
+          }
+        }
+      }
+    }
+
+    // Добавляем товары проекта (для типа "Продажа"), если они указаны и таблица существует
+    if (projectItemsData && Array.isArray(projectItemsData) && projectItemsData.length > 0) {
+      const itemsTableCheck = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'project_items'
+        )
+      `);
+
+      if (itemsTableCheck.rows[0].exists) {
+        for (const item of projectItemsData) {
+          try {
+            await client.query(
+              `
+              INSERT INTO project_items
+                (project_id, name, quantity, declared_price, supplier_id, supplier_price, description)
+              VALUES
+                ($1, $2, $3, $4, $5, $6, $7)
+              `,
+              [
+                projectId,
+                item.name,
+                item.quantity,
+                item.declaredPrice ?? 0,
+                item.supplierId || null,
+                item.supplierPrice ?? null,
+                item.description || null,
+              ],
+            );
+          } catch (itemError: any) {
+            console.error('Ошибка добавления товара проекта:', {
+              error: itemError,
+              item,
+            });
+            // Не прерываем транзакцию из-за одной неудачной позиции
           }
         }
       }

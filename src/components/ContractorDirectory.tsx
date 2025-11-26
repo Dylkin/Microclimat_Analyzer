@@ -874,7 +874,8 @@ const ContractorDirectory: React.FC = () => {
         <div className="space-y-6">
           {renderContractorForm(true)}
           
-          {/* Объекты квалификации для редактируемого контрагента */}
+          {/* Объекты квалификации для редактируемого контрагента (только если не чистый Поставщик) */}
+          {!(editingContractorData.role && editingContractorData.role.includes('supplier') && !editingContractorData.role.includes('buyer')) && (
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Объекты квалификации</h3>
@@ -948,6 +949,7 @@ const ContractorDirectory: React.FC = () => {
               contractorAddress={editingContractorData.address}
             />
           </div>
+          )}
         </div>
       )}
 

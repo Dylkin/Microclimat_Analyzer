@@ -51,19 +51,33 @@ router.get('/', async (req, res) => {
       });
     });
     
-    const contractors = contractorsResult.rows.map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      address: row.address || undefined,
-      role: row.role && Array.isArray(row.role) ? row.role : (row.role ? [row.role] : []),
-      tags: row.tags && Array.isArray(row.tags) ? row.tags : [],
-      latitude: undefined, // Пока не используется в БД
-      longitude: undefined,
-      geocodedAt: undefined,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-      contacts: contactsByContractor.get(row.id) || []
-    }));
+    const contractors = contractorsResult.rows.map((row: any) => {
+      // Приводим tags из формата text[] (строка "{tag1,tag2}") к массиву строк
+      let tags: string[] = [];
+      if (Array.isArray(row.tags)) {
+        tags = row.tags;
+      } else if (typeof row.tags === 'string') {
+        tags = row.tags
+          .replace(/^{|}$/g, '')
+          .split(',')
+          .map((t: string) => t.trim())
+          .filter((t: string) => t.length > 0);
+      }
+
+      return {
+        id: row.id,
+        name: row.name,
+        address: row.address || undefined,
+        role: row.role && Array.isArray(row.role) ? row.role : (row.role ? [row.role] : []),
+        tags,
+        latitude: undefined, // Пока не используется в БД
+        longitude: undefined,
+        geocodedAt: undefined,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        contacts: contactsByContractor.get(row.id) || []
+      };
+    });
     
     res.json(contractors);
   } catch (error) {
@@ -131,12 +145,24 @@ router.get('/:id', async (req, res) => {
     );
     
     const contractor = contractorResult.rows[0];
+
+    // Приводим tags из формата text[] (строка "{tag1,tag2}") к массиву строк
+    let tags: string[] = [];
+    if (Array.isArray(contractor.tags)) {
+      tags = contractor.tags;
+    } else if (typeof contractor.tags === 'string') {
+      tags = contractor.tags
+        .replace(/^{|}$/g, '')
+        .split(',')
+        .map((t: string) => t.trim())
+        .filter((t: string) => t.length > 0);
+    }
     res.json({
       id: contractor.id,
       name: contractor.name,
       address: contractor.address || undefined,
       role: contractor.role && Array.isArray(contractor.role) ? contractor.role : (contractor.role ? [contractor.role] : []),
-      tags: contractor.tags && Array.isArray(contractor.tags) ? contractor.tags : [],
+      tags,
       latitude: contractor.latitude !== null && contractor.latitude !== undefined ? parseFloat(contractor.latitude) : undefined,
       longitude: contractor.longitude !== null && contractor.longitude !== undefined ? parseFloat(contractor.longitude) : undefined,
       geocodedAt: contractor.geocoded_at ? new Date(contractor.geocoded_at) : undefined,
@@ -248,7 +274,7 @@ router.post('/', async (req, res) => {
       name: contractor.name,
       address: contractor.address || undefined,
       role: contractor.role && Array.isArray(contractor.role) ? contractor.role : (contractor.role ? [contractor.role] : []),
-      tags: contractor.tags && Array.isArray(contractor.tags) ? contractor.tags : [],
+      tags,
       latitude: undefined,
       longitude: undefined,
       geocodedAt: undefined,
@@ -391,7 +417,7 @@ router.put('/:id', async (req, res) => {
       name: contractor.name,
       address: contractor.address || undefined,
       role: contractor.role && Array.isArray(contractor.role) ? contractor.role : (contractor.role ? [contractor.role] : []),
-      tags: contractor.tags && Array.isArray(contractor.tags) ? contractor.tags : [],
+      tags,
       latitude: contractor.latitude !== null && contractor.latitude !== undefined ? parseFloat(contractor.latitude) : undefined,
       longitude: contractor.longitude !== null && contractor.longitude !== undefined ? parseFloat(contractor.longitude) : undefined,
       geocodedAt: contractor.geocoded_at ? new Date(contractor.geocoded_at) : undefined,

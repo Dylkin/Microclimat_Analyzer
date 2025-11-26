@@ -14,6 +14,7 @@ const EquipmentDirectory = lazy(() => import('./components/equipment-management'
 const ContractNegotiation = lazy(() => import('./components/ContractNegotiation'));
 const TestingExecution = lazy(() => import('./components/testing-management').then(m => ({ default: m.TestingExecution })));
 const CreatingReport = lazy(() => import('./components/CreatingReport'));
+const DocumentsSubmission = lazy(() => import('./components/DocumentsSubmission'));
 const DataAnalysis = lazy(() => import('./components/DataAnalysis'));
 const AuditLogs = lazy(() => import('./components/AuditLogs'));
 const ResetPassword = lazy(() => import('./components/ResetPassword'));
@@ -129,6 +130,13 @@ const AppContent: React.FC = () => {
             project={selectedProject}
             onBack={() => handlePageChange('projects')}
             onPageChange={handlePageChange}
+          />
+        ) : <div>Доступ запрещен или проект не выбран</div>;
+      case 'documents_submission':
+        return hasAccess('analyzer') && selectedProject ? wrapWithSuspense(
+          <DocumentsSubmission
+            project={selectedProject}
+            onBack={() => handlePageChange('projects')}
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;
       case 'data_analysis':

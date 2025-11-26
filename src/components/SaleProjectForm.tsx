@@ -379,60 +379,6 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                       />
                     </div>
 
-                    {/* Поставщик */}
-                    <div className="relative">
-                      <label className="block text-xs text-gray-500 mb-1">Поставщик</label>
-                      <div className="relative">
-                        <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                          type="text"
-                          value={supplierSearches[index] || (item.supplierId ? supplierContractors.find(s => s.id === item.supplierId)?.name || '' : '')}
-                          onChange={(e) => {
-                            setSupplierSearches(prev => ({ ...prev, [index]: e.target.value }));
-                            setShowSupplierDropdowns(prev => ({ ...prev, [index]: true }));
-                          }}
-                          onFocus={() => setShowSupplierDropdowns(prev => ({ ...prev, [index]: true }))}
-                          placeholder="Поиск поставщика"
-                          className="w-full pl-8 pr-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        />
-                        {showSupplierDropdowns[index] && (
-                          <div 
-                            ref={(el) => { supplierDropdownRefs.current[index] = el; }}
-                            className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-auto"
-                          >
-                            {getFilteredSuppliers(index).length > 0 ? (
-                              getFilteredSuppliers(index).map(supplier => (
-                                <div
-                                  key={supplier.id}
-                                  onClick={() => handleSupplierSelect(index, supplier)}
-                                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                                >
-                                  {supplier.name}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="px-3 py-2 text-gray-500 text-sm">
-                                Поставщик не найден
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Стоимость поставщика */}
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Стоимость поставщика</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.supplierPrice || ''}
-                        onChange={(e) => handleUpdateItem(index, 'supplierPrice', e.target.value ? parseFloat(e.target.value) : undefined)}
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      />
-                    </div>
-
                     {/* Описание */}
                     <div className="md:col-span-2">
                       <label className="block text-xs text-gray-500 mb-1">Описание</label>

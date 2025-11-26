@@ -1,4 +1,5 @@
 export type ProjectStatus = 
+  | 'documents_submission'
   | 'contract_negotiation'
   | 'testing_execution'
   | 'report_preparation'
@@ -87,6 +88,7 @@ export interface UpdateProjectData {
 }
 
 export const ProjectStatusLabels: Record<ProjectStatus, string> = {
+  'documents_submission': 'Подача документов',
   'contract_negotiation': 'Согласование договора',
   'testing_execution': 'Проведение испытаний',
   'report_preparation': 'Подготовка отчета',
@@ -96,6 +98,7 @@ export const ProjectStatusLabels: Record<ProjectStatus, string> = {
 };
 
 export const ProjectStatusColors: Record<ProjectStatus, string> = {
+  'documents_submission': 'bg-blue-100 text-blue-800',
   'contract_negotiation': 'bg-yellow-100 text-yellow-800',
   'testing_execution': 'bg-purple-100 text-purple-800',
   'report_preparation': 'bg-orange-100 text-orange-800',
