@@ -20,6 +20,7 @@ interface QualificationObjectFormProps {
   project?: any; // Добавляем полный объект проекта
   onPageChange?: (page: string, data?: any) => void;
   mode?: 'view' | 'edit' | 'create'; // Добавляем режим работы
+  hideWorkSchedule?: boolean; // Скрыть блок "План график проведения квалификационных работ" и все его подблоки
 }
 
 const getTypeIcon = (type: QualificationObjectType) => {
@@ -48,8 +49,10 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   projectId,
   project,
   onPageChange,
-  mode = 'create'
+  mode = 'create',
+  hideWorkSchedule = false
 }) => {
+  // Все хуки должны быть вызваны до любых условных возвратов
   console.log('QualificationObjectForm получил projectId:', projectId);
   const [formData, setFormData] = useState<CreateQualificationObjectData>({
     contractorId,
@@ -140,7 +143,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       // Сначала сохраняем объект квалификации
       const finalFormData = {
         ...formData,
-        id: initialData?.id // Добавляем ID для обновления существующего объекта
+        id: initialData?.id, // Добавляем ID для обновления существующего объекта
+        // projectId добавляется отдельно через параметры функции, не через initialData
       };
       
       // Вызываем onSubmit для сохранения объекта и получаем сохраненный объект с ID
@@ -715,8 +719,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         </div>
       </div>
 
-      {/* План график проведения квалификационных работ - только для существующих объектов и когда есть projectId */}
-      {initialData && projectId && (
+      {/* План график проведения квалификационных работ - только для существующих объектов и когда есть projectId, и не скрыт через hideWorkSchedule */}
+      {initialData && projectId && !hideWorkSchedule && (
         <div className="border-t border-gray-200 pt-6">
           <QualificationWorkSchedule
             qualificationObjectId={initialData.id}
@@ -724,6 +728,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             projectId={projectId}
             project={project}
             onPageChange={onPageChange}
+            mode={mode === 'create' ? 'edit' : (mode || 'edit')}
+            hideTestDocuments={hideWorkSchedule}
           />
         </div>
       )}

@@ -6,29 +6,124 @@ const router = express.Router();
 // GET /api/projects - Получить все проекты
 router.get('/', async (req, res) => {
   try {
+    // Проверяем наличие полей tender_link и tender_date
+    const tenderFieldsCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'projects' 
+      AND column_name IN ('tender_link', 'tender_date')
+    `);
+    const hasTenderFields = tenderFieldsCheck.rows.length > 0;
+    
+    const selectFields = hasTenderFields
+      ? 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.tender_link, p.tender_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name'
+      : 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name';
+    
     const result = await pool.query(`
-      SELECT 
-        p.id, p.name, p.description, p.contractor_id, 
-        p.contract_number, p.contract_date, p.status, 
-        p.created_by, p.created_at, p.updated_at,
-        c.name as contractor_name
+      SELECT ${selectFields}
       FROM projects p
       LEFT JOIN contractors c ON p.contractor_id = c.id
       ORDER BY p.created_at DESC
     `);
     
-    const projects = result.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      contractorId: row.contractor_id,
-      contractorName: row.contractor_name,
-      contractNumber: row.contract_number,
-      contractDate: row.contract_date ? new Date(row.contract_date) : undefined,
-      status: row.status,
-      createdBy: row.created_by,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at)
+    // Проверяем наличие таблицы project_qualification_objects
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'project_qualification_objects'
+      )
+    `);
+    
+    const hasProjectQualificationObjectsTable = tableCheck.rows[0].exists;
+    
+    // Получаем объекты квалификации для каждого проекта
+    const projects = await Promise.all(result.rows.map(async (row) => {
+      let qualificationObjects: any[] = [];
+      
+      if (hasProjectQualificationObjectsTable) {
+        // Используем таблицу связей
+        const objectsResult = await pool.query(`
+          SELECT pqo.id, pqo.qualification_object_id, qo.name, qo.object_type
+          FROM project_qualification_objects pqo
+          JOIN qualification_objects qo ON pqo.qualification_object_id = qo.id
+          WHERE pqo.project_id = $1
+        `, [row.id]);
+        qualificationObjects = objectsResult.rows.map(obj => ({
+          id: obj.id,
+          qualificationObjectId: obj.qualification_object_id,
+          name: obj.name,
+          objectType: obj.object_type
+        }));
+      } else {
+        // Используем прямое поле project_id в qualification_objects
+        const objectsResult = await pool.query(`
+          SELECT id, name, object_type
+          FROM qualification_objects
+          WHERE project_id = $1
+        `, [row.id]);
+        qualificationObjects = objectsResult.rows.map(obj => ({
+          id: obj.id,
+          qualificationObjectId: obj.id,
+          name: obj.name,
+          objectType: obj.object_type
+        }));
+      }
+      
+      // Получаем товары проекта, если они есть
+      let items: any[] = [];
+      const itemsTableCheck = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'project_items'
+        )
+      `);
+      
+      if (itemsTableCheck.rows[0].exists) {
+        const itemsResult = await pool.query(`
+          SELECT pi.id, pi.name, pi.quantity, pi.declared_price, pi.supplier_id, pi.supplier_price, pi.description,
+                 pi.created_at, pi.updated_at, c.name as supplier_name
+          FROM project_items pi
+          LEFT JOIN contractors c ON pi.supplier_id = c.id
+          WHERE pi.project_id = $1
+          ORDER BY pi.created_at
+        `, [row.id]);
+        
+        items = itemsResult.rows.map(item => ({
+          id: item.id,
+          projectId: row.id,
+          name: item.name,
+          quantity: item.quantity,
+          declaredPrice: parseFloat(item.declared_price),
+          supplierId: item.supplier_id,
+          supplierName: item.supplier_name,
+          supplierPrice: item.supplier_price ? parseFloat(item.supplier_price) : undefined,
+          description: item.description,
+          createdAt: new Date(item.created_at),
+          updatedAt: new Date(item.updated_at)
+        }));
+      }
+      
+      return {
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        type: row.type || 'qualification',
+        contractorId: row.contractor_id,
+        contractorName: row.contractor_name,
+        contractNumber: row.contract_number,
+        contractDate: row.contract_date ? new Date(row.contract_date) : undefined,
+        tenderLink: row.tender_link || undefined,
+        tenderDate: row.tender_date ? new Date(row.tender_date) : undefined,
+        status: row.status,
+        createdBy: row.created_by,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        qualificationObjects: qualificationObjects,
+        items: items.length > 0 ? items : undefined
+      };
     }));
     
     res.json(projects);
@@ -43,12 +138,22 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
+    // Проверяем наличие полей tender_link и tender_date
+    const tenderFieldsCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'projects' 
+      AND column_name IN ('tender_link', 'tender_date')
+    `);
+    const hasTenderFields = tenderFieldsCheck.rows.length > 0;
+    
+    const selectFields = hasTenderFields
+      ? 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.tender_link, p.tender_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name'
+      : 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name';
+    
     const projectResult = await pool.query(`
-      SELECT 
-        p.id, p.name, p.description, p.contractor_id, 
-        p.contract_number, p.contract_date, p.status, 
-        p.created_by, p.created_at, p.updated_at,
-        c.name as contractor_name
+      SELECT ${selectFields}
       FROM projects p
       LEFT JOIN contractors c ON p.contractor_id = c.id
       WHERE p.id = $1
@@ -60,88 +165,337 @@ router.get('/:id', async (req, res) => {
     
     const projectRow = projectResult.rows[0];
     
-    // Получаем связанные объекты квалификации
-    const objectsResult = await pool.query(`
-      SELECT qo.id, qo.name, qo.object_type, qo.conditioning_system
-      FROM project_qualification_objects pqo
-      JOIN qualification_objects qo ON pqo.qualification_object_id = qo.id
-      WHERE pqo.project_id = $1
-    `, [id]);
+    // Проверяем наличие таблицы project_qualification_objects
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'project_qualification_objects'
+      )
+    `);
     
-    // Получаем назначения этапов
-    const stagesResult = await pool.query(`
-      SELECT id, stage, assigned_user_id, assigned_at, completed_at, notes
-      FROM project_stage_assignments
-      WHERE project_id = $1
-      ORDER BY assigned_at
-    `, [id]);
+    // Получаем связанные объекты квалификации
+    let objectsResult;
+    if (tableCheck.rows[0].exists) {
+      // Используем таблицу связей
+      objectsResult = await pool.query(`
+        SELECT pqo.id, pqo.qualification_object_id, qo.name, qo.object_type
+        FROM project_qualification_objects pqo
+        JOIN qualification_objects qo ON pqo.qualification_object_id = qo.id
+        WHERE pqo.project_id = $1
+      `, [id]);
+    } else {
+      // Используем прямое поле project_id
+      objectsResult = await pool.query(`
+        SELECT id, name, object_type
+        FROM qualification_objects
+        WHERE project_id = $1
+      `, [id]);
+    }
+    
+    // Получаем товары проекта
+    let projectItems: any[] = [];
+    const itemsTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'project_items'
+      )
+    `);
+    
+    if (itemsTableCheck.rows[0].exists) {
+      const itemsResult = await pool.query(`
+        SELECT pi.id, pi.name, pi.quantity, pi.declared_price, pi.supplier_id, pi.supplier_price, pi.description,
+               pi.created_at, pi.updated_at, c.name as supplier_name
+        FROM project_items pi
+        LEFT JOIN contractors c ON pi.supplier_id = c.id
+        WHERE pi.project_id = $1
+        ORDER BY pi.created_at
+      `, [id]);
+      
+      projectItems = itemsResult.rows.map(item => ({
+        id: item.id,
+        projectId: id,
+        name: item.name,
+        quantity: item.quantity,
+        declaredPrice: parseFloat(item.declared_price),
+        supplierId: item.supplier_id,
+        supplierName: item.supplier_name,
+        supplierPrice: item.supplier_price ? parseFloat(item.supplier_price) : undefined,
+        description: item.description,
+        createdAt: new Date(item.created_at),
+        updatedAt: new Date(item.updated_at)
+      }));
+    }
+    
+    // Получаем назначения этапов (если таблица существует)
+    let stagesResult;
+    try {
+      const tableCheckStages = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'project_stage_assignments'
+        )
+      `);
+      
+      if (tableCheckStages.rows[0].exists) {
+        stagesResult = await pool.query(`
+          SELECT id, stage, assigned_user_id, assigned_at, completed_at, notes
+          FROM project_stage_assignments
+          WHERE project_id = $1
+          ORDER BY assigned_at
+        `, [id]);
+      } else {
+        stagesResult = { rows: [] };
+      }
+    } catch (error) {
+      console.error('Error fetching stage assignments:', error);
+      stagesResult = { rows: [] };
+    }
     
     const project = {
       id: projectRow.id,
       name: projectRow.name,
       description: projectRow.description,
+      type: projectRow.type || 'qualification',
       contractorId: projectRow.contractor_id,
       contractorName: projectRow.contractor_name,
       contractNumber: projectRow.contract_number,
       contractDate: projectRow.contract_date ? new Date(projectRow.contract_date) : undefined,
+      tenderLink: projectRow.tender_link || undefined,
+      tenderDate: projectRow.tender_date ? new Date(projectRow.tender_date) : undefined,
       status: projectRow.status,
       createdBy: projectRow.created_by,
       createdAt: new Date(projectRow.created_at),
       updatedAt: new Date(projectRow.updated_at),
       qualificationObjects: objectsResult.rows.map(row => ({
-        id: row.id,
+        id: tableCheck.rows[0].exists ? row.id : row.id,
+        qualificationObjectId: tableCheck.rows[0].exists ? row.qualification_object_id : row.id,
         name: row.name,
-        objectType: row.object_type,
-        conditioningSystem: row.conditioning_system
+        objectType: row.object_type
       })),
-      stageAssignments: stagesResult.rows.map(row => ({
+      items: projectItems.length > 0 ? projectItems : undefined,
+      stageAssignments: (stagesResult?.rows || []).map(row => ({
         id: row.id,
         stage: row.stage,
         assignedUserId: row.assigned_user_id,
-        assignedAt: new Date(row.assigned_at),
+        assignedAt: row.assigned_at ? new Date(row.assigned_at) : undefined,
         completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
         notes: row.notes
       }))
     };
     
     res.json(project);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching project:', error);
-    res.status(500).json({ error: 'Ошибка получения проекта' });
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    res.status(500).json({ 
+      error: 'Ошибка получения проекта',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 // POST /api/projects - Создать проект
 router.post('/', async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { name, description, contractorId, contractNumber, contractDate, status, createdBy } = req.body;
+    await client.query('BEGIN');
+    
+    const { name, description, type, contractorId, contractNumber, contractDate, tenderLink, tenderDate, status, createdBy, qualificationObjectIds, items: projectItemsData } = req.body;
     
     if (!name || !contractorId) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Название и подрядчик обязательны' });
     }
     
-    const result = await pool.query(`
-      INSERT INTO projects (name, description, contractor_id, contract_number, contract_date, status, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id, name, description, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at
-    `, [name, description || null, contractorId, contractNumber || null, contractDate || null, status || 'draft', createdBy || null]);
+    // Проверяем наличие полей tender_link и tender_date
+    const tenderFieldsCheck = await client.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'projects' 
+      AND column_name IN ('tender_link', 'tender_date')
+    `);
+    const hasTenderFields = tenderFieldsCheck.rows.length > 0;
+    
+    // Формируем запрос с учетом наличия полей
+    const insertFields = hasTenderFields
+      ? 'INSERT INTO projects (name, description, type, contractor_id, contract_number, contract_date, tender_link, tender_date, status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, name, description, type, contractor_id, contract_number, contract_date, tender_link, tender_date, status, created_by, created_at, updated_at'
+      : 'INSERT INTO projects (name, description, type, contractor_id, contract_number, contract_date, status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, name, description, type, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at';
+    
+    const initialStatus = status || 'contract_negotiation';
+    
+    const insertValues = hasTenderFields
+      ? [name, description || null, type || 'qualification', contractorId, contractNumber || null, contractDate || null, tenderLink || null, tenderDate || null, initialStatus, createdBy || null]
+      : [name, description || null, type || 'qualification', contractorId, contractNumber || null, contractDate || null, initialStatus, createdBy || null];
+    
+    // Создаем проект
+    const result = await client.query(insertFields, insertValues);
     
     const project = result.rows[0];
+    const projectId = project.id;
+    
+    // Добавляем связи с объектами квалификации, если они указаны
+    if (qualificationObjectIds && Array.isArray(qualificationObjectIds) && qualificationObjectIds.length > 0) {
+      // Проверяем существование таблицы project_qualification_objects
+      const tableCheck = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'project_qualification_objects'
+        )
+      `);
+      
+      if (tableCheck.rows[0].exists) {
+        // Вставляем связи в таблицу project_qualification_objects
+        for (const objectId of qualificationObjectIds) {
+          try {
+            await client.query(`
+              INSERT INTO project_qualification_objects (project_id, qualification_object_id)
+              VALUES ($1, $2)
+              ON CONFLICT (project_id, qualification_object_id) DO NOTHING
+            `, [projectId, objectId]);
+          } catch (linkError: any) {
+            console.error(`Ошибка добавления связи с объектом ${objectId}:`, linkError);
+            // Продолжаем с другими объектами
+          }
+        }
+      } else {
+        // Если таблицы нет, обновляем project_id в объектах квалификации напрямую
+        for (const objectId of qualificationObjectIds) {
+          try {
+            await client.query(`
+              UPDATE qualification_objects
+              SET project_id = $1
+              WHERE id = $2
+            `, [projectId, objectId]);
+          } catch (updateError: any) {
+            console.error(`Ошибка обновления объекта ${objectId}:`, updateError);
+            // Продолжаем с другими объектами
+          }
+        }
+      }
+    }
+    
+    await client.query('COMMIT');
+    
+    // Получаем полную информацию о проекте с объектами квалификации
+    const fullProjectResult = await pool.query(`
+      SELECT 
+        p.id, p.name, p.description, p.type, p.contractor_id, 
+        p.contract_number, p.contract_date, p.status, 
+        p.created_by, p.created_at, p.updated_at,
+        c.name as contractor_name
+      FROM projects p
+      LEFT JOIN contractors c ON p.contractor_id = c.id
+      WHERE p.id = $1
+    `, [projectId]);
+    
+    const projectRow = fullProjectResult.rows[0];
+    
+    // Получаем связанные объекты квалификации
+    let qualificationObjects: any[] = [];
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'project_qualification_objects'
+      )
+    `);
+    
+    if (tableCheck.rows[0].exists) {
+      const objectsResult = await pool.query(`
+        SELECT pqo.id, pqo.qualification_object_id, qo.name, qo.object_type
+        FROM project_qualification_objects pqo
+        JOIN qualification_objects qo ON pqo.qualification_object_id = qo.id
+        WHERE pqo.project_id = $1
+      `, [projectId]);
+      qualificationObjects = objectsResult.rows.map(row => ({
+        id: row.id,
+        qualificationObjectId: row.qualification_object_id,
+        name: row.name,
+        objectType: row.object_type
+      }));
+    } else {
+      // Если таблицы нет, получаем объекты по project_id
+      const objectsResult = await pool.query(`
+        SELECT id, name, object_type
+        FROM qualification_objects
+        WHERE project_id = $1
+      `, [projectId]);
+      qualificationObjects = objectsResult.rows.map(row => ({
+        id: row.id,
+        qualificationObjectId: row.id,
+        name: row.name,
+        objectType: row.object_type
+      }));
+    }
+    
+    // Получаем товары проекта
+    let savedItems: any[] = [];
+    const itemsTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'project_items'
+      )
+    `);
+    
+    if (itemsTableCheck.rows[0].exists) {
+      const itemsResult = await pool.query(`
+        SELECT pi.id, pi.name, pi.quantity, pi.declared_price, pi.supplier_id, pi.supplier_price, pi.description,
+               pi.created_at, pi.updated_at, c.name as supplier_name
+        FROM project_items pi
+        LEFT JOIN contractors c ON pi.supplier_id = c.id
+        WHERE pi.project_id = $1
+        ORDER BY pi.created_at
+      `, [projectId]);
+      
+      savedItems = itemsResult.rows.map(item => ({
+        id: item.id,
+        projectId: projectId,
+        name: item.name,
+        quantity: item.quantity,
+        declaredPrice: parseFloat(item.declared_price),
+        supplierId: item.supplier_id,
+        supplierName: item.supplier_name,
+        supplierPrice: item.supplier_price ? parseFloat(item.supplier_price) : undefined,
+        description: item.description,
+        createdAt: new Date(item.created_at),
+        updatedAt: new Date(item.updated_at)
+      }));
+    }
+    
     res.status(201).json({
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      contractorId: project.contractor_id,
-      contractNumber: project.contract_number,
-      contractDate: project.contract_date ? new Date(project.contract_date) : undefined,
-      status: project.status,
-      createdBy: project.created_by,
-      createdAt: new Date(project.created_at),
-      updatedAt: new Date(project.updated_at)
+      id: projectRow.id,
+      name: projectRow.name,
+      description: projectRow.description,
+      type: projectRow.type || 'qualification',
+      contractorId: projectRow.contractor_id,
+      contractorName: projectRow.contractor_name,
+      contractNumber: projectRow.contract_number,
+      contractDate: projectRow.contract_date ? new Date(projectRow.contract_date) : undefined,
+      tenderLink: projectRow.tender_link || undefined,
+      tenderDate: projectRow.tender_date ? new Date(projectRow.tender_date) : undefined,
+      status: projectRow.status,
+      createdBy: projectRow.created_by,
+      createdAt: new Date(projectRow.created_at),
+      updatedAt: new Date(projectRow.updated_at),
+      qualificationObjects: qualificationObjects,
+      items: savedItems.length > 0 ? savedItems : undefined
     });
   } catch (error: any) {
+    await client.query('ROLLBACK');
     console.error('Error creating project:', error);
-    res.status(500).json({ error: 'Ошибка создания проекта' });
+    res.status(500).json({ error: `Ошибка создания проекта: ${error.message || 'Неизвестная ошибка'}` });
+  } finally {
+    client.release();
   }
 });
 
@@ -149,7 +503,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, contractorId, contractNumber, contractDate, status } = req.body;
+    const { name, description, type, contractorId, contractNumber, contractDate, status } = req.body;
     
     const updates: string[] = [];
     const values: any[] = [];
@@ -162,6 +516,10 @@ router.put('/:id', async (req, res) => {
     if (description !== undefined) {
       updates.push(`description = $${paramCount++}`);
       values.push(description);
+    }
+    if (type !== undefined) {
+      updates.push(`type = $${paramCount++}`);
+      values.push(type);
     }
     if (contractorId !== undefined) {
       updates.push(`contractor_id = $${paramCount++}`);
@@ -189,7 +547,7 @@ router.put('/:id', async (req, res) => {
     
     const result = await pool.query(
       `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramCount}
-       RETURNING id, name, description, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at`,
+       RETURNING id, name, description, type, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at`,
       values
     );
     
@@ -202,6 +560,7 @@ router.put('/:id', async (req, res) => {
       id: project.id,
       name: project.name,
       description: project.description,
+      type: project.type || 'qualification',
       contractorId: project.contractor_id,
       contractNumber: project.contract_number,
       contractDate: project.contract_date ? new Date(project.contract_date) : undefined,

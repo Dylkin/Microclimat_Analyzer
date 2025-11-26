@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from './apiClient';
 import { sanitizeFileName } from './fileNameUtils';
 import { getMimeType } from './mimeTypeUtils';
 
@@ -14,71 +14,38 @@ export interface ProjectDocument {
   uploadedAt: Date;
 }
 
-interface DatabaseProjectDocument {
-  id: string;
-  project_id: string;
-  document_type: 'commercial_offer' | 'contract' | 'qualification_protocol';
-  file_name: string;
-  file_size: number;
-  file_url: string;
-  mime_type: string;
-  uploaded_by: string;
-  uploaded_at: string;
-  created_at: string;
-}
-
 class ProjectDocumentService {
-  private supabase: any;
-
-  constructor() {
-    this.supabase = supabase;
-  }
-
-  // Проверка доступности Supabase
   isAvailable(): boolean {
-    return !!this.supabase;
+    return true; // API всегда доступен
   }
 
   // Получение документов проекта
   async getProjectDocuments(projectId: string): Promise<ProjectDocument[]> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      const { data, error } = await this.supabase
-        .from('project_documents')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('uploaded_at', { ascending: false });
-
-      if (error) {
-        console.error('Ошибка получения документов проекта:', error);
-        throw new Error(`Ошибка получения документов: ${error.message}`);
-      }
-
-      return data.map((doc: DatabaseProjectDocument) => {
+      const data = await apiClient.get<any[]>(`/project-documents?project_id=${projectId}`);
+      
+      return data.map((doc: any) => {
         // Определяем тип документа: если в имени файла есть qualification_protocol, то это протокол
-        let documentType = doc.document_type;
-        if (doc.file_name.includes('qualification_protocol')) {
+        let documentType = doc.documentType || doc.document_type;
+        if ((doc.fileName || doc.file_name)?.includes('qualification_protocol')) {
           documentType = 'qualification_protocol';
         }
         
         return {
           id: doc.id,
-          projectId: doc.project_id,
+          projectId: doc.projectId || doc.project_id,
           documentType: documentType as 'commercial_offer' | 'contract' | 'qualification_protocol',
-          fileName: doc.file_name,
-          fileSize: doc.file_size,
-          fileUrl: doc.file_url,
-          mimeType: doc.mime_type,
-          uploadedBy: doc.uploaded_by,
-          uploadedAt: new Date(doc.uploaded_at)
+          fileName: doc.fileName || doc.file_name,
+          fileSize: doc.fileSize || doc.file_size,
+          fileUrl: doc.fileUrl || doc.file_url,
+          mimeType: doc.mimeType || doc.mime_type,
+          uploadedBy: doc.uploadedBy || doc.uploaded_by,
+          uploadedAt: doc.uploadedAt ? new Date(doc.uploadedAt) : (doc.uploaded_at ? new Date(doc.uploaded_at) : new Date())
         };
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при получении документов проекта:', error);
-      throw error;
+      throw new Error(`Ошибка получения документов: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
@@ -89,18 +56,7 @@ class ProjectDocumentService {
     file: File,
     userId?: string
   ): Promise<ProjectDocument> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
-    // Проверяем аутентификацию пользователя
-    const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('Требуется аутентификация для загрузки файлов. Пожалуйста, войдите в систему.');
-    }
-
     try {
-     
       // Генерируем уникальное имя файла
       const sanitizedOriginalName = sanitizeFileName(file.name);
       const fileExt = sanitizedOriginalName.split('.').pop();
@@ -109,132 +65,74 @@ class ProjectDocumentService {
 
       console.log('Загружаем файл в Storage:', { fileName, filePath, fileSize: file.size });
 
-      // Загружаем файл в Supabase Storage
+      // Загружаем файл через API
       const mimeType = getMimeType(file.name);
-      const { data: uploadData, error: uploadError } = await this.supabase.storage
-        .from('documents')
-        .upload(filePath, file, {
-          contentType: mimeType,
-          cacheControl: '3600',
-          upsert: true
-        });
+      const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
+        bucket: 'documents',
+        path: filePath
+      });
 
-      if (uploadError) {
-        console.error('Ошибка загрузки файла в Storage:', uploadError);
-        console.error('Детали ошибки Storage:', {
-          code: uploadError.statusCode,
-          message: uploadError.message,
-          error: uploadError.error
-        });
-        
-        // Более детальная диагностика ошибки
-        if (uploadError.message?.includes('not found') || uploadError.message?.includes('does not exist')) {
-          throw new Error(`Bucket 'documents' не найден или недоступен. Проверьте настройки Storage в Supabase Dashboard.`);
-        } else if (uploadError.message?.includes('permission') || uploadError.message?.includes('policy')) {
-          throw new Error(`Недостаточно прав для загрузки в bucket 'documents'. Проверьте RLS политики Storage.`);
-        } else {
-          throw new Error(`Ошибка загрузки файла: ${uploadError.message}`);
-        }
-      }
-
-      console.log('Файл успешно загружен в Storage:', uploadData);
-
-      // Получаем публичный URL файла
-      const { data: urlData } = this.supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
-
-      if (!urlData?.publicUrl) {
-        throw new Error('Не удалось получить публичный URL файла');
-      }
-
-      console.log('Получен публичный URL:', urlData.publicUrl);
+      const publicUrl = uploadResult.data?.publicUrl || `/uploads/documents/${filePath}`;
+      console.log('Получен публичный URL:', publicUrl);
 
       // Сохраняем информацию о документе в базе данных
-      const { data: docData, error: docError } = await this.supabase
-        .from('project_documents')
-        .upsert({
-          project_id: projectId,
-          document_type: documentType, // Используем маппированный тип для базы данных
-          file_name: file.name,
-          file_size: file.size,
-          file_url: urlData.publicUrl,
-          mime_type: file.type,
-          uploaded_by: null // Временно устанавливаем null, так как uploaded_by ссылается на auth.users
-        })
-        .select()
-        .single();
-
-      if (docError) {
-        console.error('Ошибка сохранения информации о документе:', docError);
-        throw new Error(`Ошибка сохранения документа: ${docError.message}`);
-      }
+      const docData = await apiClient.post<any>('/project-documents', {
+        projectId,
+        documentType,
+        fileName: file.name,
+        fileSize: file.size,
+        fileUrl: publicUrl,
+        mimeType: mimeType,
+        uploadedBy: userId || null
+      });
 
       console.log('Информация о документе сохранена в БД:', docData);
 
       return {
         id: docData.id,
-        projectId: docData.project_id,
-        documentType: documentType, // Возвращаем оригинальный тип документа
-        fileName: docData.file_name,
-        fileSize: docData.file_size,
-        fileUrl: docData.file_url,
-        mimeType: docData.mime_type,
-        uploadedBy: docData.uploaded_by,
-        uploadedAt: new Date(docData.uploaded_at)
+        projectId: docData.projectId || docData.project_id,
+        documentType: documentType,
+        fileName: docData.fileName || docData.file_name,
+        fileSize: docData.fileSize || docData.file_size,
+        fileUrl: docData.fileUrl || docData.file_url,
+        mimeType: docData.mimeType || docData.mime_type,
+        uploadedBy: docData.uploadedBy || docData.uploaded_by,
+        uploadedAt: docData.uploadedAt ? new Date(docData.uploadedAt) : (docData.uploaded_at ? new Date(docData.uploaded_at) : new Date())
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при загрузке документа:', error);
-      throw error;
+      throw new Error(`Ошибка загрузки документа: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
   // Удаление документа
   async deleteDocument(documentId: string): Promise<void> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      // Сначала получаем информацию о документе для удаления файла из Storage
-      const { data: docData, error: getError } = await this.supabase
-        .from('project_documents')
-        .select('file_url')
-        .eq('id', documentId)
-        .single();
-
-      if (getError) {
-        console.error('Ошибка получения информации о документе:', getError);
-        throw new Error(`Ошибка получения документа: ${getError.message}`);
-      }
-
-      // Извлекаем путь файла из URL
-      const filePath = docData.file_url.split('/').pop();
-      if (filePath) {
-        // Удаляем файл из Storage
-        const { error: storageError } = await this.supabase.storage
-          .from('documents')
-          .remove([`project-documents/${filePath}`]);
-
-        if (storageError) {
-          console.warn('Ошибка удаления файла из Storage:', storageError);
-          // Не прерываем выполнение, так как запись в БД все равно нужно удалить
+      // Получаем информацию о документе для удаления файла из Storage
+      const docData = await apiClient.get<any>(`/project-documents?project_id=&id=${documentId}`);
+      
+      // Удаляем файл из Storage, если есть URL
+      if (docData && docData.length > 0 && docData[0].fileUrl) {
+        const fileUrl = docData[0].fileUrl || docData[0].file_url;
+        const filePath = fileUrl.split('/').pop();
+        if (filePath) {
+          try {
+            await apiClient.post('/storage/remove', {
+              bucket: 'documents',
+              paths: [`project-documents/${filePath}`]
+            });
+          } catch (storageError) {
+            console.warn('Ошибка удаления файла из Storage:', storageError);
+            // Не прерываем выполнение
+          }
         }
       }
 
       // Удаляем запись из базы данных
-      const { error: deleteError } = await this.supabase
-        .from('project_documents')
-        .delete()
-        .eq('id', documentId);
-
-      if (deleteError) {
-        console.error('Ошибка удаления документа из БД:', deleteError);
-        throw new Error(`Ошибка удаления документа: ${deleteError.message}`);
-      }
-    } catch (error) {
+      await apiClient.delete(`/project-documents/${documentId}`);
+    } catch (error: any) {
       console.error('Ошибка при удалении документа:', error);
-      throw error;
+      throw new Error(`Ошибка удаления документа: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 

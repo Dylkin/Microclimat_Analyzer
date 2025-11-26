@@ -1,7 +1,16 @@
+export type ContractorRole = 'supplier' | 'buyer';
+
+export const ContractorRoleLabels: Record<ContractorRole, string> = {
+  'supplier': 'Поставщик',
+  'buyer': 'Покупатель'
+};
+
 export interface Contractor {
   id: string;
   name: string;
   address?: string;
+  role?: ContractorRole[];
+  tags?: string[];
   latitude?: number;
   longitude?: number;
   geocodedAt?: Date;
@@ -22,12 +31,16 @@ export interface ContractorContact {
 export interface CreateContractorData {
   name: string;
   address?: string;
+  role?: ContractorRole[];
+  tags?: string[];
   contacts: Omit<ContractorContact, 'id' | 'contractorId' | 'createdAt'>[];
 }
 
 export interface UpdateContractorData {
   name?: string;
   address?: string;
+  role?: ContractorRole[];
+  tags?: string[];
   latitude?: number;
   longitude?: number;
   geocodedAt?: Date;

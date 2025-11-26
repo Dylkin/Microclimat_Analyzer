@@ -16,15 +16,13 @@ const UserDirectory: React.FC = () => {
     fullName: '',
     email: '',
     password: '',
-    role: 'specialist' as UserRole,
-    position: ''
+    role: 'specialist' as UserRole
   });
 
   const [editUser, setEditUser] = useState({
     fullName: '',
     email: '',
-    role: 'specialist' as UserRole,
-    position: ''
+    role: 'specialist' as UserRole
   });
 
   const roleLabels: Record<UserRole, string> = {
@@ -58,8 +56,7 @@ const UserDirectory: React.FC = () => {
         fullName: '',
         email: '',
         password: '',
-        role: 'specialist',
-        position: ''
+        role: 'specialist'
       });
       setShowAddForm(false);
       alert('Пользователь успешно добавлен');
@@ -77,8 +74,7 @@ const UserDirectory: React.FC = () => {
     setEditUser({
       fullName: user.fullName,
       email: user.email,
-      role: user.role,
-      position: user.position || ''
+      role: user.role
     });
     setEditingUser(user.id);
   };
@@ -268,24 +264,9 @@ const UserDirectory: React.FC = () => {
                 <option value="manager">Руководитель</option>
                 <option value="director">Менеджер</option>
                 <option value="admin">Администратор</option>
-                <option value="administrator">Администратор</option>
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Должность
-              </label>
-              <input
-                type="text"
-                value={newUser.position}
-                onChange={(e) => setNewUser(prev => ({ ...prev, position: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите должность"
-                title="Должность пользователя"
-                aria-label="Должность пользователя"
-              />
-            </div>
           </div>
 
           <div className="flex justify-end space-x-3 mt-6">
@@ -320,9 +301,6 @@ const UserDirectory: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Роль
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Должность
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Пароль
@@ -385,27 +363,11 @@ const UserDirectory: React.FC = () => {
                         <option value="manager">Руководитель</option>
                         <option value="director">Менеджер</option>
                         <option value="admin">Администратор</option>
-                        <option value="administrator">Администратор</option>
                       </select>
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                         {roleLabels[user.role] || 'Неизвестная роль'}
                       </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingUser === user.id ? (
-                      <input
-                        type="text"
-                        value={editUser.position}
-                        onChange={(e) => setEditUser(prev => ({ ...prev, position: e.target.value }))}
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="Введите должность"
-                        title="Должность пользователя"
-                        aria-label="Должность пользователя"
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-500">{user.position || 'Не указана'}</div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

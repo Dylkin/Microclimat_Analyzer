@@ -61,11 +61,6 @@ const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onBack, on
 
   // Загрузка протоколов квалификации
   const loadQualificationProtocols = async () => {
-    if (!qualificationProtocolService.isAvailable()) {
-      console.warn('Supabase не настроен для работы с протоколами квалификации');
-      return;
-    }
-
     try {
       const protocols = await qualificationProtocolService.getProjectProtocols(project.id);
       setQualificationProtocols(protocols);
@@ -121,6 +116,7 @@ const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onBack, on
         projectQualificationObjects={project.qualificationObjects}
         qualificationProtocols={qualificationProtocols}
         onPageChange={onPageChange}
+        showExecuteButton={true}
       />
     </div>
   );

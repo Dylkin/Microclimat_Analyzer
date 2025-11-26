@@ -130,7 +130,12 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
 
   // Форматтеры
   const formatTime = timeFormat('%d.%m %H:%M');
-  const formatValue = (value: number) => `${value.toFixed(1)}${dataType === 'temperature' ? '°C' : '%'}`;
+  const formatValue = (value: number | string | undefined) => {
+    if (value === undefined || value === null) return '-';
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(numValue)) return '-';
+    return `${numValue.toFixed(1)}${dataType === 'temperature' ? '°C' : '%'}`;
+  };
 
   // Бисектор для поиска ближайшей точки
   const bisectDate = bisector((d: TimeSeriesPoint) => d.timestamp).left;
@@ -153,7 +158,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
 
     if (point) {
       const value = dataType === 'temperature' ? point.temperature : point.humidity;
-      if (value !== undefined) {
+      if (value !== undefined && typeof value === 'number' && !isNaN(value)) {
         // Получаем имя файла из данных
         const fileName = data.find(d => d.fileId === point.fileId)?.fileId || '';
         const shortFileName = fileName.substring(0, 6);
@@ -163,7 +168,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           y: mouseY,
           timestamp: point.timestamp,
           fileName: shortFileName,
-          [dataType]: value,
+          [dataType]: value as number,
           visible: true
         });
       }

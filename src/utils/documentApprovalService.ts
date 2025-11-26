@@ -1,226 +1,132 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from './apiClient';
 import { DocumentComment, ApprovalRecord, DocumentApprovalStatus } from '../types/DocumentApproval';
 
 export class DocumentApprovalService {
-  private supabase: any;
-
-  constructor() {
-    this.supabase = supabase;
-  }
 
   async addComment(documentId: string, comment: string, userId: string): Promise<DocumentComment> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
-    const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('Требуется аутентификация для добавления комментариев');
-    }
-
-    // Получаем ФИО пользователя из таблицы users
-    let userName = 'Пользователь';
     try {
-      const { data: userData, error: userError } = await this.supabase
-        .from('users')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
-      
-      if (!userError && userData) {
-        userName = userData.full_name;
-      } else {
-        // Fallback к email если не найдено в таблице users
-        userName = user.email || 'Пользователь';
+      // Получаем ФИО пользователя из API
+      let userName = 'Пользователь';
+      try {
+        const userData = await apiClient.get<any>(`/users/${userId}`);
+        userName = userData.fullName || userData.full_name || userData.email || 'Пользователь';
+      } catch (error) {
+        console.warn('Не удалось получить ФИО пользователя:', error);
       }
-    } catch (error) {
-      console.warn('Не удалось получить ФИО пользователя из таблицы users:', error);
-      userName = user.email || 'Пользователь';
-    }
 
-    const commentData = {
-      document_id: documentId,
-      user_id: user.id,
-      user_name: userName,
-      comment: comment.trim()
-    };
+      const data = await apiClient.post<any>('/document-approval/comments', {
+        documentId,
+        userId,
+        userName,
+        comment: comment.trim()
+      });
 
-    const { data, error } = await this.supabase
-      .from('document_comments')
-      .insert([commentData])
-      .select()
-      .single();
-
-    if (error) {
+      return {
+        id: data.id,
+        documentId: data.documentId || data.document_id,
+        userId: data.userId || data.user_id,
+        userName: data.userName || data.user_name,
+        comment: data.comment,
+        createdAt: data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date()),
+        updatedAt: data.updatedAt ? new Date(data.updatedAt) : (data.updated_at ? new Date(data.updated_at) : new Date())
+      };
+    } catch (error: any) {
       console.error('Ошибка сохранения комментария:', error);
-      throw new Error(`Ошибка сохранения комментария: ${error.message}`);
+      throw new Error(`Ошибка сохранения комментария: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    return {
-      id: data.id,
-      documentId: data.document_id,
-      userId: data.user_id,
-      userName: data.user_name,
-      comment: data.comment,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
-    };
   }
 
   async getComments(documentId: string): Promise<DocumentComment[]> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
-    const { data, error } = await this.supabase
-      .from('document_comments')
-      .select('*')
-      .eq('document_id', documentId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
+    try {
+      const data = await apiClient.get<any[]>(`/document-approval/comments/${documentId}`);
+      return (data || []).map((comment: any) => ({
+        id: comment.id,
+        documentId: comment.documentId || comment.document_id,
+        userId: comment.userId || comment.user_id,
+        userName: comment.userName || comment.user_name,
+        comment: comment.comment,
+        createdAt: comment.createdAt ? new Date(comment.createdAt) : (comment.created_at ? new Date(comment.created_at) : new Date()),
+        updatedAt: comment.updatedAt ? new Date(comment.updatedAt) : (comment.updated_at ? new Date(comment.updated_at) : new Date())
+      }));
+    } catch (error: any) {
       console.error('Ошибка загрузки комментариев:', error);
       return [];
     }
-
-    return (data || []).map((comment: any) => ({
-      id: comment.id,
-      documentId: comment.document_id,
-      userId: comment.user_id,
-      userName: comment.user_name,
-      comment: comment.comment,
-      createdAt: new Date(comment.created_at),
-      updatedAt: new Date(comment.updated_at)
-    }));
   }
 
   async approveDocument(documentId: string, userId: string, comment?: string): Promise<ApprovalRecord> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
-    const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('Требуется аутентификация для согласования документов');
-    }
-
-    // Получаем ФИО пользователя из таблицы users
-    let userName = 'Пользователь';
     try {
-      const { data: userData, error: userError } = await this.supabase
-        .from('users')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
-      
-      if (!userError && userData) {
-        userName = userData.full_name;
-      } else {
-        // Fallback к email если не найдено в таблице users
-        userName = user.email || 'Пользователь';
+      // Получаем ФИО пользователя из API
+      let userName = 'Пользователь';
+      try {
+        const userData = await apiClient.get<any>(`/users/${userId}`);
+        userName = userData.fullName || userData.full_name || userData.email || 'Пользователь';
+      } catch (error) {
+        console.warn('Не удалось получить ФИО пользователя:', error);
       }
-    } catch (error) {
-      console.warn('Не удалось получить ФИО пользователя из таблицы users:', error);
-      userName = user.email || 'Пользователь';
-    }
 
-    const approvalData = {
-      document_id: documentId,
-      user_id: user.id,
-      user_name: userName,
-      status: 'approved',
-      comment: comment?.trim() || null
-    };
+      const data = await apiClient.post<any>('/document-approval/approve', {
+        documentId,
+        userId,
+        userName,
+        comment: comment?.trim()
+      });
 
-    const { data, error } = await this.supabase
-      .from('document_approvals')
-      .insert([approvalData])
-      .select()
-      .single();
-
-    if (error) {
+      return {
+        id: data.id,
+        documentId: data.documentId || data.document_id,
+        userId: data.userId || data.user_id,
+        userName: data.userName || data.user_name,
+        status: data.status,
+        comment: data.comment,
+        createdAt: data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date()),
+        updatedAt: data.updatedAt ? new Date(data.updatedAt) : (data.updated_at ? new Date(data.updated_at) : new Date())
+      };
+    } catch (error: any) {
       console.error('Ошибка сохранения согласования:', error);
-      throw new Error(`Ошибка сохранения согласования: ${error.message}`);
+      throw new Error(`Ошибка сохранения согласования: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    return {
-      id: data.id,
-      documentId: data.document_id,
-      userId: data.user_id,
-      userName: data.user_name,
-      status: data.status,
-      comment: data.comment,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
-    };
   }
 
   async rejectDocument(documentId: string, userId: string, comment?: string): Promise<ApprovalRecord> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
-    const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('Требуется аутентификация для отклонения документов');
-    }
-
-    // Получаем ФИО пользователя из таблицы users
-    let userName = 'Пользователь';
     try {
-      const { data: userData, error: userError } = await this.supabase
-        .from('users')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
-      
-      if (!userError && userData) {
-        userName = userData.full_name;
-      } else {
-        // Fallback к email если не найдено в таблице users
-        userName = user.email || 'Пользователь';
+      if (!comment) {
+        throw new Error('Комментарий обязателен при отклонении документа');
       }
-    } catch (error) {
-      console.warn('Не удалось получить ФИО пользователя из таблицы users:', error);
-      userName = user.email || 'Пользователь';
-    }
 
-    const approvalData = {
-      document_id: documentId,
-      user_id: user.id,
-      user_name: userName,
-      status: 'rejected',
-      comment: comment?.trim() || null
-    };
+      // Получаем ФИО пользователя из API
+      let userName = 'Пользователь';
+      try {
+        const userData = await apiClient.get<any>(`/users/${userId}`);
+        userName = userData.fullName || userData.full_name || userData.email || 'Пользователь';
+      } catch (error) {
+        console.warn('Не удалось получить ФИО пользователя:', error);
+      }
 
-    const { data, error } = await this.supabase
-      .from('document_approvals')
-      .insert([approvalData])
-      .select()
-      .single();
+      const data = await apiClient.post<any>('/document-approval/reject', {
+        documentId,
+        userId,
+        userName,
+        comment: comment.trim()
+      });
 
-    if (error) {
+      return {
+        id: data.id,
+        documentId: data.documentId || data.document_id,
+        userId: data.userId || data.user_id,
+        userName: data.userName || data.user_name,
+        status: data.status,
+        comment: data.comment,
+        createdAt: data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date()),
+        updatedAt: data.updatedAt ? new Date(data.updatedAt) : (data.updated_at ? new Date(data.updated_at) : new Date())
+      };
+    } catch (error: any) {
       console.error('Ошибка сохранения отклонения:', error);
-      throw new Error(`Ошибка сохранения отклонения: ${error.message}`);
+      throw new Error(`Ошибка сохранения отклонения: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    return {
-      id: data.id,
-      documentId: data.document_id,
-      userId: data.user_id,
-      userName: data.user_name,
-      status: data.status,
-      comment: data.comment,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
-    };
   }
 
   async getApprovalStatus(documentId: string): Promise<DocumentApprovalStatus> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     const [comments, approvals] = await Promise.all([
       this.getComments(documentId),
       this.getApprovalHistory(documentId)
@@ -239,92 +145,58 @@ export class DocumentApprovalService {
   }
 
   async cancelApproval(documentId: string, userId: string, comment?: string): Promise<ApprovalRecord> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
-    const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('Требуется аутентификация для отмены согласования');
-    }
-
-    // Получаем ФИО пользователя из таблицы users
-    let userName = 'Пользователь';
     try {
-      const { data: userData, error: userError } = await this.supabase
-        .from('users')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
-      
-      if (!userError && userData) {
-        userName = userData.full_name;
-      } else {
-        // Fallback к email если не найдено в таблице users
-        userName = user.email || 'Пользователь';
+      // Получаем ФИО пользователя из API
+      let userName = 'Пользователь';
+      try {
+        const userData = await apiClient.get<any>(`/users/${userId}`);
+        userName = userData.fullName || userData.full_name || userData.email || 'Пользователь';
+      } catch (error) {
+        console.warn('Не удалось получить ФИО пользователя:', error);
       }
-    } catch (error) {
-      console.warn('Не удалось получить ФИО пользователя из таблицы users:', error);
-      userName = user.email || 'Пользователь';
-    }
 
-    const approvalData = {
-      document_id: documentId,
-      user_id: user.id,
-      user_name: userName,
-      status: 'pending',
-      comment: comment?.trim() || 'Согласование отменено'
-    };
+      // Отменяем согласование через создание новой записи со статусом pending
+      const data = await apiClient.post<any>('/document-approval/approve', {
+        documentId,
+        userId,
+        userName,
+        comment: comment?.trim() || 'Согласование отменено',
+        status: 'pending'
+      });
 
-    const { data, error } = await this.supabase
-      .from('document_approvals')
-      .insert([approvalData])
-      .select()
-      .single();
-
-    if (error) {
+      return {
+        id: data.id,
+        documentId: data.documentId || data.document_id,
+        userId: data.userId || data.user_id,
+        userName: data.userName || data.user_name,
+        status: 'pending',
+        comment: data.comment,
+        createdAt: data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date()),
+        updatedAt: data.updatedAt ? new Date(data.updatedAt) : (data.updated_at ? new Date(data.updated_at) : new Date())
+      };
+    } catch (error: any) {
       console.error('Ошибка сохранения отмены согласования:', error);
-      throw new Error(`Ошибка сохранения отмены согласования: ${error.message}`);
+      throw new Error(`Ошибка сохранения отмены согласования: ${error.message || 'Неизвестная ошибка'}`);
     }
-
-    return {
-      id: data.id,
-      documentId: data.document_id,
-      userId: data.user_id,
-      userName: data.user_name,
-      status: data.status,
-      comment: data.comment,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
-    };
   }
 
   async getApprovalHistory(documentId: string): Promise<ApprovalRecord[]> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
-    const { data, error } = await this.supabase
-      .from('document_approvals')
-      .select('*')
-      .eq('document_id', documentId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
+    try {
+      const data = await apiClient.get<any[]>(`/document-approval/approvals/${documentId}`);
+      return (data || []).map((approval: any) => ({
+        id: approval.id,
+        documentId: approval.documentId || approval.document_id,
+        userId: approval.userId || approval.user_id,
+        userName: approval.userName || approval.user_name,
+        status: approval.status,
+        comment: approval.comment,
+        createdAt: approval.createdAt ? new Date(approval.createdAt) : (approval.created_at ? new Date(approval.created_at) : new Date()),
+        updatedAt: approval.updatedAt ? new Date(approval.updatedAt) : (approval.updated_at ? new Date(approval.updated_at) : new Date())
+      }));
+    } catch (error: any) {
       console.error('Ошибка загрузки истории согласований:', error);
       return [];
     }
-
-    return (data || []).map((approval: any) => ({
-      id: approval.id,
-      documentId: approval.document_id,
-      userId: approval.user_id,
-      userName: approval.user_name,
-      status: approval.status,
-      comment: approval.comment,
-      createdAt: new Date(approval.created_at),
-      updatedAt: new Date(approval.updated_at)
-    }));
   }
 }
 

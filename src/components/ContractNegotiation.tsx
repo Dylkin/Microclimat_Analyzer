@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft, FileText, AlertTriangle, CheckCircle, FileCheck } from 'lucide-react';
 import { Project } from '../types/Project';
 import { Contractor } from '../types/Contractor';
@@ -12,6 +12,7 @@ import { QualificationObjectsCRUD } from './contract/QualificationObjectsCRUD';
 import { DocumentApproval } from './contract/DocumentApproval';
 import { ContractInstructions } from './contract/ContractInstructions';
 import { Accordion } from './ui/Accordion';
+import { reverseObjectTypeMapping } from '../utils/objectTypeMapping';
 
 interface ContractNegotiationProps {
   project: Project;
@@ -20,17 +21,9 @@ interface ContractNegotiationProps {
 }
 
 const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBack, onPageChange }) => {
+  // ВСЕ хуки должны быть вызваны до любых условных возвратов
   const { user } = useAuth();
   const [currentProject, setCurrentProject] = useState<Project>(project);
-
-  // Логирование для диагностики
-  console.log('ContractNegotiation: Получен проект:', {
-    id: project.id,
-    name: project.name,
-    contractNumber: project.contractNumber,
-    contractDate: project.contractDate,
-    project: project
-  });
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [contractor, setContractor] = useState<Contractor | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,50 +48,20 @@ const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBa
   const [isDocumentAccordionExpanded, setIsDocumentAccordionExpanded] = useState(true);
   const [isQualificationObjectOpen, setIsQualificationObjectOpen] = useState(false);
 
-  // Get documents by type - moved up to avoid reference errors
-  const commercialOfferDoc = documents.find(doc => doc.documentType === 'commercial_offer');
-  const contractDoc = documents.find(doc => doc.documentType === 'contract');
-
-  // Безопасная проверка данных проекта
-  if (!currentProject || !currentProject.id) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-            title="Назад к списку проектов"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <FileText className="w-8 h-8 text-red-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки проекта</h1>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <p className="text-red-600">Данные проекта не найдены или повреждены</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Загрузка данных контрагента
-  const loadContractor = async () => {
-    // Убрана проверка isAvailable - API клиент всегда доступен
+  // Загрузка данных контрагента - определена до useEffect
+  const loadContractor = useCallback(async () => {
+    if (!currentProject?.id) return;
     try {
       const contractorData = await contractorService.getContractorById(currentProject.contractorId);
       setContractor(contractorData);
     } catch (error) {
       console.error('Ошибка загрузки контрагента:', error);
-      // Не устанавливаем ошибку, так как это не критично для работы страницы
     }
-  };
+  }, [currentProject?.id, currentProject?.contractorId]);
 
-  // Загрузка документов проекта
-  const loadDocuments = async () => {
-    if (!enhancedProjectDocumentService.isAvailable()) {
-      setError('Supabase не настроен для работы с документами');
-      return;
-    }
+  // Загрузка документов проекта - определена до useEffect
+  const loadDocuments = useCallback(async () => {
+    if (!currentProject?.id) return;
 
     setLoading(true);
     setError(null);
@@ -120,27 +83,177 @@ const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBa
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentProject?.id]);
 
+  // Логирование для диагностики (только при изменении проекта)
   useEffect(() => {
+    console.log('ContractNegotiation: Получен проект:', {
+      id: project.id,
+      name: project.name,
+      contractNumber: project.contractNumber,
+      contractDate: project.contractDate,
+      qualificationObjects: project.qualificationObjects
+    });
+  }, [project.id]);
+
+  // Загружаем полную информацию о проекте при изменении project.id
+  useEffect(() => {
+    const loadFullProject = async () => {
+      if (!project.id) return;
+      try {
+        const { projectService } = await import('../utils/projectService');
+        const fullProject = await projectService.getProjectById(project.id);
+        console.log('ContractNegotiation: Загружен полный проект:', {
+          id: fullProject.id,
+          qualificationObjects: fullProject.qualificationObjects,
+          qualificationObjectsCount: fullProject.qualificationObjects?.length || 0
+        });
+        setCurrentProject(fullProject);
+      } catch (error) {
+        console.error('ContractNegotiation: Ошибка загрузки полного проекта:', error);
+      }
+    };
+    loadFullProject();
+  }, [project.id]);
+
+  // Загрузка данных при изменении проекта
+  useEffect(() => {
+    if (!currentProject?.id) return;
     loadDocuments();
     loadContractor();
-    
-    // Инициализируем статусы при загрузке
-    const commercialOfferDoc = documents.find(doc => doc.documentType === 'commercial_offer');
-    const contractDoc = documents.find(doc => doc.documentType === 'contract');
-    
-    setDocumentStatuses({
-      commercialOffer: commercialOfferDoc ? 'Согласование' : 'В работе',
-      contract: contractDoc ? 'Согласование' : 'В работе'
-    });
-  }, [currentProject.id]);
+  }, [currentProject?.id, loadDocuments, loadContractor]);
 
-  // Инициализация состояния аккордеона при загрузке документов
+  // Get documents by type - moved up to avoid reference errors
+  const commercialOfferDoc = useMemo(() => documents.find(doc => doc.documentType === 'commercial_offer'), [documents]);
+  const contractDoc = useMemo(() => documents.find(doc => doc.documentType === 'contract'), [documents]);
+
+  // Инициализация статусов документов при загрузке - ПЕРЕД условным return
   useEffect(() => {
-    const allApproved = isAllDocumentsApproved();
-    setIsDocumentAccordionExpanded(!allApproved);
-  }, [documents, approvedDocuments]);
+    if (documents.length > 0) {
+      const commercialOfferDoc = documents.find(doc => doc.documentType === 'commercial_offer');
+      const contractDoc = documents.find(doc => doc.documentType === 'contract');
+      
+      setDocumentStatuses({
+        commercialOffer: commercialOfferDoc ? 'Согласование' : 'В работе',
+        contract: contractDoc ? 'Согласование' : 'В работе'
+      });
+    }
+  }, [documents]);
+
+  // Мемоизируем результат проверки согласования для стабильности
+  // Используем строку для approvedDocuments, чтобы избежать проблем с Set
+  const approvedDocumentsString = useMemo(() => {
+    return Array.from(approvedDocuments).sort().join(',');
+  }, [approvedDocuments]);
+
+  const allDocumentsApproved = useMemo(() => {
+    // Если документов нет, возвращаем false (аккордеон должен быть развернут)
+    if (!commercialOfferDoc && !contractDoc && qualificationProtocols.length === 0) {
+      return false;
+    }
+    
+    const commercialOfferApproved = commercialOfferDoc ? approvedDocuments.has(commercialOfferDoc.id) : true;
+    const contractApproved = contractDoc ? approvedDocuments.has(contractDoc.id) : true;
+    
+    // Проверяем протоколы квалификации
+    const allProtocolsApproved = qualificationProtocols.length > 0 
+      ? qualificationProtocols.every(protocol => {
+          if (!protocol.document) return true;
+          return approvedDocuments.has(protocol.document.id);
+        })
+      : true;
+    
+    // Если есть оба документа, проверяем, что оба согласованы
+    if (commercialOfferDoc && contractDoc) {
+      return commercialOfferApproved && contractApproved && allProtocolsApproved;
+    }
+    
+    // Если есть только один документ, проверяем его согласование
+    if (commercialOfferDoc && !contractDoc) {
+      return commercialOfferApproved && allProtocolsApproved;
+    }
+    
+    if (contractDoc && !commercialOfferDoc) {
+      return contractApproved && allProtocolsApproved;
+    }
+    
+    // Если есть только протоколы, проверяем их
+    if (qualificationProtocols.length > 0) {
+      return allProtocolsApproved;
+    }
+    
+    return false;
+  }, [commercialOfferDoc, contractDoc, approvedDocumentsString, qualificationProtocols]);
+
+  // Инициализация состояния аккордеона при загрузке документов - ПЕРЕД условным return
+  useEffect(() => {
+    // Аккордеон должен быть развернут по умолчанию
+    // Закрываем только если все документы согласованы
+    setIsDocumentAccordionExpanded(!allDocumentsApproved);
+  }, [allDocumentsApproved]);
+
+  const handleDocumentStatusesChange = useCallback((statuses: Map<string, any>) => {
+    setRealDocumentStatuses(statuses);
+  }, []);
+
+  // Мемоизируем selectedQualificationObjects для DocumentApproval - ПЕРЕД условным return
+  const selectedQualificationObjectsForApproval = useMemo(() => {
+    const objects = currentProject.qualificationObjects || [];
+    console.log('ContractNegotiation: Формирование selectedQualificationObjectsForApproval:', {
+      qualificationObjects: objects,
+      count: objects.length,
+      currentProject: {
+        id: currentProject.id,
+        name: currentProject.name,
+        qualificationObjectsCount: objects.length
+      }
+    });
+    
+    const mapped = objects.map(obj => {
+      // Преобразуем тип объекта из английского (из БД) в русский (для отображения)
+      // Если тип уже на русском, оставляем как есть
+      const objectType = obj.qualificationObjectType || 'unknown';
+      const russianType = reverseObjectTypeMapping[objectType] || objectType;
+      
+      console.log('ContractNegotiation: Маппинг объекта:', {
+        originalType: objectType,
+        russianType: russianType,
+        id: obj.qualificationObjectId,
+        name: obj.qualificationObjectName
+      });
+      
+      return {
+        id: obj.qualificationObjectId,
+        type: russianType, // Используем русский тип для отображения
+        name: obj.qualificationObjectName || 'Без названия'
+      };
+    });
+    
+    console.log('ContractNegotiation: Mapped selectedQualificationObjectsForApproval:', mapped);
+    return mapped;
+  }, [currentProject.qualificationObjects]);
+
+  // Безопасная проверка данных проекта - ПОСЛЕ ВСЕХ хуков
+  if (!currentProject || !currentProject.id) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onBack}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+            title="Назад к списку проектов"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <FileText className="w-8 h-8 text-red-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Ошибка загрузки проекта</h1>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <p className="text-red-600">Данные проекта не найдены или повреждены</p>
+        </div>
+      </div>
+    );
+  }
 
   // Удален автоматический эффект закрытия аккордеона
   // Теперь аккордеон закрывается только в ручном режиме
@@ -284,36 +397,6 @@ const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBa
     }
   };
 
-  const handleDocumentStatusesChange = (statuses: Map<string, any>) => {
-    console.log('ContractNegotiation: Получены статусы документов:', statuses);
-    setRealDocumentStatuses(statuses);
-  };
-
-
-  // Проверяем, согласованы ли все документы
-  const isAllDocumentsApproved = () => {
-    const commercialOfferApproved = commercialOfferDoc ? approvedDocuments.has(commercialOfferDoc.id) : false;
-    const contractApproved = contractDoc ? approvedDocuments.has(contractDoc.id) : false;
-    
-    // Если есть оба документа, проверяем, что оба согласованы
-    if (commercialOfferDoc && contractDoc) {
-      return commercialOfferApproved && contractApproved;
-    }
-    
-    // Если есть только один документ, проверяем его согласование
-    if (commercialOfferDoc && !contractDoc) {
-      return commercialOfferApproved;
-    }
-    
-    if (contractDoc && !commercialOfferDoc) {
-      return contractApproved;
-    }
-    
-    // Если нет документов, считаем что "согласовано"
-    return true;
-  };
-
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -376,13 +459,6 @@ const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBa
           const dbStatus = realDocumentStatuses.get(contractDoc.id);
           const isApproved = dbStatus?.status === 'approved';
           
-          console.log('🔒 isCheckboxesBlocked debug:');
-          console.log('  - contractDoc:', contractDoc);
-          console.log('  - dbStatus:', dbStatus);
-          console.log('  - isApproved:', isApproved);
-          console.log('  - realDocumentStatuses:', realDocumentStatuses);
-          console.log('  - documents count:', documents.length);
-          
           return isApproved;
         })()}
         onPageChange={onPageChange}
@@ -406,11 +482,7 @@ const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBa
               qualificationProtocols={qualificationProtocols}
               approvedDocuments={approvedDocuments}
               documentApprovals={documentApprovals}
-              selectedQualificationObjects={currentProject.qualificationObjects?.map(obj => ({
-                id: obj.qualificationObjectId,
-                type: obj.qualificationObjectType || 'unknown',
-                name: obj.qualificationObjectName || 'Без названия'
-              })) || []}
+              selectedQualificationObjects={selectedQualificationObjectsForApproval}
               onUpload={handleFileUpload}
               onDelete={handleDeleteDocument}
               onApprove={handleApproveDocument}

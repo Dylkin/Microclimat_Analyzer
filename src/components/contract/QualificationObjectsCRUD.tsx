@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Building, Car, Refrigerator, Snowflake, CheckSquare, Square, FileText, ExternalLink, MoreVertical, Play, Eye } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Building, Car, Refrigerator, Snowflake, CheckSquare, Square, FileText, ExternalLink, MoreVertical, Eye, Edit2, Play, BarChart3 } from 'lucide-react';
 import { QualificationObject, QualificationObjectTypeLabels } from '../../types/QualificationObject';
 import { qualificationObjectService } from '../../utils/qualificationObjectService';
 import { QualificationProtocolWithDocument } from '../../utils/qualificationProtocolService';
 import { QualificationObjectForm } from '../QualificationObjectForm';
+import { objectTypeMapping } from '../../utils/objectTypeMapping';
 // import { QualificationObjectsTable } from '../QualificationObjectsTable';
 
 interface QualificationObjectsCRUDProps {
@@ -23,6 +24,7 @@ interface QualificationObjectsCRUDProps {
   isCheckboxesBlocked?: boolean;
   onPageChange?: (page: string, data?: any) => void;
   onQualificationObjectStateChange?: (isOpen: boolean) => void;
+  showExecuteButton?: boolean; // Показывать кнопку "Выполнить" для страницы "Проведение испытаний"
 }
 
 export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> = ({ 
@@ -34,7 +36,8 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   qualificationProtocols = [],
   isCheckboxesBlocked = false,
   onPageChange,
-  onQualificationObjectStateChange
+  onQualificationObjectStateChange,
+  showExecuteButton = false
 }) => {
   const [objects, setObjects] = useState<QualificationObject[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,13 +45,16 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   const [editingObject, setEditingObject] = useState<QualificationObject | null>(null);
   const [viewingObject, setViewingObject] = useState<QualificationObject | null>(null);
   const [objectMode, setObjectMode] = useState<'view' | 'edit' | null>(null);
+  const [loadingObject, setLoadingObject] = useState(false);
   // const [showForm, setShowForm] = useState(false);
   const [selectedObjects, setSelectedObjects] = useState<Set<string>>(new Set());
 
-  // Отладочная информация для isCheckboxesBlocked
-  console.log('🔒 QualificationObjectsCRUD received isCheckboxesBlocked:', isCheckboxesBlocked);
-  console.log('🔒 QualificationObjectsCRUD - projectId:', projectId);
-  console.log('🔒 QualificationObjectsCRUD - objects count:', objects.length);
+  // Отладочная информация для isCheckboxesBlocked (только при изменении ключевых значений)
+  useEffect(() => {
+    console.log('🔒 QualificationObjectsCRUD received isCheckboxesBlocked:', isCheckboxesBlocked);
+    console.log('🔒 QualificationObjectsCRUD - projectId:', projectId);
+    console.log('🔒 QualificationObjectsCRUD - objects count:', objects.length);
+  }, [isCheckboxesBlocked, projectId, objects.length]);
 
   // Отслеживание изменений состояния объекта квалификации
   useEffect(() => {
@@ -60,7 +66,22 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
 
   // Получение протоколов для объекта квалификации по типу
   const getProtocolsForObjectType = (objectType: string): QualificationProtocolWithDocument[] => {
-    return qualificationProtocols.filter(protocol => protocol.objectType === objectType);
+    // Преобразуем русский тип объекта в английский для сравнения с протоколами из БД
+    const englishType = objectTypeMapping[objectType] || objectType;
+    
+    const filtered = qualificationProtocols.filter(protocol => {
+      // Протоколы из БД имеют objectType в английском формате (room, vehicle, etc.)
+      // Объекты квалификации имеют type в русском формате (помещение, автомобиль, etc.)
+      // Сравниваем оба варианта для совместимости
+      return protocol.objectType === englishType || protocol.objectType === objectType;
+    });
+    
+    console.log('QualificationObjectsCRUD: Протоколы для типа', objectType, '(англ:', englishType, '):', {
+      allProtocols: qualificationProtocols.map(p => ({ id: p.id, objectType: p.objectType })),
+      filtered: filtered.map(p => ({ id: p.id, objectType: p.objectType, hasDocument: !!p.document }))
+    });
+    
+    return filtered;
   };
 
   // Загрузка объектов квалификации
@@ -84,12 +105,17 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   }, [contractorId]);
 
   // Инициализация выбранных объектов на основе данных проекта
+  // Используем строку ID для стабильности зависимостей
+  const projectQualificationObjectIds = useMemo(() => {
+    return projectQualificationObjects.map(pqo => pqo.qualificationObjectId).sort().join(',');
+  }, [projectQualificationObjects]);
+
   useEffect(() => {
     if (projectQualificationObjects.length > 0) {
       const selectedIds = new Set(projectQualificationObjects.map(pqo => pqo.qualificationObjectId));
       setSelectedObjects(selectedIds);
     }
-  }, [projectQualificationObjects]);
+  }, [projectQualificationObjectIds, projectQualificationObjects]);
 
   // Создание нового объекта
   // const handleCreate = async (object: QualificationObject) => {
@@ -184,12 +210,12 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      {/* Object Form - отображается в верхней части */}
-      {(editingObject || viewingObject) && (
-        <div className="mb-6 bg-gray-50 border border-gray-200 rounded-lg p-6">
+      {/* Object Form - отображается только форма, если открыта */}
+      {(editingObject || viewingObject) ? (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">
-              {objectMode === 'view' ? 'Просмотр объекта квалификации' : 'Редактировать объект квалификации'}
+              {viewingObject ? 'Просмотр объекта квалификации' : 'Редактировать объект квалификации'}
             </h3>
             <button
               onClick={() => {
@@ -219,12 +245,13 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
             projectId={projectId}
             project={project}
             onPageChange={onPageChange}
-            mode={objectMode || 'edit'}
+            mode={viewingObject ? 'view' : (objectMode || 'edit')}
+            hideWorkSchedule={!showExecuteButton}
           />
         </div>
-      )}
-
-      <div className="flex items-center justify-between mb-6">
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Объекты квалификации</h2>
           {selectedObjects.size > 0 && (
@@ -387,63 +414,150 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                             </div>
                           );
                         }
-                        return objectProtocols.map((protocol) => (
-                          <div key={protocol.id} className="flex items-start space-x-2">
-                            <FileText className="w-4 h-4 text-blue-600 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <a
-                                href={protocol.document.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center space-x-1"
-                                title={`Открыть протокол: ${protocol.document.fileName}`}
-                              >
-                                <span className="truncate max-w-32">
-                                  {protocol.document.fileName}
-                                </span>
-                                <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                              </a>
-                              <div className="text-xs text-gray-500 mt-1">
-                                Загружен: {protocol.document.uploadedAt.toLocaleDateString('ru-RU')}
+                        return objectProtocols.map((protocol) => {
+                          // Проверяем наличие документа
+                          if (!protocol.document || !protocol.document.fileUrl) {
+                            return (
+                              <div key={protocol.id} className="text-sm text-gray-500 italic">
+                                Протокол без файла
+                              </div>
+                            );
+                          }
+                          
+                          return (
+                            <div key={protocol.id} className="flex items-start space-x-2">
+                              <FileText className="w-4 h-4 text-blue-600 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <a
+                                  href={protocol.document.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center space-x-1"
+                                  title={`Открыть протокол: ${protocol.document.fileName || 'Протокол'}`}
+                                >
+                                  <span className="truncate max-w-32">
+                                    {protocol.document.fileName || 'Протокол'}
+                                  </span>
+                                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                </a>
+                                {protocol.document.uploadedAt && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    Загружен: {new Date(protocol.document.uploadedAt).toLocaleDateString('ru-RU')}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
-                        ));
+                          );
+                        });
                       })()}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
                       <button
-                        onClick={() => {
-                          setViewingObject(obj);
-                          setObjectMode('view');
+                        onClick={async () => {
+                          try {
+                            setLoadingObject(true);
+                            // Загружаем полные данные объекта из API перед открытием просмотра
+                            const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id);
+                            setViewingObject(fullObject);
+                            setEditingObject(null); // Очищаем редактирование, если было открыто
+                            setObjectMode('view');
+                          } catch (error) {
+                            console.error('Ошибка загрузки объекта квалификации:', error);
+                            alert(`Ошибка загрузки объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+                          } finally {
+                            setLoadingObject(false);
+                          }
                         }}
-                        disabled={false} // Кнопка "Просмотр" всегда активна
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Просмотреть объект квалификации"
+                        disabled={loadingObject} // Блокируем кнопку во время загрузки
+                        className={`${loadingObject ? 'opacity-50 cursor-wait' : 'text-blue-600 hover:text-blue-900'}`}
+                        title={loadingObject ? 'Загрузка...' : 'Просмотреть объект квалификации'}
                       >
-                        <Eye className="w-4 h-4" />
+                        {loadingObject ? (
+                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
                       </button>
+                      {showExecuteButton && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              setLoadingObject(true);
+                              // Загружаем полные данные объекта из API перед открытием в режиме "выполнить"
+                              const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id);
+                              setEditingObject(fullObject);
+                              setViewingObject(null); // Очищаем просмотр, если было открыто
+                              setObjectMode('edit'); // Режим редактирования, но с отображением всех блоков
+                            } catch (error) {
+                              console.error('Ошибка загрузки объекта квалификации:', error);
+                              alert(`Ошибка загрузки объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+                            } finally {
+                              setLoadingObject(false);
+                            }
+                          }}
+                          disabled={loadingObject}
+                          className={`${
+                            loadingObject
+                              ? 'opacity-50 cursor-wait'
+                              : 'text-green-600 hover:text-green-900'
+                          }`}
+                          title={loadingObject ? 'Загрузка...' : 'Выполнить - открыть план графика и документы'}
+                        >
+                          {loadingObject ? (
+                            <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Play className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
                       <button
-                        onClick={() => {
-                          setEditingObject(obj);
-                          setObjectMode('edit');
+                        onClick={async () => {
+                          try {
+                            setLoadingObject(true);
+                            // Загружаем полные данные объекта из API перед открытием редактирования
+                            const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id);
+                            setEditingObject(fullObject);
+                            setViewingObject(null); // Очищаем просмотр, если было открыто
+                            setObjectMode('edit');
+                          } catch (error) {
+                            console.error('Ошибка загрузки объекта квалификации:', error);
+                            alert(`Ошибка загрузки объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+                          } finally {
+                            setLoadingObject(false);
+                          }
                         }}
-                        disabled={!selectedObjects.has(obj.id)} // Активна только для выбранных объектов
+                        disabled={loadingObject}
                         className={`${
-                          !selectedObjects.has(obj.id)
-                            ? 'text-gray-400 cursor-not-allowed opacity-50'
+                          loadingObject
+                            ? 'opacity-50 cursor-wait'
                             : 'text-indigo-600 hover:text-indigo-900'
                         }`}
-                        title={
-                          !selectedObjects.has(obj.id)
-                            ? 'Выполнение доступно только для выбранных объектов'
-                            : 'Выполнить'
-                        }
+                        title={loadingObject ? 'Загрузка...' : 'Редактировать объект квалификации'}
                       >
-                        <Play className="w-4 h-4" />
+                        {loadingObject ? (
+                          <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Edit2 className="w-4 h-4" />
+                        )}
                       </button>
+                      {onPageChange && project && (
+                        <button
+                          onClick={() => {
+                            if (onPageChange && project) {
+                              onPageChange('data_analysis', {
+                                project: project,
+                                qualificationObjectId: obj.id
+                              });
+                            }
+                          }}
+                          className="text-purple-600 hover:text-purple-900"
+                          title="Анализ данных"
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -456,9 +570,8 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
           <p className="text-gray-500">Объекты квалификации не найдены</p>
         </div>
       )}
-
-
-
+        </>
+      )}
     </div>
   );
 };

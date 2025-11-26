@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Project } from '../../types/Project';
 import { Contractor } from '../../types/Contractor';
-import { Phone, User, MapPin, Building2, Calendar } from 'lucide-react';
-import { projectPeriodService, ProjectPeriod } from '../../utils/projectPeriodService';
+import { Phone, User, MapPin, Building2 } from 'lucide-react';
 
 interface ProjectInfoProps {
   project: Project;
@@ -10,29 +9,6 @@ interface ProjectInfoProps {
 }
 
 export const ProjectInfo: React.FC<ProjectInfoProps> = ({ project, contractor }) => {
-  const [projectPeriod, setProjectPeriod] = useState<ProjectPeriod | null>(null);
-  const [loadingPeriod, setLoadingPeriod] = useState(false);
-
-  // Загрузка периода проведения проекта
-  useEffect(() => {
-    const loadProjectPeriod = async () => {
-      if (!projectPeriodService.isAvailable()) {
-        return;
-      }
-
-      setLoadingPeriod(true);
-      try {
-        const period = await projectPeriodService.getProjectPeriod(project.id);
-        setProjectPeriod(period);
-      } catch (error) {
-        console.error('Ошибка загрузки периода проекта:', error);
-      } finally {
-        setLoadingPeriod(false);
-      }
-    };
-
-    loadProjectPeriod();
-  }, [project.id]);
 
   // Функция для генерации ссылки на карту
   const getMapUrl = (address: string, latitude?: number, longitude?: number) => {
@@ -62,22 +38,6 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ project, contractor })
               <p className="text-gray-900">
                 {project.createdAt ? new Date(project.createdAt).toLocaleDateString('ru-RU') : 'Не указана'}
               </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 flex items-center">
-                <Calendar className="w-4 h-4 mr-1" />
-                Период проведения
-              </label>
-              {loadingPeriod ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mr-2"></div>
-                  <span className="text-gray-500 text-sm">Загрузка...</span>
-                </div>
-              ) : (
-                <p className="text-gray-900">
-                  {projectPeriod ? projectPeriodService.formatPeriod(projectPeriod) : 'Не установлен'}
-                </p>
-              )}
             </div>
           </div>
 

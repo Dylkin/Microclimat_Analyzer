@@ -71,7 +71,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Пользователи загружены из базы данных:', dbUsers.length);
     } catch (error) {
       console.error('Ошибка загрузки пользователей из БД:', error);
-      setError(`Ошибка загрузки пользователей: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      // Не устанавливаем ошибку, если это проблема подключения к серверу - используем fallback
+      if (!errorMessage.includes('Failed to fetch') && !errorMessage.includes('ERR_CONNECTION_REFUSED')) {
+        setError(`Ошибка загрузки пользователей: ${errorMessage}`);
+      }
       
       // Fallback к localStorage
       const savedUsers = localStorage.getItem('users');
@@ -137,16 +141,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       let foundUser: User | null = null;
 
-      // Сначала пытаемся авторизоваться через Supabase Auth
+      // Авторизация через API
       if (userService.isAvailable()) {
         try {
           foundUser = await userService.getUserByCredentials(email, password);
         } catch (error) {
-          console.error('Ошибка авторизации через Supabase Auth:', error);
+          console.error('Ошибка авторизации через API:', error);
         }
       }
 
-      // Если не найден через Supabase Auth, ищем в локальных данных (fallback)
+      // Если не найден через API, ищем в локальных данных (fallback)
       if (!foundUser) {
         foundUser = users.find(u => u.email === email && u.password === password) || null;
       }

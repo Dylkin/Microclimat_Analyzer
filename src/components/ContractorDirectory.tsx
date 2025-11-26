@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft, Eye } from 'lucide-react';
-import { Contractor, ContractorContact, CreateContractorData } from '../types/Contractor';
+import { Contractor, ContractorContact, CreateContractorData, ContractorRole, ContractorRoleLabels } from '../types/Contractor';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { ContractorMap } from './ContractorMap';
 import { QualificationObjectForm } from './QualificationObjectForm';
 import { QualificationObjectsTable } from './QualificationObjectsTable';
+import { Chip } from './ui/Chip';
 
 const ContractorDirectory: React.FC = () => {
   const [contractors, setContractors] = useState<Contractor[]>([]);
@@ -30,21 +31,28 @@ const ContractorDirectory: React.FC = () => {
   const [qualificationSearchTerm, setQualificationSearchTerm] = useState('');
   const [showAddQualificationForm, setShowAddQualificationForm] = useState(false);
   const [editingQualificationObject, setEditingQualificationObject] = useState<QualificationObject | null>(null);
+  const [viewingQualificationObject, setViewingQualificationObject] = useState<QualificationObject | null>(null);
 
   // Form state
   const [newContractor, setNewContractor] = useState<CreateContractorData>({
     name: '',
     address: '',
+    role: [],
+    tags: [],
     contacts: []
   });
 
   const [editContractor, setEditContractor] = useState<{
     name: string;
     address: string;
+    role: ContractorRole[];
+    tags: string[];
     contacts: Omit<ContractorContact, 'id' | 'contractorId' | 'createdAt'>[];
   }>({
     name: '',
     address: '',
+    role: [],
+    tags: [],
     contacts: []
   });
 
@@ -157,6 +165,7 @@ const ContractorDirectory: React.FC = () => {
     }
 
     setOperationLoading(true);
+    setError(null);
     try {
       const addedContractor = await contractorService.addContractor(newContractor);
       setContractors(prev => [...prev, addedContractor]);
@@ -165,11 +174,16 @@ const ContractorDirectory: React.FC = () => {
       setNewContractor({
         name: '',
         address: '',
+        role: [],
+        tags: [],
         contacts: []
       });
       setShowAddForm(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка добавления контрагента:', error);
+      const errorMessage = error?.message || error?.details || 'Неизвестная ошибка при добавлении контрагента';
+      setError(errorMessage);
+      alert(`Ошибка добавления контрагента: ${errorMessage}`);
     } finally {
       setOperationLoading(false);
     }
@@ -180,6 +194,8 @@ const ContractorDirectory: React.FC = () => {
     setEditContractor({
       name: contractor.name,
       address: contractor.address || '',
+      role: contractor.role || [],
+      tags: contractor.tags || [],
       contacts: contractor.contacts.map(contact => ({
         employeeName: contact.employeeName,
         phone: contact.phone || '',
@@ -201,7 +217,9 @@ const ContractorDirectory: React.FC = () => {
       // Сначала обновляем основную информацию контрагента
       const updatedContractor = await contractorService.updateContractor(editingContractorData!.id, {
         name: editContractor.name,
-        address: editContractor.address || undefined
+        address: editContractor.address || undefined,
+        role: editContractor.role && editContractor.role.length > 0 ? editContractor.role : undefined,
+        tags: editContractor.tags && editContractor.tags.length > 0 ? editContractor.tags : []
       });
       
       // Удаляем старые контакты
@@ -388,7 +406,7 @@ const ContractorDirectory: React.FC = () => {
     const onSubmit = isEdit ? handleSaveEdit : handleAddContractor;
     const onCancel = isEdit ? () => {
       setEditingContractorData(null);
-      setEditContractor({ name: '', address: '', contacts: [] });
+      setEditContractor({ name: '', address: '', role: [], tags: [], contacts: [] });
       setQualificationObjects([]);
       setFilteredQualificationObjects([]);
       setQualificationSearchTerm('');
@@ -434,6 +452,78 @@ const ContractorDirectory: React.FC = () => {
                 onChange={(e) => setFormData((prev: any) => ({ ...prev, address: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Введите адрес (будет геокодирован автоматически)"
+              />
+            </div>
+          </div>
+
+          {/* Роль */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Роль
+            </label>
+            <div className="flex space-x-6">
+              {(['supplier', 'buyer'] as ContractorRole[]).map((role) => (
+                <label key={role} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.role?.includes(role) || false}
+                    onChange={(e) => {
+                      const currentRoles = formData.role || [];
+                      if (e.target.checked) {
+                        setFormData((prev: any) => ({ ...prev, role: [...currentRoles, role] }));
+                      } else {
+                        setFormData((prev: any) => ({ ...prev, role: currentRoles.filter((r: ContractorRole) => r !== role) }));
+                      }
+                    }}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-gray-700">{ContractorRoleLabels[role]}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Теги */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Теги
+            </label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {(formData as any).tags && (formData as any).tags.length > 0 ? (
+                (formData as any).tags.map((tag: string, index: number) => (
+                  <Chip
+                    key={`${tag}-${index}`}
+                    label={tag}
+                    size="sm"
+                    variant="primary"
+                    onRemove={() =>
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        tags: prev.tags.filter((t: string, i: number) => i !== index)
+                      }))
+                    }
+                  />
+                ))
+              ) : (
+                <span className="text-xs text-gray-400">Теги не заданы</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                placeholder="Введите тег и нажмите Enter"
+                onKeyDown={(e) => {
+                  const value = (e.target as HTMLInputElement).value.trim();
+                  if (e.key === 'Enter' && value) {
+                    e.preventDefault();
+                    setFormData((prev: any) => ({
+                      ...prev,
+                      tags: prev.tags ? [...prev.tags, value] : [value]
+                    }));
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }}
               />
             </div>
           </div>
@@ -564,7 +654,7 @@ const ContractorDirectory: React.FC = () => {
                   setShowAddForm(false);
                 } else if (editingContractorData) {
                   setEditingContractorData(null);
-                  setEditContractor({ name: '', address: '', contacts: [] });
+                  setEditContractor({ name: '', address: '', role: [], tags: [], contacts: [] });
                   setQualificationObjects([]);
                   setFilteredQualificationObjects([]);
                   setQualificationSearchTerm('');
@@ -632,6 +722,9 @@ const ContractorDirectory: React.FC = () => {
                     Контрагент
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Роль
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Адрес
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -647,10 +740,33 @@ const ContractorDirectory: React.FC = () => {
                   <tr key={contractor.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{contractor.name}</div>
+                        <div
+                          className="text-sm font-medium text-gray-900 cursor-help"
+                          title={contractor.name}
+                        >
+                          {contractor.name.length > 30
+                            ? `${contractor.name.substring(0, 30)}...`
+                            : contractor.name}
+                        </div>
                         <div className="text-xs text-gray-500">
                           Создан: {contractor.createdAt.toLocaleDateString('ru-RU')}
                         </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-wrap gap-1">
+                        {contractor.role && contractor.role.length > 0 ? (
+                          contractor.role.map((role) => (
+                            <span
+                              key={role}
+                              className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800"
+                            >
+                              {ContractorRoleLabels[role]}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-400">Не указана</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -773,7 +889,7 @@ const ContractorDirectory: React.FC = () => {
                 <button
                   onClick={() => {
                     setEditingContractorData(null);
-                    setEditContractor({ name: '', address: '', contacts: [] });
+                    setEditContractor({ name: '', address: '', role: [], tags: [], contacts: [] });
                     setQualificationObjects([]);
                     setFilteredQualificationObjects([]);
                     setQualificationSearchTerm('');
@@ -878,6 +994,24 @@ const ContractorDirectory: React.FC = () => {
                     </div>
                   )}
                 </div>
+                {/* Теги */}
+                <div>
+                  <label className="block text-xs text-gray-500">Теги</label>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {viewingContractor.tags && viewingContractor.tags.length > 0 ? (
+                      viewingContractor.tags.map((tag, index) => (
+                        <Chip
+                          key={`${tag}-${index}`}
+                          label={tag}
+                          size="sm"
+                          variant="primary"
+                        />
+                      ))
+                    ) : (
+                      <span className="text-xs text-gray-400">Теги не заданы</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -916,21 +1050,33 @@ const ContractorDirectory: React.FC = () => {
           </div>
 
           {/* Объекты квалификации для просматриваемого контрагента */}
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Объекты квалификации</h3>
-            
-            <QualificationObjectsTable
-              objects={filteredQualificationObjects}
-              onAdd={() => {}}
-              onEdit={() => {}}
-              onDelete={() => {}}
-              onShowOnMap={(obj) => {
-                console.log('Show on map:', obj);
-              }}
-              loading={loading}
-              hideAddButton={true}
-            />
-          </div>
+          {!(viewingContractor.role && viewingContractor.role.includes('supplier') && !viewingContractor.role.includes('buyer')) && (
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Объекты квалификации</h3>
+              
+              <QualificationObjectsTable
+                objects={filteredQualificationObjects}
+                onAdd={() => {}}
+                onEdit={() => {}}
+                onDelete={() => {}}
+                onShowOnMap={(obj) => {
+                  console.log('Show on map:', obj);
+                }}
+                loading={loading}
+                hideAddButton={true}
+                viewMode={true}
+                onView={(obj) => {
+                  setViewingQualificationObject(obj);
+                }}
+                viewingQualificationObject={viewingQualificationObject}
+                onCancelQualificationObjectView={() => {
+                  setViewingQualificationObject(null);
+                }}
+                contractorId={viewingContractor?.id}
+                contractorAddress={viewingContractor?.address}
+              />
+            </div>
+          )}
 
           <div className="flex justify-end mt-6">
             <button
@@ -939,6 +1085,7 @@ const ContractorDirectory: React.FC = () => {
                 setQualificationObjects([]);
                 setFilteredQualificationObjects([]);
                 setQualificationSearchTerm('');
+                setViewingQualificationObject(null);
               }}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >

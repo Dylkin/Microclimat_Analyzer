@@ -1,71 +1,46 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from './apiClient';
 import { AuditLog, CreateAuditLogData, AuditAction, AuditEntityType } from '../types/AuditLog';
 
 class AuditService {
-  private supabase: any;
-
-  constructor() {
-    this.supabase = supabase;
-  }
-
-  /**
-   * Проверяет доступность Supabase
-   */
   isAvailable(): boolean {
-    return !!this.supabase;
+    return true; // API всегда доступен
   }
 
   /**
    * Создает запись аудита
    */
   async createAuditLog(data: CreateAuditLogData): Promise<AuditLog> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
-      const auditData = {
-        user_id: data.userId,
-        user_name: data.userName,
-        user_role: data.userRole,
+      const auditLog = await apiClient.post<any>('/audit-logs', {
+        userId: data.userId,
+        userName: data.userName,
+        userRole: data.userRole,
         action: data.action,
-        entity_type: data.entityType,
-        entity_id: data.entityId,
-        entity_name: data.entityName,
+        entityType: data.entityType,
+        entityId: data.entityId,
+        entityName: data.entityName,
         details: data.details || null,
-        ip_address: data.ipAddress || null,
-        user_agent: data.userAgent || null,
-        timestamp: new Date().toISOString()
-      };
-
-      const { data: auditLog, error } = await this.supabase
-        .from('audit_logs')
-        .insert(auditData)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Ошибка создания записи аудита:', error);
-        throw new Error(`Ошибка создания записи аудита: ${error.message}`);
-      }
+        ipAddress: data.ipAddress || null,
+        userAgent: data.userAgent || null
+      });
 
       return {
         id: auditLog.id,
-        userId: auditLog.user_id,
-        userName: auditLog.user_name,
-        userRole: auditLog.user_role,
+        userId: auditLog.userId || auditLog.user_id,
+        userName: auditLog.userName || auditLog.user_name,
+        userRole: auditLog.userRole || auditLog.user_role,
         action: auditLog.action as AuditAction,
-        entityType: auditLog.entity_type as AuditEntityType,
-        entityId: auditLog.entity_id,
-        entityName: auditLog.entity_name,
-        details: auditLog.details,
-        timestamp: new Date(auditLog.timestamp),
-        ipAddress: auditLog.ip_address,
-        userAgent: auditLog.user_agent
+        entityType: auditLog.entityType || auditLog.entity_type as AuditEntityType,
+        entityId: auditLog.entityId || auditLog.entity_id,
+        entityName: auditLog.entityName || auditLog.entity_name,
+        details: auditLog.details || auditLog.changes,
+        timestamp: auditLog.timestamp ? new Date(auditLog.timestamp) : (auditLog.created_at ? new Date(auditLog.created_at) : new Date()),
+        ipAddress: auditLog.ipAddress || auditLog.ip_address,
+        userAgent: auditLog.userAgent || auditLog.user_agent
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка в createAuditLog:', error);
-      throw error;
+      throw new Error(`Ошибка создания записи аудита: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
@@ -82,77 +57,44 @@ class AuditService {
     limit?: number;
     offset?: number;
   }): Promise<AuditLog[]> {
-    if (!this.supabase) {
-      console.error('AuditService: Supabase не настроен');
-      throw new Error('Supabase не настроен');
-    }
-
     console.log('AuditService: Начинаем загрузку логов аудита с фильтрами:', filters);
 
     try {
-      let query = this.supabase
-        .from('audit_logs')
-        .select('*')
-        .order('timestamp', { ascending: false });
+      const params = new URLSearchParams();
+      
+      if (filters?.userId) params.append('user_id', filters.userId);
+      if (filters?.action) params.append('action', filters.action);
+      if (filters?.entityType) params.append('entity_type', filters.entityType);
+      if (filters?.entityId) params.append('entity_id', filters.entityId);
+      if (filters?.startDate) params.append('start_date', filters.startDate.toISOString());
+      if (filters?.endDate) params.append('end_date', filters.endDate.toISOString());
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset) params.append('offset', filters.offset.toString());
 
-      if (filters?.userId) {
-        query = query.eq('user_id', filters.userId);
-      }
+      const queryString = params.toString();
+      const url = queryString ? `/audit-logs?${queryString}` : '/audit-logs';
+      
+      const data = await apiClient.get<any[]>(url);
 
-      if (filters?.action) {
-        query = query.eq('action', filters.action);
-      }
-
-      if (filters?.entityType) {
-        query = query.eq('entity_type', filters.entityType);
-      }
-
-      if (filters?.entityId) {
-        query = query.eq('entity_id', filters.entityId);
-      }
-
-      if (filters?.startDate) {
-        query = query.gte('timestamp', filters.startDate.toISOString());
-      }
-
-      if (filters?.endDate) {
-        query = query.lte('timestamp', filters.endDate.toISOString());
-      }
-
-      if (filters?.limit) {
-        query = query.limit(filters.limit);
-      }
-
-      if (filters?.offset) {
-        query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
-      }
-
-      const { data, error } = await query;
-
-      console.log('AuditService: Результат запроса:', { data, error });
-
-      if (error) {
-        console.error('AuditService: Ошибка получения логов аудита:', error);
-        throw new Error(`Ошибка получения логов аудита: ${error.message}`);
-      }
+      console.log('AuditService: Результат запроса:', { count: data.length });
 
       return data.map((log: any) => ({
         id: log.id,
-        userId: log.user_id,
-        userName: log.user_name,
-        userRole: log.user_role,
+        userId: log.userId || log.user_id,
+        userName: log.userName || log.user_name,
+        userRole: log.userRole || log.user_role,
         action: log.action as AuditAction,
-        entityType: log.entity_type as AuditEntityType,
-        entityId: log.entity_id,
-        entityName: log.entity_name,
-        details: log.details,
-        timestamp: new Date(log.timestamp),
-        ipAddress: log.ip_address,
-        userAgent: log.user_agent
+        entityType: log.entityType || log.entity_type as AuditEntityType,
+        entityId: log.entityId || log.entity_id,
+        entityName: log.entityName || log.entity_name,
+        details: log.details || log.changes,
+        timestamp: log.timestamp ? new Date(log.timestamp) : (log.created_at ? new Date(log.created_at) : new Date()),
+        ipAddress: log.ipAddress || log.ip_address,
+        userAgent: log.userAgent || log.user_agent
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка в getAuditLogs:', error);
-      throw error;
+      throw new Error(`Ошибка получения логов аудита: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 
@@ -164,33 +106,23 @@ class AuditService {
     actionsByType: Record<string, number>;
     lastActivity: Date | null;
   }> {
-    if (!this.supabase) {
-      throw new Error('Supabase не настроен');
-    }
-
     try {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const { data, error } = await this.supabase
-        .from('audit_logs')
-        .select('action, timestamp')
-        .eq('user_id', userId)
-        .gte('timestamp', startDate.toISOString())
-        .order('timestamp', { ascending: false });
-
-      if (error) {
-        console.error('Ошибка получения статистики аудита:', error);
-        throw new Error(`Ошибка получения статистики аудита: ${error.message}`);
-      }
+      const data = await this.getAuditLogs({
+        userId,
+        startDate,
+        limit: 1000
+      });
 
       const actionsByType: Record<string, number> = {};
       let lastActivity: Date | null = null;
 
-      data.forEach((log: any) => {
+      data.forEach((log) => {
         actionsByType[log.action] = (actionsByType[log.action] || 0) + 1;
-        if (!lastActivity) {
-          lastActivity = new Date(log.timestamp);
+        if (!lastActivity || log.timestamp > lastActivity) {
+          lastActivity = log.timestamp;
         }
       });
 
@@ -199,9 +131,9 @@ class AuditService {
         actionsByType,
         lastActivity
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка в getUserAuditStats:', error);
-      throw error;
+      throw new Error(`Ошибка получения статистики аудита: ${error.message || 'Неизвестная ошибка'}`);
     }
   }
 

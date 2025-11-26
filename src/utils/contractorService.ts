@@ -43,9 +43,19 @@ class ContractorService {
   async getAllContractors(): Promise<Contractor[]> {
     try {
       console.log('Загружаем контрагентов...');
-      const contractors = await apiClient.get<Contractor[]>('/contractors');
+      const contractors = await apiClient.get<any[]>('/contractors');
       console.log('Контрагенты загружены:', contractors.length);
-      return contractors;
+      
+      // Преобразуем даты из строк в Date объекты
+      return contractors.map(contractor => ({
+        ...contractor,
+        createdAt: contractor.createdAt ? new Date(contractor.createdAt) : new Date(),
+        updatedAt: contractor.updatedAt ? new Date(contractor.updatedAt) : new Date(),
+        contacts: (contractor.contacts || []).map((contact: any) => ({
+          ...contact,
+          createdAt: contact.createdAt ? new Date(contact.createdAt) : new Date()
+        }))
+      }));
     } catch (error) {
       console.error('Ошибка получения контрагентов:', error);
       throw error;
@@ -56,8 +66,18 @@ class ContractorService {
   async getContractorById(contractorId: string): Promise<Contractor> {
     try {
       console.log('Загружаем контрагента по ID:', contractorId);
-      const contractor = await apiClient.get<Contractor>(`/contractors/${contractorId}`);
-      return contractor;
+      const contractor = await apiClient.get<any>(`/contractors/${contractorId}`);
+      
+      // Преобразуем даты из строк в Date объекты
+      return {
+        ...contractor,
+        createdAt: contractor.createdAt ? new Date(contractor.createdAt) : new Date(),
+        updatedAt: contractor.updatedAt ? new Date(contractor.updatedAt) : new Date(),
+        contacts: (contractor.contacts || []).map((contact: any) => ({
+          ...contact,
+          createdAt: contact.createdAt ? new Date(contact.createdAt) : new Date()
+        }))
+      };
     } catch (error) {
       console.error('Ошибка получения контрагента:', error);
       throw error;
@@ -75,23 +95,41 @@ class ContractorService {
         geocodeResult = await this.geocodeAddress(contractorData.address);
       }
 
-      const contractor = await apiClient.post<Contractor>('/contractors', {
+      const contractor = await apiClient.post<any>('/contractors', {
         name: contractorData.name,
         address: contractorData.address || null,
-        contacts: contractorData.contacts || []
+        role: contractorData.role && contractorData.role.length > 0 ? contractorData.role : null,
+        // Теги пока не поддерживаются на бэкенде явно, но можем отправлять их для будущей совместимости
+        tags: contractorData.tags && contractorData.tags.length > 0 ? contractorData.tags : undefined,
+        contacts: (contractorData.contacts || []).map(contact => ({
+          employeeName: contact.employeeName,
+          phone: contact.phone || null,
+          comment: contact.comment || null
+        }))
       });
+
+      // Преобразуем даты из строк в Date объекты
+      const mappedContractor: Contractor = {
+        ...contractor,
+        createdAt: contractor.createdAt ? new Date(contractor.createdAt) : new Date(),
+        updatedAt: contractor.updatedAt ? new Date(contractor.updatedAt) : new Date(),
+        contacts: (contractor.contacts || []).map((contact: any) => ({
+          ...contact,
+          createdAt: contact.createdAt ? new Date(contact.createdAt) : new Date()
+        }))
+      };
 
       // Если геокодирование выполнено, обновляем координаты
       if (geocodeResult) {
-        return await this.updateContractor(contractor.id, {
+        return await this.updateContractor(mappedContractor.id, {
           latitude: geocodeResult.latitude,
           longitude: geocodeResult.longitude,
           geocodedAt: new Date()
         });
       }
 
-      console.log('Контрагент успешно добавлен:', contractor);
-      return contractor;
+      console.log('Контрагент успешно добавлен:', mappedContractor);
+      return mappedContractor;
     } catch (error) {
       console.error('Ошибка при добавлении контрагента:', error);
       throw error;
@@ -101,18 +139,18 @@ class ContractorService {
   // Обновление контрагента
   async updateContractor(id: string, updates: UpdateContractorData): Promise<Contractor> {
     try {
-      // Если адрес изменился, выполняем геокодирование
-      if (updates.address !== undefined && updates.address) {
-        const geocodeResult = await this.geocodeAddress(updates.address);
-        if (geocodeResult) {
-          updates.latitude = geocodeResult.latitude;
-          updates.longitude = geocodeResult.longitude;
-          updates.geocodedAt = new Date();
-        }
-      }
-
-      const contractor = await apiClient.put<Contractor>(`/contractors/${id}`, updates);
-      return contractor;
+      const contractor = await apiClient.put<any>(`/contractors/${id}`, updates);
+      
+      // Преобразуем даты из строк в Date объекты
+      return {
+        ...contractor,
+        createdAt: contractor.createdAt ? new Date(contractor.createdAt) : new Date(),
+        updatedAt: contractor.updatedAt ? new Date(contractor.updatedAt) : new Date(),
+        contacts: (contractor.contacts || []).map((contact: any) => ({
+          ...contact,
+          createdAt: contact.createdAt ? new Date(contact.createdAt) : new Date()
+        }))
+      };
     } catch (error) {
       console.error('Ошибка при обновлении контрагента:', error);
       throw error;
@@ -131,23 +169,58 @@ class ContractorService {
 
   // Добавление контакта к контрагенту
   async addContact(contractorId: string, contactData: Omit<ContractorContact, 'id' | 'contractorId' | 'createdAt'>): Promise<ContractorContact> {
-    // Пока не реализовано на backend, возвращаем заглушку
-    console.warn('addContact не реализован на backend');
-    throw new Error('Функция добавления контакта не реализована на backend');
+    try {
+      const contact = await apiClient.post<any>(`/contractors/${contractorId}/contacts`, {
+        employeeName: contactData.employeeName,
+        phone: contactData.phone || null,
+        comment: contactData.comment || null
+      });
+
+      return {
+        id: contact.id,
+        contractorId: contact.contractorId || contact.contractor_id,
+        employeeName: contact.employeeName || contact.employee_name,
+        phone: contact.phone || undefined,
+        comment: contact.comment || undefined,
+        createdAt: contact.createdAt ? new Date(contact.createdAt) : (contact.created_at ? new Date(contact.created_at) : new Date())
+      };
+    } catch (error: any) {
+      console.error('Ошибка при добавлении контакта:', error);
+      throw new Error(`Ошибка добавления контакта: ${error.message || 'Неизвестная ошибка'}`);
+    }
   }
 
   // Обновление контакта
   async updateContact(id: string, updates: Partial<Omit<ContractorContact, 'id' | 'contractorId' | 'createdAt'>>): Promise<ContractorContact> {
-    // Пока не реализовано на backend, возвращаем заглушку
-    console.warn('updateContact не реализован на backend');
-    throw new Error('Функция обновления контакта не реализована на backend');
+    try {
+      const contact = await apiClient.put<any>(`/contractors/contacts/${id}`, {
+        employeeName: updates.employeeName,
+        phone: updates.phone,
+        comment: updates.comment
+      });
+
+      return {
+        id: contact.id,
+        contractorId: contact.contractorId || contact.contractor_id,
+        employeeName: contact.employeeName || contact.employee_name,
+        phone: contact.phone || undefined,
+        comment: contact.comment || undefined,
+        createdAt: contact.createdAt ? new Date(contact.createdAt) : (contact.created_at ? new Date(contact.created_at) : new Date())
+      };
+    } catch (error: any) {
+      console.error('Ошибка при обновлении контакта:', error);
+      throw new Error(`Ошибка обновления контакта: ${error.message || 'Неизвестная ошибка'}`);
+    }
   }
 
   // Удаление контакта
   async deleteContact(id: string): Promise<void> {
-    // Пока не реализовано на backend, возвращаем заглушку
-    console.warn('deleteContact не реализован на backend');
-    throw new Error('Функция удаления контакта не реализована на backend');
+    try {
+      await apiClient.delete(`/contractors/contacts/${id}`);
+    } catch (error: any) {
+      console.error('Ошибка при удалении контакта:', error);
+      throw new Error(`Ошибка удаления контакта: ${error.message || 'Неизвестная ошибка'}`);
+    }
   }
 }
 

@@ -30,6 +30,8 @@ interface QualificationWorkScheduleProps {
   projectId?: string;
   project?: any; // Добавляем полный объект проекта
   onPageChange?: (page: string, data?: any) => void;
+  mode?: 'view' | 'edit'; // Режим просмотра или редактирования
+  hideTestDocuments?: boolean; // Скрыть блок "Документы по испытанию" и "Информация о расписании"
 }
 
 const QUALIFICATION_STAGES: Omit<QualificationWorkStage, 'id' | 'startDate' | 'endDate' | 'isCompleted'>[] = [
@@ -68,7 +70,9 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   qualificationObjectName,
   projectId,
   project,
-  onPageChange
+  onPageChange,
+  mode = 'edit',
+  hideTestDocuments = false
 }) => {
   const { user } = useAuth();
   const [stages, setStages] = useState<QualificationWorkStage[]>([]);
@@ -80,7 +84,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   const [testDocuments, setTestDocuments] = useState<File[]>([]);
   const [loggerRemovalFiles, setLoggerRemovalFiles] = useState<{ [key: string]: File | null }>({});
   const [storageFiles, setStorageFiles] = useState<{ [key: string]: { name: string; url: string; size: number; lastModified: string } }>({});
-  const [parsingStatus, setParsingStatus] = useState<{ [key: string]: 'idle' | 'parsing' | 'completed' | 'error' }>({});
+  const [parsingStatus, setParsingStatus] = useState<{ [key: string]: 'parsing' | 'completed' | 'error' | 'processing' | undefined }>({});
   const [parsingResults, setParsingResults] = useState<{ [key: string]: { recordCount: number; error?: string } }>({});
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [parsingProgress, setParsingProgress] = useState<{ [key: string]: number }>({});
@@ -134,12 +138,59 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
             endDateType: typeof stage.endDate
           });
           
+          // Форматируем даты для input type="date" (YYYY-MM-DD)
+          // Используем локальное время, чтобы избежать проблем с часовыми поясами
+          const formatDateForInput = (date: string | Date | null | undefined): string => {
+            if (!date) return '';
+            if (typeof date === 'string') {
+              // Если это ISO строка, извлекаем только дату (но нужно учесть часовой пояс)
+              if (date.includes('T')) {
+                // Парсим ISO строку и используем локальное время
+                const d = new Date(date);
+                if (!isNaN(d.getTime())) {
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  return `${year}-${month}-${day}`;
+                }
+                // Если парсинг не удался, просто извлекаем дату из строки
+                return date.split('T')[0];
+              }
+              // Если это уже в формате YYYY-MM-DD, возвращаем как есть
+              if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+                return date;
+              }
+              // Пытаемся распарсить и отформатировать
+              try {
+                const d = new Date(date);
+                if (!isNaN(d.getTime())) {
+                  // Используем локальное время вместо UTC
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  return `${year}-${month}-${day}`;
+                }
+              } catch (e) {
+                console.warn('Ошибка форматирования даты:', date, e);
+              }
+              return '';
+            }
+            if (date instanceof Date) {
+              // Используем локальное время вместо UTC
+              const year = date.getFullYear();
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              const day = String(date.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }
+            return '';
+          };
+          
           return {
             id: stage.id,
             name: stage.stageName,
             description: stage.stageDescription,
-            startDate: stage.startDate || '',
-            endDate: stage.endDate || '',
+            startDate: formatDateForInput(stage.startDate),
+            endDate: formatDateForInput(stage.endDate),
             isCompleted: stage.isCompleted,
             completedAt: stage.completedAt || undefined,
             completedBy: stage.completedBy || undefined,
@@ -165,12 +216,59 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         const allStages = await qualificationWorkScheduleService.createAllStages(qualificationObjectId, projectId);
         
         // Преобразуем данные из базы в формат компонента
+        // Форматируем даты для input type="date" (YYYY-MM-DD)
+        // Используем локальное время, чтобы избежать проблем с часовыми поясами
+        const formatDateForInput = (date: string | Date | null | undefined): string => {
+          if (!date) return '';
+          if (typeof date === 'string') {
+            // Если это ISO строка, извлекаем только дату (но нужно учесть часовой пояс)
+            if (date.includes('T')) {
+              // Парсим ISO строку и используем локальное время
+              const d = new Date(date);
+              if (!isNaN(d.getTime())) {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+              }
+              // Если парсинг не удался, просто извлекаем дату из строки
+              return date.split('T')[0];
+            }
+            // Если это уже в формате YYYY-MM-DD, возвращаем как есть
+            if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+              return date;
+            }
+            // Пытаемся распарсить и отформатировать
+            try {
+              const d = new Date(date);
+              if (!isNaN(d.getTime())) {
+                // Используем локальное время вместо UTC
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+              }
+            } catch (e) {
+              console.warn('Ошибка форматирования даты:', date, e);
+            }
+            return '';
+          }
+          if (date instanceof Date) {
+            // Используем локальное время вместо UTC
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          }
+          return '';
+        };
+        
         const convertedStages = allStages.map(stage => ({
           id: stage.id,
           name: stage.stageName,
           description: stage.stageDescription,
-          startDate: stage.startDate || '',
-          endDate: stage.endDate || '',
+          startDate: formatDateForInput(stage.startDate),
+          endDate: formatDateForInput(stage.endDate),
           isCompleted: stage.isCompleted,
           completedAt: stage.completedAt || undefined,
           completedBy: stage.completedBy || undefined,
@@ -237,13 +335,36 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         console.log('Загруженные сводки данных логгеров:', summaries);
         
         // Обновляем статусы парсинга
-        const statusMap: { [key: string]: 'idle' | 'parsing' | 'completed' | 'error' } = {};
+        const statusMap: { [key: string]: 'parsing' | 'completed' | 'error' | 'processing' | undefined } = {};
         const resultsMap: { [key: string]: { recordCount: number; error?: string } } = {};
         
         // Группируем записи по fileKey и берем последнюю (самую свежую) запись
         const groupedSummaries = new Map<string, any>();
         summaries.forEach(summary => {
-          const fileKey = getLoggerRemovalFileKey(summary.zone_number, summary.measurement_level);
+          // Нормализуем measurement_level перед созданием ключа
+          const normalizedLevel = summary.measurement_level !== null && summary.measurement_level !== undefined
+            ? (typeof summary.measurement_level === 'string' ? parseFloat(summary.measurement_level) : Number(summary.measurement_level))
+            : null;
+          
+          // Нормализуем zone_number
+          const normalizedZone = summary.zone_number !== null && summary.zone_number !== undefined
+            ? (typeof summary.zone_number === 'string' ? parseInt(summary.zone_number, 10) : Number(summary.zone_number))
+            : null;
+          
+          const fileKey = getLoggerRemovalFileKey(normalizedZone, normalizedLevel);
+          
+          console.log('QualificationWorkSchedule: Создание ключа для сводки:', {
+            zone_number: summary.zone_number,
+            zone_number_type: typeof summary.zone_number,
+            normalizedZone,
+            measurement_level: summary.measurement_level,
+            measurement_level_type: typeof summary.measurement_level,
+            normalizedLevel,
+            fileKey,
+            fileName: summary.file_name,
+            parsing_status: summary.parsing_status
+          });
+          
           // Если запись уже есть, берем ту, у которой больше record_count (более свежая)
           if (!groupedSummaries.has(fileKey) || summary.record_count > groupedSummaries.get(fileKey).record_count) {
             groupedSummaries.set(fileKey, summary);
@@ -254,26 +375,58 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         const progressMap: { [key: string]: number } = {};
         
         groupedSummaries.forEach((summary, fileKey) => {
-          console.log(`Загружен статус для ${fileKey}:`, {
+          // Пересчитываем ключ для проверки с правильной нормализацией
+          const normalizedLevel = summary.measurement_level !== null && summary.measurement_level !== undefined
+            ? (typeof summary.measurement_level === 'string' ? parseFloat(summary.measurement_level) : Number(summary.measurement_level))
+            : null;
+          const normalizedZone = summary.zone_number !== null && summary.zone_number !== undefined
+            ? (typeof summary.zone_number === 'string' ? parseInt(summary.zone_number, 10) : Number(summary.zone_number))
+            : null;
+          const recalculatedKey = getLoggerRemovalFileKey(normalizedZone, normalizedLevel);
+          
+          console.log(`QualificationWorkSchedule: Загружен статус для ${fileKey}:`, {
             fileKey,
             zone_number: summary.zone_number,
+            zone_number_type: typeof summary.zone_number,
+            normalizedZone,
             measurement_level: summary.measurement_level,
             measurement_level_type: typeof summary.measurement_level,
+            normalizedLevel,
             parsing_status: summary.parsing_status,
             record_count: summary.record_count,
-            file_name: summary.file_name
+            file_name: summary.file_name,
+            // Проверяем формирование ключа
+            recalculatedKey,
+            keysMatch: fileKey === recalculatedKey
           });
-          statusMap[fileKey] = summary.parsing_status as 'idle' | 'parsing' | 'completed' | 'error';
-          resultsMap[fileKey] = {
+          
+          // Используем пересчитанный ключ, если он отличается от исходного
+          const finalKey = fileKey !== recalculatedKey ? recalculatedKey : fileKey;
+          
+          if (fileKey !== recalculatedKey) {
+            console.warn(`QualificationWorkSchedule: Ключи не совпадают! Используем пересчитанный ключ. fileKey: ${fileKey}, recalculatedKey: ${recalculatedKey}`);
+          }
+          
+          statusMap[finalKey] = summary.parsing_status as 'parsing' | 'completed' | 'error' | 'processing' | undefined;
+          resultsMap[finalKey] = {
             recordCount: summary.record_count,
             error: summary.error_message || undefined
           };
           
           // Если статус completed, устанавливаем прогресс на 100%
           if (summary.parsing_status === 'completed') {
-            progressMap[fileKey] = 100;
+            progressMap[finalKey] = 100;
           }
         });
+        
+        console.log('QualificationWorkSchedule: Итоговые ключи статусов из БД:', Object.keys(statusMap));
+        console.log('QualificationWorkSchedule: Все сводки из БД:', summaries.map(s => ({
+          zone: s.zone_number,
+          level: s.measurement_level,
+          fileKey: getLoggerRemovalFileKey(s.zone_number, s.measurement_level),
+          status: s.parsing_status,
+          fileName: s.file_name
+        })));
         
         // Обновляем прогресс одним вызовом
         if (Object.keys(progressMap).length > 0) {
@@ -283,13 +436,25 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
           }));
         }
         
-        console.log('Обновляем статусы парсинга:', statusMap);
-        console.log('Доступные ключи статусов:', Object.keys(statusMap));
-        console.log('Текущие статусы парсинга:', parsingStatus);
+        console.log('QualificationWorkSchedule: Обновляем статусы парсинга:', statusMap);
+        console.log('QualificationWorkSchedule: Доступные ключи статусов из БД:', Object.keys(statusMap));
+        console.log('QualificationWorkSchedule: Текущие локальные статусы парсинга:', parsingStatus);
+        console.log('QualificationWorkSchedule: Доступные ключи локальных статусов:', Object.keys(parsingStatus));
         
         // Объединяем статусы из БД с локальными статусами
-        const mergedStatusMap = { ...parsingStatus, ...statusMap };
-        console.log('Объединенные статусы:', mergedStatusMap);
+        // Приоритет у статусов из БД, но если локальный статус 'completed', сохраняем его
+        const mergedStatusMap = { ...parsingStatus };
+        Object.keys(statusMap).forEach(key => {
+          // Если в БД статус 'completed' или локальный статус 'completed', используем 'completed'
+          if (statusMap[key] === 'completed' || mergedStatusMap[key] === 'completed') {
+            mergedStatusMap[key] = 'completed';
+          } else {
+            mergedStatusMap[key] = statusMap[key];
+          }
+        });
+        
+        console.log('QualificationWorkSchedule: Объединенные статусы:', mergedStatusMap);
+        console.log('QualificationWorkSchedule: Ключи объединенных статусов:', Object.keys(mergedStatusMap));
         
         setParsingStatus(mergedStatusMap);
         setParsingResults(resultsMap);
@@ -321,21 +486,26 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
           console.log('QualificationWorkSchedule: Зона "Внешний датчик" не найдена, создаем её');
           try {
             // Создаем зону "Внешний датчик" с номером 0
-            const externalZone = {
+            const externalZone: MeasurementZone = {
               id: `zone-external-${Date.now()}`,
               zoneNumber: 0,
               measurementLevels: [
                 {
                   id: `level-external-${Date.now()}`,
                   level: 1.0,
-                  equipmentId: `equipment-external-${Date.now()}`,
-                  equipmentName: 'Внешний датчик'
+                  equipmentId: '',
+                  equipmentName: ''
                 }
               ]
             };
             
             // Добавляем зону "Внешний датчик" в начало списка
-            const updatedZones = [externalZone, ...qualificationObject.measurementZones];
+            // Перенумеровываем остальные зоны, начиная с 0
+            const renumberedZones = qualificationObject.measurementZones.map((zone, index) => ({
+              ...zone,
+              zoneNumber: index + 1 // Старые зоны начинаются с 1, но теперь должны начинаться с 0
+            }));
+            const updatedZones = [externalZone, ...renumberedZones];
             
             // Сохраняем обновленные зоны
             await qualificationObjectService.updateMeasurementZones(qualificationObjectId, updatedZones);
@@ -371,11 +541,13 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
   // Обработка изменения дат
   const handleDateChange = (stageId: string, field: 'startDate' | 'endDate', value: string) => {
+    if (mode === 'view') return; // Не изменяем даты в режиме просмотра
+    
     console.log('QualificationWorkSchedule: handleDateChange:', { stageId, field, value });
     setStages(prevStages => 
       prevStages.map(stage => 
         stage.id === stageId 
-          ? { ...stage, [field]: value }
+          ? { ...stage, [field]: value || '' }
           : stage
       )
     );
@@ -383,11 +555,13 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
   // Обработка изменения единой даты (для этапов с одной датой)
   const handleSingleDateChange = (stageId: string, value: string) => {
+    if (mode === 'view') return; // Не изменяем даты в режиме просмотра
+    
     console.log('QualificationWorkSchedule: handleSingleDateChange:', { stageId, value });
     setStages(prevStages => 
       prevStages.map(stage => 
         stage.id === stageId 
-          ? { ...stage, startDate: value, endDate: value }
+          ? { ...stage, startDate: value || '', endDate: value || '' }
           : stage
       )
     );
@@ -444,8 +618,14 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       return true; // Можно отменить завершение
     }
     
-    const validation = validateStageDates(stage);
-    return validation.isValid;
+    // Проверяем, что даты заполнены (для этапов с одной датой - startDate, для остальных - startDate и endDate)
+    if (isSingleDateStage(stage.name)) {
+      // Для этапов с одной датой проверяем только startDate
+      return !!(stage.startDate && stage.startDate.trim() !== '');
+    } else {
+      // Для этапов с двумя датами проверяем обе
+      return !!(stage.startDate && stage.startDate.trim() !== '' && stage.endDate && stage.endDate.trim() !== '');
+    }
   };
 
   // Обработка завершения/отмены этапа
@@ -471,12 +651,12 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       return;
     }
 
-    // Если этап не завершен, проверяем валидацию дат
+    // Если этап не завершен, проверяем, что даты заполнены
     if (!currentStage.isCompleted) {
-      const validation = validateStageDates(currentStage);
-      if (!validation.isValid) {
-        console.log('Валидация не пройдена:', validation.errors);
-        setError(validation.errors.join('; '));
+      const canComplete = canCompleteStage(currentStage);
+      if (!canComplete) {
+        console.log('Даты не заполнены, завершение этапа невозможно');
+        setError('Для завершения этапа необходимо заполнить даты');
         return;
       }
     }
@@ -588,11 +768,12 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
           );
         } else {
           console.log('Обновляем существующий этап в БД с ID:', stageId);
-          // Обновляем существующий этап
+          // Обновляем существующий этап с передачей projectId
           await qualificationWorkScheduleService.updateWorkStage(
             qualificationObjectId,
             stageId,
-            stageToSave
+            stageToSave,
+            projectId
           );
         }
       }
@@ -725,8 +906,20 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         } catch (error) {
           console.error('QualificationWorkSchedule: Ошибка при вызове handleFileParsing', {
             fileName: file.name,
-            error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+            error: error instanceof Error ? error.message : 'Неизвестная ошибка',
+            stack: error instanceof Error ? error.stack : undefined
           });
+          // Показываем ошибку пользователю
+          setError(`Ошибка обработки файла ${file.name}: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+          // Устанавливаем статус ошибки
+          setParsingStatus(prev => ({
+            ...prev,
+            [levelId]: 'error'
+          }));
+          // Перезагружаем файлы для обновления статусов
+          setTimeout(async () => {
+            await loadLoggerRemovalFiles();
+          }, 1000);
         }
       } else {
         console.log('QualificationWorkSchedule: Файл не требует парсинга', {
@@ -751,15 +944,14 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   // Удаление файла снятия логгеров
   const removeLoggerRemovalFile = async (levelId: string) => {
     try {
-      // Парсим ключ для получения номера зоны и уровня
-      const match = levelId.match(/zone-(\d+)-level-(\d+)/);
-      if (!match) {
+      // Парсим ключ для получения номера зоны и уровня (поддерживает дробные значения)
+      const parsed = parseLevelId(levelId);
+      if (!parsed) {
         setError('Не удалось определить зону и уровень для удаления файла');
         return;
       }
 
-      const zoneNumber = parseInt(match[1]);
-      const measurementLevel = parseInt(match[2]);
+      const { zoneNumber, level: measurementLevel } = parsed;
 
       console.log('Удаляем файл логгера:', { levelId, zoneNumber, measurementLevel });
 
@@ -775,33 +967,48 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         return;
       }
 
-      // Удаляем файл из Supabase Storage
-      await qualificationObjectService.deleteLoggerRemovalFile(qualificationObjectId, zoneNumber, measurementLevel);
-      console.log('Файл удален из Storage');
-
-      // Удаляем данные из базы данных
       // Находим название файла для удаления из БД
       const storageFile = storageFiles[levelId];
-      if (storageFile && loggerDataService.isAvailable()) {
-        const deleteResult = await loggerDataService.deleteLoggerData(
-          currentProjectId,
-          qualificationObjectId,
-          storageFile.name
-        );
-        
-        if (!deleteResult.success) {
-          console.error('Ошибка удаления данных из БД:', deleteResult.error);
-          setError(`Ошибка удаления данных из БД: ${deleteResult.error}`);
-          return;
+      const fileName = storageFile?.name || null;
+
+      // Удаляем файл из Storage
+      try {
+        await qualificationObjectService.deleteLoggerRemovalFile(qualificationObjectId, zoneNumber, measurementLevel);
+        console.log('Файл удален из Storage');
+      } catch (storageError) {
+        console.warn('Ошибка удаления файла из Storage (может быть уже удален):', storageError);
+        // Продолжаем удаление данных из БД даже если файл не найден в Storage
+      }
+
+      // Удаляем данные из базы данных
+      if (fileName && loggerDataService.isAvailable()) {
+        try {
+          const deleteResult = await loggerDataService.deleteLoggerData(
+            currentProjectId,
+            qualificationObjectId,
+            fileName
+          );
+          
+          if (!deleteResult.success) {
+            console.error('Ошибка удаления данных из БД:', deleteResult.error);
+            setError(`Ошибка удаления данных из БД: ${deleteResult.error}`);
+            return;
+          }
+          console.log('Данные удалены из БД');
+        } catch (dbError) {
+          console.error('Ошибка при удалении данных из БД:', dbError);
+          // Продолжаем удаление локального состояния даже если БД ошибка
         }
-        console.log('Данные удалены из БД');
+      } else if (!fileName) {
+        console.warn('Имя файла не найдено для удаления из БД');
       }
 
       // Обновляем локальное состояние
-      setLoggerRemovalFiles(prev => ({
-        ...prev,
-        [levelId]: null
-      }));
+      setLoggerRemovalFiles(prev => {
+        const newFiles = { ...prev };
+        delete newFiles[levelId];
+        return newFiles;
+      });
       
       setStorageFiles(prev => {
         const newStorageFiles = { ...prev };
@@ -822,6 +1029,18 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         return newResults;
       });
 
+      setParsingProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[levelId];
+        return newProgress;
+      });
+
+      setUploadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[levelId];
+        return newProgress;
+      });
+
       setSuccess('Файл логгера успешно удален');
       setTimeout(() => setSuccess(null), 3000);
 
@@ -832,10 +1051,48 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   };
 
   // Получение ключа для файла снятия логгеров
-  const getLoggerRemovalFileKey = (zoneNumber: number, level: number) => {
-    // Преобразуем дробные значения в строку с точкой для совместимости
-    const levelStr = level.toString();
-    return `zone-${zoneNumber}-level-${levelStr}`;
+  const getLoggerRemovalFileKey = (zoneNumber: number | string | null | undefined, level: number | string | null | undefined) => {
+    // Нормализуем значения: приводим к числам и форматируем одинаково
+    const normalizedZone = zoneNumber === null || zoneNumber === undefined 
+      ? 0 
+      : (typeof zoneNumber === 'string' ? parseInt(zoneNumber, 10) : Number(zoneNumber));
+    
+    const normalizedLevel = level === null || level === undefined 
+      ? 0 
+      : (typeof level === 'string' ? parseFloat(level) : Number(level));
+    
+    // Форматируем уровень измерения: убираем лишние нули в конце, но сохраняем дробную часть
+    // Например: 0.30 -> 0.3, 2.10 -> 2.1, но 0.33 остается 0.33
+    // Для целых чисел (1, 2, 3) оставляем без точки: 1, 2, 3
+    // Используем parseFloat и toString для нормализации
+    let levelStr: string;
+    if (isNaN(normalizedLevel)) {
+      levelStr = '0';
+    } else {
+      const num = parseFloat(normalizedLevel.toString());
+      // Если число целое, выводим без точки, иначе с точкой
+      if (num % 1 === 0) {
+        levelStr = num.toString();
+      } else {
+        levelStr = num.toString();
+      }
+    }
+    
+    const fileKey = `zone-${normalizedZone}-level-${levelStr}`;
+    
+    // Отладочное логирование для диагностики
+    if (normalizedZone === 0 && normalizedLevel === 1) {
+      console.log('QualificationWorkSchedule: Формирование ключа для zone-0-level-1:', {
+        zoneNumber,
+        level,
+        normalizedZone,
+        normalizedLevel,
+        levelStr,
+        fileKey
+      });
+    }
+    
+    return fileKey;
   };
 
   // Извлечение zoneNumber и level из levelId
@@ -874,6 +1131,17 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
       const { zoneNumber, level: measurementLevel } = parsed;
 
+      // Проверяем формирование ключа файла
+      const expectedFileKeyForParsing = getLoggerRemovalFileKey(zoneNumber, measurementLevel);
+      console.log('QualificationWorkSchedule: Проверка ключа файла:', {
+        levelId,
+        zoneNumber,
+        measurementLevel,
+        measurementLevelType: typeof measurementLevel,
+        expectedFileKey: expectedFileKeyForParsing,
+        keysMatch: levelId === expectedFileKeyForParsing
+      });
+
       // Находим название логгера
       const zone = measurementZones.find(z => z.zoneNumber === zoneNumber);
       const level = zone?.measurementLevels.find(l => l.level === measurementLevel);
@@ -887,7 +1155,9 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         loggerName,
         measurementZones: measurementZones.length,
         zone: zone ? 'найдена' : 'не найдена',
-        level: level ? 'найден' : 'не найден'
+        level: level ? 'найден' : 'не найден',
+        levelId,
+        expectedFileKey: expectedFileKeyForParsing
       });
 
       // Устанавливаем статус парсинга
@@ -923,10 +1193,31 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         [levelId]: 50
       }));
 
-      console.log('Парсинг завершен:', parsedData);
+      console.log('QualificationWorkSchedule: Парсинг завершен:', {
+        fileName: parsedData.fileName,
+        recordCount: parsedData.recordCount,
+        parsingStatus: parsedData.parsingStatus,
+        errorMessage: parsedData.errorMessage,
+        hasMeasurements: parsedData.measurements && parsedData.measurements.length > 0,
+        measurementsCount: parsedData.measurements?.length || 0
+      });
 
       if (parsedData.parsingStatus === 'error') {
-        throw new Error(parsedData.errorMessage || 'Ошибка парсинга файла');
+        const errorMsg = parsedData.errorMessage || 'Ошибка парсинга файла';
+        console.error('QualificationWorkSchedule: Парсинг завершился с ошибкой:', errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      // Проверяем, что парсинг действительно завершился успешно
+      if (parsedData.parsingStatus !== 'completed') {
+        console.warn('QualificationWorkSchedule: Парсинг не завершен успешно, статус:', parsedData.parsingStatus);
+        // Если статус не 'completed', но и не 'error', устанавливаем 'completed' вручную
+        if (parsedData.measurements && parsedData.measurements.length > 0) {
+          parsedData.parsingStatus = 'completed';
+          console.log('QualificationWorkSchedule: Статус парсинга исправлен на completed, т.к. есть измерения');
+        } else {
+          throw new Error('Парсинг не завершился успешно и нет данных для сохранения');
+        }
       }
 
       // Получаем projectId для сохранения данных
@@ -937,11 +1228,14 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       }
       
       if (!currentProjectId) {
+        console.error('QualificationWorkSchedule: ProjectId не найден');
         throw new Error('ProjectId не найден для сохранения данных логгера');
       }
       
+      console.log('QualificationWorkSchedule: ProjectId найден:', currentProjectId);
+      
       // Сначала загружаем файл в Supabase Storage
-      console.log('Загружаем файл в Supabase Storage:', file.name);
+      console.log('QualificationWorkSchedule: Загружаем файл в Storage:', file.name);
       setParsingProgress(prev => ({
         ...prev,
         [levelId]: 70
@@ -954,13 +1248,24 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         file
       );
       
-      console.log('Файл загружен в Storage:', storageUrl);
+      console.log('QualificationWorkSchedule: Файл загружен в Storage:', storageUrl);
 
       // Сохраняем данные в базу данных
       setParsingProgress(prev => ({
         ...prev,
         [levelId]: 85
       }));
+      
+      console.log('QualificationWorkSchedule: Сохранение данных в БД:', {
+        projectId: currentProjectId,
+        qualificationObjectId,
+        zoneNumber,
+        measurementLevel,
+        loggerName,
+        fileName: parsedData.fileName,
+        recordCount: parsedData.recordCount,
+        parsingStatus: parsedData.parsingStatus
+      });
       
       const saveResult = await loggerDataService.saveLoggerData(
         currentProjectId,
@@ -971,25 +1276,56 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         parsedData
       );
 
+      console.log('QualificationWorkSchedule: Результат сохранения в БД:', {
+        success: saveResult.success,
+        error: saveResult.error,
+        recordCount: saveResult.recordCount
+      });
+
       if (!saveResult.success) {
-        throw new Error(saveResult.error || 'Ошибка сохранения данных');
+        const errorMsg = saveResult.error || 'Ошибка сохранения данных';
+        console.error('QualificationWorkSchedule: Ошибка сохранения данных в БД:', errorMsg);
+        throw new Error(errorMsg);
       }
 
       // Обновляем статус и результаты
-      console.log('Устанавливаем локальный статус completed для:', levelId);
+      console.log('QualificationWorkSchedule: Устанавливаем локальный статус completed для:', levelId);
+      console.log('QualificationWorkSchedule: fileKey (levelId):', levelId);
+      console.log('QualificationWorkSchedule: zoneNumber:', zoneNumber, 'measurementLevel:', measurementLevel);
+      
+      // Проверяем, что ключ формируется правильно
+      const expectedFileKey = getLoggerRemovalFileKey(zoneNumber, measurementLevel);
+      console.log('QualificationWorkSchedule: Ожидаемый fileKey:', expectedFileKey);
+      console.log('QualificationWorkSchedule: levelId совпадает с expectedFileKey?', levelId === expectedFileKey);
+      
+      // Используем правильный ключ (expectedFileKey), если levelId не совпадает
+      const correctFileKey = expectedFileKey;
+      if (levelId !== correctFileKey) {
+        console.warn('QualificationWorkSchedule: levelId не совпадает с expectedFileKey, используем correctFileKey:', correctFileKey);
+        console.warn('QualificationWorkSchedule: levelId:', levelId, 'vs correctFileKey:', correctFileKey);
+      }
+      
       setParsingProgress(prev => ({
         ...prev,
-        [levelId]: 100
+        [correctFileKey]: 100
       }));
       
-      setParsingStatus(prev => ({
-        ...prev,
-        [levelId]: 'completed'
-      }));
+      setParsingStatus(prev => {
+        // Используем правильный ключ для обновления статуса
+        const keyToUse = correctFileKey;
+        const newStatus = {
+          ...prev,
+          [keyToUse]: 'completed' as const
+        };
+        console.log('QualificationWorkSchedule: Установлен статус completed для', keyToUse);
+        console.log('QualificationWorkSchedule: Новый статус:', newStatus);
+        console.log('QualificationWorkSchedule: Все ключи в новом статусе:', Object.keys(newStatus));
+        return newStatus;
+      });
 
       setParsingResults(prev => ({
         ...prev,
-        [levelId]: {
+        [correctFileKey]: {
           recordCount: saveResult.recordCount || 0
         }
       }));
@@ -998,13 +1334,57 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       setTimeout(() => setSuccess(null), 5000);
 
       // Обновляем файлы в Storage после успешной загрузки
-      console.log('Перезагружаем файлы из Storage и БД...');
+      console.log('QualificationWorkSchedule: Перезагружаем файлы из Storage и БД...');
+      console.log('QualificationWorkSchedule: Ожидаемый fileKey для обновления:', correctFileKey);
+      console.log('QualificationWorkSchedule: zoneNumber:', zoneNumber, 'measurementLevel:', measurementLevel);
       
-      // Небольшая задержка для обновления БД
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Увеличиваем задержку для обновления БД (БД может быть медленной)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Сохраняем текущий статус перед перезагрузкой
+      const statusBeforeReload = parsingStatus[correctFileKey];
+      console.log('QualificationWorkSchedule: Статус перед перезагрузкой для', correctFileKey, ':', statusBeforeReload);
       
       await loadLoggerRemovalFiles();
-      console.log('Перезагрузка завершена');
+      
+      // После загрузки проверяем, что статус обновился
+      console.log('QualificationWorkSchedule: Перезагрузка завершена');
+      console.log('QualificationWorkSchedule: Проверка статуса после перезагрузки для', correctFileKey);
+      
+      // Принудительно обновляем статус после загрузки, если он не обновился
+      // Используем setTimeout для того, чтобы дать время React обновить состояние
+      setTimeout(() => {
+        setParsingStatus(prev => {
+          const currentStatus = prev[correctFileKey];
+          console.log('QualificationWorkSchedule: Текущий статус для', correctFileKey, 'после перезагрузки:', currentStatus);
+          console.log('QualificationWorkSchedule: Все доступные ключи статусов:', Object.keys(prev));
+          
+          if (currentStatus !== 'completed') {
+            console.warn('QualificationWorkSchedule: Статус не обновился после перезагрузки, принудительно устанавливаем completed');
+            console.log('QualificationWorkSchedule: Все статусы:', prev);
+            
+            return {
+              ...prev,
+              [correctFileKey]: 'completed' as const
+            };
+          }
+          return prev;
+        });
+        
+        // Также обновляем результаты, если их нет
+        setParsingResults(prev => {
+          if (!prev[correctFileKey] || !prev[correctFileKey].recordCount) {
+            console.log('QualificationWorkSchedule: Обновляем результаты для', correctFileKey);
+            return {
+              ...prev,
+              [correctFileKey]: {
+                recordCount: saveResult.recordCount || 0
+              }
+            };
+          }
+          return prev;
+        });
+      }, 1000);
 
     } catch (error) {
       console.error('QualificationWorkSchedule: Ошибка парсинга файла:', {
@@ -1015,6 +1395,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         stack: error instanceof Error ? error.stack : undefined
       });
       
+      // Устанавливаем статус ошибки
       setParsingStatus(prev => ({
         ...prev,
         [levelId]: 'error'
@@ -1028,7 +1409,55 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         }
       }));
 
+      // Пытаемся сохранить информацию об ошибке в БД, если файл был загружен в Storage
+      try {
+        const parsed = parseLevelId(levelId);
+        if (parsed && projectId) {
+          const { zoneNumber, level: measurementLevel } = parsed;
+          const zone = measurementZones.find(z => z.zoneNumber === zoneNumber);
+          const level = zone?.measurementLevels.find(l => l.level === measurementLevel);
+          const loggerName = level?.equipmentName || `Логгер зона ${zoneNumber} уровень ${measurementLevel}`;
+          
+          // Проверяем, был ли файл загружен в Storage
+          const fileKey = getLoggerRemovalFileKey(zoneNumber, measurementLevel);
+          const storageFile = storageFiles[fileKey];
+          
+          if (storageFile) {
+            // Файл был загружен, но парсинг не удался - сохраняем ошибку в БД
+            await loggerDataService.saveLoggerData(
+              projectId,
+              qualificationObjectId,
+              zoneNumber,
+              measurementLevel,
+              loggerName,
+              {
+                fileName: file.name,
+                deviceMetadata: {
+                  deviceType: 0,
+                  deviceModel: 'Unknown',
+                  serialNumber: 'Unknown'
+                },
+                measurements: [],
+                startDate: new Date(),
+                endDate: new Date(),
+                recordCount: 0,
+                parsingStatus: 'error',
+                errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка'
+              }
+            );
+            console.log('QualificationWorkSchedule: Информация об ошибке сохранена в БД');
+          }
+        }
+      } catch (dbError) {
+        console.error('QualificationWorkSchedule: Ошибка сохранения информации об ошибке в БД:', dbError);
+      }
+
       setError(`Ошибка обработки файла ${file.name}: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      
+      // Перезагружаем файлы из Storage и БД для обновления статусов
+      setTimeout(async () => {
+        await loadLoggerRemovalFiles();
+      }, 1000);
     }
   };
 
@@ -1089,11 +1518,27 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       // Валидация дат
       for (const stage of stages) {
         if (stage.startDate && stage.endDate) {
-          const startDate = new Date(stage.startDate);
-          const endDate = new Date(stage.endDate);
+          // Парсим даты в формате YYYY-MM-DD как локальное время
+          // Создаем Date объекты, используя локальное время (не UTC)
+          const startDateParts = stage.startDate.split('-');
+          const endDateParts = stage.endDate.split('-');
           
-          if (startDate > endDate) {
-            throw new Error(`В этапе "${stage.name}" дата начала не может быть позже даты окончания`);
+          if (startDateParts.length === 3 && endDateParts.length === 3) {
+            // Создаем Date объекты в локальном времени
+            const startDate = new Date(
+              parseInt(startDateParts[0]),
+              parseInt(startDateParts[1]) - 1, // месяц начинается с 0
+              parseInt(startDateParts[2])
+            );
+            const endDate = new Date(
+              parseInt(endDateParts[0]),
+              parseInt(endDateParts[1]) - 1, // месяц начинается с 0
+              parseInt(endDateParts[2])
+            );
+            
+            if (startDate > endDate) {
+              throw new Error(`В этапе "${stage.name}" дата начала не может быть позже даты окончания`);
+            }
           }
         }
       }
@@ -1108,8 +1553,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       const stagesToSave = stages.map(stage => ({
         stageName: stage.name,
         stageDescription: stage.description,
-        startDate: stage.startDate || undefined,
-        endDate: stage.endDate || undefined,
+        startDate: stage.startDate && stage.startDate.trim() !== '' ? stage.startDate : undefined,
+        endDate: stage.endDate && stage.endDate.trim() !== '' ? stage.endDate : undefined,
         isCompleted: stage.isCompleted,
         completedAt: stage.completedAt || undefined,
         completedBy: stage.completedBy || undefined,
@@ -1133,12 +1578,59 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       console.log('Все этапы загружены из БД:', allStages);
 
       // Обновляем локальное состояние с данными из базы
+      // Форматируем даты для input type="date" (YYYY-MM-DD)
+      // Используем локальное время, чтобы избежать проблем с часовыми поясами
+      const formatDateForInput = (date: string | Date | null | undefined): string => {
+        if (!date) return '';
+        if (typeof date === 'string') {
+          // Если это ISO строка, извлекаем только дату (но нужно учесть часовой пояс)
+          if (date.includes('T')) {
+            // Парсим ISO строку и используем локальное время
+            const d = new Date(date);
+            if (!isNaN(d.getTime())) {
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }
+            // Если парсинг не удался, просто извлекаем дату из строки
+            return date.split('T')[0];
+          }
+          // Если это уже в формате YYYY-MM-DD, возвращаем как есть
+          if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return date;
+          }
+          // Пытаемся распарсить и отформатировать
+          try {
+            const d = new Date(date);
+            if (!isNaN(d.getTime())) {
+              // Используем локальное время вместо UTC
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }
+          } catch (e) {
+            console.warn('Ошибка форматирования даты:', date, e);
+          }
+          return '';
+        }
+        if (date instanceof Date) {
+          // Используем локальное время вместо UTC
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        }
+        return '';
+      };
+      
       const updatedStages = allStages.map(stage => ({
         id: stage.id,
         name: stage.stageName,
         description: stage.stageDescription,
-        startDate: stage.startDate || '',
-        endDate: stage.endDate || '',
+        startDate: formatDateForInput(stage.startDate),
+        endDate: formatDateForInput(stage.endDate),
         isCompleted: stage.isCompleted,
         completedAt: stage.completedAt || undefined,
         completedBy: stage.completedBy || undefined,
@@ -1319,36 +1811,31 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                       type="date"
                       value={stage.startDate}
                       onChange={(e) => handleSingleDateChange(stage.id, e.target.value)}
-                      disabled={stage.isCompleted}
+                      disabled={stage.isCompleted || mode === 'view'}
+                      readOnly={mode === 'view'}
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                        stage.isCompleted 
+                        stage.isCompleted || mode === 'view'
                           ? 'bg-gray-100 cursor-not-allowed border-gray-300' 
-                          : !stage.startDate && !stage.isCompleted
-                            ? 'border-red-300 focus:ring-red-500'
-                            : 'border-gray-300'
+                          : 'border-gray-300'
                       }`}
                       title={`Дата этапа: ${stage.name}`}
                     />
-                    {!stage.startDate && !stage.isCompleted && (
-                      <p className="mt-1 text-sm text-red-600">
-                        Необходимо указать дату проведения
-                      </p>
-                    )}
                     
                     {/* Блок расстановки оборудования для этапа "Расстановка логгеров" */}
                     {stage.name === 'Расстановка логгеров' && (
-                      <div className={`mt-4 ${stage.isCompleted ? 'pointer-events-none opacity-60' : ''}`}>
+                      <div className={`mt-4 ${stage.isCompleted || mode === 'view' ? 'pointer-events-none opacity-60' : ''}`}>
                         <EquipmentPlacement
                           qualificationObjectId={qualificationObjectId}
                           initialZones={measurementZones}
                           onZonesChange={handleZonesChange}
+                          readOnly={mode === 'view'}
                         />
                       </div>
                     )}
 
                     {/* Блок снятия логгеров для этапа "Снятие логгеров" */}
                     {stage.name === 'Снятие логгеров' && (
-                      <div className={`mt-4 ${stage.isCompleted ? 'pointer-events-none opacity-60' : ''}`}>
+                      <div className={`mt-4 ${stage.isCompleted || mode === 'view' ? 'pointer-events-none opacity-60' : ''}`}>
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-4">
                             <h5 className="text-sm font-medium text-gray-900">Файлы данных логгеров</h5>
@@ -1412,7 +1899,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                                       return (
                                         <tr key={`${zone.id}-${level.id}`}>
                                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                                            {zone.zoneNumber === 0 ? 'Внешний' : zone.zoneNumber}
+                                            {zone.zoneNumber === 0 ? 'Внешняя температура' : `Зона №${zone.zoneNumber}`}
                                           </td>
                                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                             {level.level}
@@ -1517,7 +2004,41 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                                                 );
                                               }
                                               
-                                              // Файл загружен, но не обработан
+                                              // Проверяем, есть ли статус в БД (может быть не загружен еще)
+                                              // Если файл есть в Storage, но статус undefined, значит он еще не обработан
+                                              const hasStatus = parsingStatus[fileKey] !== undefined;
+                                              
+                                              // Отладочная информация
+                                              if (storageFile && !hasStatus) {
+                                                console.warn('QualificationWorkSchedule: Файл в Storage, но нет статуса для', fileKey, {
+                                                  fileKey,
+                                                  storageFile: storageFile.name,
+                                                  parsingStatusKeys: Object.keys(parsingStatus),
+                                                  parsingStatusValues: Object.values(parsingStatus)
+                                                });
+                                              }
+                                              
+                                              if (!hasStatus && storageFile) {
+                                                // Файл загружен, но статус еще не загружен из БД - показываем как "Ожидает обработки"
+                                                return (
+                                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                    Ожидает обработки
+                                                  </span>
+                                                );
+                                              }
+                                              
+                                              // Файл загружен, но не обработан (статус не 'completed' и не 'parsing')
+                                              // Проверяем, может быть статус 'processing' в БД
+                                              // Удаляем эту проверку, так как она вызывает ошибки типизации
+                                              // const currentStatus = parsingStatus[fileKey];
+                                              // if (hasStatus && currentStatus !== undefined && 
+                                              //     currentStatus !== 'completed' && 
+                                              //     currentStatus !== 'parsing' && 
+                                              //     currentStatus !== 'error' && 
+                                              //     currentStatus !== 'processing') {
+                                              //   console.warn('QualificationWorkSchedule: Неожиданный статус для', fileKey, ':', currentStatus);
+                                              // }
+                                              
                                               return (
                                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                                   Ожидает обработки
@@ -1527,18 +2048,75 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                                           </td>
                                           <td className="px-3 py-2 whitespace-nowrap text-sm font-medium">
                                             <div className="flex items-center space-x-2">
-                                              <label className="cursor-pointer">
-                                                <input
-                                                  type="file"
-                                                  accept=".vi2,.csv,.xls,.xlsx,.pdf"
-                                                  onChange={(e) => handleLoggerRemovalFileUpload(fileKey, e)}
-                                                  className="hidden"
-                                                />
-                                                <span className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200">
-                                                  <Upload className="w-3 h-3 mr-1" />
-                                                  {storageFile || file ? 'Заменить' : 'Загрузить'}
-                                                </span>
-                                              </label>
+                                              {mode !== 'view' && !stage.isCompleted && (
+                                                <>
+                                                  <label className="cursor-pointer">
+                                                    <input
+                                                      type="file"
+                                                      accept=".vi2,.csv,.xls,.xlsx,.pdf"
+                                                      onChange={(e) => handleLoggerRemovalFileUpload(fileKey, e)}
+                                                      className="hidden"
+                                                      disabled={stage.isCompleted}
+                                                    />
+                                                    <span className={`inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded ${
+                                                      stage.isCompleted 
+                                                        ? 'text-gray-400 bg-gray-100 cursor-not-allowed' 
+                                                        : 'text-indigo-700 bg-indigo-100 hover:bg-indigo-200'
+                                                    }`}>
+                                                      <Upload className="w-3 h-3 mr-1" />
+                                                      {storageFile || file ? 'Заменить' : 'Загрузить'}
+                                                    </span>
+                                                  </label>
+                                                  {/* Кнопка повторной обработки для файлов в статусе "Ожидает обработки" или "Ошибка" */}
+                                                  {storageFile && (() => {
+                                                    const status = parsingStatus[fileKey];
+                                                    const canRetry = status === undefined || 
+                                                                    status === 'error' || 
+                                                                    status === 'processing' ||
+                                                                    (status !== 'parsing' && status !== 'completed');
+                                                    const isProcessing = status === 'parsing' || status === 'processing';
+                                                    
+                                                    return canRetry ? (
+                                                      <button
+                                                        onClick={async () => {
+                                                          try {
+                                                            // Загружаем файл из Storage для повторной обработки
+                                                            const response = await fetch(storageFile.url);
+                                                            const blob = await response.blob();
+                                                            const fileName = storageFile.name || `file-${fileKey}`;
+                                                            const file = new File([blob], fileName, { type: blob.type });
+                                                            
+                                                            // Определяем расширение файла
+                                                            const fileExtension = '.' + fileName.split('.').pop()?.toLowerCase();
+                                                            
+                                                            // Запускаем парсинг
+                                                            if (['.vi2', '.xls', '.xlsx'].includes(fileExtension)) {
+                                                              await handleFileParsing(fileKey, file, fileExtension);
+                                                            } else {
+                                                              setError('Файл не поддерживает автоматическую обработку');
+                                                            }
+                                                          } catch (error) {
+                                                            console.error('Ошибка повторной обработки файла:', error);
+                                                            setError(`Ошибка повторной обработки файла: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+                                                          }
+                                                        }}
+                                                        disabled={isProcessing}
+                                                        className={`inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded ${
+                                                          isProcessing
+                                                            ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                                                            : 'text-green-700 bg-green-100 hover:bg-green-200'
+                                                        }`}
+                                                        title="Повторить обработку файла"
+                                                      >
+                                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                        </svg>
+                                                        Повторить
+                                                      </button>
+                                                    ) : null;
+                                                  })()}
+                                                </>
+                                              )}
                                               {storageFile && (
                                                 <a
                                                   href={storageFile.url}
@@ -1550,10 +2128,15 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                                                   Скачать
                                                 </a>
                                               )}
-                                              {(storageFile || file) && (
+                                              {mode !== 'view' && !stage.isCompleted && (storageFile || file) && (
                                                 <button
                                                   onClick={async () => await removeLoggerRemovalFile(fileKey)}
-                                                  className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200"
+                                                  disabled={stage.isCompleted}
+                                                  className={`inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded ${
+                                                    stage.isCompleted 
+                                                      ? 'text-gray-400 bg-gray-100 cursor-not-allowed' 
+                                                      : 'text-red-700 bg-red-100 hover:bg-red-200'
+                                                  }`}
                                                 >
                                                   <X className="w-3 h-3 mr-1" />
                                                   Удалить
@@ -1594,7 +2177,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                           <div className="mt-4 flex justify-end">
                             <button
                               onClick={handleSaveLoggerRemovalFiles}
-                              disabled={saving || Object.values(loggerRemovalFiles).every(file => file === null)}
+                              disabled={saving || stage.isCompleted || mode === 'view' || Object.values(loggerRemovalFiles).every(file => file === null)}
                               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {saving ? (
@@ -1624,21 +2207,15 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                         type="date"
                         value={stage.startDate}
                         onChange={(e) => handleDateChange(stage.id, 'startDate', e.target.value)}
-                        disabled={stage.isCompleted}
+                        disabled={stage.isCompleted || mode === 'view'}
+                        readOnly={mode === 'view'}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                          stage.isCompleted 
+                          stage.isCompleted || mode === 'view'
                             ? 'bg-gray-100 cursor-not-allowed border-gray-300' 
-                            : !stage.startDate && !stage.isCompleted
-                              ? 'border-red-300 focus:ring-red-500'
-                              : 'border-gray-300'
+                            : 'border-gray-300'
                         }`}
                         title={`Дата начала этапа: ${stage.name}`}
                       />
-                      {!stage.startDate && !stage.isCompleted && (
-                        <p className="mt-1 text-sm text-red-600">
-                          Необходимо указать дату начала
-                        </p>
-                      )}
                     </div>
                     
                     <div>
@@ -1649,87 +2226,60 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                         type="date"
                         value={stage.endDate}
                         onChange={(e) => handleDateChange(stage.id, 'endDate', e.target.value)}
-                        disabled={stage.isCompleted}
+                        disabled={stage.isCompleted || mode === 'view'}
+                        readOnly={mode === 'view'}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                          stage.isCompleted 
+                          stage.isCompleted || mode === 'view'
                             ? 'bg-gray-100 cursor-not-allowed border-gray-300' 
-                            : !stage.endDate && !stage.isCompleted
-                              ? 'border-red-300 focus:ring-red-500'
-                              : 'border-gray-300'
+                            : 'border-gray-300'
                         }`}
                         title={`Дата окончания этапа: ${stage.name}`}
                       />
-                      {!stage.endDate && !stage.isCompleted && (
-                        <p className="mt-1 text-sm text-red-600">
-                          Необходимо указать дату окончания
-                        </p>
-                      )}
                     </div>
                   </div>
                 )}
                 
-                {/* Отображение ошибок валидации дат */}
-                {!stage.isCompleted && (() => {
-                  const validation = validateStageDates(stage);
-                  if (!validation.isValid) {
-                    return (
-                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-                        <div className="flex items-start">
-                          <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 mr-2 flex-shrink-0" />
-                          <div>
-                            <h4 className="text-sm font-medium text-red-800">Ошибки валидации:</h4>
-                            <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
-                              {validation.errors.map((error, index) => (
-                                <li key={index}>{error}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-                
-                {/* Кнопки "Завершено"/"Отмена" и "Анализ данных" отдельно от полей дат */}
-                <div className="mt-4 flex justify-end space-x-3">
-                  <button
-                    onClick={() => handleStageCompletion(stage.id)}
-                    disabled={stageCompletionLoading[stage.id] || !canCompleteStage(stage)}
-                    className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-                      stage.isCompleted 
-                        ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500' 
-                        : canCompleteStage(stage)
-                          ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
-                          : 'bg-gray-400 cursor-not-allowed'
-                    }`}
-                    title={!canCompleteStage(stage) && !stage.isCompleted ? 'Заполните даты для завершения этапа' : ''}
-                  >
-                    {stageCompletionLoading[stage.id] ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Сохранение...
-                      </>
-                    ) : stage.isCompleted ? (
-                      <>
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Отмена
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Завершено
-                      </>
-                    )}
-                  </button>
+                {/* Кнопки "Завершено"/"Отмена" и "Анализ данных" отдельно от полей дат - скрыты в режиме просмотра */}
+                {mode !== 'view' && (
+                  <div className="mt-4 flex justify-end space-x-3">
+                    <button
+                      onClick={() => handleStageCompletion(stage.id)}
+                      disabled={stageCompletionLoading[stage.id] || !canCompleteStage(stage)}
+                      className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                        stage.isCompleted 
+                          ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500' 
+                          : canCompleteStage(stage)
+                            ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
+                            : 'bg-gray-400 cursor-not-allowed'
+                      }`}
+                      title={!canCompleteStage(stage) && !stage.isCompleted ? 'Заполните даты для завершения этапа' : ''}
+                    >
+                      {stageCompletionLoading[stage.id] ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Сохранение...
+                        </>
+                      ) : stage.isCompleted ? (
+                        <>
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Отмена
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Завершено
+                        </>
+                      )}
+                    </button>
                   
-                  {/* Кнопка "Анализ данных" - показывается для этапа "Снятие логгеров" */}
-                  {stage.name === 'Снятие логгеров' && (() => {
+                  {/* Кнопка "Анализ данных" - показывается для этапа "Снятие логгеров" (скрыта в режиме просмотра) */}
+                  {(mode === 'edit' || !mode) && stage.name === 'Снятие логгеров' && (() => {
                     // Проверяем, есть ли обработанные файлы
                     const hasProcessedFiles = Object.keys(parsingStatus).some(fileKey => 
                       parsingStatus[fileKey] === 'completed' && parsingResults[fileKey]?.recordCount > 0
                     );
                     
+                    // Кнопка "Анализ данных" доступна независимо от статуса завершения этапа
                     return hasProcessedFiles ? (
                       <button
                         onClick={() => handleDataAnalysis()}
@@ -1750,12 +2300,36 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                     );
                   })()}
                 </div>
+                )}
                 
               </div>
             </div>
           </div>
         ));
           })()}
+        </div>
+      )}
+
+      {/* Кнопка "Сохранить План график" после всех этапов - скрыта в режиме просмотра */}
+      {!loading && mode !== 'view' && (
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 shadow-lg"
+          >
+            {saving ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Сохранение...
+              </>
+            ) : (
+              <>
+                <Save className="w-5 h-5 mr-2" />
+                Сохранить План график
+              </>
+            )}
+          </button>
         </div>
       )}
 
@@ -1774,7 +2348,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       )}
 
       {/* Документы по испытанию */}
-      {!loading && (
+      {!loading && !hideTestDocuments && (
         <div className="mt-6 border border-gray-200 rounded-lg p-4">
           <div className="flex items-center space-x-2 mb-4">
             <FileText className="w-5 h-5 text-indigo-600" />
@@ -1849,7 +2423,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       )}
 
       {/* Информация о расписании */}
-      {!loading && (
+      {!loading && !hideTestDocuments && (
         <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
           <h4 className="text-sm font-medium text-gray-900 mb-2">Информация о расписании:</h4>
           <ul className="text-sm text-gray-700 space-y-1">
@@ -1863,8 +2437,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         </div>
       )}
 
-      {/* Кнопка сохранения */}
-      {!loading && (
+      {/* Кнопка сохранения - скрыта в режиме просмотра */}
+      {!loading && mode !== 'view' && (
         <div className="mt-6 flex justify-end">
           <button
             onClick={handleSave}
