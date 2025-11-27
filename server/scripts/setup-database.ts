@@ -176,7 +176,20 @@ const main = async () => {
       const files = await fs.readdir(migrationsDir);
       migrationFiles = files
         .filter(file => file.endsWith('.sql'))
-        .sort(); // Сортируем по имени (включая дату)
+        .sort()
+        // Отфильтровываем Supabase-специфичные миграции, которые зависят от схемы auth/ролей/политик
+        // и не нужны в самостоятельной установке PostgreSQL.
+        // Оставляем только "базовые" миграции и нашу актуальную add_not_suitable_status.
+        .filter(file => {
+          // Всегда оставляем миграцию для статуса "not_suitable"
+          if (file === '20251201000001_add_not_suitable_status.sql') return true;
+
+          // Оставляем все "ранние" структурные миграции (2025-01-01 .. 2025-01-02 и др. до Supabase-пакета)
+          if (file < '20250700000000_') return true;
+
+          // Все остальные (Supabase/политики/роль authenticated и т.п.) — пропускаем
+          return false;
+        });
     } catch (error) {
       console.log('⚠️  Папка миграций не найдена, пропускаем');
     }
