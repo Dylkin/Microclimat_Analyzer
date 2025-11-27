@@ -70,7 +70,9 @@ CREATE TABLE IF NOT EXISTS public.contractor_contacts (
   contractor_id UUID REFERENCES public.contractors(id) ON DELETE CASCADE,
   employee_name TEXT NOT NULL,
   phone TEXT,
+  email TEXT,
   comment TEXT,
+  is_selected_for_requests BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -257,6 +259,20 @@ CREATE TABLE IF NOT EXISTS public.documentation_checks (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- ================================================
+-- 2. ГАРАНТИРУЕМ НАЛИЧИЕ НЕОБХОДИМЫХ КОЛОНОК В СУЩЕСТВУЮЩИХ ТАБЛИЦАХ
+-- (На случай, если таблицы были созданы в старой версии без этих полей)
+-- ================================================
+
+-- В таблице подрядчиков гарантируем наличие email
+ALTER TABLE public.contractors
+  ADD COLUMN IF NOT EXISTS email TEXT;
+
+-- В таблице контактов подрядчиков гарантируем наличие email и флага is_selected_for_requests
+ALTER TABLE public.contractor_contacts
+  ADD COLUMN IF NOT EXISTS email TEXT,
+  ADD COLUMN IF NOT EXISTS is_selected_for_requests BOOLEAN DEFAULT TRUE;
 
 -- Таблица аудита
 CREATE TABLE IF NOT EXISTS public.audit_logs (
