@@ -184,6 +184,13 @@ const main = async () => {
           // Всегда оставляем миграцию для статуса "not_suitable"
           if (file === '20251201000001_add_not_suitable_status.sql') return true;
 
+          // Явно пропускаем проблемные/дублирующие миграции,
+          // которые в standalone-режиме PostgreSQL вызывают ошибки:
+          // - добавление статуса creating_report (мы задаём статус в database_setup.sql)
+          // - создание audit_logs (таблица уже создаётся в database_setup.sql, там нет столбца timestamp)
+          if (file === '20250101180000_add_creating_report_status.sql') return false;
+          if (file === '20250102000000_create_audit_logs.sql') return false;
+
           // Оставляем все "ранние" структурные миграции (2025-01-01 .. 2025-01-02 и др. до Supabase-пакета)
           if (file < '20250700000000_') return true;
 
