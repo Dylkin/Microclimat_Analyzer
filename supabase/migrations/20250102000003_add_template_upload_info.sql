@@ -18,3 +18,4 @@ COMMENT ON COLUMN public.qualification_object_types.contract_template_uploaded_b
 
 
 
+

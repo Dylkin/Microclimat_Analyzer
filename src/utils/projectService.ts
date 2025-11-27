@@ -136,7 +136,8 @@ const mapProject = (dto: ProjectDto): Project => {
     'report_preparation',
     'report_approval',
     'report_printing',
-    'completed'
+    'completed',
+    'not_suitable'
   ];
   
   let status: ProjectStatus = dto.status as ProjectStatus;

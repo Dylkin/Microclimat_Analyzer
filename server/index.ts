@@ -22,6 +22,7 @@ import reportsRouter from './routes/reports.js';
 import tendersRouter from './routes/tenders.js';
 import dbProxyRouter from './routes/dbProxy.js';
 import storageRouter from './routes/storage.js';
+import mailRouter from './routes/mail.js';
 
 dotenv.config();
 
@@ -64,6 +65,7 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/tenders', tendersRouter);
 app.use('/api/db', dbProxyRouter);
 app.use('/api/storage', storageRouter);
+app.use('/api/mail', mailRouter);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

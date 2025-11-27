@@ -75,6 +75,7 @@ class ContractorService {
         updatedAt: contractor.updatedAt ? new Date(contractor.updatedAt) : new Date(),
         contacts: (contractor.contacts || []).map((contact: any) => ({
           ...contact,
+          isSelectedForRequests: contact.isSelectedForRequests !== false,
           createdAt: contact.createdAt ? new Date(contact.createdAt) : new Date()
         }))
       };
@@ -104,6 +105,7 @@ class ContractorService {
         contacts: (contractorData.contacts || []).map(contact => ({
           employeeName: contact.employeeName,
           phone: contact.phone || null,
+          email: contact.email || null,
           comment: contact.comment || null
         }))
       });
@@ -115,6 +117,7 @@ class ContractorService {
         updatedAt: contractor.updatedAt ? new Date(contractor.updatedAt) : new Date(),
         contacts: (contractor.contacts || []).map((contact: any) => ({
           ...contact,
+          isSelectedForRequests: contact.isSelectedForRequests !== false,
           createdAt: contact.createdAt ? new Date(contact.createdAt) : new Date()
         }))
       };
@@ -148,6 +151,7 @@ class ContractorService {
         updatedAt: contractor.updatedAt ? new Date(contractor.updatedAt) : new Date(),
         contacts: (contractor.contacts || []).map((contact: any) => ({
           ...contact,
+          isSelectedForRequests: contact.isSelectedForRequests !== false,
           createdAt: contact.createdAt ? new Date(contact.createdAt) : new Date()
         }))
       };
@@ -173,7 +177,9 @@ class ContractorService {
       const contact = await apiClient.post<any>(`/contractors/${contractorId}/contacts`, {
         employeeName: contactData.employeeName,
         phone: contactData.phone || null,
-        comment: contactData.comment || null
+        email: contactData.email || null,
+        comment: contactData.comment || null,
+        isSelectedForRequests: contactData.isSelectedForRequests !== false
       });
 
       return {
@@ -181,6 +187,8 @@ class ContractorService {
         contractorId: contact.contractorId || contact.contractor_id,
         employeeName: contact.employeeName || contact.employee_name,
         phone: contact.phone || undefined,
+        email: contact.email || undefined,
+        isSelectedForRequests: contact.isSelectedForRequests !== false || contact.is_selected_for_requests !== false,
         comment: contact.comment || undefined,
         createdAt: contact.createdAt ? new Date(contact.createdAt) : (contact.created_at ? new Date(contact.created_at) : new Date())
       };
@@ -196,7 +204,9 @@ class ContractorService {
       const contact = await apiClient.put<any>(`/contractors/contacts/${id}`, {
         employeeName: updates.employeeName,
         phone: updates.phone,
-        comment: updates.comment
+        email: updates.email,
+        comment: updates.comment,
+        isSelectedForRequests: updates.isSelectedForRequests
       });
 
       return {
@@ -204,6 +214,8 @@ class ContractorService {
         contractorId: contact.contractorId || contact.contractor_id,
         employeeName: contact.employeeName || contact.employee_name,
         phone: contact.phone || undefined,
+        email: contact.email || undefined,
+        isSelectedForRequests: contact.isSelectedForRequests !== false || contact.is_selected_for_requests !== false,
         comment: contact.comment || undefined,
         createdAt: contact.createdAt ? new Date(contact.createdAt) : (contact.created_at ? new Date(contact.created_at) : new Date())
       };
@@ -219,7 +231,12 @@ class ContractorService {
       await apiClient.delete(`/contractors/contacts/${id}`);
     } catch (error: any) {
       console.error('Ошибка при удалении контакта:', error);
-      throw new Error(`Ошибка удаления контакта: ${error.message || 'Неизвестная ошибка'}`);
+      const message = error?.message || '';
+      // Если контакт уже удалён или не найден, не считаем это критической ошибкой
+      if (message.includes('Контакт не найден') || message.includes('404')) {
+        return;
+      }
+      throw new Error(`Ошибка удаления контакта: ${message || 'Неизвестная ошибка'}`);
     }
   }
 }

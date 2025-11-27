@@ -13,3 +13,4 @@ COMMENT ON COLUMN public.contractors.role IS 'Роли контрагента: s
 
 
 
+

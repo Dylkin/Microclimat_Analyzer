@@ -342,6 +342,8 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         return <Play className="w-4 h-4 text-purple-600" />;
       case 'report_printing':
         return <Printer className="w-4 h-4 text-green-600" />;
+      case 'not_suitable':
+        return <AlertCircle className="w-4 h-4 text-red-600" />;
       default:
         return <AlertCircle className="w-4 h-4 text-blue-600" />;
     }
@@ -385,6 +387,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
           label: 'Печать отчета',
           page: 'report_printing',
           icon: Printer
+        };
+      case 'not_suitable':
+        return {
+          label: 'Не подходит',
+          page: 'not_suitable',
+          icon: AlertCircle
         };
       case 'completed':
         return {
@@ -733,19 +741,36 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                       {editingProject === project.id ? (
                         <select
                           value={editProject.status}
-                          onChange={(e) => setEditProject(prev => ({ ...prev, status: e.target.value as ProjectStatus }))}
+                          onChange={(e) =>
+                            setEditProject((prev) => ({
+                              ...prev,
+                              status: e.target.value as ProjectStatus,
+                            }))
+                          }
                           className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                           title="Статус проекта"
                           aria-label="Статус проекта"
                         >
-                          {Object.entries(ProjectStatusLabels).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
+                          {Object.entries(ProjectStatusLabels)
+                            .filter(([value]) =>
+                              project.type === 'sale'
+                                ? value === 'documents_submission' ||
+                                  value === 'contract_negotiation' ||
+                                  value === 'not_suitable'
+                                : true
+                            )
+                            .map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
                         </select>
                       ) : (
                         <div className="flex items-center space-x-2">
                           {getStatusIcon(project.status)}
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ProjectStatusColors[project.status]}`}>
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ProjectStatusColors[project.status]}`}
+                          >
                             {ProjectStatusLabels[project.status]}
                           </span>
                         </div>

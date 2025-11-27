@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
     `);
     
     const contactsResult = await pool.query(`
-      SELECT id, contractor_id, employee_name, phone, comment, created_at
+      SELECT id, contractor_id, employee_name, phone, email, comment, created_at, is_selected_for_requests
       FROM contractor_contacts
       ORDER BY created_at
     `);
@@ -46,6 +46,8 @@ router.get('/', async (req, res) => {
         contractorId: contact.contractor_id,
         employeeName: contact.employee_name,
         phone: contact.phone || undefined,
+        email: contact.email || undefined,
+        isSelectedForRequests: contact.is_selected_for_requests !== false,
         comment: contact.comment || undefined,
         createdAt: new Date(contact.created_at)
       });
@@ -140,7 +142,7 @@ router.get('/:id', async (req, res) => {
     }
     
     const contactsResult = await pool.query(
-      'SELECT id, contractor_id, employee_name, phone, comment, created_at FROM contractor_contacts WHERE contractor_id = $1 ORDER BY created_at',
+      'SELECT id, contractor_id, employee_name, phone, email, comment, created_at, is_selected_for_requests FROM contractor_contacts WHERE contractor_id = $1 ORDER BY created_at',
       [id]
     );
     
@@ -173,6 +175,8 @@ router.get('/:id', async (req, res) => {
         contractorId: contact.contractor_id,
         employeeName: contact.employee_name,
         phone: contact.phone || undefined,
+        email: contact.email || undefined,
+        isSelectedForRequests: contact.is_selected_for_requests !== false,
         comment: contact.comment || undefined,
         createdAt: new Date(contact.created_at)
       }))
@@ -255,14 +259,16 @@ router.post('/', async (req, res) => {
     if (contacts && contacts.length > 0) {
       for (const contact of contacts) {
         const contactResult = await pool.query(
-          'INSERT INTO contractor_contacts (contractor_id, employee_name, phone, comment) VALUES ($1, $2, $3, $4) RETURNING id, contractor_id, employee_name, phone, comment, created_at',
-          [contractorId, contact.employeeName, contact.phone || null, contact.comment || null]
+          'INSERT INTO contractor_contacts (contractor_id, employee_name, phone, email, comment, is_selected_for_requests) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, contractor_id, employee_name, phone, email, comment, created_at, is_selected_for_requests',
+          [contractorId, contact.employeeName, contact.phone || null, contact.email || null, contact.comment || null, contact.isSelectedForRequests !== false]
         );
         insertedContacts.push({
           id: contactResult.rows[0].id,
           contractorId: contactResult.rows[0].contractor_id,
           employeeName: contactResult.rows[0].employee_name,
           phone: contactResult.rows[0].phone || undefined,
+          email: contactResult.rows[0].email || undefined,
+          isSelectedForRequests: contactResult.rows[0].is_selected_for_requests !== false,
           comment: contactResult.rows[0].comment || undefined,
           createdAt: new Date(contactResult.rows[0].created_at)
         });
@@ -455,17 +461,17 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/contacts', async (req, res) => {
   try {
     const { id } = req.params;
-    const { employeeName, phone, comment } = req.body;
+    const { employeeName, phone, email, comment, isSelectedForRequests } = req.body;
 
     if (!employeeName) {
       return res.status(400).json({ error: 'Имя сотрудника обязательно' });
     }
 
     const result = await pool.query(`
-      INSERT INTO contractor_contacts (contractor_id, employee_name, phone, comment)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, contractor_id, employee_name, phone, comment, created_at
-    `, [id, employeeName, phone || null, comment || null]);
+      INSERT INTO contractor_contacts (contractor_id, employee_name, phone, email, comment, is_selected_for_requests)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, contractor_id, employee_name, phone, email, comment, created_at, is_selected_for_requests
+    `, [id, employeeName, phone || null, email || null, comment || null, isSelectedForRequests !== false]);
 
     const contact = result.rows[0];
     res.status(201).json({
@@ -473,6 +479,8 @@ router.post('/:id/contacts', async (req, res) => {
       contractorId: contact.contractor_id,
       employeeName: contact.employee_name,
       phone: contact.phone || undefined,
+      email: contact.email || undefined,
+      isSelectedForRequests: contact.is_selected_for_requests !== false,
       comment: contact.comment || undefined,
       createdAt: new Date(contact.created_at)
     });
@@ -489,7 +497,7 @@ router.post('/:id/contacts', async (req, res) => {
 router.put('/contacts/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { employeeName, phone, comment } = req.body;
+    const { employeeName, phone, email, comment, isSelectedForRequests } = req.body;
 
     const updates: string[] = [];
     const values: any[] = [];
@@ -502,6 +510,14 @@ router.put('/contacts/:id', async (req, res) => {
     if (phone !== undefined) {
       updates.push(`phone = $${paramCount++}`);
       values.push(phone || null);
+    }
+    if (email !== undefined) {
+      updates.push(`email = $${paramCount++}`);
+      values.push(email || null);
+    }
+    if (isSelectedForRequests !== undefined) {
+      updates.push(`is_selected_for_requests = $${paramCount++}`);
+      values.push(isSelectedForRequests !== false);
     }
     if (comment !== undefined) {
       updates.push(`comment = $${paramCount++}`);
@@ -518,7 +534,7 @@ router.put('/contacts/:id', async (req, res) => {
       UPDATE contractor_contacts
       SET ${updates.join(', ')}
       WHERE id = $${paramCount}
-      RETURNING id, contractor_id, employee_name, phone, comment, created_at
+      RETURNING id, contractor_id, employee_name, phone, email, comment, created_at, is_selected_for_requests
     `, values);
 
     if (result.rows.length === 0) {
@@ -531,6 +547,8 @@ router.put('/contacts/:id', async (req, res) => {
       contractorId: contact.contractor_id,
       employeeName: contact.employee_name,
       phone: contact.phone || undefined,
+      email: contact.email || undefined,
+      isSelectedForRequests: contact.is_selected_for_requests !== false,
       comment: contact.comment || undefined,
       createdAt: new Date(contact.created_at)
     });

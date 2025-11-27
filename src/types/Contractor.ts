@@ -24,6 +24,9 @@ export interface ContractorContact {
   contractorId: string;
   employeeName: string;
   phone?: string;
+  email?: string;
+  // Используется в блоке "Товары и возможные поставщики" для отметки сотрудника
+  isSelectedForRequests?: boolean;
   comment?: string;
   createdAt: Date;
 }

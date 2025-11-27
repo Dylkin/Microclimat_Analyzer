@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft, Eye } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Save, X, MapPin, Phone, User, MessageSquare, Map, Loader, AlertTriangle, Search, ArrowLeft, Eye, Mail } from 'lucide-react';
 import { Contractor, ContractorContact, CreateContractorData, ContractorRole, ContractorRoleLabels } from '../types/Contractor';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { contractorService } from '../utils/contractorService';
@@ -199,6 +199,7 @@ const ContractorDirectory: React.FC = () => {
       contacts: contractor.contacts.map(contact => ({
         employeeName: contact.employeeName,
         phone: contact.phone || '',
+        email: contact.email || '',
         comment: contact.comment || ''
       }))
     });
@@ -343,12 +344,12 @@ const ContractorDirectory: React.FC = () => {
     if (isEdit) {
       setEditContractor(prev => ({
         ...prev,
-        contacts: [...prev.contacts, { employeeName: '', phone: '', comment: '' }]
+        contacts: [...prev.contacts, { employeeName: '', phone: '', email: '', comment: '' }]
       }));
     } else {
       setNewContractor(prev => ({
         ...prev,
-        contacts: [...prev.contacts, { employeeName: '', phone: '', comment: '' }]
+        contacts: [...prev.contacts, { employeeName: '', phone: '', email: '', comment: '' }]
       }));
     }
   };
@@ -416,14 +417,6 @@ const ContractorDirectory: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-          <button
-            onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600"
-            title="Закрыть"
-            aria-label="Закрыть"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         <div className="space-y-4">
@@ -528,18 +521,18 @@ const ContractorDirectory: React.FC = () => {
             </div>
           </div>
 
-          {/* Контакты */}
+          {/* Сотрудники */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className="block text-sm font-medium text-gray-700">
-                Контакты
+                Сотрудники
               </label>
               <button
                 onClick={() => addNewContact(isEdit)}
                 className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
               >
                 <Plus className="w-3 h-3" />
-                <span>Добавить контакт</span>
+                <span>Добавить сотрудника</span>
               </button>
             </div>
 
@@ -552,7 +545,7 @@ const ContractorDirectory: React.FC = () => {
               <div className="space-y-3">
                 {formData.contacts.map((contact, index) => (
                   <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Сотрудник *</label>
                         <input
@@ -571,6 +564,16 @@ const ContractorDirectory: React.FC = () => {
                           onChange={(e) => updateNewContact(index, 'phone', e.target.value, isEdit)}
                           className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                           placeholder="+7 (999) 123-45-67"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">E-mail</label>
+                        <input
+                          type="email"
+                          value={contact.email || ''}
+                          onChange={(e) => updateNewContact(index, 'email', e.target.value, isEdit)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="email@company.com"
                         />
                       </div>
                       <div className="flex space-x-2">
@@ -647,7 +650,7 @@ const ContractorDirectory: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          {(showAddForm || editingContractorData) && (
+          {(showAddForm || editingContractorData || viewingContractor) && (
             <button
               onClick={() => {
                 if (showAddForm) {
@@ -660,6 +663,12 @@ const ContractorDirectory: React.FC = () => {
                   setQualificationSearchTerm('');
                   setShowAddQualificationForm(false);
                   setEditingQualificationObject(null);
+                } else if (viewingContractor) {
+                  setViewingContractor(null);
+                  setQualificationObjects([]);
+                  setFilteredQualificationObjects([]);
+                  setQualificationSearchTerm('');
+                  setViewingQualificationObject(null);
                 }
               }}
               className="text-gray-600 hover:text-gray-900 transition-colors flex items-center space-x-2"
@@ -671,7 +680,7 @@ const ContractorDirectory: React.FC = () => {
           <Building2 className="w-8 h-8 text-indigo-600" />
           <h1 className="text-2xl font-bold text-gray-900">Справочник контрагентов</h1>
         </div>
-        {!showAddForm && !editingContractorData && (
+        {!showAddForm && !editingContractorData && !viewingContractor && (
           <button
             onClick={() => setShowAddForm(true)}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
@@ -683,7 +692,7 @@ const ContractorDirectory: React.FC = () => {
       </div>
 
       {/* Search */}
-      {!showAddForm && !editingContractorData && (
+      {!showAddForm && !editingContractorData && !viewingContractor && (
         <div className="bg-white rounded-lg shadow p-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -712,7 +721,7 @@ const ContractorDirectory: React.FC = () => {
       )}
 
       {/* Contractors Table */}
-      {!showAddForm && (
+      {!showAddForm && !editingContractorData && !viewingContractor && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -789,31 +798,19 @@ const ContractorDirectory: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {contractor.contacts.length > 0 ? (
-                        <div className="space-y-2">
-                          {contractor.contacts.map((contact) => (
-                            <div key={contact.id} className="text-sm">
-                              <div className="flex items-center space-x-1">
-                                <User className="w-3 h-3 text-gray-400" />
-                                <span className="font-medium">{contact.employeeName}</span>
+                      {contractor.contacts.length > 0 && contractor.contacts.some((c) => c.phone) ? (
+                        <div className="space-y-1">
+                          {contractor.contacts
+                            .filter((contact) => contact.phone)
+                            .map((contact) => (
+                              <div key={contact.id} className="flex items-center space-x-1 text-sm text-gray-700">
+                                <Phone className="w-3 h-3 text-gray-400" />
+                                <span>{contact.phone}</span>
                               </div>
-                              {contact.phone && (
-                                <div className="flex items-center space-x-1 text-gray-600">
-                                  <Phone className="w-3 h-3" />
-                                  <span>{contact.phone}</span>
-                                </div>
-                              )}
-                              {contact.comment && (
-                                <div className="flex items-center space-x-1 text-gray-500">
-                                  <MessageSquare className="w-3 h-3" />
-                                  <span className="text-xs">{contact.comment}</span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                            ))}
                         </div>
                       ) : (
-                        <span className="text-gray-400 text-sm">Нет контактов</span>
+                        <span className="text-gray-400 text-sm">Нет телефонов</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -958,19 +955,6 @@ const ContractorDirectory: React.FC = () => {
         <div className="bg-white rounded-lg shadow p-6 mt-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Просмотр контрагента</h2>
-            <button
-              onClick={() => {
-                setViewingContractor(null);
-                setQualificationObjects([]);
-                setFilteredQualificationObjects([]);
-                setQualificationSearchTerm('');
-              }}
-              className="text-gray-400 hover:text-gray-600"
-              title="Закрыть"
-              aria-label="Закрыть"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
 
           {/* Основная информация контрагента */}
@@ -1018,7 +1002,7 @@ const ContractorDirectory: React.FC = () => {
             </div>
 
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Контакты</h3>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Сотрудники</h3>
               {viewingContractor.contacts.length > 0 ? (
                 <div className="space-y-3">
                   {viewingContractor.contacts.map((contact) => (
@@ -1033,6 +1017,12 @@ const ContractorDirectory: React.FC = () => {
                           <span className="text-gray-600">{contact.phone}</span>
                         </div>
                       )}
+                      {contact.email && (
+                        <div className="flex items-center space-x-2 mb-1">
+                          <Mail className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-600">{contact.email}</span>
+                        </div>
+                      )}
                       {contact.comment && (
                         <div className="flex items-center space-x-2">
                           <MessageSquare className="w-4 h-4 text-gray-400" />
@@ -1045,7 +1035,7 @@ const ContractorDirectory: React.FC = () => {
               ) : (
                 <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
                   <User className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">Контакты не добавлены</p>
+                  <p className="text-sm">Сотрудники не добавлены</p>
                 </div>
               )}
             </div>

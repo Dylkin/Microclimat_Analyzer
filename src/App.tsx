@@ -2,6 +2,7 @@ import React, { useState, Suspense, lazy, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
+import { MailSettingsPage } from './components/MailSettingsPage';
 import './index.css';
 
 // Lazy load components for code splitting
@@ -15,6 +16,7 @@ const ContractNegotiation = lazy(() => import('./components/ContractNegotiation'
 const TestingExecution = lazy(() => import('./components/testing-management').then(m => ({ default: m.TestingExecution })));
 const CreatingReport = lazy(() => import('./components/CreatingReport'));
 const DocumentsSubmission = lazy(() => import('./components/DocumentsSubmission'));
+const NotSuitable = lazy(() => import('./components/NotSuitable'));
 const DataAnalysis = lazy(() => import('./components/DataAnalysis'));
 const AuditLogs = lazy(() => import('./components/AuditLogs'));
 const ResetPassword = lazy(() => import('./components/ResetPassword'));
@@ -139,6 +141,13 @@ const AppContent: React.FC = () => {
             onBack={() => handlePageChange('projects')}
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;
+      case 'not_suitable':
+        return hasAccess('analyzer') && selectedProject ? wrapWithSuspense(
+          <NotSuitable
+            project={selectedProject}
+            onBack={() => handlePageChange('projects')}
+          />
+        ) : <div>Доступ запрещен или проект не выбран</div>;
       case 'data_analysis':
         // Используем project из pageData, если он есть, иначе selectedProject
         const projectForAnalysis = pageData?.project || selectedProject;
@@ -169,6 +178,8 @@ const AppContent: React.FC = () => {
         return hasAccess('analyzer') ? wrapWithSuspense(<QualificationObjectTypes />) : <div>Доступ запрещен</div>;
       case 'tender-search':
         return hasAccess('analyzer') ? wrapWithSuspense(<TenderSearch />) : <div>Доступ запрещен</div>;
+      case 'mail-settings':
+        return hasAccess('analyzer') ? wrapWithSuspense(<MailSettingsPage />) : <div>Доступ запрещен</div>;
       default:
         return wrapWithSuspense(
           <MicroclimatAnalyzer 

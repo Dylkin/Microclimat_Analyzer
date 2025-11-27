@@ -5,7 +5,8 @@ export type ProjectStatus =
   | 'report_preparation'
   | 'report_approval'
   | 'report_printing'
-  | 'completed';
+  | 'completed'
+  | 'not_suitable';
 
 export type ProjectType = 'qualification' | 'sale' | 'other';
 
@@ -94,7 +95,8 @@ export const ProjectStatusLabels: Record<ProjectStatus, string> = {
   'report_preparation': 'Подготовка отчета',
   'report_approval': 'Согласование отчета',
   'report_printing': 'Печать отчета',
-  'completed': 'Завершен'
+  'completed': 'Завершен',
+  'not_suitable': 'Не подходит'
 };
 
 export const ProjectStatusColors: Record<ProjectStatus, string> = {
@@ -104,7 +106,8 @@ export const ProjectStatusColors: Record<ProjectStatus, string> = {
   'report_preparation': 'bg-orange-100 text-orange-800',
   'report_approval': 'bg-indigo-100 text-indigo-800',
   'report_printing': 'bg-green-100 text-green-800',
-  'completed': 'bg-gray-100 text-gray-800'
+  'completed': 'bg-gray-100 text-gray-800',
+  'not_suitable': 'bg-red-100 text-red-800'
 };
 
 export const ProjectTypeLabels: Record<ProjectType, string> = {

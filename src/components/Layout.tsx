@@ -69,6 +69,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
           access: 'admin' as const
         },
         {
+          name: 'Настройки почты',
+          key: 'mail-settings',
+          icon: Settings,
+          access: 'analyzer' as const
+        },
+        {
           name: 'Поиск тендеров',
           key: 'tender-search',
           icon: Search,

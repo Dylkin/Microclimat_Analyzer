@@ -617,6 +617,80 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// POST /api/projects/:id/not-suitable - Установить статус "Не подходит" с комментарием
+router.post('/:id/not-suitable', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const { comment, userId } = req.body;
+
+    if (!comment || typeof comment !== 'string' || !comment.trim()) {
+      client.release();
+      return res.status(400).json({ error: 'Комментарий обязателен для заполнения' });
+    }
+
+    await client.query('BEGIN');
+
+    // Обновляем статус проекта
+    await client.query(
+      `UPDATE projects 
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2`,
+      ['not_suitable', id],
+    );
+
+    // Фиксируем комментарий, дату/время и пользователя в project_stage_assignments
+    await client.query(
+      `
+      INSERT INTO project_stage_assignments (project_id, stage, assigned_user_id, assigned_at, completed_at, notes)
+      VALUES ($1, $2, $3, NOW(), NOW(), $4)
+      ON CONFLICT (project_id, stage)
+      DO UPDATE SET 
+        assigned_user_id = EXCLUDED.assigned_user_id,
+        assigned_at = NOW(),
+        completed_at = NOW(),
+        notes = EXCLUDED.notes
+      `,
+      [id, 'not_suitable', userId || null, comment.trim()],
+    );
+
+    await client.query('COMMIT');
+
+    // Возвращаем обновлённый проект
+    const result = await pool.query(
+      `SELECT id, name, description, type, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at
+       FROM projects
+       WHERE id = $1`,
+      [id],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Проект не найден' });
+    }
+
+    const project = result.rows[0];
+    res.json({
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      type: project.type || 'qualification',
+      contractorId: project.contractor_id,
+      contractNumber: project.contract_number,
+      contractDate: project.contract_date ? new Date(project.contract_date) : undefined,
+      status: project.status,
+      createdBy: project.created_by,
+      createdAt: new Date(project.created_at),
+      updatedAt: new Date(project.updated_at),
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error setting not_suitable status:', error);
+    res.status(500).json({ error: 'Ошибка установки статуса \"Не подходит\"' });
+  } finally {
+    client.release();
+  }
+});
+
 // DELETE /api/projects/:id - Удалить проект
 router.delete('/:id', async (req, res) => {
   try {

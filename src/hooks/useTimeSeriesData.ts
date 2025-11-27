@@ -17,23 +17,11 @@ export const useTimeSeriesData = ({ files, qualificationObjectId, projectId }: U
 
   const processFileData = useCallback(async (file: UploadedFile): Promise<TimeSeriesPoint[]> => {
     try {
-      const measurements = await databaseService.getMeasurements(file.id);
-      if (!measurements || measurements.length === 0) {
-        console.warn(`No measurements found for file: ${file.name}`);
-        return [];
-      }
-
-      // Преобразуем все данные без сэмплирования для отображения всех точек
-      const points: TimeSeriesPoint[] = measurements.map((measurement, index) => ({
-        timestamp: measurement.timestamp.getTime(),
-        temperature: measurement.temperature,
-        humidity: measurement.humidity,
-        fileId: file.name, // Используем имя файла для связи
-        originalIndex: index,
-        zoneNumber: file.zoneNumber
-      }));
-
-      return points;
+      // В текущей реализации измерения из локальной "БД" не используются.
+      // Источник данных — loggerDataService (loadDataFromDatabase).
+      // Оставляем заглушку, чтобы не ломать сигнатуру хука.
+      console.warn(`processFileData (stub) called for file: ${file.name}`);
+      return [];
     } catch (error) {
       console.error(`Error processing file ${file.name}:`, error);
       return [];

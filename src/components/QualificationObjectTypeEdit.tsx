@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Car, Snowflake, Package, Box, Upload, X, Download, Save, ArrowLeft, FileText, Clock, User } from 'lucide-react';
+import {
+  Building2,
+  Car,
+  Snowflake,
+  Package,
+  Box,
+  Upload,
+  X,
+  Download,
+  Save,
+  ArrowLeft,
+  FileText,
+  Clock,
+  User,
+} from 'lucide-react';
 import { QualificationObjectType, qualificationObjectTypeService } from '../utils/qualificationObjectTypeService';
 import { useAuth } from '../contexts/AuthContext';
 

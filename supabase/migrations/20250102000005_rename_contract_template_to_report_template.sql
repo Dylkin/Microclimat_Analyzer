@@ -26,3 +26,4 @@ COMMENT ON COLUMN public.qualification_object_types.report_template_uploaded_by_
 
 
 
+
