@@ -82,9 +82,12 @@ router.get('/', async (req, res) => {
     });
     
     res.json(contractors);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching contractors:', error);
-    res.status(500).json({ error: 'Ошибка получения подрядчиков' });
+    res.status(500).json({
+      error: 'Ошибка получения подрядчиков',
+      details: error.message || String(error),
+    });
   }
 });
 
