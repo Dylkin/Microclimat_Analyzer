@@ -73,7 +73,7 @@ docker run --name postgres-microclimat -e POSTGRES_PASSWORD=your_password -e POS
 
 2. Замените `DB_PASSWORD` на пароль, который вы указали при установке PostgreSQL
 
-## Создание базы данных
+## Создание базы данных и структуры
 
 После того, как PostgreSQL запущен, выполните:
 
@@ -81,29 +81,27 @@ docker run --name postgres-microclimat -e POSTGRES_PASSWORD=your_password -e POS
 # Через psql (если доступен)
 psql -U postgres
 CREATE DATABASE microclimat;
-
-# Или через скрипт проверки (создаст базу автоматически)
-npx tsx server/scripts/check-database.ts
 ```
 
-## Проверка подключения
+## Инициализация структуры БД и пользователя по умолчанию
 
-После настройки выполните проверку:
+После создания базы данных и настройки файла `.env` выполните из корня проекта:
 
 ```bash
-npx tsx server/scripts/check-database.ts
+# Применить все структуры и миграции, создать таблицы и вспомогательные данные
+npm run setup-db
+
+# Создать пользователя по умолчанию (администратора)
+npm run create-default-user
+
+# или одной командой
+npm run init-db
 ```
 
-Скрипт должен показать:
-- ✅ PostgreSQL подключен успешно
-- ✅ База данных "microclimat" существует
-- Список таблиц (если они уже созданы)
-
-## Создание таблиц
-
-После создания базы данных выполните SQL скрипты из проекта для создания таблиц:
-- `database_setup.sql`
-- Другие SQL файлы в корне проекта
+Эти скрипты:
+- создадут таблицу `schema_migrations`,
+- применят файл `database_setup.sql` и все SQL‑миграции из `supabase/migrations`,
+- создадут пользователя по умолчанию (`Дылкин П.А.`, `pavel.dylkin@gmail.com`, роль `admin`).*** End Patch"  ഗ】  assistant to=functions.apply_patch십시오оставка to=functions.apply_patch ***!
 
 ## Проблемы и решения
 

@@ -11,6 +11,8 @@
     "server:prod": "tsx server/index.ts",
     "migrate": "tsx server/scripts/apply-migrations.ts",
     "setup-db": "tsx server/scripts/setup-database.ts",
+    "create-default-user": "tsx server/scripts/create-default-user.ts",
+    "init-db": "npm run setup-db && npm run create-default-user",
     "add-loggers": "tsx server/scripts/add-testo-loggers.ts",
     "add-columns": "tsx server/scripts/add-missing-columns.ts",
     "create-project-objects-table": "tsx server/scripts/create-project-qualification-objects-table.ts",
