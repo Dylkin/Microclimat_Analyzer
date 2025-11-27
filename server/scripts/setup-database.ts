@@ -43,6 +43,73 @@ const applyMigration = async (filename: string, sql: string) => {
   }
 };
 
+// Функция создания таблиц для оборудования (measurement_equipment + equipment_verifications)
+const ensureEquipmentTables = async () => {
+  try {
+    console.log('📋 Шаг 5: Создание таблиц для оборудования (measurement_equipment)...');
+
+    // Создаем ENUM тип для типов оборудования
+    await pool.query(`
+      DO $$ BEGIN
+        CREATE TYPE equipment_type AS ENUM ('-', 'Testo 174T', 'Testo 174H');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    // Создаем таблицу measurement_equipment
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS public.measurement_equipment (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        type equipment_type NOT NULL DEFAULT '-',
+        name TEXT NOT NULL,
+        serial_number TEXT UNIQUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
+    // Создаем таблицу equipment_verifications
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS public.equipment_verifications (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        equipment_id UUID NOT NULL REFERENCES public.measurement_equipment(id) ON DELETE CASCADE,
+        verification_start_date DATE NOT NULL,
+        verification_end_date DATE NOT NULL,
+        verification_file_url TEXT,
+        verification_file_name TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
+    // Создаем индексы
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_equipment_verifications_equipment_id 
+      ON public.equipment_verifications(equipment_id)
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_equipment_verifications_dates 
+      ON public.equipment_verifications(verification_start_date, verification_end_date)
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_measurement_equipment_type 
+      ON public.measurement_equipment(type)
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_measurement_equipment_serial 
+      ON public.measurement_equipment(serial_number)
+    `);
+
+    console.log('✅ Таблицы для оборудования проверены/созданы');
+  } catch (error: any) {
+    console.error('⚠️  Ошибка при создании таблиц оборудования:', error.message);
+    // Не прерываем процесс развертывания
+  }
+};
+
 // Функция добавления тестовых логгеров
 const addTestoLoggers = async () => {
   try {
@@ -225,8 +292,11 @@ const main = async () => {
 
     console.log('\n✅ Все миграции применены успешно!');
 
-    // Автоматическое добавление тестовых логгеров после миграций
-    console.log('\n📋 Шаг 5: Добавление тестовых логгеров...');
+    // Гарантируем наличие таблиц для оборудования и добавляем тестовые логгеры
+    console.log('\n📋 Шаг 5: Подготовка таблиц оборудования...');
+    await ensureEquipmentTables();
+
+    console.log('\n📋 Шаг 6: Добавление тестовых логгеров...');
     await addTestoLoggers();
 
     console.log('\n🎉 Настройка базы данных завершена успешно!');
