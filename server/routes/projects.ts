@@ -127,9 +127,12 @@ router.get('/', async (req, res) => {
     }));
     
     res.json(projects);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching projects:', error);
-    res.status(500).json({ error: 'Ошибка получения проектов' });
+    res.status(500).json({
+      error: 'Ошибка получения проектов',
+      details: error.message || String(error),
+    });
   }
 });
 

@@ -1,6 +1,11 @@
 // API клиент для работы с бэкендом вместо Supabase
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Базовый URL берём из переменных окружения VITE_API_URL или VITE_API_BASE_URL.
+// По умолчанию используем '/api', чтобы в продакшене работать через Nginx reverse proxy,
+// а не ходить на localhost:3001 из браузера пользователя.
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  '/api';
 
 // Типы для ответов API
 export interface ApiResponse<T> {
