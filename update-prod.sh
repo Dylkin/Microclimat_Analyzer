@@ -16,19 +16,19 @@ NC='\033[0m' # No Color
 
 # Функции для вывода
 print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    printf "${BLUE}[INFO]${NC} %s\n" "$1"
 }
 
 print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    printf "${GREEN}[SUCCESS]${NC} %s\n" "$1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    printf "${YELLOW}[WARNING]${NC} %s\n" "$1"
 }
 
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    printf "${RED}[ERROR]${NC} %s\n" "$1"
 }
 
 # Определение пути к проекту
@@ -57,10 +57,20 @@ fi
 cd "$PROJECT_DIR"
 
 # Проверка наличия Git
-if ! command -v git &> /dev/null; then
-    print_error "Git не установлен"
+GIT_CMD=""
+if command -v git &> /dev/null; then
+    GIT_CMD="git"
+elif [ -x "/usr/bin/git" ]; then
+    GIT_CMD="/usr/bin/git"
+elif [ -x "/usr/local/bin/git" ]; then
+    GIT_CMD="/usr/local/bin/git"
+else
+    print_error "Git не установлен или не найден в стандартных путях"
+    print_info "Проверьте установку Git: which git"
     exit 1
 fi
+
+print_info "Используется Git: $GIT_CMD"
 
 # Проверка наличия Node.js
 if ! command -v node &> /dev/null; then
@@ -105,11 +115,11 @@ update_code() {
     print_info "Обновление кода из Git..."
     
     # Определение ветки
-    CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
+    CURRENT_BRANCH=$($GIT_CMD branch --show-current 2>/dev/null || echo "main")
     print_info "Текущая ветка: $CURRENT_BRANCH"
     
     # Сохранение изменений (если есть)
-    if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+    if ! $GIT_CMD diff-index --quiet HEAD -- 2>/dev/null; then
         print_warning "Обнаружены незакоммиченные изменения"
         read -p "Продолжить обновление? (y/n) " -n 1 -r
         echo
@@ -120,11 +130,11 @@ update_code() {
     fi
     
     # Получение последних изменений
-    git fetch origin
+    $GIT_CMD fetch origin
     
     # Проверка наличия обновлений
-    LOCAL=$(git rev-parse @)
-    REMOTE=$(git rev-parse @{u} 2>/dev/null || echo "")
+    LOCAL=$($GIT_CMD rev-parse @)
+    REMOTE=$($GIT_CMD rev-parse @{u} 2>/dev/null || echo "")
     
     if [ -z "$REMOTE" ] || [ "$LOCAL" = "$REMOTE" ]; then
         print_warning "Нет новых изменений в репозитории"
@@ -137,7 +147,7 @@ update_code() {
     fi
     
     # Обновление кода
-    git pull origin "$CURRENT_BRANCH"
+    $GIT_CMD pull origin "$CURRENT_BRANCH"
     
     print_success "Код обновлен"
 }
