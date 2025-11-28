@@ -141,9 +141,10 @@ update_code() {
     # Сохранение изменений (если есть)
     if ! $GIT_CMD diff-index --quiet HEAD -- 2>/dev/null; then
         print_warning "Обнаружены незакоммиченные изменения"
-        read -p "Продолжить обновление? (y/n) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        printf "Продолжить обновление? (y/n) "
+        read REPLY
+        REPLY=$(echo "$REPLY" | cut -c1)
+        if [ "$REPLY" != "y" ] && [ "$REPLY" != "Y" ]; then
             print_error "Обновление отменено"
             exit 1
         fi
@@ -158,9 +159,10 @@ update_code() {
     
     if [ -z "$REMOTE" ] || [ "$LOCAL" = "$REMOTE" ]; then
         print_warning "Нет новых изменений в репозитории"
-        read -p "Продолжить обновление? (y/n) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        printf "Продолжить обновление? (y/n) "
+        read REPLY
+        REPLY=$(echo "$REPLY" | cut -c1)
+        if [ "$REPLY" != "y" ] && [ "$REPLY" != "Y" ]; then
             print_info "Обновление отменено"
             exit 0
         fi
@@ -203,9 +205,10 @@ update_database() {
     else
         print_error "Ошибка при обновлении базы данных"
         print_info "Лог сохранен в /tmp/db-update.log"
-        read -p "Продолжить обновление? (y/n) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        printf "Продолжить обновление? (y/n) "
+        read REPLY
+        REPLY=$(echo "$REPLY" | cut -c1)
+        if [ "$REPLY" != "y" ] && [ "$REPLY" != "Y" ]; then
             exit 1
         fi
     fi
@@ -313,9 +316,10 @@ main() {
     echo ""
     
     # Создание резервной копии (опционально)
-    read -p "Создать резервную копию перед обновлением? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    printf "Создать резервную копию перед обновлением? (y/n) "
+    read REPLY
+    REPLY=$(echo "$REPLY" | cut -c1)
+    if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
         create_backup
         echo ""
     fi
@@ -329,9 +333,10 @@ main() {
     echo ""
     
     # Обновление БД
-    read -p "Обновить структуру базы данных? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    printf "Обновить структуру базы данных? (y/n) "
+    read REPLY
+    REPLY=$(echo "$REPLY" | cut -c1)
+    if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
         update_database
         echo ""
     fi
@@ -341,9 +346,10 @@ main() {
     echo ""
     
     # Перезапуск сервисов
-    read -p "Перезапустить сервисы? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    printf "Перезапустить сервисы? (y/n) "
+    read REPLY
+    REPLY=$(echo "$REPLY" | cut -c1)
+    if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
         restart_services
         echo ""
     fi
