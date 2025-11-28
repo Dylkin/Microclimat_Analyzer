@@ -73,16 +73,36 @@ fi
 print_info "Используется Git: $GIT_CMD"
 
 # Проверка наличия Node.js
-if ! command -v node &> /dev/null; then
-    print_error "Node.js не установлен"
+NODE_CMD=""
+if command -v node &> /dev/null; then
+    NODE_CMD="node"
+elif [ -x "/usr/bin/node" ]; then
+    NODE_CMD="/usr/bin/node"
+elif [ -x "/usr/local/bin/node" ]; then
+    NODE_CMD="/usr/local/bin/node"
+else
+    print_error "Node.js не установлен или не найден в стандартных путях"
+    print_info "Проверьте установку Node.js: which node"
     exit 1
 fi
 
+print_info "Используется Node.js: $NODE_CMD"
+
 # Проверка наличия npm
-if ! command -v npm &> /dev/null; then
-    print_error "npm не установлен"
+NPM_CMD=""
+if command -v npm &> /dev/null; then
+    NPM_CMD="npm"
+elif [ -x "/usr/bin/npm" ]; then
+    NPM_CMD="/usr/bin/npm"
+elif [ -x "/usr/local/bin/npm" ]; then
+    NPM_CMD="/usr/local/bin/npm"
+else
+    print_error "npm не установлен или не найден в стандартных путях"
+    print_info "Проверьте установку npm: which npm"
     exit 1
 fi
+
+print_info "Используется npm: $NPM_CMD"
 
 # Функция для создания резервной копии
 create_backup() {
@@ -156,7 +176,7 @@ update_code() {
 install_dependencies() {
     print_info "Установка/обновление зависимостей..."
     
-    npm install
+    $NPM_CMD install
     
     print_success "Зависимости установлены"
 }
@@ -178,7 +198,7 @@ update_database() {
     fi
     
     # Запуск скрипта обновления БД
-    if npm run setup-db 2>&1 | tee /tmp/db-update.log; then
+    if $NPM_CMD run setup-db 2>&1 | tee /tmp/db-update.log; then
         print_success "База данных обновлена"
     else
         print_error "Ошибка при обновлении базы данных"
@@ -195,7 +215,7 @@ update_database() {
 build_frontend() {
     print_info "Сборка фронтенда..."
     
-    if npm run build; then
+    if $NPM_CMD run build; then
         print_success "Фронтенд собран"
         
         # Проверка наличия dist
