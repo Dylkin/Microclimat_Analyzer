@@ -76,6 +76,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     reportFilename: null
   });
 
+  // Отладка: логируем изменения состояния шаблона
+  useEffect(() => {
+    console.log('🔄 Состояние шаблона изменилось:', {
+      hasTemplateFile: !!reportStatus.templateFile,
+      templateFileName: reportStatus.templateFile?.name,
+      templateFileSize: reportStatus.templateFile?.size,
+      templateValidation: reportStatus.templateValidation
+    });
+  }, [reportStatus.templateFile, reportStatus.templateValidation]);
+
   // Состояние для объекта квалификации с зонами измерения
   const [qualificationObject, setQualificationObject] = useState<any>(null);
 
@@ -725,6 +735,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           templateValidation: null 
         }));
         
+        console.log('✅ Шаблон сохранен в состояние:', clonedFile.name);
+        
         // Валидируем шаблон
         validateTemplate(clonedFile);
       } catch (error) {
@@ -746,8 +758,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         templateValidation: validation 
       }));
       
+      console.log('✅ Результат валидации сохранен в состояние:', {
+        isValid: validation.isValid,
+        errors: validation.errors
+      });
+      
       if (!validation.isValid) {
         console.warn('Ошибки валидации шаблона:', validation.errors);
+      } else {
+        console.log('✅ Шаблон успешно валидирован');
       }
     } catch (error) {
       console.error('Ошибка валидации шаблона:', error);
@@ -1544,7 +1563,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                   Среднее t°C
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Соответствие лимитам
+                  Соответствие критериям
                 </th>
               </tr>
             </thead>
@@ -1667,42 +1686,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               Шаблон отчета из справочника объектов квалификации
             </h3>
             
-            {templateFromDirectory.loading ? (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                <span className="text-sm text-gray-600">
-                  Загрузка шаблона из справочника...
-                </span>
-              </div>
-            ) : templateFromDirectory.error ? (
-              <div className="border-2 border-dashed border-red-300 rounded-lg p-6 text-center bg-red-50">
-                <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                <span className="text-sm text-red-600 mb-2 block">
-                  {templateFromDirectory.error}
-                </span>
-                <span className="text-xs text-gray-500">
-                  Вы можете загрузить шаблон вручную
-                </span>
-                <div className="mt-4">
-                  <input
-                    type="file"
-                    accept=".docx"
-                    onChange={handleTemplateUpload}
-                    className="hidden"
-                    id="template-upload-fallback"
-                    title="Загрузить DOCX шаблон"
-                    aria-label="Загрузить DOCX шаблон"
-                  />
-                  <label
-                    htmlFor="template-upload-fallback"
-                    className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Загрузить шаблон вручную
-                  </label>
-                </div>
-              </div>
-            ) : templateFromDirectory.loaded && reportStatus.templateFile ? (
+            {(() => {
+              console.log('🔍 Проверка состояния шаблона:', {
+                hasTemplateFile: !!reportStatus.templateFile,
+                templateFileName: reportStatus.templateFile?.name,
+                templateFromDirectoryLoading: templateFromDirectory.loading,
+                templateFromDirectoryError: templateFromDirectory.error,
+                templateFromDirectoryLoaded: templateFromDirectory.loaded,
+                templateValidation: reportStatus.templateValidation
+              });
+              return null;
+            })()}
+            
+            {reportStatus.templateFile ? (
+              // Показываем загруженный шаблон (из справочника или вручную)
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
@@ -1712,7 +1709,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                         {reportStatus.templateFile.name}
                       </span>
                       <span className="text-xs text-gray-500">
-                        Загружен из справочника объектов квалификации
+                        {templateFromDirectory.loaded 
+                          ? 'Загружен из справочника объектов квалификации'
+                          : 'Загружен вручную'}
                       </span>
                     </div>
                   </div>
@@ -1752,6 +1751,41 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     )}
                   </div>
                 )}
+              </div>
+            ) : templateFromDirectory.loading ? (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                <span className="text-sm text-gray-600">
+                  Загрузка шаблона из справочника...
+                </span>
+              </div>
+            ) : templateFromDirectory.error ? (
+              <div className="border-2 border-dashed border-red-300 rounded-lg p-6 text-center bg-red-50">
+                <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                <span className="text-sm text-red-600 mb-2 block">
+                  {templateFromDirectory.error}
+                </span>
+                <span className="text-xs text-gray-500">
+                  Вы можете загрузить шаблон вручную
+                </span>
+                <div className="mt-4">
+                  <input
+                    type="file"
+                    accept=".docx"
+                    onChange={handleTemplateUpload}
+                    className="hidden"
+                    id="template-upload-fallback"
+                    title="Загрузить DOCX шаблон"
+                    aria-label="Загрузить DOCX шаблон"
+                  />
+                  <label
+                    htmlFor="template-upload-fallback"
+                    className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Загрузить шаблон вручную
+                  </label>
+                </div>
               </div>
             ) : (
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">

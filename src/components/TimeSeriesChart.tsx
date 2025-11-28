@@ -355,28 +355,49 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           ))}
 
           {/* Вертикальные линии сетки */}
-          {xScale.ticks(8).map(tick => (
-            <g key={tick.getTime()}>
-              <line
-                x1={xScale(tick)}
-                y1={0}
-                x2={xScale(tick)}
-                y2={innerHeight}
-                stroke="#f3f4f6"
-                strokeWidth={1}
-              />
-              <text
-                x={xScale(tick)}
-                y={innerHeight + 25}
-                textAnchor="middle"
-                fontSize="12"
-                fill="#6b7280"
-                transform={`rotate(-45, ${xScale(tick)}, ${innerHeight + 25})`}
-              >
-                {formatTime(tick)}
-              </text>
-            </g>
-          ))}
+          {(() => {
+            // Получаем домен оси X
+            const domain = xScale.domain();
+            const startTime = domain[0];
+            const endTime = domain[1];
+            
+            // Вычисляем общий временной диапазон в миллисекундах
+            const timeRange = endTime.getTime() - startTime.getTime();
+            
+            // Количество меток: увеличиваем в 2 раза (с 8 до 16)
+            const tickCount = 16;
+            
+            // Создаем равномерно распределенные метки
+            const ticks: Date[] = [];
+            for (let i = 0; i < tickCount; i++) {
+              // Вычисляем время для каждой метки на равном расстоянии
+              const tickTime = startTime.getTime() + (timeRange * i) / (tickCount - 1);
+              ticks.push(new Date(tickTime));
+            }
+            
+            return ticks.map(tick => (
+              <g key={tick.getTime()}>
+                <line
+                  x1={xScale(tick)}
+                  y1={0}
+                  x2={xScale(tick)}
+                  y2={innerHeight}
+                  stroke="#f3f4f6"
+                  strokeWidth={1}
+                />
+                <text
+                  x={xScale(tick)}
+                  y={innerHeight + 25}
+                  textAnchor="middle"
+                  fontSize="12"
+                  fill="#6b7280"
+                  transform={`rotate(-45, ${xScale(tick)}, ${innerHeight + 25})`}
+                >
+                  {formatTime(tick)}
+                </text>
+              </g>
+            ));
+          })()}
         </g>
 
         {/* Лимиты */}

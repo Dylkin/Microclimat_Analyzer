@@ -668,19 +668,6 @@ export class DocxTemplateProcessor {
           <w:r>
             <w:br w:type="page"/>
           </w:r>
-        </w:p>
-        <w:p>
-          <w:pPr>
-            <w:spacing w:before="400" w:after="400"/>
-            <w:jc w:val="center"/>
-          </w:pPr>
-          <w:r>
-            <w:rPr>
-              <w:b/>
-              <w:sz w:val="32"/>
-            </w:rPr>
-            <w:t>Дополнительный анализ - ${new Date().toLocaleString('ru-RU')}</w:t>
-          </w:r>
         </w:p>`;
       
       // Вставляем новый контент перед закрывающим тегом </w:body>
@@ -1300,7 +1287,7 @@ export class DocxTemplateProcessor {
           </w:tcPr>
           <w:p>
             <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:b/></w:rPr><w:t>Соответствие</w:t></w:r>
+            <w:r><w:rPr><w:b/></w:rPr><w:t>Соответствие критериям</w:t></w:r>
           </w:p>
         </w:tc>
       </w:tr>`;
@@ -1599,27 +1586,6 @@ export class DocxTemplateProcessor {
    * Создание нового контента для добавления в существующий документ
    */
   private async createNewContent(data: TemplateReportData, imageId: string): Promise<string> {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('ru-RU');
-    const timeStr = now.toLocaleTimeString('ru-RU');
-    
-    // Создаем заголовок для нового раздела
-    const sectionHeader = `
-      <w:p>
-        <w:pPr>
-          <w:pStyle w:val="Heading1"/>
-          <w:spacing w:before="240" w:after="120"/>
-        </w:pPr>
-        <w:r>
-          <w:rPr>
-            <w:b/>
-            <w:sz w:val="28"/>
-            <w:szCs w:val="28"/>
-          </w:rPr>
-          <w:t>Дополнительный анализ от ${dateStr} ${timeStr}</w:t>
-        </w:r>
-      </w:p>`;
-
     // Создаем изображение графика
     const chartImage = `
       <w:p>
@@ -1694,7 +1660,7 @@ export class DocxTemplateProcessor {
         </w:p>`;
     }
 
-    return sectionHeader + chartImage + resultsTable + conclusions;
+    return chartImage + resultsTable + conclusions;
   }
 
 
