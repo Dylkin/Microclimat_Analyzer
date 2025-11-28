@@ -310,7 +310,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, address, role, tags, latitude, longitude, geocodedAt } = req.body;
+    const { name, address, role, tags, latitude, longitude, geocodedAt, contacts } = req.body;
     
     const updates: string[] = [];
     const values: any[] = [];
@@ -369,12 +369,37 @@ router.put('/:id', async (req, res) => {
       values.push(geocodedAt ? new Date(geocodedAt) : null);
     }
     
-    if (updates.length === 0) {
-      return res.status(400).json({ error: 'Нет данных для обновления' });
+    // Обрабатываем контакты, если они переданы
+    if (contacts !== undefined) {
+      // Удаляем все существующие контакты
+      await pool.query('DELETE FROM contractor_contacts WHERE contractor_id = $1', [id]);
+      
+      // Добавляем новые контакты, если они есть
+      if (Array.isArray(contacts) && contacts.length > 0) {
+        for (const contact of contacts) {
+          await pool.query(
+            'INSERT INTO contractor_contacts (contractor_id, employee_name, phone, email, comment, is_selected_for_requests) VALUES ($1, $2, $3, $4, $5, $6)',
+            [
+              id,
+              contact.employeeName || null,
+              contact.phone || null,
+              contact.email || null,
+              contact.comment || null,
+              contact.isSelectedForRequests !== false
+            ]
+          );
+        }
+      }
+      
+      // Обновляем updated_at контрагента, если обновлялись только контакты
+      if (updates.length === 0) {
+        await pool.query('UPDATE contractors SET updated_at = NOW() WHERE id = $1', [id]);
+      }
     }
     
-    updates.push(`updated_at = NOW()`);
-    values.push(id);
+    if (updates.length === 0 && contacts === undefined) {
+      return res.status(400).json({ error: 'Нет данных для обновления' });
+    }
     
     // Проверяем наличие полей latitude, longitude, geocoded_at в таблице
     const tableCheck = await pool.query(`
@@ -407,6 +432,11 @@ router.put('/:id', async (req, res) => {
     `);
     const hasTagsFieldForReturning = tagsCheckForReturning.rows.length > 0;
     
+    // Обновляем основные поля контрагента только если есть что обновлять
+    if (updates.length > 0) {
+      updates.push(`updated_at = NOW()`);
+      values.push(id);
+    
     // Формируем SELECT для RETURNING с учетом наличия полей
     const returningFields = [
       'id, name, address',
@@ -416,13 +446,34 @@ router.put('/:id', async (req, res) => {
       'created_at, updated_at'
     ].filter(Boolean).join(', ');
     
-    const result = await pool.query(
-      `UPDATE contractors SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING ${returningFields}`,
-      values
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Контрагент не найден' });
+    let result;
+    if (updates.length > 0) {
+      result = await pool.query(
+        `UPDATE contractors SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING ${returningFields}`,
+        values
+      );
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Контрагент не найден' });
+      }
+    } else {
+      // Если обновлялись только контакты, получаем данные контрагента
+      const selectFields = [
+        'id, name, address',
+        hasRoleFieldForReturning ? 'role' : '',
+        hasTagsFieldForReturning ? 'tags' : '',
+        hasGeoFields ? 'latitude, longitude, geocoded_at' : '',
+        'created_at, updated_at'
+      ].filter(Boolean).join(', ');
+      
+      result = await pool.query(
+        `SELECT ${selectFields} FROM contractors WHERE id = $1`,
+        [id]
+      );
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Контрагент не найден' });
+      }
     }
     
     // Получаем контакты
