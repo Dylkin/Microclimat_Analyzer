@@ -1830,49 +1830,99 @@ export class DocxTemplateProcessor {
    */
   async validateTemplate(templateFile: File): Promise<{ isValid: boolean; errors: string[] }> {
     try {
+      console.log('🔍 Начало валидации шаблона:', {
+        name: templateFile.name,
+        size: templateFile.size,
+        type: templateFile.type,
+        lastModified: templateFile.lastModified
+      });
+
       // Проверяем расширение файла
       if (!templateFile.name.toLowerCase().endsWith('.docx')) {
+        console.warn('❌ Неверное расширение файла:', templateFile.name);
         return {
           isValid: false,
           errors: ['Файл должен иметь расширение .docx']
         };
       }
 
+      // Проверяем размер файла
+      if (templateFile.size === 0) {
+        console.warn('❌ Файл пустой');
+        return {
+          isValid: false,
+          errors: ['Файл пустой']
+        };
+      }
+
       // Читаем файл как ArrayBuffer
-      const buffer = await templateFile.arrayBuffer();
-      
+      let buffer: ArrayBuffer;
+      try {
+        buffer = await templateFile.arrayBuffer();
+        console.log('✅ Файл прочитан в ArrayBuffer, размер:', buffer.byteLength, 'байт');
+      } catch (readError) {
+        console.error('❌ Ошибка чтения файла:', readError);
+        return {
+          isValid: false,
+          errors: [`Ошибка чтения файла: ${readError instanceof Error ? readError.message : String(readError)}`]
+        };
+      }
+
       // Проверяем, что это валидный ZIP архив (DOCX)
       try {
         const zip = new PizZip(buffer);
+        console.log('✅ ZIP архив создан, файлов в архиве:', Object.keys(zip.files).length);
         
         // Проверяем наличие основных файлов DOCX
-        if (!zip.files['word/document.xml']) {
+        const requiredFiles = [
+          'word/document.xml',
+          '[Content_Types].xml'
+        ];
+        
+        const missingFiles = requiredFiles.filter(file => !zip.files[file]);
+        if (missingFiles.length > 0) {
+          console.warn('❌ Отсутствуют обязательные файлы:', missingFiles);
           return {
             isValid: false,
-            errors: ['Файл не является корректным DOCX документом']
+            errors: [`Файл не является корректным DOCX документом. Отсутствуют: ${missingFiles.join(', ')}`]
           };
         }
 
         // Читаем содержимое документа
-        const documentXml = zip.files['word/document.xml'].asText();
-        
-        return {
-          isValid: true,
-          errors: []
-        };
+        try {
+          const documentXml = zip.files['word/document.xml'].asText();
+          console.log('✅ document.xml прочитан, размер:', documentXml.length, 'символов');
+          
+          return {
+            isValid: true,
+            errors: []
+          };
+        } catch (xmlError) {
+          console.error('❌ Ошибка чтения document.xml:', xmlError);
+          return {
+            isValid: false,
+            errors: [`Ошибка чтения содержимого документа: ${xmlError instanceof Error ? xmlError.message : String(xmlError)}`]
+          };
+        }
 
       } catch (zipError) {
+        console.error('❌ Ошибка создания ZIP архива:', zipError);
+        console.error('Детали ошибки:', {
+          message: zipError instanceof Error ? zipError.message : String(zipError),
+          name: zipError instanceof Error ? zipError.name : 'Unknown',
+          stack: zipError instanceof Error ? zipError.stack : undefined
+        });
         return {
           isValid: false,
-          errors: ['Не удалось прочитать DOCX файл. Возможно, файл поврежден.']
+          errors: [`Не удалось прочитать DOCX файл. Возможно, файл поврежден. Ошибка: ${zipError instanceof Error ? zipError.message : String(zipError)}`]
         };
       }
 
     } catch (error) {
-      console.error('Ошибка валидации шаблона:', error);
+      console.error('❌ Общая ошибка валидации шаблона:', error);
       return {
         isValid: false,
-        errors: ['Ошибка при проверке файла шаблона']
+        errors: [`Ошибка при проверке файла шаблона: ${error instanceof Error ? error.message : String(error)}`]
       };
     }
   }

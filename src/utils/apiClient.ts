@@ -82,17 +82,38 @@ class ApiClient {
 
       // Проверяем, есть ли контент для парсинга
       const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const text = await response.text();
-        if (text.trim() === '') {
-          return undefined as T;
-        }
-        return JSON.parse(text);
+      const text = await response.text();
+      
+      if (text.trim() === '') {
+        return undefined as T;
       }
 
-      // Если не JSON, возвращаем текст или пустой ответ
-      const text = await response.text();
-      return (text ? JSON.parse(text) : undefined) as T;
+      // Проверяем, что ответ действительно JSON, а не HTML
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          return JSON.parse(text);
+        } catch (parseError) {
+          console.error('Ошибка парсинга JSON:', parseError);
+          console.error('Полученный ответ:', text.substring(0, 200));
+          throw new Error(`Ошибка парсинга JSON ответа. Возможно, backend не запущен или прокси не настроен. Ответ начинается с: ${text.substring(0, 50)}`);
+        }
+      }
+
+      // Если не JSON, но похоже на HTML - это ошибка
+      if (text.trim().toLowerCase().startsWith('<!doctype') || text.trim().toLowerCase().startsWith('<html')) {
+        console.error('Получен HTML вместо JSON. Возможно, backend не запущен или прокси не настроен.');
+        console.error('URL запроса:', url);
+        console.error('Ответ:', text.substring(0, 500));
+        throw new Error('Backend не отвечает. Получен HTML вместо JSON. Убедитесь, что backend запущен на порту 3001.');
+      }
+
+      // Пытаемся распарсить как JSON, если это не HTML
+      try {
+        return JSON.parse(text);
+      } catch (parseError) {
+        console.warn('Не удалось распарсить ответ как JSON:', parseError);
+        return undefined as T;
+      }
     } catch (error) {
       if (error instanceof Error) {
         throw error;
