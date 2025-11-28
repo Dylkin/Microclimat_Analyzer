@@ -436,6 +436,7 @@ router.put('/:id', async (req, res) => {
     if (updates.length > 0) {
       updates.push(`updated_at = NOW()`);
       values.push(id);
+    }
     
     // Формируем SELECT для RETURNING с учетом наличия полей
     const returningFields = [
