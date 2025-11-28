@@ -364,8 +364,8 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             // Вычисляем общий временной диапазон в миллисекундах
             const timeRange = endTime.getTime() - startTime.getTime();
             
-            // Количество меток: увеличиваем в 2 раза (с 8 до 16)
-            const tickCount = 16;
+            // Количество меток: увеличиваем в 2 раза (с 16 до 32)
+            const tickCount = 32;
             
             // Создаем равномерно распределенные метки
             const ticks: Date[] = [];

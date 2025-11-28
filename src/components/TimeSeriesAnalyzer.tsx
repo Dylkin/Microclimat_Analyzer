@@ -667,10 +667,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleAddMarker = useCallback((timestamp: number) => {
+    // Определяем название маркера на основе количества существующих маркеров
+    // Нечётные по порядку (1, 3, 5, ...): "Начало испытания"
+    // Чётные по порядку (2, 4, 6, ...): "Завершение испытания"
+    const markerNumber = markers.length + 1;
+    const label = markerNumber % 2 === 1 
+      ? 'Начало испытания' 
+      : 'Завершение испытания';
+    
     const newMarker: VerticalMarker = {
       id: Date.now().toString(),
       timestamp,
-      label: `Маркер ${markers.length + 1}`,
+      label,
       color: '#8b5cf6',
       type: 'test'
     };

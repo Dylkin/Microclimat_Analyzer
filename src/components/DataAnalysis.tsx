@@ -271,14 +271,37 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm mt-4">
-              <div>
-                <span className="font-medium text-gray-800">Серийный (Гос. номер):</span>
-                <p className="text-gray-700">{selectedQualificationObject.serialNumber || selectedQualificationObject.vin || 'Не указан'}</p>
-              </div>
-              <div>
-                <span className="font-medium text-gray-800">Климатическая установка:</span>
-                <p className="text-gray-700">{selectedQualificationObject.climateSystem || 'Не указана'}</p>
-              </div>
+              {selectedQualificationObject.type === 'автомобиль' ? (
+                <>
+                  <div>
+                    <span className="font-medium text-gray-800">VIN номер:</span>
+                    <p className="text-gray-700">{selectedQualificationObject.vin || 'Не указан'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-800">Регистрационный номер:</span>
+                    <p className="text-gray-700">{selectedQualificationObject.registrationNumber || 'Не указан'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-800">Объем кузова (м³):</span>
+                    <p className="text-gray-700">{selectedQualificationObject.bodyVolume ? `${selectedQualificationObject.bodyVolume}` : 'Не указан'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-800">Климатическая установка:</span>
+                    <p className="text-gray-700">{selectedQualificationObject.climateSystem || 'Не указана'}</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <span className="font-medium text-gray-800">Серийный (Гос. номер):</span>
+                    <p className="text-gray-700">{selectedQualificationObject.serialNumber || selectedQualificationObject.vin || 'Не указан'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-800">Климатическая установка:</span>
+                    <p className="text-gray-700">{selectedQualificationObject.climateSystem || 'Не указана'}</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
