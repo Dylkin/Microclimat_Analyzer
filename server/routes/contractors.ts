@@ -387,20 +387,31 @@ router.put('/:id', async (req, res) => {
     
     const hasGeoFields = tableCheck.rows.length > 0;
     
-    // Проверяем наличие поля role
-    const roleCheck = await pool.query(`
+    // Проверяем наличие поля role для RETURNING
+    const roleCheckForReturning = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_schema = 'public' 
       AND table_name = 'contractors' 
       AND column_name = 'role'
     `);
-    const hasRoleField = roleCheck.rows.length > 0;
+    const hasRoleFieldForReturning = roleCheckForReturning.rows.length > 0;
+    
+    // Проверяем наличие поля tags для RETURNING
+    const tagsCheckForReturning = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'contractors' 
+      AND column_name = 'tags'
+    `);
+    const hasTagsFieldForReturning = tagsCheckForReturning.rows.length > 0;
     
     // Формируем SELECT для RETURNING с учетом наличия полей
     const returningFields = [
       'id, name, address',
-      hasRoleField ? 'role' : '',
+      hasRoleFieldForReturning ? 'role' : '',
+      hasTagsFieldForReturning ? 'tags' : '',
       hasGeoFields ? 'latitude, longitude, geocoded_at' : '',
       'created_at, updated_at'
     ].filter(Boolean).join(', ');
@@ -416,17 +427,35 @@ router.put('/:id', async (req, res) => {
     
     // Получаем контакты
     const contactsResult = await pool.query(
-      'SELECT id, contractor_id, employee_name, phone, comment, created_at FROM contractor_contacts WHERE contractor_id = $1 ORDER BY created_at',
+      'SELECT id, contractor_id, employee_name, phone, email, comment, created_at, is_selected_for_requests FROM contractor_contacts WHERE contractor_id = $1 ORDER BY created_at',
       [id]
     );
     
     const contractor = result.rows[0];
+    
+    // Приводим tags из формата text[] (строка "{tag1,tag2}") к массиву строк
+    let tagsArray: string[] = [];
+    if (contractor.tags !== undefined && contractor.tags !== null) {
+      if (Array.isArray(contractor.tags)) {
+        tagsArray = contractor.tags;
+      } else if (typeof contractor.tags === 'string') {
+        tagsArray = contractor.tags
+          .replace(/^{|}$/g, '')
+          .split(',')
+          .map((t: string) => t.trim())
+          .filter((t: string) => t.length > 0);
+      }
+    } else if (tags !== undefined) {
+      // Если tags не было в БД, используем значение из запроса
+      tagsArray = Array.isArray(tags) ? tags : [];
+    }
+    
     res.json({
       id: contractor.id,
       name: contractor.name,
       address: contractor.address || undefined,
       role: contractor.role && Array.isArray(contractor.role) ? contractor.role : (contractor.role ? [contractor.role] : []),
-      tags,
+      tags: tagsArray,
       latitude: contractor.latitude !== null && contractor.latitude !== undefined ? parseFloat(contractor.latitude) : undefined,
       longitude: contractor.longitude !== null && contractor.longitude !== undefined ? parseFloat(contractor.longitude) : undefined,
       geocodedAt: contractor.geocoded_at ? new Date(contractor.geocoded_at) : undefined,
@@ -437,13 +466,18 @@ router.put('/:id', async (req, res) => {
         contractorId: contact.contractor_id,
         employeeName: contact.employee_name,
         phone: contact.phone || undefined,
+        email: contact.email || undefined,
+        isSelectedForRequests: contact.is_selected_for_requests !== false,
         comment: contact.comment || undefined,
         createdAt: new Date(contact.created_at)
       }))
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating contractor:', error);
-    res.status(500).json({ error: 'Ошибка обновления контрагента' });
+    res.status(500).json({ 
+      error: 'Ошибка обновления контрагента',
+      details: error.message || String(error)
+    });
   }
 });
 
