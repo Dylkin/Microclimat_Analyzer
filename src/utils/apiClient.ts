@@ -44,20 +44,26 @@ class ApiClient {
     // Пытаемся получить userId из localStorage
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem('currentUser');
+      console.log('ApiClient.getUserId: currentUser из localStorage:', userStr);
       if (userStr) {
         try {
           const user = JSON.parse(userStr);
+          console.log('ApiClient.getUserId: распарсенный user:', user);
           const userId = user?.id || null;
           if (!userId) {
             console.warn('ApiClient: userId не найден в объекте пользователя', user);
+          } else {
+            console.log('ApiClient.getUserId: найден userId:', userId);
           }
           return userId;
         } catch (error) {
-          console.error('ApiClient: Ошибка парсинга currentUser из localStorage:', error);
+          console.error('ApiClient: Ошибка парсинга currentUser из localStorage:', error, userStr);
           return null;
         }
       } else {
         console.warn('ApiClient: currentUser не найден в localStorage');
+        // Проверяем все ключи в localStorage
+        console.log('ApiClient: все ключи в localStorage:', Object.keys(localStorage));
       }
     }
     return null;
