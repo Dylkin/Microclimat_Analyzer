@@ -327,26 +327,32 @@ class ApiClient {
 export const apiClient = new ApiClient();
 
 // Временная глобальная переменная для отладки (всегда доступна)
+// Выполняем сразу при загрузке модуля
 if (typeof window !== 'undefined') {
-  (window as any).apiClient = apiClient;
-  (window as any).getUserId = () => {
-    const userStr = localStorage.getItem('currentUser');
-    console.log('window.getUserId: currentUser из localStorage:', userStr);
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        const userId = user?.id || null;
-        console.log('window.getUserId: найден userId:', userId);
-        return userId;
-      } catch (e) {
-        console.error('window.getUserId: ошибка парсинга:', e);
-        return null;
+  try {
+    (window as any).apiClient = apiClient;
+    (window as any).getUserId = () => {
+      const userStr = localStorage.getItem('currentUser');
+      console.log('window.getUserId: currentUser из localStorage:', userStr);
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          const userId = user?.id || null;
+          console.log('window.getUserId: найден userId:', userId);
+          return userId;
+        } catch (e) {
+          console.error('window.getUserId: ошибка парсинга:', e);
+          return null;
+        }
       }
-    }
-    console.warn('window.getUserId: currentUser не найден в localStorage');
-    return null;
-  };
-  console.log('🔧 Отладка: apiClient и getUserId доступны в window.apiClient и window.getUserId()');
+      console.warn('window.getUserId: currentUser не найден в localStorage');
+      return null;
+    };
+    console.log('🔧 Отладка: apiClient и getUserId доступны в window.apiClient и window.getUserId()');
+    console.log('🔧 Проверка: window.getUserId ===', typeof (window as any).getUserId);
+  } catch (error) {
+    console.error('Ошибка при регистрации window.getUserId:', error);
+  }
 }
 
 // Экспортируем класс для создания дополнительных экземпляров
