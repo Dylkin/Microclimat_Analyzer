@@ -3,6 +3,7 @@
 # ================================
 # Скрипт обновления продакшена
 # Microclimat Analyzer
+# Автоматический режим - все операции выполняются без подтверждений
 # ================================
 
 set -e  # Выход при ошибке
@@ -141,13 +142,7 @@ update_code() {
     # Сохранение изменений (если есть)
     if ! $GIT_CMD diff-index --quiet HEAD -- 2>/dev/null; then
         print_warning "Обнаружены незакоммиченные изменения"
-        printf "Продолжить обновление? (y/n) "
-        read REPLY
-        REPLY=$(echo "$REPLY" | cut -c1)
-        if [ "$REPLY" != "y" ] && [ "$REPLY" != "Y" ]; then
-            print_error "Обновление отменено"
-            exit 1
-        fi
+        print_info "Продолжаем обновление автоматически..."
     fi
     
     # Получение последних изменений
@@ -159,13 +154,7 @@ update_code() {
     
     if [ -z "$REMOTE" ] || [ "$LOCAL" = "$REMOTE" ]; then
         print_warning "Нет новых изменений в репозитории"
-        printf "Продолжить обновление? (y/n) "
-        read REPLY
-        REPLY=$(echo "$REPLY" | cut -c1)
-        if [ "$REPLY" != "y" ] && [ "$REPLY" != "Y" ]; then
-            print_info "Обновление отменено"
-            exit 0
-        fi
+        print_info "Продолжаем обновление автоматически..."
     fi
     
     # Обновление кода
@@ -205,12 +194,7 @@ update_database() {
     else
         print_error "Ошибка при обновлении базы данных"
         print_info "Лог сохранен в /tmp/db-update.log"
-        printf "Продолжить обновление? (y/n) "
-        read REPLY
-        REPLY=$(echo "$REPLY" | cut -c1)
-        if [ "$REPLY" != "y" ] && [ "$REPLY" != "Y" ]; then
-            exit 1
-        fi
+        print_warning "Продолжаем обновление автоматически..."
     fi
 }
 
@@ -315,14 +299,10 @@ main() {
     echo "======================================"
     echo ""
     
-    # Создание резервной копии (опционально)
-    printf "Создать резервную копию перед обновлением? (y/n) "
-    read REPLY
-    REPLY=$(echo "$REPLY" | cut -c1)
-    if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
-        create_backup
-        echo ""
-    fi
+    # Создание резервной копии (автоматически)
+    print_info "Создание резервной копии перед обновлением..."
+    create_backup
+    echo ""
     
     # Обновление кода
     update_code
@@ -332,27 +312,17 @@ main() {
     install_dependencies
     echo ""
     
-    # Обновление БД
-    printf "Обновить структуру базы данных? (y/n) "
-    read REPLY
-    REPLY=$(echo "$REPLY" | cut -c1)
-    if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
-        update_database
-        echo ""
-    fi
+    # Обновление БД (автоматически)
+    update_database
+    echo ""
     
     # Сборка фронтенда
     build_frontend
     echo ""
     
-    # Перезапуск сервисов
-    printf "Перезапустить сервисы? (y/n) "
-    read REPLY
-    REPLY=$(echo "$REPLY" | cut -c1)
-    if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
-        restart_services
-        echo ""
-    fi
+    # Перезапуск сервисов (автоматически)
+    restart_services
+    echo ""
     
     # Проверка работоспособности
     verify_deployment
