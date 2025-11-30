@@ -14,9 +14,12 @@ interface ReleaseInfo {
 
 // GET /api/release/info - Получить информацию о последних 5 релизах
 router.get('/info', async (req, res) => {
+  console.log('=== НОВЫЙ КОД ВЫПОЛНЯЕТСЯ ===');
+  console.log('Запрос к /api/release/info получен');
   try {
     const releases: ReleaseInfo[] = [];
     const projectDir = process.cwd();
+    console.log('Инициализирован массив releases, projectDir:', projectDir);
 
     // Получаем последние 5 коммитов с информацией
     try {
