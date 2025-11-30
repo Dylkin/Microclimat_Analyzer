@@ -23,6 +23,7 @@ import tendersRouter from './routes/tenders.js';
 import dbProxyRouter from './routes/dbProxy.js';
 import storageRouter from './routes/storage.js';
 import mailRouter from './routes/mail.js';
+import testHeadersRouter from './routes/testHeaders.js';
 
 dotenv.config();
 
@@ -43,36 +44,6 @@ app.get('/health', async (req, res) => {
   } catch (error) {
     res.status(500).json({ status: 'error', database: 'disconnected', error: (error as Error).message });
   }
-});
-
-// Test endpoint для проверки заголовков
-app.get('/api/test-headers', (req, res) => {
-  const allHeaders: Record<string, any> = {};
-  Object.keys(req.headers).forEach(key => {
-    allHeaders[key] = req.headers[key];
-  });
-  
-  const xHeaders: Record<string, any> = {};
-  Object.keys(req.headers).forEach(key => {
-    if (key.toLowerCase().startsWith('x-') || key.toLowerCase().includes('user')) {
-      xHeaders[key] = req.headers[key];
-    }
-  });
-  
-  res.json({
-    method: req.method,
-    path: req.path,
-    query: req.query,
-    body: req.body,
-    allHeaders: allHeaders,
-    xHeaders: xHeaders,
-    specificHeaders: {
-      'x-user-id': req.headers['x-user-id'],
-      'X-User-Id': req.headers['x-user-id'],
-      'x-userid': req.headers['x-userid'],
-      'user-id': req.headers['user-id'],
-    }
-  });
 });
 
 // API Routes
@@ -96,6 +67,7 @@ app.use('/api/tenders', tendersRouter);
 app.use('/api/db', dbProxyRouter);
 app.use('/api/storage', storageRouter);
 app.use('/api/mail', mailRouter);
+app.use('/api', testHeadersRouter);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
