@@ -13,15 +13,23 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       || req.headers['user-id'] as string;
     
     if (!userId) {
+      // Логируем все заголовки для отладки
+      const allHeaders: Record<string, any> = {};
+      Object.keys(req.headers).forEach(key => {
+        allHeaders[key] = req.headers[key];
+      });
+      
       console.error('Ошибка авторизации: userId не предоставлен', {
         method: req.method,
         path: req.path,
         body: req.body,
         query: req.query,
-        headers: {
+        allHeaders: allHeaders,
+        specificHeaders: {
           'x-user-id': req.headers['x-user-id'],
           'x-userid': req.headers['x-userid'],
           'user-id': req.headers['user-id'],
+          'x-user-id-lower': req.headers['x-user-id']?.toLowerCase(),
           'authorization': req.headers['authorization']
         }
       });

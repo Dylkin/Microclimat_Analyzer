@@ -9,10 +9,12 @@ setlocal enabledelayedexpansion
 REM Параметры подключения
 set SSH_HOST=stas@192.168.98.42
 set PROJECT_DIR=/home/stas/Microclimat_Analyzer
+set SSH_PASSWORD=159357Stas
 
 REM Можно передать хост как параметр
 if not "%1"=="" set SSH_HOST=%1
 if not "%2"=="" set PROJECT_DIR=%2
+if not "%3"=="" set SSH_PASSWORD=%3
 
 echo.
 echo ========================================
@@ -21,6 +23,11 @@ echo ========================================
 echo.
 echo [INFO] Сервер: %SSH_HOST%
 echo [INFO] Директория: %PROJECT_DIR%
+echo.
+echo [INFO] Пароль для SSH: %SSH_PASSWORD%
+echo [INFO] Пароль для sudo: %SSH_PASSWORD%
+echo.
+echo [INFO] При запросе пароля SSH введите: %SSH_PASSWORD%
 echo.
 
 REM Проверка наличия SSH
@@ -38,25 +45,8 @@ echo [INFO] Подключение к серверу и запуск update-prod
 echo.
 
 REM Подключаемся к серверу и запускаем скрипт обновления
-set SSH_PASSWORD=159357Stas
-set SSH_USER=stas
-set SSH_HOST_ONLY=192.168.98.42
-
-REM Используем plink с автоматическим принятием ключа хоста
-REM Для plink нужно указать fingerprint ключа хоста
-REM Из предыдущего вывода: ssh-ed25519 255 SHA256:zKyaX+SZi84RtPZeVyWau+IAqNlQFss2pkLf/xuETDg
-where plink >nul 2>&1
-if %ERRORLEVEL% EQU 0 (
-    echo [INFO] Используем plink для автоматической передачи пароля...
-    plink -ssh -pw %SSH_PASSWORD% -hostkey "ssh-ed25519 255 SHA256:zKyaX+SZi84RtPZeVyWau+IAqNlQFss2pkLf/xuETDg" %SSH_USER%@%SSH_HOST_ONLY% "cd %PROJECT_DIR% && echo %SSH_PASSWORD% | sudo -S bash update-prod.sh"
-) else (
-    REM Используем обычный SSH (потребует ввода пароля вручную)
-    echo [INFO] plink не найден, используем обычный SSH
-    echo [INFO] Пароль для SSH: %SSH_PASSWORD%
-    echo [INFO] Пароль для sudo: %SSH_PASSWORD%
-    echo.
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL %SSH_HOST% "cd %PROJECT_DIR% && echo '%SSH_PASSWORD%' | sudo -S bash update-prod.sh"
-)
+REM SSH запросит пароль - введите: %SSH_PASSWORD%
+ssh -o StrictHostKeyChecking=no %SSH_HOST% "cd %PROJECT_DIR% && echo '%SSH_PASSWORD%' | sudo -S bash update-prod.sh"
 
 set EXIT_CODE=%ERRORLEVEL%
 

@@ -89,10 +89,20 @@ class ApiClient {
     const userId = this.getUserId();
     if (userId) {
       headers['x-user-id'] = userId;
+      // Также добавляем в других форматах для совместимости
+      headers['X-User-Id'] = userId;
+      headers['x-userid'] = userId;
+      console.log('ApiClient.request: userId добавлен в заголовки', {
+        userId,
+        endpoint: url,
+        method: options.method || 'GET',
+        headers: Object.keys(headers)
+      });
     } else {
       console.warn('ApiClient.request: userId не найден для запроса', {
         endpoint: url,
-        method: options.method || 'GET'
+        method: options.method || 'GET',
+        localStorage: typeof window !== 'undefined' ? localStorage.getItem('currentUser') : 'N/A'
       });
     }
 
@@ -165,8 +175,12 @@ class ApiClient {
     if (userId && !endpoint.includes('userId=')) {
       const separator = endpoint.includes('?') ? '&' : '?';
       url = `${endpoint}${separator}userId=${encodeURIComponent(userId)}`;
+      console.log('ApiClient.get: userId добавлен в query', { userId, url });
     } else if (!userId) {
-      console.warn('ApiClient.get: userId не найден для запроса', endpoint);
+      console.warn('ApiClient.get: userId не найден для запроса', {
+        endpoint,
+        localStorage: typeof window !== 'undefined' ? localStorage.getItem('currentUser') : 'N/A'
+      });
     }
     return this.request<T>(url, { method: 'GET' });
   }

@@ -1,7 +1,7 @@
 @echo off
 REM ================================
 REM Скрипт для запуска update-prod.sh на удаленном сервере
-REM Microclimat Analyzer
+REM Microclimat Analyzer (с передачей пароля)
 REM ================================
 
 setlocal enabledelayedexpansion
@@ -9,10 +9,12 @@ setlocal enabledelayedexpansion
 REM Параметры подключения
 set SSH_HOST=stas@192.168.98.42
 set PROJECT_DIR=/home/stas/Microclimat_Analyzer
+set SSH_PASSWORD=159357Stas
 
-REM Можно передать хост как параметр
+REM Можно передать параметры
 if not "%1"=="" set SSH_HOST=%1
 if not "%2"=="" set PROJECT_DIR=%2
+if not "%3"=="" set SSH_PASSWORD=%3
 
 echo.
 echo ========================================
@@ -34,28 +36,27 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
+REM Проверка наличия sshpass (через WSL или Git Bash)
+where sshpass >nul 2>&1
+set USESSHPASS=%ERRORLEVEL%
+
 echo [INFO] Подключение к серверу и запуск update-prod.sh...
 echo.
 
-REM Подключаемся к серверу и запускаем скрипт обновления
-set SSH_PASSWORD=159357Stas
-set SSH_USER=stas
-set SSH_HOST_ONLY=192.168.98.42
-
-REM Используем plink с автоматическим принятием ключа хоста
-REM Для plink нужно указать fingerprint ключа хоста
-REM Из предыдущего вывода: ssh-ed25519 255 SHA256:zKyaX+SZi84RtPZeVyWau+IAqNlQFss2pkLf/xuETDg
-where plink >nul 2>&1
-if %ERRORLEVEL% EQU 0 (
-    echo [INFO] Используем plink для автоматической передачи пароля...
-    plink -ssh -pw %SSH_PASSWORD% -hostkey "ssh-ed25519 255 SHA256:zKyaX+SZi84RtPZeVyWau+IAqNlQFss2pkLf/xuETDg" %SSH_USER%@%SSH_HOST_ONLY% "cd %PROJECT_DIR% && echo %SSH_PASSWORD% | sudo -S bash update-prod.sh"
+if %USESSHPASS% EQU 0 (
+    REM Используем sshpass для передачи пароля
+    echo %SSH_PASSWORD% | sshpass -p %SSH_PASSWORD% ssh -o StrictHostKeyChecking=no %SSH_HOST% "cd %PROJECT_DIR% && sudo -S sh ./update-prod.sh /y" <<< %SSH_PASSWORD%
 ) else (
-    REM Используем обычный SSH (потребует ввода пароля вручную)
-    echo [INFO] plink не найден, используем обычный SSH
-    echo [INFO] Пароль для SSH: %SSH_PASSWORD%
-    echo [INFO] Пароль для sudo: %SSH_PASSWORD%
-    echo.
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL %SSH_HOST% "cd %PROJECT_DIR% && echo '%SSH_PASSWORD%' | sudo -S bash update-prod.sh"
+    REM Используем PowerShell для передачи пароля
+    powershell -Command "$password = ConvertTo-SecureString '%SSH_PASSWORD%' -AsPlainText -Force; $credential = New-Object System.Management.Automation.PSCredential('%SSH_HOST%', $password); $session = New-SSHSession -ComputerName '%SSH_HOST%' -Credential $credential -AcceptKey; Invoke-SSHCommand -SessionId $session.SessionId -Command 'cd %PROJECT_DIR% && sudo -S sh ./update-prod.sh /y' <<< '%SSH_PASSWORD%'"
+    
+    REM Если PowerShell не работает, используем обычный SSH (потребует ввода пароля)
+    if %ERRORLEVEL% NEQ 0 (
+        echo [WARNING] sshpass не найден, используем обычный SSH
+        echo [INFO] Введите пароль при запросе
+        echo.
+        ssh %SSH_HOST% "cd %PROJECT_DIR% && echo '%SSH_PASSWORD%' | sudo -S sh ./update-prod.sh /y"
+    )
 )
 
 set EXIT_CODE=%ERRORLEVEL%

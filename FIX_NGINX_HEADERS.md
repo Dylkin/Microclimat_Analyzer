@@ -31,7 +31,12 @@ location /api {
     proxy_set_header X-Forwarded-Proto $scheme;
     
     # Добавить эти строки для передачи заголовка x-user-id
+    # В Nginx заголовки преобразуются: x-user-id → $http_x_user_id
     proxy_set_header X-User-Id $http_x_user_id;
+    # Также пробуем другие варианты на случай нормализации заголовков
+    proxy_set_header x-user-id $http_x_user_id;
+    proxy_set_header x-userid $http_x_userid;
+    # Включаем передачу всех заголовков от клиента
     proxy_pass_request_headers on;
     
     proxy_cache_bypass $http_upgrade;
