@@ -6,7 +6,15 @@
 
 set -e
 
-NGINX_CONF="/etc/nginx/sites-available/microclimat-analyzer"
+# Пробуем найти конфигурационный файл
+NGINX_CONF="/etc/nginx/sites-available/microclimat"
+if [ ! -f "$NGINX_CONF" ]; then
+    NGINX_CONF="/etc/nginx/sites-available/microclimat-analyzer"
+fi
+if [ ! -f "$NGINX_CONF" ]; then
+    echo "Конфигурационный файл не найден. Проверьте /etc/nginx/sites-available/"
+    exit 1
+fi
 
 # Проверка прав
 if [ "$EUID" -ne 0 ]; then

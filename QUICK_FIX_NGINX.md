@@ -8,7 +8,7 @@
 ### Шаг 1: Откройте конфигурационный файл Nginx
 
 ```bash
-sudo nano /etc/nginx/sites-available/microclimat-analyzer
+sudo nano /etc/nginx/sites-available/microclimat
 ```
 
 ### Шаг 2: Найдите блок `location /api` и добавьте строки
@@ -76,6 +76,6 @@ sudo systemctl reload nginx
 ## Альтернатива: одна команда (если файл называется microclimat-analyzer)
 
 ```bash
-sudo sed -i '/proxy_set_header X-Forwarded-Proto/a\    proxy_pass_request_headers on;\n    proxy_set_header X-User-Id $http_x_user_id;\n    proxy_set_header x-user-id $http_x_user_id;' /etc/nginx/sites-available/microclimat-analyzer && sudo nginx -t && sudo systemctl reload nginx
+sudo sed -i '/proxy_set_header X-Forwarded-Proto/a\    proxy_pass_request_headers on;\n    proxy_set_header X-User-Id $http_x_user_id;\n    proxy_set_header x-user-id $http_x_user_id;' /etc/nginx/sites-available/microclimat && sudo nginx -t && sudo systemctl reload nginx
 ```
 
