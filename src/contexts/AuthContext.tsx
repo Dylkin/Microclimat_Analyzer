@@ -388,9 +388,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Пользователь существует в БД, восстанавливаем сессию
                 setUser(parsedUser);
               } else {
-                // Пользователь не найден в БД, очищаем localStorage
-                console.warn('Пользователь из localStorage не найден в БД, очищаем сессию');
-                localStorage.removeItem('currentUser');
+                // Пользователь не найден в БД по ID
+                // Проверяем, не был ли это старый UUID (миграция UUID v0 -> v5)
+                const OLD_DEFAULT_UUID = '00000000-0000-0000-0000-000000000001';
+                if (parsedUser.id === OLD_DEFAULT_UUID && parsedUser.email) {
+                  // Пытаемся найти пользователя по email (миграция UUID)
+                  console.log('Обнаружен старый UUID, пытаемся найти пользователя по email для миграции...');
+                  const userByEmail = dbUsers.find(u => u.email === parsedUser.email);
+                  if (userByEmail) {
+                    // Найден пользователь с новым UUID, обновляем localStorage
+                    console.log('Пользователь найден по email, обновляем UUID в localStorage');
+                    const updatedUser = {
+                      ...parsedUser,
+                      id: userByEmail.id
+                    };
+                    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+                    setUser(updatedUser);
+                  } else {
+                    // Пользователь не найден ни по ID, ни по email
+                    console.warn('Пользователь из localStorage не найден в БД, очищаем сессию');
+                    localStorage.removeItem('currentUser');
+                  }
+                } else {
+                  // Пользователь не найден в БД, очищаем localStorage
+                  console.warn('Пользователь из localStorage не найден в БД, очищаем сессию');
+                  localStorage.removeItem('currentUser');
+                }
               }
             } catch (error) {
               // Если не удалось проверить в БД, все равно восстанавливаем сессию
