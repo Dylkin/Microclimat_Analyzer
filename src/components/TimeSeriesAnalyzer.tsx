@@ -48,6 +48,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [showSettings, setShowSettings] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
   const [editingMarkerType, setEditingMarkerType] = useState<string | null>(null);
+  const [editingMarkerTimestamp, setEditingMarkerTimestamp] = useState<string | null>(null);
   const [conclusions, setConclusions] = useState('');
   const [reportStatus, setReportStatus] = useState<{
     isGenerating: boolean;
@@ -694,6 +695,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     const color = type === 'test' ? '#8b5cf6' : '#f59e0b';
     setMarkers(prev => prev.map(m => m.id === id ? { ...m, type, color } : m));
     setEditingMarkerType(null);
+  };
+
+  const handleUpdateMarkerTimestamp = (id: string, newTimestamp: number) => {
+    // Проверяем, что новый timestamp находится в пределах данных
+    if (data && data.timeRange && data.timeRange.length === 2) {
+      const timeRange = data.timeRange;
+      if (newTimestamp < timeRange[0] || newTimestamp > timeRange[1]) {
+        alert(`Время маркера должно находиться в пределах данных: ${new Date(timeRange[0]).toLocaleString('ru-RU')} - ${new Date(timeRange[1]).toLocaleString('ru-RU')}`);
+        return;
+      }
+    }
+    
+    setMarkers(prev => prev.map(m => m.id === id ? { ...m, timestamp: newTimestamp } : m));
+    setEditingMarkerTimestamp(null);
   };
 
   const getMarkerTypeLabel = (type: MarkerType): string => {
@@ -1463,15 +1478,104 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                           <span className="font-medium">{marker.label}</span>
                         )}
                         
-                        <span className="text-sm text-gray-500">
-                          {new Date(marker.timestamp).toLocaleString('ru-RU', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
+                        {editingMarkerTimestamp === marker.id ? (
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="time"
+                              value={new Date(marker.timestamp).toTimeString().slice(0, 5)}
+                              onChange={(e) => {
+                                const [hours, minutes] = e.target.value.split(':').map(Number);
+                                const currentDate = new Date(marker.timestamp);
+                                currentDate.setHours(hours, minutes, 0, 0);
+                                const newTimestamp = currentDate.getTime();
+                                if (!isNaN(newTimestamp)) {
+                                  handleUpdateMarkerTimestamp(marker.id, newTimestamp);
+                                }
+                              }}
+                              onWheel={(e) => {
+                                e.preventDefault();
+                                const delta = e.deltaY > 0 ? -1 : 1;
+                                const currentDate = new Date(marker.timestamp);
+                                const minutes = currentDate.getMinutes();
+                                const hours = currentDate.getHours();
+                                
+                                // Определяем, что изменять: минуты или часы (в зависимости от того, зажат ли Shift)
+                                if (e.shiftKey) {
+                                  // Изменяем часы
+                                  currentDate.setHours(hours + delta, minutes, 0, 0);
+                                } else {
+                                  // Изменяем минуты
+                                  currentDate.setMinutes(minutes + delta, 0, 0);
+                                }
+                                
+                                const newTimestamp = currentDate.getTime();
+                                if (!isNaN(newTimestamp)) {
+                                  handleUpdateMarkerTimestamp(marker.id, newTimestamp);
+                                }
+                              }}
+                              onBlur={() => setEditingMarkerTimestamp(null)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === 'Escape') {
+                                  setEditingMarkerTimestamp(null);
+                                } else if (e.key === 'ArrowUp') {
+                                  e.preventDefault();
+                                  const currentDate = new Date(marker.timestamp);
+                                  const minutes = currentDate.getMinutes();
+                                  const hours = currentDate.getHours();
+                                  if (e.shiftKey) {
+                                    currentDate.setHours(hours + 1, minutes, 0, 0);
+                                  } else {
+                                    currentDate.setMinutes(minutes + 1, 0, 0);
+                                  }
+                                  const newTimestamp = currentDate.getTime();
+                                  if (!isNaN(newTimestamp)) {
+                                    handleUpdateMarkerTimestamp(marker.id, newTimestamp);
+                                  }
+                                } else if (e.key === 'ArrowDown') {
+                                  e.preventDefault();
+                                  const currentDate = new Date(marker.timestamp);
+                                  const minutes = currentDate.getMinutes();
+                                  const hours = currentDate.getHours();
+                                  if (e.shiftKey) {
+                                    currentDate.setHours(hours - 1, minutes, 0, 0);
+                                  } else {
+                                    currentDate.setMinutes(minutes - 1, 0, 0);
+                                  }
+                                  const newTimestamp = currentDate.getTime();
+                                  if (!isNaN(newTimestamp)) {
+                                    handleUpdateMarkerTimestamp(marker.id, newTimestamp);
+                                  }
+                                }
+                              }}
+                              className="text-sm px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              autoFocus
+                              title="Время маркера (часы:минуты). Скролл мыши для изменения, Shift+скролл для изменения часов"
+                              aria-label="Время маркера"
+                              step="60"
+                            />
+                            <span className="text-xs text-gray-400">
+                              {new Date(marker.timestamp).toLocaleDateString('ru-RU', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                              })}
+                            </span>
+                          </div>
+                        ) : (
+                          <span 
+                            className="text-sm text-gray-500 cursor-pointer hover:text-gray-700 hover:underline"
+                            onClick={() => setEditingMarkerTimestamp(marker.id)}
+                            title="Нажмите для редактирования времени (часы:минуты)"
+                          >
+                            {new Date(marker.timestamp).toLocaleString('ru-RU', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        )}
                       </div>
                       
                       <div className="flex items-center space-x-2">
@@ -1502,6 +1606,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                   </div>
                   
                   <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => {
+                        if (editingMarkerTimestamp === marker.id) {
+                          setEditingMarkerTimestamp(null);
+                        } else {
+                          setEditingMarkerTimestamp(marker.id);
+                        }
+                      }}
+                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                      title="Редактировать дату и время"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => setEditingMarker(marker.id)}
                       className="text-indigo-600 hover:text-indigo-800 transition-colors"

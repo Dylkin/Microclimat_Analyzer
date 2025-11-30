@@ -1,10 +1,11 @@
 import express from 'express';
 import { pool } from '../config/database.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // GET /api/projects - Получить все проекты
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     // Проверяем наличие полей tender_link и tender_date
     const tenderFieldsCheck = await pool.query(`
@@ -137,7 +138,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/projects/:id - Получить проект по ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -305,7 +306,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/projects - Создать проект
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -545,7 +546,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/projects/:id - Обновить проект
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, type, contractorId, contractNumber, contractDate, status } = req.body;
@@ -621,7 +622,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // POST /api/projects/:id/not-suitable - Установить статус "Не подходит" с комментарием
-router.post('/:id/not-suitable', async (req, res) => {
+router.post('/:id/not-suitable', requireAuth, async (req, res) => {
   const client = await pool.connect();
   try {
     const { id } = req.params;
@@ -695,7 +696,7 @@ router.post('/:id/not-suitable', async (req, res) => {
 });
 
 // DELETE /api/projects/:id - Удалить проект
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     

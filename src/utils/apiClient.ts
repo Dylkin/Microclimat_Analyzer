@@ -40,6 +40,22 @@ class ApiClient {
     }
   }
 
+  private getUserId(): string | null {
+    // Пытаемся получить userId из localStorage
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('currentUser');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          return user?.id || null;
+        } catch {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -60,6 +76,12 @@ class ApiClient {
 
     if (this.authToken) {
       headers['Authorization'] = `Bearer ${this.authToken}`;
+    }
+
+    // Добавляем userId в заголовок для аутентификации
+    const userId = this.getUserId();
+    if (userId) {
+      headers['x-user-id'] = userId;
     }
 
     try {
@@ -124,7 +146,14 @@ class ApiClient {
 
   // GET запрос
   async get<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'GET' });
+    // Добавляем userId в query параметры для GET запросов
+    const userId = this.getUserId();
+    let url = endpoint;
+    if (userId && !endpoint.includes('userId=')) {
+      const separator = endpoint.includes('?') ? '&' : '?';
+      url = `${endpoint}${separator}userId=${encodeURIComponent(userId)}`;
+    }
+    return this.request<T>(url, { method: 'GET' });
   }
 
   // POST запрос
@@ -137,9 +166,18 @@ class ApiClient {
       headers['Content-Type'] = 'application/json';
     }
 
+    // Добавляем userId в body, если его там нет
+    let requestBody = body;
+    if (!isFormData && requestBody && typeof requestBody === 'object') {
+      const userId = this.getUserId();
+      if (userId && !requestBody.userId) {
+        requestBody = { ...requestBody, userId };
+      }
+    }
+
     return this.request<T>(endpoint, {
       method: 'POST',
-      body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
+      body: isFormData ? body : (requestBody ? JSON.stringify(requestBody) : undefined),
       ...options,
       headers: {
         ...headers,
@@ -150,9 +188,18 @@ class ApiClient {
 
   // PUT запрос
   async put<T>(endpoint: string, body?: any): Promise<T> {
+    // Добавляем userId в body, если его там нет
+    let requestBody = body;
+    if (requestBody && typeof requestBody === 'object') {
+      const userId = this.getUserId();
+      if (userId && !requestBody.userId) {
+        requestBody = { ...requestBody, userId };
+      }
+    }
+
     return this.request<T>(endpoint, {
       method: 'PUT',
-      body: body ? JSON.stringify(body) : undefined,
+      body: requestBody ? JSON.stringify(requestBody) : undefined,
     });
   }
 
