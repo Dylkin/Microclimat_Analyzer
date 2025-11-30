@@ -75,6 +75,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
           access: 'analyzer' as const
         },
         {
+          name: 'Релиз',
+          key: 'release',
+          icon: Package,
+          access: 'analyzer' as const
+        },
+        {
           name: 'Поиск тендеров',
           key: 'tender-search',
           icon: Search,

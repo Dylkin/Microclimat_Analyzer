@@ -24,6 +24,7 @@ import dbProxyRouter from './routes/dbProxy.js';
 import storageRouter from './routes/storage.js';
 import mailRouter from './routes/mail.js';
 import testHeadersRouter from './routes/testHeaders.js';
+import releaseRouter from './routes/release.js';
 
 dotenv.config();
 
@@ -67,6 +68,7 @@ app.use('/api/tenders', tendersRouter);
 app.use('/api/db', dbProxyRouter);
 app.use('/api/storage', storageRouter);
 app.use('/api/mail', mailRouter);
+app.use('/api/release', releaseRouter);
 app.use('/api', testHeadersRouter);
 
 // Error handling middleware

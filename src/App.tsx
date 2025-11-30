@@ -22,6 +22,7 @@ const AuditLogs = lazy(() => import('./components/AuditLogs'));
 const ResetPassword = lazy(() => import('./components/ResetPassword'));
 const TenderSearch = lazy(() => import('./components/TenderSearch'));
 const QualificationObjectTypes = lazy(() => import('./components/QualificationObjectTypes'));
+const ReleasePage = lazy(() => import('./components/ReleasePage').then(m => ({ default: m.ReleasePage })));
 
 // Loading component
 const LoadingSpinner: React.FC = () => (
@@ -180,6 +181,8 @@ const AppContent: React.FC = () => {
         return hasAccess('analyzer') ? wrapWithSuspense(<TenderSearch />) : <div>Доступ запрещен</div>;
       case 'mail-settings':
         return hasAccess('analyzer') ? wrapWithSuspense(<MailSettingsPage />) : <div>Доступ запрещен</div>;
+      case 'release':
+        return hasAccess('analyzer') ? wrapWithSuspense(<ReleasePage />) : <div>Доступ запрещен</div>;
       default:
         return wrapWithSuspense(
           <MicroclimatAnalyzer 
