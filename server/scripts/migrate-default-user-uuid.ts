@@ -1,0 +1,149 @@
+import { pool } from '../config/database.js';
+import * as dotenv from 'dotenv';
+import { v5 as uuidv5 } from 'uuid';
+
+dotenv.config();
+
+// Миграция: обновление UUID пользователя по умолчанию с версии 0 на версию 5
+const OLD_UUID = '00000000-0000-0000-0000-000000000001';
+const DNS_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL || 'pavel.dylkin@gmail.com';
+const NEW_UUID = uuidv5(DEFAULT_ADMIN_EMAIL, DNS_NAMESPACE);
+
+async function migrateDefaultUserUUID() {
+  try {
+    console.log('Начало миграции UUID пользователя по умолчанию...');
+    console.log(`Старый UUID: ${OLD_UUID}`);
+    console.log(`Новый UUID (v5): ${NEW_UUID}`);
+
+    // Проверяем, существует ли пользователь со старым UUID
+    const checkOldResult = await pool.query(
+      'SELECT id, email, full_name, role FROM users WHERE id = $1',
+      [OLD_UUID]
+    );
+
+    if (checkOldResult.rows.length === 0) {
+      console.log('⚠️ Пользователь со старым UUID не найден. Проверяем новый UUID...');
+      
+      // Проверяем, существует ли пользователь с новым UUID
+      const checkNewResult = await pool.query(
+        'SELECT id, email, full_name, role FROM users WHERE id = $1',
+        [NEW_UUID]
+      );
+
+      if (checkNewResult.rows.length > 0) {
+        console.log('✅ Пользователь с новым UUID уже существует. Миграция не требуется.');
+        await pool.end();
+        return;
+      } else {
+        console.log('⚠️ Пользователь не найден ни со старым, ни с новым UUID.');
+        console.log('💡 Запустите npm run create-default-user для создания пользователя.');
+        await pool.end();
+        return;
+      }
+    }
+
+    const oldUser = checkOldResult.rows[0];
+    console.log('Найден пользователь со старым UUID:', oldUser);
+
+    // Проверяем, существует ли пользователь с новым UUID
+    const checkNewResult = await pool.query(
+      'SELECT id FROM users WHERE id = $1',
+      [NEW_UUID]
+    );
+
+    if (checkNewResult.rows.length > 0) {
+      console.log('⚠️ Пользователь с новым UUID уже существует. Удаляем старую запись...');
+      
+      // Удаляем старую запись
+      await pool.query('DELETE FROM users WHERE id = $1', [OLD_UUID]);
+      console.log('✅ Старая запись удалена.');
+    } else {
+      console.log('Обновление UUID пользователя...');
+      
+      // Обновляем UUID пользователя
+      // Сначала обновляем все связанные таблицы, которые могут ссылаться на users.id
+      // Затем обновляем сам users
+      
+      // Обновляем все таблицы, которые ссылаются на users.id
+      
+      // project_stage_assignments.assigned_by
+      try {
+        const result1 = await pool.query(
+          'UPDATE project_stage_assignments SET assigned_by = $1 WHERE assigned_by = $2',
+          [NEW_UUID, OLD_UUID]
+        );
+        console.log(`✅ Обновлены project_stage_assignments: ${result1.rowCount} записей`);
+      } catch (error: any) {
+        console.warn('⚠️ Ошибка обновления project_stage_assignments (таблица может не существовать):', error.message);
+      }
+
+      // qualification_work_schedule.completed_by
+      try {
+        const result2 = await pool.query(
+          'UPDATE qualification_work_schedule SET completed_by = $1 WHERE completed_by = $2',
+          [NEW_UUID, OLD_UUID]
+        );
+        console.log(`✅ Обновлены qualification_work_schedule: ${result2.rowCount} записей`);
+      } catch (error: any) {
+        console.warn('⚠️ Ошибка обновления qualification_work_schedule (таблица может не существовать):', error.message);
+      }
+
+      // projects.created_by
+      try {
+        const result3 = await pool.query(
+          'UPDATE projects SET created_by = $1 WHERE created_by = $2',
+          [NEW_UUID, OLD_UUID]
+        );
+        console.log(`✅ Обновлены projects: ${result3.rowCount} записей`);
+      } catch (error: any) {
+        console.warn('⚠️ Ошибка обновления projects (таблица может не существовать):', error.message);
+      }
+
+      // audit_logs.user_id
+      try {
+        const result4 = await pool.query(
+          'UPDATE audit_logs SET user_id = $1 WHERE user_id = $2',
+          [NEW_UUID, OLD_UUID]
+        );
+        console.log(`✅ Обновлены audit_logs: ${result4.rowCount} записей`);
+      } catch (error: any) {
+        console.warn('⚠️ Ошибка обновления audit_logs (таблица может не существовать):', error.message);
+      }
+
+      // Другие таблицы, которые могут ссылаться на users.id
+      // Добавьте здесь другие таблицы по необходимости
+
+      // Обновляем сам users
+      await pool.query(
+        'UPDATE users SET id = $1 WHERE id = $2',
+        [NEW_UUID, OLD_UUID]
+      );
+      console.log('✅ UUID пользователя обновлен в таблице users');
+    }
+
+    // Проверяем результат
+    const verifyResult = await pool.query(
+      'SELECT id, email, full_name, role, is_default FROM users WHERE id = $1',
+      [NEW_UUID]
+    );
+
+    if (verifyResult.rows.length > 0) {
+      console.log('✅ Миграция завершена успешно!');
+      console.log('Новый пользователь:', verifyResult.rows[0]);
+    } else {
+      console.error('❌ Ошибка: пользователь не найден после миграции');
+    }
+
+    await pool.end();
+    process.exit(0);
+  } catch (error: any) {
+    console.error('❌ Ошибка миграции:', error.message);
+    console.error(error);
+    await pool.end();
+    process.exit(1);
+  }
+}
+
+migrateDefaultUserUUID();
+

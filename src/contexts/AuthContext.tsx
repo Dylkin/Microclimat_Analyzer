@@ -3,8 +3,11 @@ import { User, AuthUser } from '../types/User';
 import { userService } from '../utils/userService';
 
 // Helper function to validate UUID format
+// Принимает UUID версий 0-5 (включая nil UUID 00000000-0000-0000-0000-000000000000)
 const isValidUUID = (uuid: string): boolean => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuid || typeof uuid !== 'string') return false;
+  // Более мягкая проверка: формат UUID с версией 0-5
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(uuid);
 };
 
@@ -34,10 +37,18 @@ export const useAuth = () => {
   return context;
 };
 
+// UUID версии 5 для пользователя по умолчанию (генерируется на основе email)
+// Используется тот же алгоритм, что и в server/scripts/create-default-user.ts
+// DNS namespace: 6ba7b810-9dad-11d1-80b4-00c04fd430c8
+// Email: pavel.dylkin@gmail.com
+// Результат UUID v5: 4ddace07-1e3a-5ff9-ac81-0183d0e34403
+const DEFAULT_ADMIN_EMAIL = 'pavel.dylkin@gmail.com';
+const DEFAULT_ADMIN_ID = '4ddace07-1e3a-5ff9-ac81-0183d0e34403'; // UUID v5 для pavel.dylkin@gmail.com
+
 const defaultUser: User = {
-  id: '00000000-0000-0000-0000-000000000001',
+  id: DEFAULT_ADMIN_ID,
   fullName: 'Дылкин П.А.',
-  email: 'pavel.dylkin@gmail.com',
+  email: DEFAULT_ADMIN_EMAIL,
   password: '00016346',
   role: 'administrator',
   isDefault: true

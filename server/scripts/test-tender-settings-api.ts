@@ -5,7 +5,7 @@ dotenv.config();
 async function testAPI() {
   try {
     const testData = {
-      userId: '00000000-0000-0000-0000-000000000001',
+      userId: '4ddace07-1e3a-5ff9-ac81-0183d0e34403', // UUID v5 для pavel.dylkin@gmail.com
       purchaseItems: ['Тестовый предмет закупки'],
       organizationUnps: ['123456789']
     };

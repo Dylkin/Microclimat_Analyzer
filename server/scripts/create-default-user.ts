@@ -1,14 +1,18 @@
 import { pool } from '../config/database.js';
 import * as dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
+import { v5 as uuidv5 } from 'uuid';
 
 dotenv.config();
 
 // Значения по умолчанию для первого пользователя можно переопределить через .env
 // DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_NAME, DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_ROLE
-const DEFAULT_ADMIN_ID = '00000000-0000-0000-0000-000000000001';
-const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME || 'Дылкин П.А.';
+// Генерируем UUID версии 5 на основе namespace и имени пользователя
+// Используем стандартный DNS namespace UUID и email пользователя для детерминированной генерации
+const DNS_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL || 'pavel.dylkin@gmail.com';
+const DEFAULT_ADMIN_ID = uuidv5(DEFAULT_ADMIN_EMAIL, DNS_NAMESPACE);
+const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME || 'Дылкин П.А.';
 const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || '00016346';
 // В БД допустимы роли 'admin', 'user', 'viewer' (см. CHECK в database_setup.sql)
 let DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE || 'admin';

@@ -7,7 +7,7 @@ async function testSave() {
   try {
     console.log('Тестирование сохранения настроек...');
     
-    const userId = '00000000-0000-0000-0000-000000000001'; // ID пользователя по умолчанию
+    const userId = '4ddace07-1e3a-5ff9-ac81-0183d0e34403'; // ID пользователя по умолчанию (UUID v5)
     const purchaseItems = ['Тестовый предмет'];
     const organizationUnps = ['123456789'];
     

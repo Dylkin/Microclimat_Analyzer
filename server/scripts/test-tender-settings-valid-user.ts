@@ -6,7 +6,7 @@ async function testValidUser() {
   try {
     // Используем ID существующего пользователя из БД
     const testData = {
-      userId: '00000000-0000-0000-0000-000000000001', // ID пользователя по умолчанию
+      userId: '4ddace07-1e3a-5ff9-ac81-0183d0e34403', // ID пользователя по умолчанию (UUID v5)
       purchaseItems: ['Тестовый предмет'],
       organizationUnps: []
     };
