@@ -19,19 +19,29 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
         allHeaders[key] = req.headers[key];
       });
       
+      // Логируем все заголовки, начинающиеся с x- или X-
+      const xHeaders: Record<string, any> = {};
+      Object.keys(req.headers).forEach(key => {
+        if (key.toLowerCase().startsWith('x-') || key.toLowerCase().includes('user')) {
+          xHeaders[key] = req.headers[key];
+        }
+      });
+      
       console.error('Ошибка авторизации: userId не предоставлен', {
         method: req.method,
         path: req.path,
         body: req.body,
         query: req.query,
+        xHeaders: xHeaders,
         allHeaders: allHeaders,
         specificHeaders: {
           'x-user-id': req.headers['x-user-id'],
+          'X-User-Id': req.headers['x-user-id'],
           'x-userid': req.headers['x-userid'],
           'user-id': req.headers['user-id'],
-          'x-user-id-lower': req.headers['x-user-id']?.toLowerCase(),
           'authorization': req.headers['authorization']
-        }
+        },
+        rawHeaders: Object.keys(req.headers).map(k => `${k}: ${req.headers[k]}`)
       });
       return res.status(401).json({ 
         error: 'Не авторизован',
