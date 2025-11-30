@@ -25,6 +25,7 @@ import storageRouter from './routes/storage.js';
 import mailRouter from './routes/mail.js';
 import testHeadersRouter from './routes/testHeaders.js';
 import releaseRouter from './routes/release.js';
+console.log('🔍 Загружен releaseRouter из ./routes/release.js');
 
 dotenv.config();
 
@@ -68,7 +69,9 @@ app.use('/api/tenders', tendersRouter);
 app.use('/api/db', dbProxyRouter);
 app.use('/api/storage', storageRouter);
 app.use('/api/mail', mailRouter);
+console.log('🔍 Регистрация /api/release роутера');
 app.use('/api/release', releaseRouter);
+console.log('✅ /api/release роутер зарегистрирован');
 app.use('/api', testHeadersRouter);
 
 // Error handling middleware
