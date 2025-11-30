@@ -326,5 +326,23 @@ class ApiClient {
 // Экспортируем единый экземпляр
 export const apiClient = new ApiClient();
 
+// Временная глобальная переменная для отладки (только в development)
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  (window as any).apiClient = apiClient;
+  (window as any).getUserId = () => {
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        return user?.id || null;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  };
+  console.log('🔧 Отладка: apiClient и getUserId доступны в window.apiClient и window.getUserId()');
+}
+
 // Экспортируем класс для создания дополнительных экземпляров
 export default ApiClient;
