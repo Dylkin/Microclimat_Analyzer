@@ -38,9 +38,9 @@ echo [INFO] Подключение к серверу и запуск update-prod
 echo.
 
 REM Подключаемся к серверу и запускаем скрипт обновления
-REM Пытаемся установить права, но игнорируем ошибку если не получилось
-REM Запускаем через bash, если chmod не сработал
-ssh %SSH_HOST% "cd %PROJECT_DIR% && (chmod +x update-prod.sh 2>/dev/null || true) && (bash update-prod.sh || ./update-prod.sh)"
+REM Используем bash для запуска скрипта (не требует chmod)
+REM Убираем sudo, так как скрипт должен выполняться от имени пользователя
+ssh %SSH_HOST% "cd %PROJECT_DIR% && bash update-prod.sh"
 
 set EXIT_CODE=%ERRORLEVEL%
 
