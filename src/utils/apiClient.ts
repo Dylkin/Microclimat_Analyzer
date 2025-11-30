@@ -47,10 +47,17 @@ class ApiClient {
       if (userStr) {
         try {
           const user = JSON.parse(userStr);
-          return user?.id || null;
-        } catch {
+          const userId = user?.id || null;
+          if (!userId) {
+            console.warn('ApiClient: userId не найден в объекте пользователя', user);
+          }
+          return userId;
+        } catch (error) {
+          console.error('ApiClient: Ошибка парсинга currentUser из localStorage:', error);
           return null;
         }
+      } else {
+        console.warn('ApiClient: currentUser не найден в localStorage');
       }
     }
     return null;
@@ -82,6 +89,11 @@ class ApiClient {
     const userId = this.getUserId();
     if (userId) {
       headers['x-user-id'] = userId;
+    } else {
+      console.warn('ApiClient.request: userId не найден для запроса', {
+        endpoint: url,
+        method: options.method || 'GET'
+      });
     }
 
     try {
@@ -146,12 +158,15 @@ class ApiClient {
 
   // GET запрос
   async get<T>(endpoint: string): Promise<T> {
-    // Добавляем userId в query параметры для GET запросов
+    // userId будет добавлен в заголовки в методе request()
+    // Также добавляем в query для совместимости
     const userId = this.getUserId();
     let url = endpoint;
     if (userId && !endpoint.includes('userId=')) {
       const separator = endpoint.includes('?') ? '&' : '?';
       url = `${endpoint}${separator}userId=${encodeURIComponent(userId)}`;
+    } else if (!userId) {
+      console.warn('ApiClient.get: userId не найден для запроса', endpoint);
     }
     return this.request<T>(url, { method: 'GET' });
   }

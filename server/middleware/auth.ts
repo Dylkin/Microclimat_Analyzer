@@ -4,15 +4,26 @@ import { pool } from '../config/database.js';
 // Middleware для проверки авторизации пользователя
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Извлекаем userId из body (для POST/PUT) или query (для GET)
-    const userId = req.body?.userId || req.query?.userId as string || req.headers['x-user-id'] as string;
+    // Извлекаем userId из body (для POST/PUT), query (для GET) или заголовков
+    // Проверяем заголовки в разных форматах (x-user-id, x-userid, user-id)
+    const userId = req.body?.userId 
+      || req.query?.userId as string 
+      || req.headers['x-user-id'] as string
+      || req.headers['x-userid'] as string
+      || req.headers['user-id'] as string;
     
     if (!userId) {
       console.error('Ошибка авторизации: userId не предоставлен', {
         method: req.method,
+        path: req.path,
         body: req.body,
         query: req.query,
-        headers: req.headers
+        headers: {
+          'x-user-id': req.headers['x-user-id'],
+          'x-userid': req.headers['x-userid'],
+          'user-id': req.headers['user-id'],
+          'authorization': req.headers['authorization']
+        }
       });
       return res.status(401).json({ 
         error: 'Не авторизован',
