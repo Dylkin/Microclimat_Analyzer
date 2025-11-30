@@ -74,48 +74,61 @@ async function migrateDefaultUserUUID() {
         // Затем обновляем сам users
         
         // Обновляем все таблицы, которые ссылаются на users.id
+        // Используем SAVEPOINT для каждой операции, чтобы ошибки не прерывали транзакцию
       
       // project_stage_assignments.assigned_by
       try {
+        await client.query('SAVEPOINT sp_project_stage_assignments');
         const result1 = await client.query(
           'UPDATE project_stage_assignments SET assigned_by = $1 WHERE assigned_by = $2',
           [NEW_UUID, OLD_UUID]
         );
         console.log(`✅ Обновлены project_stage_assignments: ${result1.rowCount} записей`);
+        await client.query('RELEASE SAVEPOINT sp_project_stage_assignments');
       } catch (error: any) {
+        await client.query('ROLLBACK TO SAVEPOINT sp_project_stage_assignments');
         console.warn('⚠️ Ошибка обновления project_stage_assignments (таблица может не существовать):', error.message);
       }
 
       // qualification_work_schedule.completed_by
       try {
+        await client.query('SAVEPOINT sp_qualification_work_schedule');
         const result2 = await client.query(
           'UPDATE qualification_work_schedule SET completed_by = $1 WHERE completed_by = $2',
           [NEW_UUID, OLD_UUID]
         );
         console.log(`✅ Обновлены qualification_work_schedule: ${result2.rowCount} записей`);
+        await client.query('RELEASE SAVEPOINT sp_qualification_work_schedule');
       } catch (error: any) {
+        await client.query('ROLLBACK TO SAVEPOINT sp_qualification_work_schedule');
         console.warn('⚠️ Ошибка обновления qualification_work_schedule (таблица может не существовать):', error.message);
       }
 
       // projects.created_by
       try {
+        await client.query('SAVEPOINT sp_projects');
         const result3 = await client.query(
           'UPDATE projects SET created_by = $1 WHERE created_by = $2',
           [NEW_UUID, OLD_UUID]
         );
         console.log(`✅ Обновлены projects: ${result3.rowCount} записей`);
+        await client.query('RELEASE SAVEPOINT sp_projects');
       } catch (error: any) {
+        await client.query('ROLLBACK TO SAVEPOINT sp_projects');
         console.warn('⚠️ Ошибка обновления projects (таблица может не существовать):', error.message);
       }
 
       // audit_logs.user_id
       try {
+        await client.query('SAVEPOINT sp_audit_logs');
         const result4 = await client.query(
           'UPDATE audit_logs SET user_id = $1 WHERE user_id = $2',
           [NEW_UUID, OLD_UUID]
         );
         console.log(`✅ Обновлены audit_logs: ${result4.rowCount} записей`);
+        await client.query('RELEASE SAVEPOINT sp_audit_logs');
       } catch (error: any) {
+        await client.query('ROLLBACK TO SAVEPOINT sp_audit_logs');
         console.warn('⚠️ Ошибка обновления audit_logs (таблица может не существовать):', error.message);
       }
 
