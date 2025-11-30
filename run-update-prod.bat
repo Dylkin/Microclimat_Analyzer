@@ -38,7 +38,9 @@ echo [INFO] Подключение к серверу и запуск update-prod
 echo.
 
 REM Подключаемся к серверу и запускаем скрипт обновления
-ssh %SSH_HOST% "cd %PROJECT_DIR% && chmod +x update-prod.sh && ./update-prod.sh"
+REM Пытаемся установить права, но игнорируем ошибку если не получилось
+REM Запускаем через bash, если chmod не сработал
+ssh %SSH_HOST% "cd %PROJECT_DIR% && (chmod +x update-prod.sh 2>/dev/null || true) && (bash update-prod.sh || ./update-prod.sh)"
 
 set EXIT_CODE=%ERRORLEVEL%
 
