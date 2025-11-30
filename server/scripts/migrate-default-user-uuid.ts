@@ -61,15 +61,23 @@ async function migrateDefaultUserUUID() {
     } else {
       console.log('Обновление UUID пользователя...');
       
-      // Обновляем UUID пользователя
-      // Сначала обновляем все связанные таблицы, которые могут ссылаться на users.id
-      // Затем обновляем сам users
-      
-      // Обновляем все таблицы, которые ссылаются на users.id
+      // Используем транзакцию для атомарности
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        
+        // Временно отключаем проверку внешних ключей
+        await client.query('SET session_replication_role = replica');
+        
+        // Обновляем UUID пользователя
+        // Сначала обновляем все связанные таблицы, которые могут ссылаться на users.id
+        // Затем обновляем сам users
+        
+        // Обновляем все таблицы, которые ссылаются на users.id
       
       // project_stage_assignments.assigned_by
       try {
-        const result1 = await pool.query(
+        const result1 = await client.query(
           'UPDATE project_stage_assignments SET assigned_by = $1 WHERE assigned_by = $2',
           [NEW_UUID, OLD_UUID]
         );
@@ -80,7 +88,7 @@ async function migrateDefaultUserUUID() {
 
       // qualification_work_schedule.completed_by
       try {
-        const result2 = await pool.query(
+        const result2 = await client.query(
           'UPDATE qualification_work_schedule SET completed_by = $1 WHERE completed_by = $2',
           [NEW_UUID, OLD_UUID]
         );
@@ -91,7 +99,7 @@ async function migrateDefaultUserUUID() {
 
       // projects.created_by
       try {
-        const result3 = await pool.query(
+        const result3 = await client.query(
           'UPDATE projects SET created_by = $1 WHERE created_by = $2',
           [NEW_UUID, OLD_UUID]
         );
@@ -102,7 +110,7 @@ async function migrateDefaultUserUUID() {
 
       // audit_logs.user_id
       try {
-        const result4 = await pool.query(
+        const result4 = await client.query(
           'UPDATE audit_logs SET user_id = $1 WHERE user_id = $2',
           [NEW_UUID, OLD_UUID]
         );
@@ -115,24 +123,40 @@ async function migrateDefaultUserUUID() {
       // Добавьте здесь другие таблицы по необходимости
 
       // Обновляем сам users
-      await pool.query(
+      await client.query(
         'UPDATE users SET id = $1 WHERE id = $2',
         [NEW_UUID, OLD_UUID]
       );
       console.log('✅ UUID пользователя обновлен в таблице users');
+      
+      // Включаем обратно проверку внешних ключей
+      await client.query('SET session_replication_role = DEFAULT');
+      
+      // Коммитим транзакцию
+      await client.query('COMMIT');
+      console.log('✅ Транзакция успешно завершена');
     }
 
-    // Проверяем результат
-    const verifyResult = await pool.query(
-      'SELECT id, email, full_name, role, is_default FROM users WHERE id = $1',
-      [NEW_UUID]
-    );
+        // Проверяем результат
+        const verifyResult = await client.query(
+          'SELECT id, email, full_name, role, is_default FROM users WHERE id = $1',
+          [NEW_UUID]
+        );
 
-    if (verifyResult.rows.length > 0) {
-      console.log('✅ Миграция завершена успешно!');
-      console.log('Новый пользователь:', verifyResult.rows[0]);
-    } else {
-      console.error('❌ Ошибка: пользователь не найден после миграции');
+        if (verifyResult.rows.length > 0) {
+          console.log('✅ Миграция завершена успешно!');
+          console.log('Новый пользователь:', verifyResult.rows[0]);
+        } else {
+          console.error('❌ Ошибка: пользователь не найден после миграции');
+        }
+      } catch (error: any) {
+        // Откатываем транзакцию в случае ошибки
+        await client.query('ROLLBACK');
+        console.error('❌ Ошибка миграции, транзакция откачена:', error.message);
+        throw error;
+      } finally {
+        client.release();
+      }
     }
 
     await pool.end();
