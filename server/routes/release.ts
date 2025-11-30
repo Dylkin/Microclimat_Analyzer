@@ -96,6 +96,8 @@ router.get('/info', async (req, res) => {
       return dateB - dateA; // По убыванию (новые сверху)
     });
 
+    console.log('Отправка релизов, количество:', releases.length, 'тип:', Array.isArray(releases) ? 'array' : typeof releases);
+    console.log('Первый релиз:', releases[0] ? JSON.stringify(releases[0]) : 'нет');
     res.json(releases);
   } catch (error: any) {
     console.error('Ошибка получения информации о релизах:', error);
