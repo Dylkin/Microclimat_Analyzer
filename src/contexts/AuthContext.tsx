@@ -391,6 +391,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               
               if (userExists) {
                 // Пользователь существует в БД, восстанавливаем сессию
+                console.log('✅ Пользователь найден в БД, восстанавливаем сессию:', {
+                  id: parsedUser.id,
+                  email: parsedUser.email,
+                  role: parsedUser.role
+                });
                 setUser(parsedUser);
               } else {
                 // Пользователь не найден в БД по ID
@@ -402,12 +407,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   const userByEmail = dbUsers.find(u => u.email === parsedUser.email);
                   if (userByEmail) {
                     // Найден пользователь с новым UUID, обновляем localStorage
-                    console.log('Пользователь найден по email, обновляем UUID в localStorage');
+                    console.log('✅ Пользователь найден по email, обновляем UUID в localStorage', {
+                      oldId: parsedUser.id,
+                      newId: userByEmail.id,
+                      email: parsedUser.email
+                    });
                     const updatedUser = {
                       ...parsedUser,
                       id: userByEmail.id
                     };
                     localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+                    console.log('✅ Обновленный пользователь сохранен в localStorage:', updatedUser);
                     setUser(updatedUser);
                   } else {
                     // Пользователь не найден ни по ID, ни по email
