@@ -135,20 +135,19 @@ async function migrateDefaultUserUUID() {
       // Коммитим транзакцию
       await client.query('COMMIT');
       console.log('✅ Транзакция успешно завершена');
-    }
+      
+      // Проверяем результат
+      const verifyResult = await client.query(
+        'SELECT id, email, full_name, role, is_default FROM users WHERE id = $1',
+        [NEW_UUID]
+      );
 
-        // Проверяем результат
-        const verifyResult = await client.query(
-          'SELECT id, email, full_name, role, is_default FROM users WHERE id = $1',
-          [NEW_UUID]
-        );
-
-        if (verifyResult.rows.length > 0) {
-          console.log('✅ Миграция завершена успешно!');
-          console.log('Новый пользователь:', verifyResult.rows[0]);
-        } else {
-          console.error('❌ Ошибка: пользователь не найден после миграции');
-        }
+      if (verifyResult.rows.length > 0) {
+        console.log('✅ Миграция завершена успешно!');
+        console.log('Новый пользователь:', verifyResult.rows[0]);
+      } else {
+        console.error('❌ Ошибка: пользователь не найден после миграции');
+      }
       } catch (error: any) {
         // Откатываем транзакцию в случае ошибки
         await client.query('ROLLBACK');
