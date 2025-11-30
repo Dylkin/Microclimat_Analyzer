@@ -16,12 +16,22 @@ interface ReleaseInfo {
 router.get('/info', async (req, res) => {
   try {
     const releases: ReleaseInfo[] = [];
+    const projectDir = process.cwd();
 
     // Получаем последние 5 коммитов с информацией
     try {
       // Формат: hash|date|message
-      const gitLog = execSync('git log -5 --format=%H|%ci|%s', { encoding: 'utf-8' }).trim();
+      // Указываем рабочую директорию и добавляем обработку ошибок
+      console.log('Попытка получить git log из директории:', projectDir);
+      const gitLog = execSync('git log -5 --format=%H|%ci|%s', { 
+        encoding: 'utf-8',
+        cwd: projectDir,
+        stdio: ['pipe', 'pipe', 'pipe']
+      }).trim();
+      
+      console.log('Git log получен, длина:', gitLog.length);
       const commits = gitLog.split('\n').filter(line => line.trim());
+      console.log('Найдено коммитов:', commits.length);
 
       commits.forEach((commitLine) => {
         const parts = commitLine.split('|');
@@ -35,7 +45,7 @@ router.get('/info', async (req, res) => {
           try {
             commitDate = new Date(commitDateStr).toISOString();
           } catch (error) {
-            console.warn('Ошибка парсинга даты коммита:', commitDateStr);
+            console.warn('Ошибка парсинга даты коммита:', commitDateStr, error);
           }
 
           // Дата сборки - используем дату коммита (или можно использовать текущую дату)
@@ -47,10 +57,19 @@ router.get('/info', async (req, res) => {
             buildDate,
             changes: commitMessage || 'Обновление системы'
           });
+        } else {
+          console.warn('Неверный формат строки коммита:', commitLine);
         }
       });
-    } catch (error) {
-      console.warn('Не удалось получить информацию из git:', error);
+    } catch (error: any) {
+      console.error('Не удалось получить информацию из git:', error);
+      console.error('Детали ошибки:', {
+        message: error?.message,
+        code: error?.code,
+        signal: error?.signal,
+        stderr: error?.stderr?.toString(),
+        stdout: error?.stdout?.toString()
+      });
       // Если git недоступен, создаем одну запись с текущей датой
       releases.push({
         commitHash: 'unknown',
