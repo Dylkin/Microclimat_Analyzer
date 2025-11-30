@@ -70,10 +70,31 @@ class UserService {
     }
   }
 
-  // Отправка письма для сброса пароля (заглушка, требует реализации на backend)
+  // Отправка письма для сброса пароля по email
   async sendPasswordResetEmail(email: string): Promise<void> {
-    console.warn('sendPasswordResetEmail не реализован для PostgreSQL API');
-    throw new Error('Функция отправки письма для сброса пароля не реализована');
+    try {
+      // Сначала находим пользователя по email
+      const users = await this.getAllUsers();
+      const user = users.find(u => u.email === email);
+      if (!user) {
+        throw new Error('Пользователь с таким email не найден');
+      }
+      // Вызываем метод для отправки по userId
+      await this.sendPasswordResetEmailByUserId(user.id);
+    } catch (error) {
+      console.error('Ошибка при отправке письма для сброса пароля:', error);
+      throw error;
+    }
+  }
+
+  // Отправка письма для сброса пароля по userId
+  async sendPasswordResetEmailByUserId(userId: string): Promise<void> {
+    try {
+      await apiClient.post(`/users/${userId}/send-password-reset`);
+    } catch (error) {
+      console.error('Ошибка при отправке письма для сброса пароля:', error);
+      throw error;
+    }
   }
 
   // Обновление пароля через токен сброса (заглушка, требует реализации на backend)

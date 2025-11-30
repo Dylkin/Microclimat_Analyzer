@@ -1,6 +1,8 @@
 import express from 'express';
 import { pool } from '../config/database.js';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import { sendEmail } from '../services/mailService.js';
 
 const router = express.Router();
 
@@ -225,7 +227,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// POST /api/users/:id/reset-password - Сброс пароля
+// POST /api/users/:id/reset-password - Сброс пароля (прямой сброс с новым паролем)
 router.post('/:id/reset-password', async (req, res) => {
   try {
     const { id } = req.params;
@@ -246,6 +248,116 @@ router.post('/:id/reset-password', async (req, res) => {
   } catch (error) {
     console.error('Error resetting password:', error);
     res.status(500).json({ error: 'Ошибка сброса пароля' });
+  }
+});
+
+// POST /api/users/:id/send-password-reset - Отправка email с ссылкой для сброса пароля
+router.post('/:id/send-password-reset', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Получаем информацию о пользователе
+    const userResult = await pool.query(
+      'SELECT id, full_name, email FROM users WHERE id = $1',
+      [id]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+    
+    const user = userResult.rows[0];
+    
+    if (!user.email) {
+      return res.status(400).json({ error: 'У пользователя не указан email' });
+    }
+    
+    // Генерируем токен сброса пароля
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiry = new Date();
+    tokenExpiry.setHours(tokenExpiry.getHours() + 24); // Токен действителен 24 часа
+    
+    // Сохраняем токен в базе данных (создаем таблицу если её нет)
+    try {
+      // Проверяем существование таблицы password_reset_tokens
+      const tableCheck = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'password_reset_tokens'
+        )
+      `);
+      
+      if (!tableCheck.rows[0].exists) {
+        // Создаем таблицу для токенов сброса пароля
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token TEXT NOT NULL UNIQUE,
+            expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            used BOOLEAN DEFAULT FALSE
+          );
+          CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+          CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+        `);
+      }
+      
+      // Удаляем старые неиспользованные токены для этого пользователя
+      await pool.query(
+        'DELETE FROM password_reset_tokens WHERE user_id = $1 AND (used = TRUE OR expires_at < NOW())',
+        [id]
+      );
+      
+      // Сохраняем новый токен
+      await pool.query(
+        'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+        [id, resetToken, tokenExpiry]
+      );
+    } catch (dbError: any) {
+      console.error('Ошибка работы с таблицей токенов:', dbError);
+      // Если таблица не создалась, продолжаем без неё (токен будет в URL)
+    }
+    
+    // Формируем ссылку для сброса пароля
+    const baseUrl = process.env.FRONTEND_URL || process.env.API_URL || 'http://localhost:5173';
+    const resetUrl = `${baseUrl}/reset-password?token=${resetToken}&userId=${id}`;
+    
+    // Отправляем email
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Сброс пароля - Microclimat Analyzer',
+        text: `Здравствуйте, ${user.full_name}!
+
+Вы запросили сброс пароля для вашей учетной записи в системе Microclimat Analyzer.
+
+Для создания нового пароля перейдите по следующей ссылке:
+${resetUrl}
+
+Ссылка действительна в течение 24 часов.
+
+Если вы не запрашивали сброс пароля, проигнорируйте это письмо.
+
+С уважением,
+Команда Microclimat Analyzer`
+      });
+      
+      res.json({ 
+        message: 'Письмо с инструкциями по сбросу пароля отправлено на email',
+        email: user.email 
+      });
+    } catch (emailError: any) {
+      console.error('Ошибка отправки email:', emailError);
+      res.status(500).json({ 
+        error: 'Ошибка отправки email',
+        details: emailError.message 
+      });
+    }
+  } catch (error: any) {
+    console.error('Error sending password reset email:', error);
+    res.status(500).json({ error: 'Ошибка отправки письма для сброса пароля' });
   }
 });
 

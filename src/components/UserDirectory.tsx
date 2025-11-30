@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { Users, Plus, Edit2, Trash2, Save, X, Eye, EyeOff, Key } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Save, X, Key, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { User, UserRole } from '../types/User';
+import { userService } from '../utils/userService';
 
 const UserDirectory: React.FC = () => {
-  const { users, addUser, updateUser, deleteUser, resetPassword, user: currentUser } = useAuth();
+  const { users, addUser, updateUser, deleteUser, user: currentUser } = useAuth();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingUser, setEditingUser] = useState<string | null>(null);
-  const [showPasswords, setShowPasswords] = useState<{ [key: string]: boolean }>({});
-  const [resetPasswordUser, setResetPasswordUser] = useState<string | null>(null);
-  const [newPassword, setNewPassword] = useState('');
+  const [sendingResetEmail, setSendingResetEmail] = useState<string | null>(null);
   const [operationLoading, setOperationLoading] = useState(false);
 
   const [newUser, setNewUser] = useState({
@@ -128,33 +127,28 @@ const UserDirectory: React.FC = () => {
     }
   };
 
-  const handleResetPassword = async () => {
-    if (!newPassword || newPassword.length < 6) {
-      alert('Пароль должен содержать минимум 6 символов');
+  const handleSendPasswordReset = async (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (!user || !user.email) {
+      alert('У пользователя не указан email');
       return;
     }
 
+    if (!confirm(`Отправить ссылку для сброса пароля на email ${user.email}?`)) {
+      return;
+    }
+
+    setSendingResetEmail(userId);
     setOperationLoading(true);
     try {
-      const success = await resetPassword(resetPasswordUser!, newPassword);
-      if (success) {
-        alert('Пароль успешно изменен');
-        setResetPasswordUser(null);
-        setNewPassword('');
-      } else {
-        alert('Ошибка изменения пароля');
-      }
+      await userService.sendPasswordResetEmailByUserId(userId);
+      alert(`Письмо с инструкциями по сбросу пароля отправлено на email: ${user.email}`);
     } catch (error) {
-      alert(`Ошибка изменения пароля: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      alert(`Ошибка отправки письма: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setSendingResetEmail(null);
+      setOperationLoading(false);
     }
-    setOperationLoading(false);
-  };
-
-  const togglePasswordVisibility = (userId: string) => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [userId]: !prev[userId]
-    }));
   };
 
   const generatePassword = () => {
@@ -302,9 +296,6 @@ const UserDirectory: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Роль
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Пароль
-                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
                 </th>
@@ -370,33 +361,6 @@ const UserDirectory: React.FC = () => {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-500 font-mono">
-                        {showPasswords[user.id] ? user.password : '••••••••'}
-                      </span>
-                      <button
-                        onClick={() => togglePasswordVisibility(user.id)}
-                        className="text-gray-400 hover:text-gray-600"
-                        title={showPasswords[user.id] ? 'Скрыть пароль' : 'Показать пароль'}
-                      >
-                        {showPasswords[user.id] ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                      {currentUser?.role === 'administrator' && (
-                        <button
-                          onClick={() => setResetPasswordUser(user.id)}
-                          className="text-blue-600 hover:text-blue-800"
-                          title="Сбросить пароль"
-                        >
-                          <Key className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     {editingUser === user.id ? (
                       <div className="flex justify-end space-x-2">
@@ -418,6 +382,20 @@ const UserDirectory: React.FC = () => {
                       </div>
                     ) : (
                       <div className="flex justify-end space-x-2">
+                        {currentUser?.role === 'administrator' && user.email && (
+                          <button
+                            onClick={() => handleSendPasswordReset(user.id)}
+                            disabled={operationLoading || sendingResetEmail === user.id}
+                            className="text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+                            title="Отправить ссылку для сброса пароля на email"
+                          >
+                            {sendingResetEmail === user.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                            ) : (
+                              <Mail className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleEditUser(user)}
                         disabled={operationLoading}
@@ -446,46 +424,6 @@ const UserDirectory: React.FC = () => {
         </div>
       </div>
 
-      {/* Reset Password Modal */}
-      {resetPasswordUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Сброс пароля
-            </h3>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Новый пароль
-              </label>
-              <input
-                type="text"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите новый пароль"
-              />
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setResetPasswordUser(null);
-                  setNewPassword('');
-                }}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={handleResetPassword}
-                disabled={operationLoading}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                {operationLoading ? 'Сброс...' : 'Сбросить пароль'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Statistics */}
       <div className="bg-white rounded-lg shadow p-6">
