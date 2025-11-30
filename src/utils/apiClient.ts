@@ -102,13 +102,25 @@ class ApiClient {
         userId,
         endpoint: url,
         method: options.method || 'GET',
-        headers: Object.keys(headers)
+        headers: Object.keys(headers),
+        xUserIdHeader: headers['x-user-id']
       });
     } else {
-      console.warn('ApiClient.request: userId не найден для запроса', {
+      const currentUserStr = typeof window !== 'undefined' ? localStorage.getItem('currentUser') : 'N/A';
+      let currentUserParsed = null;
+      try {
+        if (currentUserStr && currentUserStr !== 'N/A') {
+          currentUserParsed = JSON.parse(currentUserStr);
+        }
+      } catch (e) {
+        // ignore
+      }
+      console.error('ApiClient.request: userId не найден для запроса', {
         endpoint: url,
         method: options.method || 'GET',
-        localStorage: typeof window !== 'undefined' ? localStorage.getItem('currentUser') : 'N/A'
+        localStorage: currentUserStr,
+        parsedUser: currentUserParsed,
+        userIdFromParsed: currentUserParsed?.id
       });
     }
 

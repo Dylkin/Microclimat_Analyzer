@@ -124,12 +124,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Проверка доступа к страницам
   const hasAccess = (page: 'analyzer' | 'help' | 'database' | 'users' | 'admin'): boolean => {
-    if (!user) return false;
+    if (!user) {
+      console.warn('hasAccess: пользователь не авторизован');
+      return false;
+    }
 
     console.log('hasAccess: проверка доступа для пользователя:', { 
+      userId: user.id,
       user: user.email, 
       role: user.role, 
-      page 
+      page,
+      fullUser: user
     });
 
     switch (user.role) {
