@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Test endpoint для проверки заголовков
+// Test endpoint для проверки заголовков (БЕЗ requireAuth для отладки)
 router.get('/test-headers', (req, res) => {
   const allHeaders: Record<string, any> = {};
   Object.keys(req.headers).forEach(key => {
