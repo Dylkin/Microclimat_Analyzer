@@ -35,7 +35,20 @@ router.get('/test-headers', (req, res) => {
 });
 
 // GET /api/projects - Получить все проекты
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', (req, res, next) => {
+  // Логируем заголовки для отладки
+  console.log('GET /api/projects - Заголовки запроса:', {
+    'x-user-id': req.headers['x-user-id'],
+    'X-User-Id': req.headers['x-user-id'],
+    'x-userid': req.headers['x-userid'],
+    'user-id': req.headers['user-id'],
+    query: req.query,
+    allXHeaders: Object.keys(req.headers)
+      .filter(k => k.toLowerCase().startsWith('x-') || k.toLowerCase().includes('user'))
+      .reduce((acc, k) => { acc[k] = req.headers[k]; return acc; }, {} as Record<string, any>)
+  });
+  next();
+}, requireAuth, async (req, res) => {
   try {
     // Проверяем наличие полей tender_link и tender_date
     const tenderFieldsCheck = await pool.query(`
