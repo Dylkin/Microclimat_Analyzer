@@ -157,6 +157,82 @@ export class DocxTemplateProcessor {
   }
 
   /**
+   * Безопасное чтение document.xml из ZIP архива
+   * Обрабатывает как сжатые, так и несжатые файлы
+   */
+  private safeReadDocumentXml(zip: PizZip, filePath: string = 'word/document.xml'): string {
+    const documentFile = zip.files[filePath];
+    
+    if (!documentFile) {
+      throw new Error(`Файл ${filePath} не найден в архиве`);
+    }
+    
+    // Проверяем метод сжатия файла (0 = STORED/несжатый, 8 = DEFLATE/сжатый)
+    // Используем type assertion для доступа к внутренним свойствам PizZip
+    const fileData = documentFile as any;
+    const compressionMethod = fileData.options?.compressionMethod ?? fileData._data?.compressionMethod ?? 8;
+    const isUncompressed = compressionMethod === 0;
+    
+    // Если файл не сжат, пытаемся читать напрямую из _data
+    if (isUncompressed && fileData._data && fileData._data.data) {
+      try {
+        console.log('📖 Файл не сжат, читаем напрямую из _data...');
+        const rawData = fileData._data.data;
+        
+        // Если данные в виде строки, используем их напрямую
+        if (typeof rawData === 'string') {
+          return rawData;
+        } else if (rawData instanceof Uint8Array) {
+          // Если данные в виде Uint8Array, декодируем в UTF-8
+          const decoder = new TextDecoder('utf-8');
+          return decoder.decode(rawData);
+        } else if (rawData instanceof ArrayBuffer) {
+          // Если данные в виде ArrayBuffer, декодируем в UTF-8
+          const decoder = new TextDecoder('utf-8');
+          return decoder.decode(rawData);
+        }
+      } catch (directReadError) {
+        console.warn('⚠️ Ошибка при прямом чтении из _data, пробуем стандартные методы:', directReadError);
+      }
+    }
+    
+    // Используем стандартные методы PizZip
+    try {
+      return documentFile.asText();
+    } catch (asTextError) {
+      // Если asText() не работает, пробуем альтернативные методы
+      try {
+        const arrayBuffer = documentFile.asArrayBuffer();
+        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+          throw new Error('ArrayBuffer пуст или недоступен');
+        }
+        const decoder = new TextDecoder('utf-8');
+        return decoder.decode(arrayBuffer);
+      } catch (arrayBufferError) {
+        // Последняя попытка - через asBinary()
+        if (typeof documentFile.asBinary === 'function') {
+          try {
+            const binaryString = documentFile.asBinary();
+            if (!binaryString || binaryString.length === 0) {
+              throw new Error('Binary string пуст или недоступен');
+            }
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            const decoder = new TextDecoder('utf-8');
+            return decoder.decode(bytes);
+          } catch (asBinaryError) {
+            throw new Error(`Не удалось прочитать файл ${filePath}. Ошибки: asText=${asTextError instanceof Error ? asTextError.message : String(asTextError)}, asArrayBuffer=${arrayBufferError instanceof Error ? arrayBufferError.message : String(arrayBufferError)}, asBinary=${asBinaryError instanceof Error ? asBinaryError.message : String(asBinaryError)}`);
+          }
+        } else {
+          throw new Error(`Не удалось прочитать файл ${filePath}. Ошибка asText: ${asTextError instanceof Error ? asTextError.message : String(asTextError)}`);
+        }
+      }
+    }
+  }
+
+  /**
    * Создание нового отчета
    */
   private async createNewReport(
@@ -194,8 +270,8 @@ export class DocxTemplateProcessor {
       // Загружаем шаблон в PizZip
       const zip = new PizZip(templateBuffer);
 
-      // Читаем основной документ
-      const documentXml = zip.files['word/document.xml'].asText();
+      // Читаем основной документ (с поддержкой несжатых файлов)
+      const documentXml = this.safeReadDocumentXml(zip);
       
       // Диагностика: проверяем содержимое документа сразу после загрузки
       console.log('Document loaded, XML length:', documentXml.length);
@@ -288,11 +364,11 @@ export class DocxTemplateProcessor {
       
       // Загружаем существующий отчет
       const existingZip = new PizZip(await existingReportBlob.arrayBuffer());
-      const existingDocumentXml = existingZip.files['word/document.xml'].asText();
+      const existingDocumentXml = this.safeReadDocumentXml(existingZip);
       
       // Загружаем новый отчет
       const newZip = new PizZip(await newReportBlob.arrayBuffer());
-      const newDocumentXml = newZip.files['word/document.xml'].asText();
+      const newDocumentXml = this.safeReadDocumentXml(newZip);
       
       // Извлекаем содержимое body из нового отчета
       const newBodyContent = this.extractBodyContent(newDocumentXml);
@@ -537,8 +613,8 @@ export class DocxTemplateProcessor {
       const imageFilename = `word/media/${imageId}.png`;
       existingZip.file(imageFilename, chartImage);
       
-      // Получаем текущий document.xml
-      const currentDocumentXml = existingZip.files['word/document.xml'].asText();
+      // Получаем текущий document.xml (с поддержкой несжатых файлов)
+      const currentDocumentXml = this.safeReadDocumentXml(existingZip);
       
       // Создаем новый контент для добавления
       const newContent = await this.createNewContent(newData, imageId);
@@ -605,15 +681,15 @@ export class DocxTemplateProcessor {
       // Обновляем файл связей в существующем отчете
       this.updateRelationships(existingZip, newRelationshipId, `media/${newImageName}`);
       
-      // Читаем содержимое шаблона для получения структуры новых данных
-      const templateDocumentXml = templateZip.files['word/document.xml'].asText();
+      // Читаем содержимое шаблона для получения структуры новых данных (с поддержкой несжатых файлов)
+      const templateDocumentXml = this.safeReadDocumentXml(templateZip);
       
       // Обрабатываем шаблон с новыми данными
       let processedTemplateXml = this.replaceChartPlaceholder(templateDocumentXml, newRelationshipId);
       processedTemplateXml = this.processTextPlaceholders(processedTemplateXml, data);
       
-      // Читаем существующий документ
-      const existingDocumentXml = existingZip.files['word/document.xml'].asText();
+      // Читаем существующий документ (с поддержкой несжатых файлов)
+      const existingDocumentXml = this.safeReadDocumentXml(existingZip);
       
       // Добавляем новый контент в существующий документ
       const updatedDocumentXml = this.appendContentToDocument(existingDocumentXml, processedTemplateXml);
@@ -1753,7 +1829,7 @@ export class DocxTemplateProcessor {
   async analyzeTemplateContent(templateFile: File): Promise<{ placeholders: string[]; hasTable: boolean; content: string }> {
     try {
       const zip = new PizZip(await templateFile.arrayBuffer());
-      const documentXml = zip.files['word/document.xml'].asText();
+      const documentXml = this.safeReadDocumentXml(zip);
       
       console.log('Analyzing template content...');
       console.log('Document XML length:', documentXml.length);
@@ -1926,75 +2002,25 @@ export class DocxTemplateProcessor {
             };
           }
 
-          // Пытаемся прочитать содержимое
-          // Используем альтернативные методы чтения для обхода проблем с inflateRaw
-          let documentXml: string;
+          // Пытаемся прочитать содержимое используя безопасный метод
+          const documentXml = this.safeReadDocumentXml(zip, 'word/document.xml');
           
-          // Проверяем, не сжат ли файл (dir = false означает, что это файл, а не директория)
-          const isCompressed = documentFile.options && documentFile.options.compression !== null && documentFile.options.compression !== undefined;
+          // Логируем информацию о файле для диагностики
+          const fileData = documentFile as any;
+          const compressionMethod = fileData.options?.compressionMethod ?? fileData._data?.compressionMethod ?? 8;
           console.log('🔍 Информация о файле:', {
             name: documentFile.name,
             dir: documentFile.dir,
             date: documentFile.date,
             options: documentFile.options,
-            isCompressed: isCompressed
+            compressionMethod: compressionMethod,
+            isUncompressed: compressionMethod === 0,
+            _data: fileData._data ? {
+              compressionMethod: fileData._data.compressionMethod,
+              uncompressedSize: fileData._data.uncompressedSize,
+              compressedSize: fileData._data.compressedSize
+            } : null
           });
-          
-          try {
-            // Сначала пробуем стандартный метод asText()
-            documentXml = documentFile.asText();
-            console.log('✅ document.xml прочитан через asText()');
-          } catch (asTextError) {
-            console.warn('⚠️ Ошибка при чтении через asText(), пробуем альтернативные методы:', asTextError);
-            
-            // Альтернативный метод 1: читаем как ArrayBuffer и декодируем вручную
-            try {
-              const arrayBuffer = documentFile.asArrayBuffer();
-              if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-                throw new Error('ArrayBuffer пуст или недоступен');
-              }
-              
-              // Декодируем ArrayBuffer в строку (UTF-8)
-              const decoder = new TextDecoder('utf-8');
-              documentXml = decoder.decode(arrayBuffer);
-              
-              console.log('✅ document.xml прочитан через альтернативный метод (asArrayBuffer)');
-            } catch (arrayBufferError) {
-              console.warn('⚠️ Ошибка при чтении через asArrayBuffer(), пробуем asBinary():', arrayBufferError);
-              
-              // Альтернативный метод 2: читаем как binary string и декодируем
-              try {
-                if (typeof documentFile.asBinary === 'function') {
-                  const binaryString = documentFile.asBinary();
-                  if (!binaryString || binaryString.length === 0) {
-                    throw new Error('Binary string пуст или недоступен');
-                  }
-                  
-                  // Конвертируем binary string в UTF-8 строку
-                  // Для этого нужно преобразовать каждый байт
-                  const bytes = new Uint8Array(binaryString.length);
-                  for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                  }
-                  const decoder = new TextDecoder('utf-8');
-                  documentXml = decoder.decode(bytes);
-                  
-                  console.log('✅ document.xml прочитан через альтернативный метод (asBinary)');
-                } else {
-                  throw new Error('Метод asBinary недоступен');
-                }
-              } catch (asBinaryError) {
-                console.error('❌ Ошибка при чтении через все методы:', {
-                  asText: asTextError instanceof Error ? asTextError.message : String(asTextError),
-                  asArrayBuffer: arrayBufferError instanceof Error ? arrayBufferError.message : String(arrayBufferError),
-                  asBinary: asBinaryError instanceof Error ? asBinaryError.message : String(asBinaryError)
-                });
-                
-                // Если все методы не сработали, возвращаем более информативную ошибку
-                throw new Error(`Не удалось прочитать файл ни одним из методов. Возможно, файл использует неподдерживаемый метод сжатия или поврежден. Первая ошибка: ${asTextError instanceof Error ? asTextError.message : String(asTextError)}`);
-              }
-            }
-          }
           
           if (!documentXml || typeof documentXml !== 'string') {
             console.error('❌ Не удалось прочитать содержимое document.xml');
