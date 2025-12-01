@@ -475,31 +475,37 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
         )}
 
         {/* Вертикальные маркеры */}
-        {markers.map(marker => (
-          <g key={marker.id} transform={`translate(${margin.left}, ${margin.top})`}>
-            <line
-              x1={xScale(new Date(marker.timestamp))}
-              y1={0}
-              x2={xScale(new Date(marker.timestamp))}
-              y2={innerHeight}
-              stroke={marker.color || '#000000'}
-              strokeWidth={2}
-              strokeDasharray="3,3"
-            />
-            {marker.label && (
-              <text
-                x={xScale(new Date(marker.timestamp))}
-                y={-10}
-                textAnchor="middle"
-                fontSize="12"
-                fill={marker.color || '#000000'}
-                fontWeight="bold"
-              >
-                {marker.label}
-              </text>
-            )}
-          </g>
-        ))}
+        {markers.map((marker, index) => {
+          // Четные маркеры (индекс 0, 2, 4...) размещаем выше, нечетные (индекс 1, 3, 5...) - ниже
+          // Это соответствует: 1-й маркер (индекс 0) - выше, 2-й маркер (индекс 1) - ниже, и т.д.
+          const labelY = index % 2 === 0 ? -10 : -25;
+          
+          return (
+            <g key={marker.id} transform={`translate(${margin.left}, ${margin.top})`}>
+              <line
+                x1={xScale(new Date(marker.timestamp))}
+                y1={0}
+                x2={xScale(new Date(marker.timestamp))}
+                y2={innerHeight}
+                stroke={marker.color || '#000000'}
+                strokeWidth={2}
+                strokeDasharray="3,3"
+              />
+              {marker.label && (
+                <text
+                  x={xScale(new Date(marker.timestamp))}
+                  y={labelY}
+                  textAnchor="middle"
+                  fontSize="12"
+                  fill={marker.color || '#000000'}
+                  fontWeight="bold"
+                >
+                  {marker.label}
+                </text>
+              )}
+            </g>
+          );
+        })}
 
         {/* Линии графиков для каждого файла */}
         <g transform={`translate(${margin.left}, ${margin.top})`}>
