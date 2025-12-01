@@ -41,7 +41,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   
   // Contract fields
   const [contractFields, setContractFields] = useState({
-    testType: ''
+    testType: '',
+    acceptanceCriterion: '' // Критерий приемлемости (мин.) для temperature_recovery
   });
   
   // UI state
@@ -1684,6 +1685,31 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <option value="power_on">Испытание на сбой электропитания (включение)</option>
               </select>
             </div>
+            {contractFields.testType === 'temperature_recovery' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Критерий приемлемости (мин.)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="999"
+                  step="1"
+                  value={contractFields.acceptanceCriterion || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Валидация: только целые числа от 0 до 999
+                    if (value === '' || (Number.isInteger(Number(value)) && Number(value) >= 0 && Number(value) <= 999)) {
+                      handleContractFieldChange('acceptanceCriterion', value);
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Введите значение (0-999)"
+                  title="Критерий приемлемости в минутах (целое число от 0 до 999)"
+                  aria-label="Критерий приемлемости в минутах"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Управление масштабом</label>
               <button
