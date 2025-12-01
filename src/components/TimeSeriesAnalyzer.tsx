@@ -3,7 +3,7 @@ import { Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
-import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType } from '../types/TimeSeriesData';
+import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType, TimeSeriesPoint } from '../types/TimeSeriesData';
 import { useAuth } from '../contexts/AuthContext';
 import html2canvas from 'html2canvas';
 import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplateProcessor';
@@ -680,6 +680,125 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       globalMaxTemp
     };
   }, [analysisResults]);
+
+  // Функция для вычисления времени в формате "час:мин"
+  const formatTimeDuration = (milliseconds: number): string => {
+    const totalMinutes = Math.floor(milliseconds / (1000 * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}:${minutes.toString().padStart(2, '0')}`;
+  };
+
+  // Функция для вычисления времени нахождения в диапазоне после отключения питания (power_off)
+  const calculateTimeInRangeAfterPowerOff = (
+    points: TimeSeriesPoint[],
+    markerTimestamp: number,
+    minLimit: number | undefined,
+    maxLimit: number | undefined
+  ): string => {
+    if (!minLimit || !maxLimit || !data) return '-';
+    
+    // Фильтруем точки после маркера отключения
+    const pointsAfterMarker = points
+      .filter(p => p.timestamp >= markerTimestamp && p.temperature !== undefined)
+      .sort((a, b) => a.timestamp - b.timestamp);
+    
+    if (pointsAfterMarker.length === 0) return '-';
+    
+    // Находим последнюю точку, где температура еще в диапазоне
+    let lastInRangeIndex = -1;
+    for (let i = 0; i < pointsAfterMarker.length; i++) {
+      const temp = pointsAfterMarker[i].temperature!;
+      if (temp >= minLimit && temp <= maxLimit) {
+        lastInRangeIndex = i;
+      } else {
+        break; // Прерываем, если температура вышла из диапазона
+      }
+    }
+    
+    if (lastInRangeIndex === -1) return '-';
+    
+    const timeInRange = pointsAfterMarker[lastInRangeIndex].timestamp - markerTimestamp;
+    return formatTimeDuration(timeInRange);
+  };
+
+  // Функция для вычисления времени восстановления до диапазона после включения питания (power_on)
+  const calculateRecoveryTimeAfterPowerOn = (
+    points: TimeSeriesPoint[],
+    markerTimestamp: number,
+    minLimit: number | undefined,
+    maxLimit: number | undefined
+  ): string => {
+    if (!minLimit || !maxLimit || !data) return '-';
+    
+    // Фильтруем точки после маркера включения
+    const pointsAfterMarker = points
+      .filter(p => p.timestamp >= markerTimestamp && p.temperature !== undefined)
+      .sort((a, b) => a.timestamp - b.timestamp);
+    
+    if (pointsAfterMarker.length === 0) return '-';
+    
+    // Находим первую точку, где температура входит в диапазон
+    for (let i = 0; i < pointsAfterMarker.length; i++) {
+      const temp = pointsAfterMarker[i].temperature!;
+      if (temp >= minLimit && temp <= maxLimit) {
+        const recoveryTime = pointsAfterMarker[i].timestamp - markerTimestamp;
+        return formatTimeDuration(recoveryTime);
+      }
+    }
+    
+    return '-'; // Температура не восстановилась
+  };
+
+  // Функция для вычисления времени восстановления после открытия двери (temperature_recovery)
+  const calculateRecoveryTimeAfterDoorOpening = (
+    points: TimeSeriesPoint[],
+    markerTimestamp: number,
+    minLimit: number | undefined,
+    maxLimit: number | undefined
+  ): { time: string; meetsCriterion: string } => {
+    if (!minLimit || !maxLimit || !data) {
+      return { time: '-', meetsCriterion: '-' };
+    }
+    
+    // Фильтруем точки после маркера открытия двери
+    const pointsAfterMarker = points
+      .filter(p => p.timestamp >= markerTimestamp && p.temperature !== undefined)
+      .sort((a, b) => a.timestamp - b.timestamp);
+    
+    if (pointsAfterMarker.length === 0) {
+      return { time: '-', meetsCriterion: '-' };
+    }
+    
+    // Находим первую точку, где температура входит в диапазон
+    for (let i = 0; i < pointsAfterMarker.length; i++) {
+      const temp = pointsAfterMarker[i].temperature!;
+      if (temp >= minLimit && temp <= maxLimit) {
+        const recoveryTime = pointsAfterMarker[i].timestamp - markerTimestamp;
+        const timeInMinutes = Math.floor(recoveryTime / (1000 * 60));
+        // Критерий: восстановление должно быть не более 30 минут (можно настроить)
+        const meetsCriterion = timeInMinutes <= 30 ? 'Да' : 'Нет';
+        return { time: formatTimeDuration(recoveryTime), meetsCriterion };
+      }
+    }
+    
+    return { time: '-', meetsCriterion: 'Нет' }; // Температура не восстановилась
+  };
+
+  // Получаем маркер для текущего типа испытания
+  const getTestMarker = (): VerticalMarker | null => {
+    if (!contractFields.testType || markers.length === 0) return null;
+    
+    // Для power_off и power_on ищем маркер типа 'test'
+    // Для temperature_recovery ищем маркер типа 'door_opening'
+    const markerType = contractFields.testType === 'temperature_recovery' ? 'door_opening' : 'test';
+    const testMarkers = markers.filter(m => m.type === markerType);
+    
+    if (testMarkers.length === 0) return null;
+    
+    // Берем первый маркер (можно улучшить логику выбора)
+    return testMarkers[0];
+  };
 
   const handleLimitChange = (type: DataType, limitType: 'min' | 'max', value: string) => {
     const numValue = value === '' ? undefined : parseFloat(value);
@@ -1683,114 +1802,121 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           )}
         </div>
       </div>
-      {/* Analysis Results Table */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
+      {/* Analysis Results Table - условный рендеринг в зависимости от типа испытания */}
+      {(() => {
+        const testType = contractFields.testType;
         
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  № зоны измерения
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Уровень измерения (м.)
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Наименование логгера
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Серийный № логгера
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Мин. t°C
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Макс. t°C
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Среднее t°C
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Соответствие критериям
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {analysisResults.map((result, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешняя температура' : result.zoneNumber}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ',')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {result.loggerName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {result.serialNumber}
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
-                    !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
-                    globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp
-                      ? 'bg-blue-200' 
-                      : ''
-                  }`}>
-                    {result.minTemp}
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
-                    !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
-                    globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp
-                      ? 'bg-red-200' 
-                      : ''
-                  }`}>
-                    {result.maxTemp}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {result.avgTemp === '-' || !result.avgTemp ? '-' : parseFloat(result.avgTemp).toFixed(1).replace('.', ',')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      result.meetsLimits === 'Да' 
-                        ? 'bg-green-100 text-green-800' 
-                        : result.meetsLimits === 'Нет'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {result.meetsLimits}
-                    </span>
-                  </td>
+        // Стандартная таблица для empty_volume и loaded_volume
+        if (testType === 'empty_volume' || testType === 'loaded_volume') {
+          return (
+            <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
+          
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    № зоны измерения
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Уровень измерения (м.)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Наименование логгера
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Серийный № логгера
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Мин. t°C
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Макс. t°C
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Среднее t°C
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Соответствие критериям
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {analysisResults.map((result, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешняя температура' : result.zoneNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ',')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {result.loggerName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {result.serialNumber}
+                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
+                      !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
+                      globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp
+                        ? 'bg-blue-200' 
+                        : ''
+                    }`}>
+                      {result.minTemp}
+                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
+                      !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
+                      globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp
+                        ? 'bg-red-200' 
+                        : ''
+                    }`}>
+                      {result.maxTemp}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {result.avgTemp === '-' || !result.avgTemp ? '-' : parseFloat(result.avgTemp).toFixed(1).replace('.', ',')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        result.meetsLimits === 'Да' 
+                          ? 'bg-green-100 text-green-800' 
+                          : result.meetsLimits === 'Нет'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {result.meetsLimits}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        {/* Legend */}
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Обозначения:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-blue-200 rounded"></div>
-              <span>Минимальное значение в выбранном периоде</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-red-200 rounded"></div>
-              <span>Максимальное значение в выбранном периоде</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                Да
-              </span>
-              <span>Соответствует лимитам</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                Нет
-              </span>
-              <span>Не соответствует лимитам</span>
+          {/* Legend */}
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Обозначения:</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-blue-200 rounded"></div>
+                <span>Минимальное значение в выбранном периоде</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-red-200 rounded"></div>
+                <span>Максимальное значение в выбранном периоде</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                  Да
+                </span>
+                <span>Соответствует лимитам</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                  Нет
+                </span>
+                <span>Не соответствует лимитам</span>
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-xs bg-gray-200 px-2 py-1 rounded font-mono">DL-023</span>
@@ -1800,10 +1926,251 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <div className="mt-3 text-xs text-gray-600">
             <strong>Примечание:</strong> При изменении масштаба графика статистика пересчитывается только для выбранного временного периода.
           </div>
-        </div>
+            </div>
+          );
+        }
+        
+        // Таблица для power_off: Испытание на сбой электропитания (отключение)
+        if (testType === 'power_off') {
+          return (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
+              
+              <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    № зоны
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Уровень (м.)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Номер логгера
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Серийный № логгера
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Питание выключено. Время, в течение которого температура находится в требуемом диапазоне, (час: мин)
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {analysisResults.map((result, index) => {
+                  const testMarker = getTestMarker();
+                  const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(result.zoneNumber.toString()) || 0);
+                  const filePoints = data?.points.filter(p => {
+                    const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+                    const pLevel = p.measurementLevel?.toString() || 'unknown';
+                    return `${pZone}_${pLevel}` === `${zoneNumber}_${result.measurementLevel.toString()}`;
+                  }) || [];
+                  
+                  const timeInRange = testMarker && limits.temperature
+                    ? calculateTimeInRangeAfterPowerOff(
+                        filePoints,
+                        testMarker.timestamp,
+                        limits.temperature.min,
+                        limits.temperature.max
+                      )
+                    : '-';
+                  
+                  return (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешняя температура' : result.zoneNumber}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ',')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.loggerName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.serialNumber}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {timeInRange}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+              </div>
+            </div>
+          );
+        }
+        
+        // Таблица для power_on: Испытание на сбой электропитания (включение)
+        if (testType === 'power_on') {
+          return (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
+              
+              <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    № зоны
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Уровень (м.)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Номер логгера
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Серийный № логгера
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Питание включено. Время восстановления до требуемого диапазона температур, (час: мин)
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {analysisResults.map((result, index) => {
+                  const testMarker = getTestMarker();
+                  const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
+                  const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
+                  const filePoints = data?.points.filter(p => {
+                    const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+                    const pLevel = p.measurementLevel?.toString() || 'unknown';
+                    return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+                  }) || [];
+                  
+                  const recoveryTime = testMarker && limits.temperature
+                    ? calculateRecoveryTimeAfterPowerOn(
+                        filePoints,
+                        testMarker.timestamp,
+                        limits.temperature.min,
+                        limits.temperature.max
+                      )
+                    : '-';
+                  
+                  return (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешняя температура' : result.zoneNumber}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ',')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.loggerName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.serialNumber}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {recoveryTime}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+              </div>
+            </div>
+          );
+        }
+        
+        // Таблица для temperature_recovery: Испытание по восстановлению температуры после открытия двери
+        if (testType === 'temperature_recovery') {
+          return (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
+              
+              <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    № зоны
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Уровень (м.)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Номер логгера
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Серийный № логгера
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Время восстановления до заданного диапазона температур, (час: мин)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Соответствует критерию
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {analysisResults.map((result, index) => {
+                  const testMarker = getTestMarker();
+                  const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
+                  const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
+                  const filePoints = data?.points.filter(p => {
+                    const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+                    const pLevel = p.measurementLevel?.toString() || 'unknown';
+                    return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+                  }) || [];
+                  
+                  const recoveryData = testMarker && limits.temperature
+                    ? calculateRecoveryTimeAfterDoorOpening(
+                        filePoints,
+                        testMarker.timestamp,
+                        limits.temperature.min,
+                        limits.temperature.max
+                      )
+                    : { time: '-', meetsCriterion: '-' };
+                  
+                  return (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешняя температура' : result.zoneNumber}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ',')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.loggerName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {result.serialNumber}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {recoveryData.time}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          recoveryData.meetsCriterion === 'Да' 
+                            ? 'bg-green-100 text-green-800' 
+                            : recoveryData.meetsCriterion === 'Нет'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {recoveryData.meetsCriterion}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+              </div>
+            </div>
+          );
+        }
+        
+        // Если тип испытания не выбран или не соответствует ни одному из типов, не показываем таблицу
+        return null;
+      })()}
 
-        {/* Поле для выводов */}
-        <div className="mt-6">
+      {/* Поле для выводов */}
+      <div className="mt-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Выводы
           </label>
@@ -1821,7 +2188,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             Заполнить
           </button>
         </div>
-      </div>
 
       {/* Кнопка формирования отчета */}
       <div className="bg-white rounded-lg shadow p-6">
