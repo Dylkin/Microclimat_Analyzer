@@ -357,36 +357,42 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
 
     // Для типов empty_volume и loaded_volume фильтруем данные по маркерам типа "Испытание"
-    if ((contractFields.testType === 'empty_volume' || contractFields.testType === 'loaded_volume') && markers.length > 0) {
-      const testMarkers = markers
-        .filter(m => m.type === 'test')
-        .sort((a, b) => a.timestamp - b.timestamp);
+    // с названиями "Начало испытания" и "Завершение испытания"
+    if (contractFields.testType === 'empty_volume' || contractFields.testType === 'loaded_volume') {
+      // Ищем маркеры типа "test" с названиями "Начало испытания" и "Завершение испытания"
+      const startMarker = markers.find(m => 
+        m.type === 'test' && m.label && m.label.trim() === 'Начало испытания'
+      );
+      const endMarker = markers.find(m => 
+        m.type === 'test' && m.label && m.label.trim() === 'Завершение испытания'
+      );
       
-      if (testMarkers.length > 0) {
+      if (startMarker && endMarker) {
         console.log('TimeSeriesAnalyzer: Filtering points by test markers', {
-          testMarkersCount: testMarkers.length,
-          markers: testMarkers.map(m => ({ id: m.id, timestamp: m.timestamp, label: m.label }))
+          startMarker: { id: startMarker.id, timestamp: startMarker.timestamp, label: startMarker.label },
+          endMarker: { id: endMarker.id, timestamp: endMarker.timestamp, label: endMarker.label }
         });
         
-        // Если есть несколько маркеров, используем диапазон между первым и последним
-        // Если маркер один, используем данные после этого маркера
-        if (testMarkers.length === 1) {
-          const startTime = testMarkers[0].timestamp;
-          filteredPoints = filteredPoints.filter(point => point.timestamp >= startTime);
-          console.log('TimeSeriesAnalyzer: Filtered by single marker, points after:', startTime, 'filtered count:', filteredPoints.length);
-        } else {
-          // Используем диапазон между первым и последним маркером
-          const startTime = testMarkers[0].timestamp;
-          const endTime = testMarkers[testMarkers.length - 1].timestamp;
-          filteredPoints = filteredPoints.filter(point => 
-            point.timestamp >= startTime && point.timestamp <= endTime
-          );
-          console.log('TimeSeriesAnalyzer: Filtered by marker range', {
-            startTime,
-            endTime,
-            filteredCount: filteredPoints.length
-          });
-        }
+        // Используем данные между маркерами "Начало испытания" и "Завершение испытания"
+        const startTime = Math.min(startMarker.timestamp, endMarker.timestamp);
+        const endTime = Math.max(startMarker.timestamp, endMarker.timestamp);
+        
+        filteredPoints = filteredPoints.filter(point => 
+          point.timestamp >= startTime && point.timestamp <= endTime
+        );
+        
+        console.log('TimeSeriesAnalyzer: Filtered by marker range', {
+          startTime,
+          endTime,
+          filteredCount: filteredPoints.length
+        });
+      } else {
+        // Если маркеры не найдены, используем все данные (с учетом зума, если он применен)
+        console.log('TimeSeriesAnalyzer: Test markers not found, using all data', {
+          hasStartMarker: !!startMarker,
+          hasEndMarker: !!endMarker,
+          allMarkers: markers.map(m => ({ id: m.id, type: m.type, label: m.label }))
+        });
       }
     }
 
