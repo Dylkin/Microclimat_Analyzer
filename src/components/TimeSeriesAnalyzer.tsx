@@ -881,19 +881,52 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return { time: '-', meetsCriterion: '-' };
     }
     
-    // Находим первую точку, где температура входит в диапазон
+    // Проверяем, выходила ли температура за пределы
+    let exceededLimits = false;
+    let exceededIndex = -1;
+    
     for (let i = 0; i < pointsAfterMarker.length; i++) {
       const temp = pointsAfterMarker[i].temperature!;
+      if (temp < minLimit || temp > maxLimit) {
+        exceededLimits = true;
+        exceededIndex = i;
+        break; // Нашли первую точку, где температура вышла за пределы
+      }
+    }
+    
+    // Если температура не выходила за пределы
+    if (!exceededLimits) {
+      const acceptanceCriterion = contractFields.acceptanceCriterion 
+        ? parseInt(contractFields.acceptanceCriterion) 
+        : 0;
+      // Если не выходили за пределы, считаем, что критерий выполнен
+      return { time: 'Не выходили за пределы', meetsCriterion: 'Да' };
+    }
+    
+    // Если выходила за пределы, ищем время возвращения в диапазон
+    // Ищем первую точку после exceededIndex, где температура снова входит в диапазон
+    for (let i = exceededIndex + 1; i < pointsAfterMarker.length; i++) {
+      const temp = pointsAfterMarker[i].temperature!;
       if (temp >= minLimit && temp <= maxLimit) {
+        // Нашли точку возвращения в диапазон
         const recoveryTime = pointsAfterMarker[i].timestamp - markerTimestamp;
         const timeInMinutes = Math.floor(recoveryTime / (1000 * 60));
-        // Критерий: восстановление должно быть не более 30 минут (можно настроить)
-        const meetsCriterion = timeInMinutes <= 30 ? 'Да' : 'Нет';
+        
+        // Используем критерий приемлемости из contractFields
+        const acceptanceCriterion = contractFields.acceptanceCriterion 
+          ? parseInt(contractFields.acceptanceCriterion) 
+          : 0;
+        const meetsCriterion = timeInMinutes <= acceptanceCriterion ? 'Да' : 'Нет';
+        
         return { time: formatTimeDuration(recoveryTime), meetsCriterion };
       }
     }
     
-    return { time: '-', meetsCriterion: 'Нет' }; // Температура не восстановилась
+    // Температура вышла за пределы, но не вернулась в диапазон
+    const acceptanceCriterion = contractFields.acceptanceCriterion 
+      ? parseInt(contractFields.acceptanceCriterion) 
+      : 0;
+    return { time: '-', meetsCriterion: 'Нет' };
   };
 
   // Получаем маркер для текущего типа испытания
