@@ -356,15 +356,29 @@ router.put('/:id', async (req, res) => {
         values.push(tags && Array.isArray(tags) && tags.length > 0 ? tags : []);
       }
     }
-    if (latitude !== undefined) {
+    
+    // Проверяем наличие полей latitude, longitude, geocoded_at в таблице
+    const geoFieldsCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'contractors' 
+      AND column_name IN ('latitude', 'longitude', 'geocoded_at')
+    `);
+    const availableGeoFields = geoFieldsCheck.rows.map((row: any) => row.column_name);
+    const hasLatitude = availableGeoFields.includes('latitude');
+    const hasLongitude = availableGeoFields.includes('longitude');
+    const hasGeocodedAt = availableGeoFields.includes('geocoded_at');
+    
+    if (latitude !== undefined && hasLatitude) {
       updates.push(`latitude = $${paramCount++}`);
       values.push(latitude || null);
     }
-    if (longitude !== undefined) {
+    if (longitude !== undefined && hasLongitude) {
       updates.push(`longitude = $${paramCount++}`);
       values.push(longitude || null);
     }
-    if (geocodedAt !== undefined) {
+    if (geocodedAt !== undefined && hasGeocodedAt) {
       updates.push(`geocoded_at = $${paramCount++}`);
       values.push(geocodedAt ? new Date(geocodedAt) : null);
     }
@@ -401,16 +415,8 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Нет данных для обновления' });
     }
     
-    // Проверяем наличие полей latitude, longitude, geocoded_at в таблице
-    const tableCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_schema = 'public' 
-      AND table_name = 'contractors' 
-      AND column_name IN ('latitude', 'longitude', 'geocoded_at')
-    `);
-    
-    const hasGeoFields = tableCheck.rows.length > 0;
+    // Используем уже проверенные значения hasLatitude, hasLongitude, hasGeocodedAt
+    const hasGeoFields = hasLatitude || hasLongitude || hasGeocodedAt;
     
     // Проверяем наличие поля role для RETURNING
     const roleCheckForReturning = await pool.query(`
