@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # ============================================
 # Скрипт развертывания Microclimat Analyzer
@@ -6,6 +6,11 @@
 # ============================================
 
 set -e  # Остановка при ошибке
+
+# Убеждаемся, что используется bash
+if [ -z "$BASH_VERSION" ]; then
+    exec bash "$0" "$@"
+fi
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -68,7 +73,8 @@ read_config() {
     read -p "Пользователь базы данных (по умолчанию: microclimat_user): " DB_USER
     DB_USER=${DB_USER:-microclimat_user}
     
-    read -sp "Пароль базы данных: " DB_PASSWORD
+    echo -n "Пароль базы данных: "
+    read -s DB_PASSWORD
     echo ""
     if [ -z "$DB_PASSWORD" ]; then
         print_error "Пароль базы данных обязателен!"
@@ -145,7 +151,7 @@ setup_database() {
     print_info "Настройка базы данных..."
     
     # Проверка существования пользователя
-    USER_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'")
+    USER_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" 2>/dev/null || echo "0")
     if [ "$USER_EXISTS" = "1" ]; then
         print_warning "Пользователь $DB_USER уже существует"
         read -p "Пересоздать пользователя и базу данных? (y/n): " -n 1 -r
@@ -156,20 +162,35 @@ DROP DATABASE IF EXISTS $DB_NAME;
 DROP USER IF EXISTS $DB_USER;
 EOF
         else
+            # Обновляем пароль существующего пользователя
+            sudo -u postgres psql -c "ALTER USER $DB_USER WITH PASSWORD '$DB_PASSWORD';"
+            print_success "Пароль пользователя обновлен"
             return
         fi
     fi
     
     # Создание пользователя и базы данных
     sudo -u postgres psql <<EOF
--- Создание пользователя
-CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';
+-- Создание пользователя с правами для создания схем и выполнения миграций
+CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD' CREATEDB CREATEROLE;
 
 -- Создание базы данных
 CREATE DATABASE $DB_NAME OWNER $DB_USER;
 
--- Предоставление прав
+-- Предоставление всех прав на базу данных
 GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
+
+-- Выход
+\q
+EOF
+    
+    # Предоставление прав на схему public
+    sudo -u postgres psql -d "$DB_NAME" <<EOF
+-- Предоставление всех прав на схему public
+GRANT ALL ON SCHEMA public TO $DB_USER;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $DB_USER;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $DB_USER;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO $DB_USER;
 
 -- Выход
 \q
@@ -177,6 +198,7 @@ EOF
     
     print_success "База данных создана: $DB_NAME"
     print_success "Пользователь создан: $DB_USER"
+    print_success "Права для миграций предоставлены"
 }
 
 # Установка Nginx
