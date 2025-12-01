@@ -1,5 +1,5 @@
 import html2canvas from 'html2canvas';
-import PizZip from 'pizzip';
+import JSZip from 'jszip';
 
 export interface TemplateReportData {
   title: string;
@@ -289,242 +289,58 @@ export class DocxTemplateProcessor {
   /**
    * Безопасное чтение document.xml из ZIP архива
    * Обрабатывает как сжатые, так и несжатые файлы
+   * Использует JSZip для надежного чтения файлов
    */
-  private safeReadDocumentXml(zip: PizZip, filePath: string = 'word/document.xml', zipBuffer?: ArrayBuffer): string {
-    const documentFile = zip.files[filePath];
+  private async safeReadDocumentXml(zip: JSZip, filePath: string = 'word/document.xml', zipBuffer?: ArrayBuffer): Promise<string> {
+    const documentFile = zip.file(filePath);
     
     if (!documentFile) {
       throw new Error(`Файл ${filePath} не найден в архиве`);
     }
     
-    // Используем type assertion для доступа к внутренним свойствам PizZip
-    const fileData = documentFile as any;
-    
-    // Проверяем метод сжатия файла (0 = STORED/несжатый, 8 = DEFLATE/сжатый)
-    // Пробуем разные способы получения метода сжатия
-    let compressionMethod = 8; // По умолчанию считаем сжатым
-    let isUncompressed = false;
-    
-    // Способ 1: из _data.compressionMethod (может быть числом или строкой)
-    if (fileData._data?.compressionMethod !== undefined) {
-      const method = fileData._data.compressionMethod;
-      if (typeof method === 'number') {
-        compressionMethod = method;
-      } else if (typeof method === 'string' && method.length > 0) {
-        // Если это строка, пробуем прочитать как число из байтов
-        const firstByte = method.charCodeAt(0);
-        compressionMethod = firstByte;
-      }
-    }
-    
-    // Способ 2: из options.compressionMethod
-    if (fileData.options?.compressionMethod !== undefined && typeof fileData.options.compressionMethod === 'number') {
-      compressionMethod = fileData.options.compressionMethod;
-    }
-    
-    // Способ 3: проверяем по размерам (если размеры совпадают, файл не сжат)
-    if (fileData._data?.compressedSize !== undefined && fileData._data?.uncompressedSize !== undefined) {
-      if (fileData._data.compressedSize === fileData._data.uncompressedSize) {
-        compressionMethod = 0;
-      }
-    }
-    
-    isUncompressed = compressionMethod === 0;
-    
     console.log('🔍 Информация о файле:', {
       name: documentFile.name,
-      compressionMethod: compressionMethod,
-      isUncompressed: isUncompressed,
-      hasData: !!fileData._data,
-      dataKeys: fileData._data ? Object.keys(fileData._data) : []
+      dir: documentFile.dir
     });
     
-    // Если файл не сжат, пытаемся читать напрямую из внутренних данных
-    if (isUncompressed && fileData._data) {
-      try {
-        console.log('📖 Файл не сжат, пытаемся читать напрямую...');
-        
-        // Пробуем разные способы получения данных
-        let rawData: any = null;
-        
-        // Способ 1: напрямую из _data.data
-        if (fileData._data.data !== undefined) {
-          rawData = fileData._data.data;
-        }
-        // Способ 2: из _data.uncompressedContent
-        else if (fileData._data.uncompressedContent !== undefined) {
-          rawData = fileData._data.uncompressedContent;
-        }
-        // Способ 3: из _data.compressedContent (если файл не сжат, это те же данные)
-        else if (fileData._data.compressedContent !== undefined && fileData._data.uncompressedSize === fileData._data.compressedSize) {
-          rawData = fileData._data.compressedContent;
-        }
-        // Способ 4: используем внутренний метод _readUint8Array если доступен
-        else if (typeof fileData._readUint8Array === 'function') {
-          try {
-            rawData = fileData._readUint8Array();
-          } catch (e) {
-            console.warn('⚠️ _readUint8Array не сработал:', e);
-          }
-        }
-        
-        if (rawData !== null) {
-          // Если данные в виде строки, используем их напрямую
-          if (typeof rawData === 'string') {
-            console.log('✅ Файл прочитан напрямую из _data (string)');
-            return rawData;
-          } else if (rawData instanceof Uint8Array) {
-            // Если данные в виде Uint8Array, декодируем в UTF-8
-            const decoder = new TextDecoder('utf-8');
-            const result = decoder.decode(rawData);
-            console.log('✅ Файл прочитан напрямую из _data (Uint8Array)');
-            return result;
-          } else if (rawData instanceof ArrayBuffer) {
-            // Если данные в виде ArrayBuffer, декодируем в UTF-8
-            const decoder = new TextDecoder('utf-8');
-            const result = decoder.decode(rawData);
-            console.log('✅ Файл прочитан напрямую из _data (ArrayBuffer)');
-            return result;
-          } else if (Array.isArray(rawData)) {
-            // Если данные в виде массива чисел, конвертируем в Uint8Array
-            const uint8Array = new Uint8Array(rawData);
-            const decoder = new TextDecoder('utf-8');
-            const result = decoder.decode(uint8Array);
-            console.log('✅ Файл прочитан напрямую из _data (Array)');
-            return result;
-          }
-        }
-      } catch (directReadError) {
-        console.warn('⚠️ Ошибка при прямом чтении из _data, пробуем стандартные методы:', directReadError);
-      }
-    }
-    
-    // Используем стандартные методы PizZip с обработкой ошибок
+    // JSZip автоматически обрабатывает как сжатые, так и несжатые файлы
     try {
-      return documentFile.asText();
-    } catch (asTextError: any) {
-      console.warn('⚠️ Ошибка при чтении через asText():', asTextError?.message);
+      // Пробуем прочитать как строку (JSZip автоматически распаковывает)
+      const content = await documentFile.async('string');
+      console.log('✅ Файл прочитан через JSZip, длина:', content.length);
+      return content;
+    } catch (stringError: any) {
+      console.warn('⚠️ Ошибка при чтении как строки, пробуем как Uint8Array:', stringError?.message);
       
-      // Проверяем, не связана ли ошибка с несжатым файлом или проблемой распаковки
-      if (asTextError?.message?.includes('inflateRaw') || asTextError?.message?.includes('undefined')) {
-        console.warn('⚠️ Ошибка inflateRaw, пробуем альтернативные методы...');
-        
-        // Пробуем использовать внутренний метод для чтения несжатых файлов
-        const sizesMatch = fileData._data && fileData._data.uncompressedSize === fileData._data.compressedSize;
-        
-        if (sizesMatch || isUncompressed) {
-          // Файл точно не сжат, пробуем читать напрямую из ZIP структуры
-          try {
-            // Используем внутренний метод load для чтения несжатых данных
-            if (typeof fileData.load === 'function') {
-              try {
-                fileData.load();
-                if (fileData._data?.data) {
-                  const rawData = fileData._data.data;
-                  if (rawData instanceof Uint8Array) {
-                    const decoder = new TextDecoder('utf-8');
-                    const result = decoder.decode(rawData);
-                    console.log('✅ Файл прочитан через load()');
-                    return result;
-                  }
-                }
-              } catch (loadError) {
-                console.warn('⚠️ Ошибка при load():', loadError);
-              }
-            }
-            
-            // Если есть доступ к исходному буферу ZIP, пробуем читать напрямую
-            if (zipBuffer) {
-              console.log('📖 Пробуем читать несжатый файл напрямую из ZIP архива...');
-              const directRead = this.readUncompressedFileFromZip(zipBuffer, filePath);
-              if (directRead) {
-                console.log('✅ Файл прочитан напрямую из ZIP архива, длина:', directRead.length);
-                return directRead;
-              } else {
-                console.warn('⚠️ Прямое чтение из ZIP не вернуло данных');
-              }
-            } else {
-              console.warn('⚠️ Исходный буфер ZIP недоступен для прямого чтения');
-            }
-          } catch (loadError) {
-            console.warn('⚠️ Ошибка при попытке чтения несжатого файла:', loadError);
-          }
-        } else {
-          // Файл сжат, но PizZip не может его распаковать
-          // Попробуем принудительно перезагрузить файл через PizZip
-          console.warn('⚠️ Файл сжат, но PizZip не может его распаковать. Пробуем перезагрузить...');
-          
-          // Пробуем создать новый PizZip объект и прочитать файл заново
-          if (zipBuffer) {
-            try {
-              const newZip = new PizZip(zipBuffer);
-              const newFile = newZip.files[filePath];
-              if (newFile) {
-                try {
-                  const result = newFile.asText();
-                  console.log('✅ Файл прочитан через новый PizZip объект');
-                  return result;
-                } catch (retryError) {
-                  console.warn('⚠️ Повторная попытка также не удалась:', retryError);
-                }
-              }
-            } catch (newZipError) {
-              console.warn('⚠️ Ошибка при создании нового PizZip:', newZipError);
-            }
-          }
-        }
-      }
-      
-      // Если asText() не работает, пробуем альтернативные методы
       try {
-        const arrayBuffer = documentFile.asArrayBuffer();
-        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-          throw new Error('ArrayBuffer пуст или недоступен');
-        }
+        // Пробуем прочитать как Uint8Array и декодировать вручную
+        const uint8Array = await documentFile.async('uint8array');
         const decoder = new TextDecoder('utf-8');
-        return decoder.decode(arrayBuffer);
-      } catch (arrayBufferError: any) {
-        // Проверяем, не связана ли ошибка с несжатым файлом
-        if (arrayBufferError?.message?.includes('inflateRaw') || arrayBufferError?.message?.includes('undefined')) {
-          console.warn('⚠️ Ошибка inflateRaw при чтении через asArrayBuffer, пробуем прямое чтение из ZIP...');
-          
-          // Последняя попытка - прямое чтение из ZIP архива (независимо от определения метода сжатия)
+        const content = decoder.decode(uint8Array);
+        console.log('✅ Файл прочитан через JSZip (Uint8Array), длина:', content.length);
+        return content;
+      } catch (uint8Error: any) {
+        console.warn('⚠️ Ошибка при чтении как Uint8Array, пробуем как ArrayBuffer:', uint8Error?.message);
+        
+        try {
+          // Последняя попытка - как ArrayBuffer
+          const arrayBuffer = await documentFile.async('arraybuffer');
+          const decoder = new TextDecoder('utf-8');
+          const content = decoder.decode(arrayBuffer);
+          console.log('✅ Файл прочитан через JSZip (ArrayBuffer), длина:', content.length);
+          return content;
+        } catch (arrayBufferError: any) {
+          // Если все методы JSZip не сработали, пробуем прямое чтение из ZIP
           if (zipBuffer) {
-            console.log('📖 Пробуем прямое чтение из ZIP архива (fallback для inflateRaw)...');
+            console.warn('⚠️ Все методы JSZip не сработали, пробуем прямое чтение из ZIP...');
             const directRead = this.readUncompressedFileFromZip(zipBuffer, filePath);
             if (directRead) {
               console.log('✅ Файл прочитан напрямую из ZIP архива (fallback), длина:', directRead.length);
               return directRead;
-            } else {
-              console.warn('⚠️ Прямое чтение из ZIP не вернуло данных');
             }
-          } else {
-            console.warn('⚠️ Исходный буфер ZIP недоступен для прямого чтения');
           }
           
-          // Файл не сжат, но PizZip не может его прочитать
-          // Возвращаем более информативную ошибку с рекомендацией
-          throw new Error(`Файл ${filePath} не сжат (метод сжатия STORED), но библиотека PizZip не может его прочитать. Попробуйте пересохранить DOCX файл в Microsoft Word с включенным сжатием.`);
-        }
-        
-        // Последняя попытка - через asBinary()
-        if (typeof documentFile.asBinary === 'function') {
-          try {
-            const binaryString = documentFile.asBinary();
-            if (!binaryString || binaryString.length === 0) {
-              throw new Error('Binary string пуст или недоступен');
-            }
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-            const decoder = new TextDecoder('utf-8');
-            return decoder.decode(bytes);
-          } catch (asBinaryError) {
-            throw new Error(`Не удалось прочитать файл ${filePath}. Ошибки: asText=${asTextError instanceof Error ? asTextError.message : String(asTextError)}, asArrayBuffer=${arrayBufferError instanceof Error ? arrayBufferError.message : String(arrayBufferError)}, asBinary=${asBinaryError instanceof Error ? asBinaryError.message : String(asBinaryError)}`);
-          }
-        } else {
-          throw new Error(`Не удалось прочитать файл ${filePath}. Ошибка asText: ${asTextError instanceof Error ? asTextError.message : String(asTextError)}`);
+          throw new Error(`Не удалось прочитать файл ${filePath}. Ошибки: string=${stringError instanceof Error ? stringError.message : String(stringError)}, uint8array=${uint8Error instanceof Error ? uint8Error.message : String(uint8Error)}, arraybuffer=${arrayBufferError instanceof Error ? arrayBufferError.message : String(arrayBufferError)}`);
         }
       }
     }
@@ -565,11 +381,11 @@ export class DocxTemplateProcessor {
       const chartImageBuffer = await this.createRotatedScreenshot(chartElement);
       console.log('Скриншот создан, размер:', chartImageBuffer.byteLength, 'байт');
 
-      // Загружаем шаблон в PizZip
-      const zip = new PizZip(templateBuffer);
+      // Загружаем шаблон в JSZip
+      const zip = await JSZip.loadAsync(templateBuffer);
 
       // Читаем основной документ (с поддержкой несжатых файлов)
-      const documentXml = this.safeReadDocumentXml(zip);
+      const documentXml = await this.safeReadDocumentXml(zip);
       
       // Диагностика: проверяем содержимое документа сразу после загрузки
       console.log('Document loaded, XML length:', documentXml.length);
@@ -585,21 +401,17 @@ export class DocxTemplateProcessor {
       const imageName = 'chart.png';
       const mediaPath = `word/media/${imageName}`;
       
-      // Создаем папку media если её нет
-      if (!zip.files['word/media/']) {
-        zip.folder('word/media');
-      }
-      
+      // Создаем папку media если её нет (JSZip создает папки автоматически)
       // Добавляем изображение
       zip.file(mediaPath, chartImageBuffer);
       console.log('Изображение добавлено в:', mediaPath);
 
       // Генерируем уникальный ID для связи
-      const relationshipId = this.generateRelationshipId(zip);
+      const relationshipId = await this.generateRelationshipId(zip);
       console.log('Сгенерирован ID связи:', relationshipId);
 
       // Обновляем файл связей
-      this.updateRelationships(zip, relationshipId, `media/${imageName}`);
+      await this.updateRelationships(zip, relationshipId, `media/${imageName}`);
 
       // Заменяем плейсхолдер на XML изображения
       const updatedDocumentXml = this.replaceChartPlaceholder(documentXml, relationshipId);
@@ -622,11 +434,11 @@ export class DocxTemplateProcessor {
       zip.file('word/document.xml', finalDocumentXml);
 
       // Обрабатываем плейсхолдеры в колонтитулах
-      this.processHeaderFooterPlaceholders(zip, data);
+      await this.processHeaderFooterPlaceholders(zip, data);
 
       // Валидация DOCX структуры
       console.log('Валидация DOCX структуры...');
-      const validationErrors = this.validateDocxStructure(zip.files);
+      const validationErrors = await this.validateDocxStructure(zip);
       if (validationErrors.length > 0) {
         console.warn('DOCX validation errors:', validationErrors);
         // Не прерываем выполнение, но логируем ошибки
@@ -636,7 +448,7 @@ export class DocxTemplateProcessor {
 
       // Генерируем итоговый DOCX файл
       console.log('Генерируем итоговый DOCX файл...');
-      const buffer = zip.generate({ 
+      const buffer = await zip.generateAsync({ 
         type: 'blob',
         compression: 'DEFLATE',
         compressionOptions: { level: 6 }
@@ -661,12 +473,12 @@ export class DocxTemplateProcessor {
       console.log('Добавляем полный отчет в конец существующего документа...');
       
       // Загружаем существующий отчет
-      const existingZip = new PizZip(await existingReportBlob.arrayBuffer());
-      const existingDocumentXml = this.safeReadDocumentXml(existingZip);
+      const existingZip = await JSZip.loadAsync(await existingReportBlob.arrayBuffer());
+      const existingDocumentXml = await this.safeReadDocumentXml(existingZip);
       
       // Загружаем новый отчет
-      const newZip = new PizZip(await newReportBlob.arrayBuffer());
-      const newDocumentXml = this.safeReadDocumentXml(newZip);
+      const newZip = await JSZip.loadAsync(await newReportBlob.arrayBuffer());
+      const newDocumentXml = await this.safeReadDocumentXml(newZip);
       
       // Извлекаем содержимое body из нового отчета
       const newBodyContent = this.extractBodyContent(newDocumentXml);
@@ -694,7 +506,7 @@ export class DocxTemplateProcessor {
       await this.copyMediaFiles(newZip, existingZip);
       
       // Генерируем обновленный DOCX файл
-      const buffer = existingZip.generate({ 
+      const buffer = await existingZip.generateAsync({ 
         type: 'blob',
         compression: 'DEFLATE',
         compressionOptions: { level: 6 }
@@ -750,7 +562,7 @@ export class DocxTemplateProcessor {
   /**
    * Копирование медиафайлов из нового отчета в существующий
    */
-  private async copyMediaFiles(sourceZip: any, targetZip: any): Promise<void> {
+  private async copyMediaFiles(sourceZip: JSZip, targetZip: JSZip): Promise<void> {
     try {
       // Получаем список всех файлов в исходном архиве
       const sourceFiles = Object.keys(sourceZip.files);
@@ -758,7 +570,7 @@ export class DocxTemplateProcessor {
       // Копируем медиафайлы
       for (const fileName of sourceFiles) {
         if (fileName.startsWith('word/media/')) {
-          const file = sourceZip.files[fileName];
+          const file = sourceZip.file(fileName);
           if (file && !file.dir) {
             // Генерируем уникальное имя файла
             const timestamp = Date.now();
@@ -766,7 +578,8 @@ export class DocxTemplateProcessor {
             const newFileName = `word/media/image_${timestamp}.${fileExtension}`;
             
             // Копируем файл
-            targetZip.file(newFileName, file.asArrayBuffer());
+            const fileData = await file.async('arraybuffer');
+            targetZip.file(newFileName, fileData);
             console.log(`Скопирован медиафайл: ${fileName} -> ${newFileName}`);
           }
         }
@@ -799,8 +612,8 @@ export class DocxTemplateProcessor {
         console.log('Добавляем данные из предыдущего отчета...');
         
         // Загружаем созданный отчет
-        const zip = new PizZip(await newReportBlob.arrayBuffer());
-        const documentXml = zip.files['word/document.xml'].asText();
+        const zip = await JSZip.loadAsync(await newReportBlob.arrayBuffer());
+        const documentXml = await zip.file('word/document.xml')!.async('string');
         
         // Создаем дополнительный контент из предыдущих данных
         const additionalContent = await this.createAdditionalContentFromPreviousData(previousReportData);
@@ -812,11 +625,11 @@ export class DocxTemplateProcessor {
         zip.file('word/document.xml', updatedDocumentXml);
         
         // Генерируем обновленный DOCX файл
-        const buffer = zip.generate({ 
-          type: 'blob',
-          compression: 'DEFLATE',
-          compressionOptions: { level: 6 }
-        });
+        const buffer = await zip.generateAsync({ 
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
         
         console.log('Новый отчет с дополнительным контентом создан успешно');
         return buffer;
@@ -900,7 +713,7 @@ export class DocxTemplateProcessor {
       console.log('Добавляем данные в существующий DOCX файл...');
       
       // Загружаем существующий DOCX файл
-      const existingZip = new PizZip(await existingDocxBlob.arrayBuffer());
+      const existingZip = await JSZip.loadAsync(await existingDocxBlob.arrayBuffer());
       
       // Создаем скриншот нового графика
       console.log('Создаем скриншот нового графика...');
@@ -912,7 +725,7 @@ export class DocxTemplateProcessor {
       existingZip.file(imageFilename, chartImage);
       
       // Получаем текущий document.xml (с поддержкой несжатых файлов)
-      const currentDocumentXml = this.safeReadDocumentXml(existingZip);
+      const currentDocumentXml = await this.safeReadDocumentXml(existingZip);
       
       // Создаем новый контент для добавления
       const newContent = await this.createNewContent(newData, imageId);
@@ -927,7 +740,7 @@ export class DocxTemplateProcessor {
       await this.updateDocumentRelations(existingZip, imageId);
       
       // Генерируем обновленный DOCX файл
-      const buffer = existingZip.generate({ 
+      const buffer = await existingZip.generateAsync({ 
         type: 'blob',
         compression: 'DEFLATE',
         compressionOptions: { level: 6 }
@@ -953,11 +766,11 @@ export class DocxTemplateProcessor {
     try {
       // Читаем существующий отчет
       const existingBuffer = await this.existingReportBlob!.arrayBuffer();
-      const existingZip = new PizZip(existingBuffer);
+      const existingZip = await JSZip.loadAsync(existingBuffer);
       
       // Читаем шаблон для новых данных
       const templateBuffer = await templateFile.arrayBuffer();
-      const templateZip = new PizZip(templateBuffer);
+      const templateZip = await JSZip.loadAsync(templateBuffer);
       
       // Создаем скриншот нового графика
       console.log('Создаем скриншот нового графика...');
@@ -973,21 +786,21 @@ export class DocxTemplateProcessor {
       console.log('Новое изображение добавлено:', newMediaPath);
       
       // Генерируем новый ID для связи
-      const newRelationshipId = this.generateRelationshipId(existingZip);
+      const newRelationshipId = await this.generateRelationshipId(existingZip);
       console.log('Сгенерирован новый ID связи:', newRelationshipId);
       
       // Обновляем файл связей в существующем отчете
-      this.updateRelationships(existingZip, newRelationshipId, `media/${newImageName}`);
+      await this.updateRelationships(existingZip, newRelationshipId, `media/${newImageName}`);
       
       // Читаем содержимое шаблона для получения структуры новых данных (с поддержкой несжатых файлов)
-      const templateDocumentXml = this.safeReadDocumentXml(templateZip);
+      const templateDocumentXml = await this.safeReadDocumentXml(templateZip);
       
       // Обрабатываем шаблон с новыми данными
       let processedTemplateXml = this.replaceChartPlaceholder(templateDocumentXml, newRelationshipId);
       processedTemplateXml = this.processTextPlaceholders(processedTemplateXml, data);
       
       // Читаем существующий документ (с поддержкой несжатых файлов)
-      const existingDocumentXml = this.safeReadDocumentXml(existingZip);
+      const existingDocumentXml = await this.safeReadDocumentXml(existingZip);
       
       // Добавляем новый контент в существующий документ
       const updatedDocumentXml = this.appendContentToDocument(existingDocumentXml, processedTemplateXml);
@@ -996,11 +809,11 @@ export class DocxTemplateProcessor {
       existingZip.file('word/document.xml', updatedDocumentXml);
       
       // Обрабатываем плейсхолдеры в колонтитулах
-      this.processHeaderFooterPlaceholders(existingZip, data);
+      await this.processHeaderFooterPlaceholders(existingZip, data);
       
       // Генерируем обновленный DOCX файл
       console.log('Генерируем обновленный DOCX файл...');
-      const buffer = existingZip.generate({ 
+      const buffer = await existingZip.generateAsync({ 
         type: 'blob',
         compression: 'DEFLATE',
         compressionOptions: { level: 6 }
@@ -1067,12 +880,13 @@ export class DocxTemplateProcessor {
   /**
    * Генерация уникального ID для связи
    */
-  private generateRelationshipId(zip: PizZip): string {
+  private async generateRelationshipId(zip: JSZip): Promise<string> {
     const relsPath = 'word/_rels/document.xml.rels';
     let maxId = 0;
     
-    if (zip.files[relsPath]) {
-      const relsXml = zip.files[relsPath].asText();
+    const relsFile = zip.file(relsPath);
+    if (relsFile) {
+      const relsXml = await relsFile.async('string');
       const idMatches = relsXml.match(/Id="rId(\d+)"/g);
       
       if (idMatches) {
@@ -1089,19 +903,15 @@ export class DocxTemplateProcessor {
   /**
    * Обновление файла связей
    */
-  private updateRelationships(zip: PizZip, relationshipId: string, imagePath: string): void {
+  private async updateRelationships(zip: JSZip, relationshipId: string, imagePath: string): Promise<void> {
     const relsPath = 'word/_rels/document.xml.rels';
     let relsXml: string;
     
-    if (zip.files[relsPath]) {
-      relsXml = zip.files[relsPath].asText();
+    const relsFile = zip.file(relsPath);
+    if (relsFile) {
+      relsXml = await relsFile.async('string');
     } else {
       // Создаем базовый файл связей
-      // Создаем папку _rels если её нет
-      if (!zip.files['word/_rels/']) {
-        zip.folder('word/_rels');
-      }
-      
       relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 </Relationships>`;
@@ -1881,7 +1691,7 @@ export class DocxTemplateProcessor {
   /**
    * Обработка плейсхолдеров в колонтитулах
    */
-  private processHeaderFooterPlaceholders(zip: PizZip, data: TemplateReportData): void {
+  private async processHeaderFooterPlaceholders(zip: JSZip, data: TemplateReportData): Promise<void> {
     try {
       console.log('Обработка плейсхолдеров в колонтитулах...');
       
@@ -1897,13 +1707,14 @@ export class DocxTemplateProcessor {
       
       let processedCount = 0;
       
-      headerFooterFiles.forEach(fileName => {
-        if (zip.files[fileName]) {
+      for (const fileName of headerFooterFiles) {
+        const file = zip.file(fileName);
+        if (file) {
           console.log(`Обрабатываем файл колонтитула: ${fileName}`);
           
           try {
             // Читаем содержимое файла колонтитула
-            const headerFooterXml = zip.files[fileName].asText();
+            const headerFooterXml = await file.async('string');
             
             // Обрабатываем плейсхолдеры
             const processedXml = this.processTextPlaceholders(headerFooterXml, data);
@@ -1917,7 +1728,7 @@ export class DocxTemplateProcessor {
             console.warn(`Ошибка обработки файла ${fileName}:`, error);
           }
         }
-      });
+      }
       
       console.log(`Обработано файлов колонтитулов: ${processedCount}`);
       
@@ -2047,8 +1858,9 @@ export class DocxTemplateProcessor {
       const relsFile = 'word/_rels/document.xml.rels';
       let relsXml = '';
       
-      if (zip.files[relsFile]) {
-        relsXml = zip.files[relsFile].asText();
+      const relsFileObj = zip.file(relsFile);
+      if (relsFileObj) {
+        relsXml = await relsFileObj.async('string');
       } else {
         // Создаем файл связей если его нет
         relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -2078,7 +1890,7 @@ export class DocxTemplateProcessor {
   /**
    * Валидация DOCX структуры
    */
-  private validateDocxStructure(files: any): string[] {
+  private async validateDocxStructure(zip: JSZip): Promise<string[]> {
     const requiredFiles = [
       '[Content_Types].xml',
       'word/document.xml',
@@ -2088,16 +1900,17 @@ export class DocxTemplateProcessor {
     const errors: string[] = [];
     
     // Проверяем наличие обязательных файлов
-    requiredFiles.forEach(file => {
-      if (!files[file]) {
+    for (const file of requiredFiles) {
+      if (!zip.file(file)) {
         errors.push(`Missing required file: ${file}`);
       }
-    });
+    }
     
     // Проверка XML валидности
-    if (files['word/document.xml']) {
+    const documentFile = zip.file('word/document.xml');
+    if (documentFile) {
       try {
-        const xmlContent = files['word/document.xml'].asText();
+        const xmlContent = await documentFile.async('string');
         
         // Проверяем на неэкранированные амперсанды
         const unescapedAmpersands = xmlContent.match(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g);
@@ -2127,8 +1940,8 @@ export class DocxTemplateProcessor {
   async analyzeTemplateContent(templateFile: File): Promise<{ placeholders: string[]; hasTable: boolean; content: string }> {
     try {
       const buffer = await templateFile.arrayBuffer();
-      const zip = new PizZip(buffer);
-      const documentXml = this.safeReadDocumentXml(zip, 'word/document.xml', buffer);
+      const zip = await JSZip.loadAsync(buffer);
+      const documentXml = await this.safeReadDocumentXml(zip, 'word/document.xml', buffer);
       
       console.log('Analyzing template content...');
       console.log('Document XML length:', documentXml.length);
@@ -2227,21 +2040,15 @@ export class DocxTemplateProcessor {
           console.warn('⚠️ Файл не начинается с ZIP сигнатуры, но попробуем обработать...');
         }
 
-        let zip: PizZip;
+        let zip: JSZip;
         try {
-          // Пробуем создать PizZip с опциями для обработки сжатых и несжатых файлов
-          // Используем опции для более надежной обработки
-          zip = new PizZip(buffer, {
-            // Опции для обработки сжатых файлов
-            // base64: false,
-            // checkCRC32: false, // Отключаем проверку CRC для проблемных файлов
-            // decodeFileName: (bytes) => { return bytes; } // Оставляем имена файлов как есть
-          });
-        } catch (pizzipError) {
-          console.error('❌ Ошибка создания PizZip объекта:', pizzipError);
+          // Загружаем ZIP архив через JSZip
+          zip = await JSZip.loadAsync(buffer);
+        } catch (jszipError) {
+          console.error('❌ Ошибка создания JSZip объекта:', jszipError);
           return {
             isValid: false,
-            errors: [`Не удалось открыть файл как ZIP архив. Возможно, файл поврежден или не является DOCX документом. Ошибка: ${pizzipError instanceof Error ? pizzipError.message : String(pizzipError)}`]
+            errors: [`Не удалось открыть файл как ZIP архив. Возможно, файл поврежден или не является DOCX документом. Ошибка: ${jszipError instanceof Error ? jszipError.message : String(jszipError)}`]
           };
         }
 
@@ -2263,7 +2070,7 @@ export class DocxTemplateProcessor {
           '[Content_Types].xml'
         ];
         
-        const missingFiles = requiredFiles.filter(file => !zip.files[file]);
+        const missingFiles = requiredFiles.filter(file => !zip.file(file));
         if (missingFiles.length > 0) {
           console.warn('❌ Отсутствуют обязательные файлы:', missingFiles);
           console.log('Доступные файлы в архиве:', Object.keys(zip.files).slice(0, 10));
@@ -2275,7 +2082,7 @@ export class DocxTemplateProcessor {
 
         // Читаем содержимое документа
         try {
-          const documentFile = zip.files['word/document.xml'];
+          const documentFile = zip.file('word/document.xml');
           
           // Проверяем, что файл существует и доступен
           if (!documentFile) {
@@ -2286,41 +2093,14 @@ export class DocxTemplateProcessor {
             };
           }
 
-          // Проверяем, что файл не поврежден (имеет метод asText)
-          if (typeof documentFile.asText !== 'function') {
-            console.error('❌ Файл word/document.xml поврежден или не может быть прочитан');
-            console.error('Детали файла:', {
-              name: documentFile.name,
-              dir: documentFile.dir,
-              date: documentFile.date,
-              comment: documentFile.comment,
-              options: documentFile.options
-            });
-            return {
-              isValid: false,
-              errors: ['Файл word/document.xml поврежден и не может быть прочитан']
-            };
-          }
-
           // Пытаемся прочитать содержимое используя безопасный метод
           // Передаем исходный буфер для чтения несжатых файлов
-          const documentXml = this.safeReadDocumentXml(zip, 'word/document.xml', buffer);
+          const documentXml = await this.safeReadDocumentXml(zip, 'word/document.xml', buffer);
           
           // Логируем информацию о файле для диагностики
-          const fileData = documentFile as any;
-          const compressionMethod = fileData.options?.compressionMethod ?? fileData._data?.compressionMethod ?? 8;
           console.log('🔍 Информация о файле:', {
             name: documentFile.name,
-            dir: documentFile.dir,
-            date: documentFile.date,
-            options: documentFile.options,
-            compressionMethod: compressionMethod,
-            isUncompressed: compressionMethod === 0,
-            _data: fileData._data ? {
-              compressionMethod: fileData._data.compressionMethod,
-              uncompressedSize: fileData._data.uncompressedSize,
-              compressedSize: fileData._data.compressedSize
-            } : null
+            dir: documentFile.dir
           });
           
           if (!documentXml || typeof documentXml !== 'string') {
