@@ -392,11 +392,18 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_cache_bypass \$http_upgrade;
         
-        # Передача заголовков для авторизации
+        # ВАЖНО: Передача заголовков для авторизации
+        # Включаем передачу всех заголовков от клиента
         proxy_pass_request_headers on;
+        
+        # Передаем заголовок x-user-id в разных форматах
+        # В Nginx заголовки преобразуются: x-user-id → \$http_x_user_id
         proxy_set_header X-User-Id \$http_x_user_id;
+        proxy_set_header x-user-id \$http_x_user_id;
+        proxy_set_header x-userid \$http_x_userid;
+        
+        proxy_cache_bypass \$http_upgrade;
     }
 
     # Проксирование загрузок

@@ -4,13 +4,40 @@ import { pool } from '../config/database.js';
 // Middleware для проверки авторизации пользователя
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Логируем все заголовки для диагностики
+    const allHeaders = Object.keys(req.headers).reduce((acc, key) => {
+      acc[key.toLowerCase()] = req.headers[key];
+      return acc;
+    }, {} as Record<string, any>);
+    
     // Извлекаем userId из body (для POST/PUT), query (для GET) или заголовков
     // Проверяем заголовки в разных форматах (x-user-id, x-userid, user-id)
+    // Nginx может преобразовывать заголовки, поэтому проверяем все варианты
     const userId = req.body?.userId 
       || req.query?.userId as string 
       || req.headers['x-user-id'] as string
       || req.headers['x-userid'] as string
-      || req.headers['user-id'] as string;
+      || req.headers['user-id'] as string
+      || allHeaders['x-user-id'] as string
+      || allHeaders['x-userid'] as string
+      || allHeaders['user-id'] as string;
+    
+    // Детальное логирование для диагностики
+    console.log('requireAuth: Проверка авторизации', {
+      method: req.method,
+      path: req.path,
+      hasBody: !!req.body,
+      bodyUserId: req.body?.userId,
+      queryUserId: req.query?.userId,
+      headers: {
+        'x-user-id': req.headers['x-user-id'],
+        'x-userid': req.headers['x-userid'],
+        'user-id': req.headers['user-id'],
+      },
+      allHeadersLowercase: allHeaders,
+      extractedUserId: userId,
+      rawHeaders: req.rawHeaders
+    });
     
     if (!userId) {
       // Логируем все заголовки для отладки
