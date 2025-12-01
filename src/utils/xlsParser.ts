@@ -1,10 +1,11 @@
 import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import { DeviceMetadata, MeasurementRecord, ParsedFileData } from '../types/FileData';
 
 /**
  * Парсер для файлов XLS/XLSX
  * Обрабатывает файлы Excel с данными температуры и влажности
- * Использует exceljs вместо xlsx для безопасности
+ * Использует exceljs для .xlsx и xlsx (SheetJS) для старых .xls файлов
  */
 export class XLSParser {
   private buffer: ArrayBuffer;
@@ -48,40 +49,47 @@ export class XLSParser {
       const fileFormat = this.detectFileFormat();
       console.log('XLSParser: Определен формат файла:', fileFormat);
 
-      // ExcelJS поддерживает только XLSX формат
+      let jsonData: any[][];
+
+      // Для старых .xls файлов используем xlsx (SheetJS)
       if (fileFormat === 'xls') {
-        throw new Error('Старый формат .xls (BIFF) не поддерживается. Пожалуйста, сохраните файл в формате .xlsx (Excel 2007+) или конвертируйте его в .xlsx перед загрузкой.');
-      }
-
-      if (fileFormat === 'unknown') {
-        console.warn('XLSParser: Не удалось определить формат файла, пробуем загрузить как XLSX...');
-      }
-
-      // Читаем Excel файл с помощью exceljs
-      const workbook = new ExcelJS.Workbook();
-      
-      try {
-        await workbook.xlsx.load(this.buffer);
-      } catch (xlsxError: any) {
-        // Если ошибка связана с форматом файла, предоставляем более понятное сообщение
-        if (xlsxError.message && xlsxError.message.includes('zip') || 
-            xlsxError.message && xlsxError.message.includes('central directory')) {
-          throw new Error('Файл не является корректным Excel файлом формата .xlsx. Возможно, это старый формат .xls. Пожалуйста, сохраните файл в формате .xlsx (Excel 2007+) или конвертируйте его.');
+        console.log('XLSParser: Используем xlsx (SheetJS) для чтения старого формата .xls');
+        jsonData = await this.parseXLSFile();
+      } else {
+        // Для .xlsx используем exceljs
+        if (fileFormat === 'unknown') {
+          console.warn('XLSParser: Не удалось определить формат файла, пробуем загрузить как XLSX...');
         }
-        throw xlsxError;
-      }
-      
-      console.log('XLSParser: Найдено листов:', workbook.worksheets.length);
 
-      // Ищем лист с данными (обычно первый лист)
-      const worksheet = workbook.worksheets[0];
-      
-      if (!worksheet) {
-        throw new Error('Не найден лист с данными в Excel файле');
+        // Читаем Excel файл с помощью exceljs
+        const workbook = new ExcelJS.Workbook();
+        
+        try {
+          await workbook.xlsx.load(this.buffer);
+          
+          console.log('XLSParser: Найдено листов:', workbook.worksheets.length);
+
+          // Ищем лист с данными (обычно первый лист)
+          const worksheet = workbook.worksheets[0];
+          
+          if (!worksheet) {
+            throw new Error('Не найден лист с данными в Excel файле');
+          }
+
+          // Конвертируем лист в массив массивов (аналог sheet_to_json с header: 1)
+          jsonData = this.worksheetToArray(worksheet);
+        } catch (xlsxError: any) {
+          // Если ошибка связана с форматом файла, пробуем использовать xlsx (SheetJS)
+          if (xlsxError.message && (xlsxError.message.includes('zip') || 
+              xlsxError.message.includes('central directory'))) {
+            console.warn('XLSParser: Не удалось загрузить через exceljs, пробуем через xlsx (SheetJS)...');
+            jsonData = await this.parseXLSFile();
+          } else {
+            throw xlsxError;
+          }
+        }
       }
 
-      // Конвертируем лист в массив массивов (аналог sheet_to_json с header: 1)
-      const jsonData = this.worksheetToArray(worksheet);
       console.log('XLSParser: Загружено строк:', jsonData.length);
 
       // Парсим данные
@@ -105,13 +113,12 @@ export class XLSParser {
       if (error instanceof Error) {
         const errorMsg = error.message.toLowerCase();
         
-        // Ошибка связанная с форматом файла (старый .xls)
+        // Ошибка связанная с форматом файла
         if (errorMsg.includes('zip') || 
             errorMsg.includes('central directory') ||
             errorMsg.includes('biff') ||
-            errorMsg.includes('xls') && errorMsg.includes('not supported') ||
-            errorMsg.includes('старый формат')) {
-          errorMessage = 'Файл имеет старый формат .xls (Excel 97-2003), который не поддерживается. Пожалуйста, откройте файл в Microsoft Excel и сохраните его в формате .xlsx (Excel 2007+), затем попробуйте загрузить снова.';
+            (errorMsg.includes('xls') && errorMsg.includes('not supported'))) {
+          errorMessage = 'Не удалось прочитать Excel файл. Убедитесь, что файл не поврежден и имеет корректный формат (.xls или .xlsx).';
         } else if (errorMsg.includes('не найден лист') || errorMsg.includes('worksheet')) {
           errorMessage = 'В Excel файле не найден лист с данными. Убедитесь, что файл содержит хотя бы один лист с данными.';
         } else if (errorMsg.includes('не содержит данных')) {
@@ -135,6 +142,53 @@ export class XLSParser {
         parsingStatus: 'error',
         errorMessage: errorMessage
       };
+    }
+  }
+
+  /**
+   * Парсинг старых .xls файлов через xlsx (SheetJS)
+   */
+  private async parseXLSFile(): Promise<any[][]> {
+    try {
+      // Конвертируем ArrayBuffer в формат, который понимает xlsx
+      const data = new Uint8Array(this.buffer);
+      
+      // Читаем файл через xlsx (SheetJS)
+      const workbook = XLSX.read(data, { type: 'array' });
+      
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        throw new Error('Не найден лист с данными в Excel файле');
+      }
+      
+      console.log('XLSParser: Найдено листов через xlsx:', workbook.SheetNames.length);
+      
+      // Берем первый лист
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      if (!worksheet) {
+        throw new Error('Не найден лист с данными в Excel файле');
+      }
+      
+      // Конвертируем лист в массив массивов (аналог sheet_to_json с header: 1)
+      // Используем sheet_to_json с опцией { header: 1 } для получения массива массивов
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1, 
+        defval: null, // Значение по умолчанию для пустых ячеек
+        raw: false // Преобразуем даты и числа в строки/числа
+      }) as any[][];
+      
+      // Фильтруем пустые строки
+      const filteredData = jsonData.filter((row: any[]) => 
+        row && row.length > 0 && row.some((cell: any) => cell !== null && cell !== undefined && cell !== '')
+      );
+      
+      console.log('XLSParser: Загружено строк через xlsx:', filteredData.length);
+      
+      return filteredData;
+    } catch (error) {
+      console.error('XLSParser: Ошибка парсинга через xlsx:', error);
+      throw error;
     }
   }
 
