@@ -98,6 +98,29 @@ export class XLSParser {
 
     } catch (error) {
       console.error('Ошибка парсинга XLS файла:', error);
+      
+      // Определяем тип ошибки и предоставляем понятное сообщение
+      let errorMessage = 'Неизвестная ошибка';
+      
+      if (error instanceof Error) {
+        const errorMsg = error.message.toLowerCase();
+        
+        // Ошибка связанная с форматом файла (старый .xls)
+        if (errorMsg.includes('zip') || 
+            errorMsg.includes('central directory') ||
+            errorMsg.includes('biff') ||
+            errorMsg.includes('xls') && errorMsg.includes('not supported') ||
+            errorMsg.includes('старый формат')) {
+          errorMessage = 'Файл имеет старый формат .xls (Excel 97-2003), который не поддерживается. Пожалуйста, откройте файл в Microsoft Excel и сохраните его в формате .xlsx (Excel 2007+), затем попробуйте загрузить снова.';
+        } else if (errorMsg.includes('не найден лист') || errorMsg.includes('worksheet')) {
+          errorMessage = 'В Excel файле не найден лист с данными. Убедитесь, что файл содержит хотя бы один лист с данными.';
+        } else if (errorMsg.includes('не содержит данных')) {
+          errorMessage = 'Файл не содержит данных для обработки. Убедитесь, что в файле есть данные в таблице.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       return {
         fileName,
         deviceMetadata: {
@@ -110,7 +133,7 @@ export class XLSParser {
         endDate: new Date(),
         recordCount: 0,
         parsingStatus: 'error',
-        errorMessage: error instanceof Error ? error.message : 'Неизвестная ошибка'
+        errorMessage: errorMessage
       };
     }
   }
