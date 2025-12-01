@@ -934,7 +934,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       id: Date.now().toString(),
       timestamp,
       label,
-      color: '#8b5cf6',
+      color: '#000000', // Черный цвет для всех маркеров
       type: 'test'
     };
     setMarkers(prev => [...prev, newMarker]);
@@ -946,8 +946,16 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleUpdateMarkerType = (id: string, type: MarkerType) => {
-    const color = type === 'test' ? '#8b5cf6' : '#f59e0b';
-    setMarkers(prev => prev.map(m => m.id === id ? { ...m, type, color } : m));
+    // Все маркеры должны быть черного цвета
+    const color = '#000000';
+    // Если тип изменен на "Открытие двери", автоматически устанавливаем название
+    const label = type === 'door_opening' ? 'Открытие двери' : undefined;
+    setMarkers(prev => prev.map(m => {
+      if (m.id === id) {
+        return { ...m, type, color, ...(label !== undefined ? { label } : {}) };
+      }
+      return m;
+    }));
     setEditingMarkerType(null);
   };
 

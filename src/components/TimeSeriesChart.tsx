@@ -482,7 +482,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               y1={0}
               x2={xScale(new Date(marker.timestamp))}
               y2={innerHeight}
-              stroke={marker.color || '#8b5cf6'}
+              stroke={marker.color || '#000000'}
               strokeWidth={2}
               strokeDasharray="3,3"
             />
@@ -492,7 +492,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                 y={-10}
                 textAnchor="middle"
                 fontSize="12"
-                fill={marker.color || '#8b5cf6'}
+                fill={marker.color || '#000000'}
                 fontWeight="bold"
               >
                 {marker.label}
