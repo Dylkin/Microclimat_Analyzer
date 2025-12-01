@@ -6,7 +6,7 @@ import fs from 'fs/promises';
 const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB для больших XLS файлов
 });
 
 const uploadsRoot = path.join(process.cwd(), 'uploads');
