@@ -25,19 +25,67 @@ if (DEFAULT_ADMIN_ROLE === 'administrator') {
 async function createDefaultUser() {
   try {
     console.log('Проверка существования пользователя по умолчанию...');
+    console.log(`Ожидаемый UUID: ${DEFAULT_ADMIN_ID}`);
+    console.log(`Ожидаемый email: ${DEFAULT_ADMIN_EMAIL}`);
 
-    // Проверяем, существует ли пользователь по умолчанию
-    const checkResult = await pool.query(
-      'SELECT id FROM users WHERE is_default = true LIMIT 1'
+    // Проверяем, существует ли пользователь с нужным UUID
+    const checkByIdResult = await pool.query(
+      'SELECT id, email, full_name, role, is_default FROM users WHERE id = $1',
+      [DEFAULT_ADMIN_ID]
     );
 
-    if (checkResult.rows.length > 0) {
-      console.log('✅ Пользователь по умолчанию уже существует');
+    if (checkByIdResult.rows.length > 0) {
+      const existingUser = checkByIdResult.rows[0];
+      console.log('✅ Пользователь с нужным UUID уже существует:', existingUser);
+      
+      // Обновляем флаг is_default, если его нет
+      if (!existingUser.is_default) {
+        console.log('Обновление флага is_default...');
+        await pool.query(
+          'UPDATE users SET is_default = true WHERE id = $1',
+          [DEFAULT_ADMIN_ID]
+        );
+        console.log('✅ Флаг is_default обновлен');
+      }
+      
       await pool.end();
       return;
     }
 
-    console.log('Создание пользователя по умолчанию...');
+    // Проверяем, существует ли пользователь с нужным email
+    const checkByEmailResult = await pool.query(
+      'SELECT id, email, full_name, role, is_default FROM users WHERE email = $1',
+      [DEFAULT_ADMIN_EMAIL]
+    );
+
+    if (checkByEmailResult.rows.length > 0) {
+      const existingUser = checkByEmailResult.rows[0];
+      console.log('⚠️ Найден пользователь с нужным email, но другим UUID:', existingUser);
+      console.log(`Обновление UUID с ${existingUser.id} на ${DEFAULT_ADMIN_ID}...`);
+      
+      // Обновляем UUID пользователя
+      await pool.query(
+        'UPDATE users SET id = $1, is_default = true WHERE email = $2',
+        [DEFAULT_ADMIN_ID, DEFAULT_ADMIN_EMAIL]
+      );
+      
+      console.log('✅ UUID пользователя обновлен');
+      await pool.end();
+      return;
+    }
+
+    // Проверяем, есть ли вообще пользователь с флагом is_default
+    const checkDefaultResult = await pool.query(
+      'SELECT id, email, full_name, role FROM users WHERE is_default = true LIMIT 1'
+    );
+
+    if (checkDefaultResult.rows.length > 0) {
+      const existingDefault = checkDefaultResult.rows[0];
+      console.log('⚠️ Найден другой пользователь с флагом is_default:', existingDefault);
+      console.log('Создаем пользователя с нужным UUID...');
+    } else {
+      console.log('Создание пользователя по умолчанию...');
+    }
 
     // Хешируем пароль
     const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
