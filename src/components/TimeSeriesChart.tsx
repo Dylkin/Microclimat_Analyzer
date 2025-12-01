@@ -3,7 +3,26 @@ import { scaleLinear, scaleTime } from 'd3-scale';
 import { extent, bisector } from 'd3-array';
 import { timeFormat } from 'd3-time-format';
 import { select, pointer } from 'd3-selection';
-import { schemeCategory10 } from 'd3-scale-chromatic';
+// Категориальная палитра с максимальной различимостью
+const CATEGORICAL_PALETTE = [
+  '#FF0000', // Красный (яркий)
+  '#00FF00', // Зеленый (яркий)
+  '#0000FF', // Синий (яркий)
+  '#FFFF00', // Желтый
+  '#FF00FF', // Пурпурный
+  '#00FFFF', // Голубой
+  '#FF8000', // Оранжевый
+  '#8000FF', // Фиолетовый
+  '#008000', // Темно-зеленый
+  '#000080', // Темно-синий
+  '#800000', // Темно-красный
+  '#808000', // Оливковый
+  '#008080', // Бирюзовый
+  '#800080', // Темно-фиолетовый
+  '#FF4081', // Розовый
+  '#40FF00', // Лаймовый
+  '#0040FF', // Кобальтовый
+];
 import { TimeSeriesPoint, ChartLimits, VerticalMarker, ZoomState, TooltipData, DataType } from '../types/TimeSeriesData';
 
 interface TimeSeriesChartProps {
@@ -66,14 +85,38 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   }, [filteredData]);
 
   // Получаем уникальные файлы и назначаем им цвета
+  // Серый цвет зарезервирован для внешнего датчика (zoneNumber === 0)
+  // Остальные датчики используют категориальную палитру
   const fileColors = React.useMemo(() => {
     const files = Array.from(dataByFile.keys());
     const colors = new Map<string, string>();
-    files.forEach((file, index) => {
-      colors.set(file, schemeCategory10[index % schemeCategory10.length]);
+    
+    // Разделяем файлы на внешние и не внешние
+    const externalFiles: string[] = [];
+    const nonExternalFiles: string[] = [];
+    
+    files.forEach(file => {
+      const fileDataPoint = data.find(d => d.fileId === file);
+      const isExternal = fileDataPoint?.zoneNumber === 0;
+      if (isExternal) {
+        externalFiles.push(file);
+      } else {
+        nonExternalFiles.push(file);
+      }
     });
+    
+    // Для внешних датчиков всегда используем серый цвет
+    externalFiles.forEach(file => {
+      colors.set(file, '#6B7280'); // Серый цвет для внешнего датчика
+    });
+    
+    // Для остальных датчиков используем категориальную палитру
+    nonExternalFiles.forEach((file, index) => {
+      colors.set(file, CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length]);
+    });
+    
     return colors;
-  }, [dataByFile]);
+  }, [dataByFile, data]);
 
   // Создаем шкалы
   const xScale = scaleTime()
@@ -463,15 +506,10 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             </clipPath>
           </defs>
           {Array.from(dataByFile.entries()).map(([fileId, fileData]) => {
-            // Проверяем, является ли это внешним датчиком по zoneNumber
-            const fileDataPoint = data.find(d => d.fileId === fileId);
-            const isExternal = fileDataPoint?.zoneNumber === 0;
-            let pathColor = dataByFile.size > 1 ? fileColors.get(fileId) : color;
-            
-            // Для внешнего датчика всегда используем серый цвет
-            if (isExternal) {
-              pathColor = '#6B7280';
-            }
+            // Получаем цвет из fileColors (уже учитывает внешний датчик)
+            const pathColor = dataByFile.size > 1 
+              ? (fileColors.get(fileId) || color)
+              : color;
             
             return (
               <path
