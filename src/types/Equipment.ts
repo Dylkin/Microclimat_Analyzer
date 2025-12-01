@@ -43,5 +43,5 @@ export interface UpdateEquipmentData {
   type?: EquipmentType;
   name?: string;
   serialNumber?: string;
-  verifications?: Omit<EquipmentVerification, 'id' | 'equipmentId' | 'createdAt'>[];
+  verifications?: Array<Omit<EquipmentVerification, 'id' | 'equipmentId' | 'createdAt'> & { id?: string }>;
 }

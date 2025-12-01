@@ -183,8 +183,35 @@ router.post('/', async (req, res) => {
   try {
     const { type, name, serialNumber } = req.body;
     
+    // Валидация
     if (!name || !type) {
       return res.status(400).json({ error: 'Название и тип оборудования обязательны' });
+    }
+    
+    // Валидация формата наименования (DL-XXX)
+    const namePattern = /^DL-\d{3}$/;
+    if (!namePattern.test(name)) {
+      return res.status(400).json({ error: 'Наименование должно быть в формате DL-XXX (например, DL-001)' });
+    }
+    
+    // Проверка на дубликаты по наименованию
+    const existingByName = await pool.query(
+      'SELECT id FROM measurement_equipment WHERE name = $1',
+      [name]
+    );
+    if (existingByName.rows.length > 0) {
+      return res.status(409).json({ error: 'Оборудование с таким наименованием уже существует' });
+    }
+    
+    // Проверка на дубликаты по серийному номеру (если указан)
+    if (serialNumber) {
+      const existingBySerial = await pool.query(
+        'SELECT id FROM measurement_equipment WHERE serial_number = $1',
+        [serialNumber]
+      );
+      if (existingBySerial.rows.length > 0) {
+        return res.status(409).json({ error: 'Оборудование с таким серийным номером уже существует' });
+      }
     }
     
     const result = await pool.query(
@@ -216,6 +243,43 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { type, name, serialNumber } = req.body;
     
+    // Проверяем существование оборудования
+    const existingCheck = await pool.query(
+      'SELECT id FROM measurement_equipment WHERE id = $1',
+      [id]
+    );
+    if (existingCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Оборудование не найдено' });
+    }
+    
+    // Валидация формата наименования (если обновляется)
+    if (name !== undefined) {
+      const namePattern = /^DL-\d{3}$/;
+      if (!namePattern.test(name)) {
+        return res.status(400).json({ error: 'Наименование должно быть в формате DL-XXX (например, DL-001)' });
+      }
+      
+      // Проверка на дубликаты по наименованию (исключая текущее оборудование)
+      const existingByName = await pool.query(
+        'SELECT id FROM measurement_equipment WHERE name = $1 AND id != $2',
+        [name, id]
+      );
+      if (existingByName.rows.length > 0) {
+        return res.status(409).json({ error: 'Оборудование с таким наименованием уже существует' });
+      }
+    }
+    
+    // Проверка на дубликаты по серийному номеру (если обновляется)
+    if (serialNumber !== undefined && serialNumber) {
+      const existingBySerial = await pool.query(
+        'SELECT id FROM measurement_equipment WHERE serial_number = $1 AND id != $2',
+        [serialNumber, id]
+      );
+      if (existingBySerial.rows.length > 0) {
+        return res.status(409).json({ error: 'Оборудование с таким серийным номером уже существует' });
+      }
+    }
+    
     const updates: string[] = [];
     const values: any[] = [];
     let paramCount = 1;
@@ -244,10 +308,6 @@ router.put('/:id', async (req, res) => {
       `UPDATE measurement_equipment SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING id, type, name, serial_number, created_at, updated_at`,
       values
     );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Оборудование не найдено' });
-    }
     
     // Получаем верификации
     const verificationsResult = await pool.query(

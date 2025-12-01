@@ -44,7 +44,7 @@ const EquipmentDirectory: React.FC = () => {
     type: EquipmentType;
     name: string;
     serialNumber: string;
-    verifications: Omit<EquipmentVerification, 'id' | 'equipmentId' | 'createdAt'>[];
+    verifications: Array<Omit<EquipmentVerification, 'id' | 'equipmentId' | 'createdAt'> & { id?: string }>;
   }>({
     type: '-',
     name: '',
@@ -155,6 +155,7 @@ const EquipmentDirectory: React.FC = () => {
       name: equipment.name,
       serialNumber: equipment.serialNumber,
       verifications: equipment.verifications.map(v => ({
+        id: v.id,
         verificationStartDate: v.verificationStartDate,
         verificationEndDate: v.verificationEndDate,
         verificationFileUrl: v.verificationFileUrl,
@@ -176,9 +177,35 @@ const EquipmentDirectory: React.FC = () => {
       return;
     }
 
+    // Валидация верификаций
+    for (const verification of editEquipment.verifications) {
+      if (!verification.verificationStartDate || !verification.verificationEndDate) {
+        alert('Все верификации должны иметь даты начала и окончания');
+        return;
+      }
+      if (verification.verificationStartDate > verification.verificationEndDate) {
+        alert('Дата начала верификации не может быть позже даты окончания');
+        return;
+      }
+    }
+
     setOperationLoading(true);
     try {
-      await equipmentService.updateEquipment(editingEquipment!.id, editEquipment);
+      // Подготавливаем данные для обновления (убираем id из новых верификаций)
+      const updateData = {
+        type: editEquipment.type,
+        name: editEquipment.name,
+        serialNumber: editEquipment.serialNumber,
+        verifications: editEquipment.verifications.map(v => ({
+          id: v.id, // Сохраняем id для существующих верификаций
+          verificationStartDate: v.verificationStartDate,
+          verificationEndDate: v.verificationEndDate,
+          verificationFileUrl: v.verificationFileUrl,
+          verificationFileName: v.verificationFileName
+        }))
+      };
+      
+      await equipmentService.updateEquipment(editingEquipment!.id, updateData);
       
       // Перезагружаем данные
       await loadEquipment(currentPage, searchTerm);

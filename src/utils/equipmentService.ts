@@ -83,11 +83,52 @@ class EquipmentService {
   // Обновление оборудования
   async updateEquipment(id: string, updates: UpdateEquipmentData): Promise<Equipment> {
     try {
+      // Сначала обновляем основную информацию об оборудовании
       const equipment = await apiClient.put<any>(`/equipment/${id}`, {
         type: updates.type,
         name: updates.name,
         serialNumber: updates.serialNumber
       });
+
+      // Если есть верификации, обновляем их
+      if (updates.verifications !== undefined) {
+        // Получаем текущие верификации
+        const currentEquipment = await this.getEquipmentById(id);
+        const currentVerificationIds = new Set(currentEquipment.verifications.map(v => v.id));
+        
+        // Определяем, какие верификации нужно добавить, обновить или удалить
+        const newVerifications = updates.verifications.filter(v => !('id' in v) || !v.id);
+        const updatedVerifications = updates.verifications.filter(v => 'id' in v && v.id && currentVerificationIds.has(v.id));
+        const verificationIdsToKeep = new Set(updatedVerifications.map((v: any) => v.id));
+        const verificationIdsToDelete = Array.from(currentVerificationIds).filter(id => !verificationIdsToKeep.has(id));
+        
+        // Удаляем старые верификации
+        for (const verificationId of verificationIdsToDelete) {
+          await this.deleteVerification(id, verificationId);
+        }
+        
+        // Добавляем новые верификации
+        for (const verification of newVerifications) {
+          await this.addVerification(id, verification);
+        }
+        
+        // Обновляем существующие верификации (через удаление и добавление)
+        for (const verification of updatedVerifications) {
+          const verificationId = (verification as any).id;
+          if (verificationId) {
+            await this.deleteVerification(id, verificationId);
+            await this.addVerification(id, {
+              verificationStartDate: verification.verificationStartDate,
+              verificationEndDate: verification.verificationEndDate,
+              verificationFileUrl: verification.verificationFileUrl,
+              verificationFileName: verification.verificationFileName
+            });
+          }
+        }
+        
+        // Перезагружаем оборудование с обновленными верификациями
+        return await this.getEquipmentById(id);
+      }
 
       return this.mapFromApi(equipment);
     } catch (error: any) {
