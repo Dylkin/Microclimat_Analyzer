@@ -887,9 +887,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           case 'temperature_recovery':
             return 'Испытание по восстановлению температуры после открытия двери';
           case 'power_off':
-            return 'Испытание на отключение электропитания';
+            return 'Испытание на сбой электропитания (отключение)';
           case 'power_on':
-            return 'Испытание на включение электропитания';
+            return 'Испытание на сбой электропитания (включение)';
           default:
             return testType || '';
         }
@@ -1450,8 +1450,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <option value="empty_volume">Испытание на соответствие критериям в пустом объеме</option>
                 <option value="loaded_volume">Испытание на соответствие критериям в загруженном объеме</option>
                 <option value="temperature_recovery">Испытание по восстановлению температуры после открытия двери</option>
-                <option value="power_off">Испытание на отключение электропитания</option>
-                <option value="power_on">Испытание на включение электропитания</option>
+                <option value="power_off">Испытание на сбой электропитания (отключение)</option>
+                <option value="power_on">Испытание на сбой электропитания (включение)</option>
               </select>
             </div>
             <div>
