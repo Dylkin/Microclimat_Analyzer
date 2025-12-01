@@ -1570,12 +1570,36 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   return (
     <div className="space-y-6">
-      {/* Settings Panel */}
-      <div className="bg-white rounded-lg shadow p-6 space-y-6">
-        <h3 className="text-lg font-semibold text-gray-900">Настройки анализа</h3>
+
+      {/* Chart */}
+      <div ref={chartRef} className="bg-white rounded-lg shadow p-3 w-full">
+        <div className="mb-2">
+          <h3 className="text-lg font-semibold text-gray-900">
+            График {dataType === 'temperature' ? 'температуры' : 'влажности'}
+          </h3>
+        </div>
+        
+        <TimeSeriesChart
+          data={data.points}
+          width={chartWidth}
+          height={chartHeight}
+          margin={chartMargin}
+          dataType={dataType}
+          limits={limits}
+          markers={markers}
+          zoomState={zoomState}
+          onZoomChange={setZoomState}
+          onMarkerAdd={handleAddMarker}
+          yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
+        />
+      </div>
+
+      {/* Test Information and Markers - always visible */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Испытания</h3>
         
         {/* Data Type Selection */}
-        <div>
+        <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">Тип данных</label>
           <div className="flex space-x-4">
             <button
@@ -1606,7 +1630,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         </div>
 
         {/* Limits */}
-        <div>
+        <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Лимиты {dataType === 'temperature' ? 'температуры (°C)' : 'влажности (%)'}
           </label>
@@ -1639,37 +1663,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             </div>
           </div>
         </div>
-
-        {/* Zoom Controls */}
-
-      </div>
-
-      {/* Chart */}
-      <div ref={chartRef} className="bg-white rounded-lg shadow p-3 w-full">
-        <div className="mb-2">
-          <h3 className="text-lg font-semibold text-gray-900">
-            График {dataType === 'temperature' ? 'температуры' : 'влажности'}
-          </h3>
-        </div>
-        
-        <TimeSeriesChart
-          data={data.points}
-          width={chartWidth}
-          height={chartHeight}
-          margin={chartMargin}
-          dataType={dataType}
-          limits={limits}
-          markers={markers}
-          zoomState={zoomState}
-          onZoomChange={setZoomState}
-          onMarkerAdd={handleAddMarker}
-          yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
-        />
-      </div>
-
-      {/* Test Information and Markers - always visible */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Испытания</h3>
         
         {/* Contract Fields */}
         <div className="mb-6">
