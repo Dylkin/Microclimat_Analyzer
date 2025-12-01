@@ -377,6 +377,9 @@ server {
     listen 80;
     server_name $DOMAIN_NAME www.$DOMAIN_NAME;
 
+    # Лимит размера загружаемых файлов (для больших XLS файлов)
+    client_max_body_size 200M;
+
     # Корневая директория для статических файлов
     root $PROJECT_DIR/dist;
     index index.html;
