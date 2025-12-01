@@ -1601,32 +1601,45 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         
         {/* Data Type Selection */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Тип данных</label>
-          <div className="flex space-x-4">
-            <button
-              onClick={() => setDataType('temperature')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                dataType === 'temperature'
-                  ? 'bg-red-100 text-red-700 border border-red-300'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <Thermometer className="w-4 h-4" />
-              <span>Температура</span>
-            </button>
-            {data.hasHumidity && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Тип данных</label>
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => setDataType('temperature')}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                    dataType === 'temperature'
+                      ? 'bg-red-100 text-red-700 border border-red-300'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <Thermometer className="w-4 h-4" />
+                  <span>Температура</span>
+                </button>
+                {data.hasHumidity && (
+                  <button
+                    onClick={() => setDataType('humidity')}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                      dataType === 'humidity'
+                        ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Droplets className="w-4 h-4" />
+                    <span>Влажность</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Управление масштабом</label>
               <button
-                onClick={() => setDataType('humidity')}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                  dataType === 'humidity'
-                    ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                onClick={handleResetZoom}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors w-full"
               >
-                <Droplets className="w-4 h-4" />
-                <span>Влажность</span>
+                Сбросить масштаб
               </button>
-            )}
+            </div>
           </div>
         </div>
 
@@ -1710,15 +1723,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 />
               </div>
             )}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Управление масштабом</label>
-              <button
-                onClick={handleResetZoom}
-                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors w-full"
-              >
-                Сбросить масштаб
-              </button>
-            </div>
           </div>
         </div>
 
