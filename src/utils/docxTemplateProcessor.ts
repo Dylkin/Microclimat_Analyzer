@@ -1836,8 +1836,50 @@ export class DocxTemplateProcessor {
 
       // Проверяем, что это валидный ZIP архив (DOCX)
       try {
-        const zip = new PizZip(buffer);
-        console.log('✅ ZIP архив создан, файлов в архиве:', Object.keys(zip.files).length);
+        // Проверяем минимальный размер файла (DOCX должен быть ZIP архивом)
+        if (buffer.byteLength < 22) { // Минимальный размер ZIP заголовка
+          console.error('❌ Файл слишком мал для DOCX архива');
+          return {
+            isValid: false,
+            errors: ['Файл слишком мал или поврежден. DOCX файл должен быть ZIP архивом.']
+          };
+        }
+
+        // Проверяем сигнатуру ZIP (PK - начало ZIP файла)
+        const uint8Array = new Uint8Array(buffer.slice(0, 4));
+        const signature = String.fromCharCode(...uint8Array);
+        if (signature !== 'PK\x03\x04' && signature !== 'PK\x05\x06' && signature !== 'PK\x07\x08') {
+          console.warn('⚠️ Файл не начинается с ZIP сигнатуры, но попробуем обработать...');
+        }
+
+        let zip: PizZip;
+        try {
+          // Пробуем создать PizZip с опциями для обработки сжатых файлов
+          // Используем опции для более надежной обработки
+          zip = new PizZip(buffer, {
+            // Опции для обработки сжатых файлов
+            // base64: false,
+            // checkCRC32: false, // Отключаем проверку CRC для проблемных файлов
+          });
+        } catch (pizzipError) {
+          console.error('❌ Ошибка создания PizZip объекта:', pizzipError);
+          return {
+            isValid: false,
+            errors: [`Не удалось открыть файл как ZIP архив. Возможно, файл поврежден или не является DOCX документом. Ошибка: ${pizzipError instanceof Error ? pizzipError.message : String(pizzipError)}`]
+          };
+        }
+
+        // Проверяем, что архив содержит файлы
+        const fileCount = Object.keys(zip.files).length;
+        console.log('✅ ZIP архив создан, файлов в архиве:', fileCount);
+        
+        if (fileCount === 0) {
+          console.error('❌ ZIP архив пуст');
+          return {
+            isValid: false,
+            errors: ['ZIP архив пуст. Файл поврежден или не является DOCX документом.']
+          };
+        }
         
         // Проверяем наличие основных файлов DOCX
         const requiredFiles = [
@@ -1848,6 +1890,7 @@ export class DocxTemplateProcessor {
         const missingFiles = requiredFiles.filter(file => !zip.files[file]);
         if (missingFiles.length > 0) {
           console.warn('❌ Отсутствуют обязательные файлы:', missingFiles);
+          console.log('Доступные файлы в архиве:', Object.keys(zip.files).slice(0, 10));
           return {
             isValid: false,
             errors: [`Файл не является корректным DOCX документом. Отсутствуют: ${missingFiles.join(', ')}`]
@@ -1856,7 +1899,111 @@ export class DocxTemplateProcessor {
 
         // Читаем содержимое документа
         try {
-          const documentXml = zip.files['word/document.xml'].asText();
+          const documentFile = zip.files['word/document.xml'];
+          
+          // Проверяем, что файл существует и доступен
+          if (!documentFile) {
+            console.error('❌ Файл word/document.xml не найден в архиве');
+            return {
+              isValid: false,
+              errors: ['Файл word/document.xml не найден в DOCX архиве']
+            };
+          }
+
+          // Проверяем, что файл не поврежден (имеет метод asText)
+          if (typeof documentFile.asText !== 'function') {
+            console.error('❌ Файл word/document.xml поврежден или не может быть прочитан');
+            console.error('Детали файла:', {
+              name: documentFile.name,
+              dir: documentFile.dir,
+              date: documentFile.date,
+              comment: documentFile.comment,
+              options: documentFile.options
+            });
+            return {
+              isValid: false,
+              errors: ['Файл word/document.xml поврежден и не может быть прочитан']
+            };
+          }
+
+          // Пытаемся прочитать содержимое
+          // Используем альтернативные методы чтения для обхода проблем с inflateRaw
+          let documentXml: string;
+          
+          // Проверяем, не сжат ли файл (dir = false означает, что это файл, а не директория)
+          const isCompressed = documentFile.options && documentFile.options.compression !== null && documentFile.options.compression !== undefined;
+          console.log('🔍 Информация о файле:', {
+            name: documentFile.name,
+            dir: documentFile.dir,
+            date: documentFile.date,
+            options: documentFile.options,
+            isCompressed: isCompressed
+          });
+          
+          try {
+            // Сначала пробуем стандартный метод asText()
+            documentXml = documentFile.asText();
+            console.log('✅ document.xml прочитан через asText()');
+          } catch (asTextError) {
+            console.warn('⚠️ Ошибка при чтении через asText(), пробуем альтернативные методы:', asTextError);
+            
+            // Альтернативный метод 1: читаем как ArrayBuffer и декодируем вручную
+            try {
+              const arrayBuffer = documentFile.asArrayBuffer();
+              if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+                throw new Error('ArrayBuffer пуст или недоступен');
+              }
+              
+              // Декодируем ArrayBuffer в строку (UTF-8)
+              const decoder = new TextDecoder('utf-8');
+              documentXml = decoder.decode(arrayBuffer);
+              
+              console.log('✅ document.xml прочитан через альтернативный метод (asArrayBuffer)');
+            } catch (arrayBufferError) {
+              console.warn('⚠️ Ошибка при чтении через asArrayBuffer(), пробуем asBinary():', arrayBufferError);
+              
+              // Альтернативный метод 2: читаем как binary string и декодируем
+              try {
+                if (typeof documentFile.asBinary === 'function') {
+                  const binaryString = documentFile.asBinary();
+                  if (!binaryString || binaryString.length === 0) {
+                    throw new Error('Binary string пуст или недоступен');
+                  }
+                  
+                  // Конвертируем binary string в UTF-8 строку
+                  // Для этого нужно преобразовать каждый байт
+                  const bytes = new Uint8Array(binaryString.length);
+                  for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                  }
+                  const decoder = new TextDecoder('utf-8');
+                  documentXml = decoder.decode(bytes);
+                  
+                  console.log('✅ document.xml прочитан через альтернативный метод (asBinary)');
+                } else {
+                  throw new Error('Метод asBinary недоступен');
+                }
+              } catch (asBinaryError) {
+                console.error('❌ Ошибка при чтении через все методы:', {
+                  asText: asTextError instanceof Error ? asTextError.message : String(asTextError),
+                  asArrayBuffer: arrayBufferError instanceof Error ? arrayBufferError.message : String(arrayBufferError),
+                  asBinary: asBinaryError instanceof Error ? asBinaryError.message : String(asBinaryError)
+                });
+                
+                // Если все методы не сработали, возвращаем более информативную ошибку
+                throw new Error(`Не удалось прочитать файл ни одним из методов. Возможно, файл использует неподдерживаемый метод сжатия или поврежден. Первая ошибка: ${asTextError instanceof Error ? asTextError.message : String(asTextError)}`);
+              }
+            }
+          }
+          
+          if (!documentXml || typeof documentXml !== 'string') {
+            console.error('❌ Не удалось прочитать содержимое document.xml');
+            return {
+              isValid: false,
+              errors: ['Не удалось прочитать содержимое файла word/document.xml']
+            };
+          }
+
           console.log('✅ document.xml прочитан, размер:', documentXml.length, 'символов');
           
           return {
@@ -1865,6 +2012,16 @@ export class DocxTemplateProcessor {
           };
         } catch (xmlError) {
           console.error('❌ Ошибка чтения document.xml:', xmlError);
+          console.error('Детали ошибки:', {
+            message: xmlError instanceof Error ? xmlError.message : String(xmlError),
+            name: xmlError instanceof Error ? xmlError.name : 'Unknown',
+            stack: xmlError instanceof Error ? xmlError.stack : undefined
+          });
+          
+          // Проверяем, что файл существует в архиве
+          const availableFiles = Object.keys(zip.files).filter(f => f.includes('document.xml'));
+          console.log('Доступные файлы document.xml в архиве:', availableFiles);
+          
           return {
             isValid: false,
             errors: [`Ошибка чтения содержимого документа: ${xmlError instanceof Error ? xmlError.message : String(xmlError)}`]

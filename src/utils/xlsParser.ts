@@ -1,9 +1,10 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { DeviceMetadata, MeasurementRecord, ParsedFileData } from '../types/FileData';
 
 /**
  * Парсер для файлов XLS/XLSX
  * Обрабатывает файлы Excel с данными температуры и влажности
+ * Использует exceljs вместо xlsx для безопасности
  */
 export class XLSParser {
   private buffer: ArrayBuffer;
@@ -20,20 +21,21 @@ export class XLSParser {
       console.log('XLSParser: Начинаем анализ XLS файла:', fileName);
       console.log('XLSParser: Размер файла:', this.buffer.byteLength, 'байт');
 
-      // Читаем Excel файл
-      const workbook = XLSX.read(this.buffer, { type: 'array' });
-      console.log('XLSParser: Найдено листов:', workbook.SheetNames);
+      // Читаем Excel файл с помощью exceljs
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(this.buffer);
+      
+      console.log('XLSParser: Найдено листов:', workbook.worksheets.length);
 
       // Ищем лист с данными (обычно первый лист)
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
+      const worksheet = workbook.worksheets[0];
       
       if (!worksheet) {
         throw new Error('Не найден лист с данными в Excel файле');
       }
 
-      // Конвертируем лист в JSON
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      // Конвертируем лист в массив массивов (аналог sheet_to_json с header: 1)
+      const jsonData = this.worksheetToArray(worksheet);
       console.log('XLSParser: Загружено строк:', jsonData.length);
 
       // Парсим данные
@@ -613,5 +615,58 @@ export class XLSParser {
     }
 
     return null;
+  }
+
+  /**
+   * Конвертация листа Excel в массив массивов (аналог XLSX.utils.sheet_to_json с header: 1)
+   */
+  private worksheetToArray(worksheet: ExcelJS.Worksheet): any[][] {
+    const result: any[][] = [];
+    
+    // Получаем количество строк и столбцов
+    const rowCount = worksheet.rowCount || 0;
+    const columnCount = worksheet.columnCount || 0;
+    
+    // Проходим по всем строкам
+    for (let rowNumber = 1; rowNumber <= rowCount; rowNumber++) {
+      const row = worksheet.getRow(rowNumber);
+      const rowData: any[] = [];
+      
+      // Проходим по всем ячейкам в строке
+      for (let colNumber = 1; colNumber <= columnCount; colNumber++) {
+        const cell = row.getCell(colNumber);
+        
+        // Получаем значение ячейки
+        let value: any = cell.value;
+        
+        // Обрабатываем разные типы значений
+        if (value === null || value === undefined) {
+          value = null;
+        } else if (typeof value === 'object') {
+          // Если это объект (например, формула, дата и т.д.)
+          if (value instanceof Date) {
+            value = value;
+          } else if (value.text !== undefined) {
+            // Если это rich text, берем текст
+            value = value.text;
+          } else if (value.result !== undefined) {
+            // Если это формула, берем результат
+            value = value.result;
+          } else {
+            // Иначе берем строковое представление
+            value = String(value);
+          }
+        }
+        
+        rowData.push(value);
+      }
+      
+      // Добавляем строку только если в ней есть хотя бы одно непустое значение
+      if (rowData.some(cell => cell !== null && cell !== undefined && cell !== '')) {
+        result.push(rowData);
+      }
+    }
+    
+    return result;
   }
 }

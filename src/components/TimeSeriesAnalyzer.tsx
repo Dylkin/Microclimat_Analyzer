@@ -237,12 +237,37 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           throw new Error(`Ошибка загрузки шаблона: ${response.statusText}`);
         }
 
+        // Проверяем, что ответ содержит бинарные данные
+        const contentType = response.headers.get('content-type');
+        if (contentType && !contentType.includes('application') && !contentType.includes('octet-stream')) {
+          console.warn('⚠️ Неожиданный Content-Type при загрузке шаблона:', contentType);
+        }
+
         const arrayBuffer = await response.arrayBuffer();
+        
+        // Проверяем, что файл не пустой
+        if (arrayBuffer.byteLength === 0) {
+          throw new Error('Загруженный файл пуст');
+        }
+
+        // Проверяем минимальный размер (DOCX должен быть ZIP архивом)
+        if (arrayBuffer.byteLength < 22) {
+          throw new Error('Загруженный файл слишком мал для DOCX документа');
+        }
+
+        // Проверяем сигнатуру ZIP (DOCX файлы начинаются с PK)
+        const uint8Array = new Uint8Array(arrayBuffer.slice(0, 4));
+        const signature = String.fromCharCode(...uint8Array);
+        if (!signature.startsWith('PK')) {
+          console.warn('⚠️ Файл не начинается с ZIP сигнатуры (PK), возможно поврежден');
+        }
+
         const blob = new Blob([arrayBuffer], {
           type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         });
         const file = new File([blob], templateFilename, {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          lastModified: Date.now()
         });
 
         // Устанавливаем шаблон в состояние

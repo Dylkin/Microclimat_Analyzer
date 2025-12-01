@@ -26,10 +26,12 @@ router.get('/info', async (req, res) => {
       // Формат: hash|date|message
       // Указываем рабочую директорию и добавляем обработку ошибок
       console.log('Попытка получить git log из директории:', projectDir);
-      const gitLog = execSync('git log -5 --format=%H|%ci|%s', { 
+      // Используем одинарные кавычки для экранирования формата
+      const gitLog = execSync("git log -5 --format='%H|%ci|%s'", { 
         encoding: 'utf-8',
         cwd: projectDir,
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: '/bin/bash'
       }).trim();
       
       console.log('Git log получен, длина:', gitLog.length);

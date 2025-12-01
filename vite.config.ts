@@ -1,11 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   define: {
     global: 'globalThis',
     'process.env': {},
+    'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : 'development'),
   },
   optimizeDeps: {
     include: [
@@ -88,4 +89,4 @@ export default defineConfig({
       }
     }
   },
-})
+}))
