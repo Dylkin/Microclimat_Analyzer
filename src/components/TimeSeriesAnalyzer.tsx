@@ -357,42 +357,110 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
 
     // Для типов empty_volume и loaded_volume фильтруем данные по маркерам типа "Испытание"
-    // с названиями "Начало испытания" и "Завершение испытания"
     if (contractFields.testType === 'empty_volume' || contractFields.testType === 'loaded_volume') {
-      // Ищем маркеры типа "test" с названиями "Начало испытания" и "Завершение испытания"
-      const startMarker = markers.find(m => 
-        m.type === 'test' && m.label && m.label.trim() === 'Начало испытания'
-      );
-      const endMarker = markers.find(m => 
-        m.type === 'test' && m.label && m.label.trim() === 'Завершение испытания'
-      );
+      // Находим все маркеры типа "test"
+      const testMarkers = markers.filter(m => m.type === 'test');
       
-      if (startMarker && endMarker) {
-        console.log('TimeSeriesAnalyzer: Filtering points by test markers', {
-          startMarker: { id: startMarker.id, timestamp: startMarker.timestamp, label: startMarker.label },
-          endMarker: { id: endMarker.id, timestamp: endMarker.timestamp, label: endMarker.label }
+      console.log('TimeSeriesAnalyzer: Processing test markers', {
+        testMarkersCount: testMarkers.length,
+        allMarkers: markers.map(m => ({ id: m.id, type: m.type, label: m.label, timestamp: m.timestamp }))
+      });
+      
+      // Если маркеры типа 'test' не найдены или найден только один - используем все данные
+      if (testMarkers.length === 0 || testMarkers.length === 1) {
+        console.log('TimeSeriesAnalyzer: No test markers or single marker, using all data', {
+          testMarkersCount: testMarkers.length
         });
-        
-        // Используем данные между маркерами "Начало испытания" и "Завершение испытания"
-        const startTime = Math.min(startMarker.timestamp, endMarker.timestamp);
-        const endTime = Math.max(startMarker.timestamp, endMarker.timestamp);
-        
-        filteredPoints = filteredPoints.filter(point => 
-          point.timestamp >= startTime && point.timestamp <= endTime
-        );
-        
-        console.log('TimeSeriesAnalyzer: Filtered by marker range', {
-          startTime,
-          endTime,
-          filteredCount: filteredPoints.length
-        });
+        // filteredPoints уже содержит все данные (с учетом зума)
       } else {
-        // Если маркеры не найдены, используем все данные (с учетом зума, если он применен)
-        console.log('TimeSeriesAnalyzer: Test markers not found, using all data', {
-          hasStartMarker: !!startMarker,
-          hasEndMarker: !!endMarker,
-          allMarkers: markers.map(m => ({ id: m.id, type: m.type, label: m.label }))
+        // Находим все пары "Начало испытания" - "Завершение испытания"
+        const startMarkers = testMarkers
+          .filter(m => m.label && m.label.trim() === 'Начало испытания')
+          .sort((a, b) => a.timestamp - b.timestamp);
+        const endMarkers = testMarkers
+          .filter(m => m.label && m.label.trim() === 'Завершение испытания')
+          .sort((a, b) => a.timestamp - b.timestamp);
+        
+        // Находим маркеры "Открытие двери" для исключения
+        const doorMarkers = markers
+          .filter(m => m.type === 'door_opening')
+          .sort((a, b) => a.timestamp - b.timestamp);
+        
+        console.log('TimeSeriesAnalyzer: Found marker pairs', {
+          startMarkersCount: startMarkers.length,
+          endMarkersCount: endMarkers.length,
+          doorMarkersCount: doorMarkers.length
         });
+        
+        if (startMarkers.length > 0 && endMarkers.length > 0) {
+          // Формируем диапазоны из пар маркеров
+          const ranges: Array<{ start: number; end: number }> = [];
+          
+          // Для каждого "Начало испытания" ищем ближайшее "Завершение испытания" после него
+          for (const startMarker of startMarkers) {
+            // Ищем первое "Завершение испытания" после "Начало испытания"
+            const endMarker = endMarkers.find(e => e.timestamp >= startMarker.timestamp);
+            
+            if (endMarker) {
+              ranges.push({
+                start: startMarker.timestamp,
+                end: endMarker.timestamp
+              });
+            }
+          }
+          
+          console.log('TimeSeriesAnalyzer: Created ranges', {
+            rangesCount: ranges.length,
+            ranges: ranges.map(r => ({ start: r.start, end: r.end }))
+          });
+          
+          if (ranges.length > 0) {
+            // Фильтруем точки, которые попадают в любой из диапазонов
+            // и не попадают в диапазоны между маркерами "Открытие двери"
+            filteredPoints = filteredPoints.filter(point => {
+              // Проверяем, попадает ли точка в какой-либо диапазон испытания
+              const inTestRange = ranges.some(range => 
+                point.timestamp >= range.start && point.timestamp <= range.end
+              );
+              
+              if (!inTestRange) {
+                return false;
+              }
+              
+              // Если точка в диапазоне испытания, проверяем, не попадает ли она в диапазон между маркерами "Открытие двери"
+              // Исключаем данные между парами маркеров "Открытие двери" внутри диапазона испытания
+              for (let i = 0; i < doorMarkers.length - 1; i += 2) {
+                const doorStart = doorMarkers[i].timestamp;
+                const doorEnd = doorMarkers[i + 1]?.timestamp;
+                
+                if (doorEnd && point.timestamp >= doorStart && point.timestamp <= doorEnd) {
+                  // Проверяем, что этот диапазон двери находится внутри диапазона испытания
+                  const inTestRangeWithDoor = ranges.some(range => 
+                    doorStart >= range.start && doorEnd <= range.end
+                  );
+                  
+                  if (inTestRangeWithDoor) {
+                    return false; // Исключаем точку, если она в диапазоне открытия двери внутри испытания
+                  }
+                }
+              }
+              
+              return true;
+            });
+            
+            console.log('TimeSeriesAnalyzer: Filtered by marker ranges', {
+              rangesCount: ranges.length,
+              doorMarkersCount: doorMarkers.length,
+              filteredCount: filteredPoints.length
+            });
+          } else {
+            // Если не удалось сформировать пары, используем все данные
+            console.log('TimeSeriesAnalyzer: Could not form marker pairs, using all data');
+          }
+        } else {
+          // Если не найдены пары "Начало испытания" - "Завершение испытания", используем все данные
+          console.log('TimeSeriesAnalyzer: No start/end marker pairs found, using all data');
+        }
       }
     }
 
