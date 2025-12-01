@@ -14,6 +14,29 @@ export class XLSParser {
   }
 
   /**
+   * Определение формата файла (XLS или XLSX)
+   */
+  private detectFileFormat(): 'xls' | 'xlsx' | 'unknown' {
+    // Проверяем сигнатуру файла
+    const uint8Array = new Uint8Array(this.buffer.slice(0, 8));
+    
+    // XLSX - это ZIP архив, начинается с PK (50 4B)
+    if (uint8Array[0] === 0x50 && uint8Array[1] === 0x4B) {
+      return 'xlsx';
+    }
+    
+    // XLS (BIFF) - начинается с D0 CF 11 E0 A1 B1 1A E1 (OLE2 header)
+    if (uint8Array[0] === 0xD0 && uint8Array[1] === 0xCF && 
+        uint8Array[2] === 0x11 && uint8Array[3] === 0xE0 &&
+        uint8Array[4] === 0xA1 && uint8Array[5] === 0xB1 &&
+        uint8Array[6] === 0x1A && uint8Array[7] === 0xE1) {
+      return 'xls';
+    }
+    
+    return 'unknown';
+  }
+
+  /**
    * Основной метод парсинга XLS файла
    */
   async parse(fileName: string): Promise<ParsedFileData> {
@@ -21,9 +44,32 @@ export class XLSParser {
       console.log('XLSParser: Начинаем анализ XLS файла:', fileName);
       console.log('XLSParser: Размер файла:', this.buffer.byteLength, 'байт');
 
+      // Определяем формат файла
+      const fileFormat = this.detectFileFormat();
+      console.log('XLSParser: Определен формат файла:', fileFormat);
+
+      // ExcelJS поддерживает только XLSX формат
+      if (fileFormat === 'xls') {
+        throw new Error('Старый формат .xls (BIFF) не поддерживается. Пожалуйста, сохраните файл в формате .xlsx (Excel 2007+) или конвертируйте его в .xlsx перед загрузкой.');
+      }
+
+      if (fileFormat === 'unknown') {
+        console.warn('XLSParser: Не удалось определить формат файла, пробуем загрузить как XLSX...');
+      }
+
       // Читаем Excel файл с помощью exceljs
       const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(this.buffer);
+      
+      try {
+        await workbook.xlsx.load(this.buffer);
+      } catch (xlsxError: any) {
+        // Если ошибка связана с форматом файла, предоставляем более понятное сообщение
+        if (xlsxError.message && xlsxError.message.includes('zip') || 
+            xlsxError.message && xlsxError.message.includes('central directory')) {
+          throw new Error('Файл не является корректным Excel файлом формата .xlsx. Возможно, это старый формат .xls. Пожалуйста, сохраните файл в формате .xlsx (Excel 2007+) или конвертируйте его.');
+        }
+        throw xlsxError;
+      }
       
       console.log('XLSParser: Найдено листов:', workbook.worksheets.length);
 
