@@ -157,49 +157,196 @@ export class DocxTemplateProcessor {
   }
 
   /**
+   * Чтение несжатого файла напрямую из ZIP архива
+   * Используется как fallback когда PizZip не может прочитать файл
+   */
+  private readUncompressedFileFromZip(zipBuffer: ArrayBuffer, fileName: string): string | null {
+    try {
+      const view = new DataView(zipBuffer);
+      let offset = 0;
+      
+      // Ищем Local File Header для нужного файла
+      while (offset < zipBuffer.byteLength - 30) {
+        // Проверяем сигнатуру Local File Header (0x04034b50)
+        if (view.getUint32(offset, true) === 0x04034b50) {
+          // Читаем размер имени файла
+          const fileNameLength = view.getUint16(offset + 26, true);
+          const extraFieldLength = view.getUint16(offset + 28, true);
+          
+          // Читаем имя файла
+          const fileStart = offset + 30;
+          const fileNameBytes = new Uint8Array(zipBuffer.slice(fileStart, fileStart + fileNameLength));
+          const foundFileName = new TextDecoder('utf-8').decode(fileNameBytes);
+          
+          // Если это нужный файл
+          if (foundFileName === fileName) {
+            // Читаем метод сжатия
+            const compressionMethod = view.getUint16(offset + 8, true);
+            
+            // Если файл не сжат (STORED = 0)
+            if (compressionMethod === 0) {
+              // Читаем размер несжатых данных
+              const uncompressedSize = view.getUint32(offset + 22, true);
+              
+              // Пропускаем имя файла и extra field
+              const dataStart = fileStart + fileNameLength + extraFieldLength;
+              
+              // Читаем данные напрямую
+              const fileData = new Uint8Array(zipBuffer.slice(dataStart, dataStart + uncompressedSize));
+              const decoder = new TextDecoder('utf-8');
+              return decoder.decode(fileData);
+            }
+          }
+          
+          // Переходим к следующему файлу
+          const compressedSize = view.getUint32(offset + 18, true);
+          offset = fileStart + fileNameLength + extraFieldLength + compressedSize;
+        } else {
+          offset++;
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Ошибка при прямом чтении из ZIP:', error);
+    }
+    
+    return null;
+  }
+
+  /**
    * Безопасное чтение document.xml из ZIP архива
    * Обрабатывает как сжатые, так и несжатые файлы
    */
-  private safeReadDocumentXml(zip: PizZip, filePath: string = 'word/document.xml'): string {
+  private safeReadDocumentXml(zip: PizZip, filePath: string = 'word/document.xml', zipBuffer?: ArrayBuffer): string {
     const documentFile = zip.files[filePath];
     
     if (!documentFile) {
       throw new Error(`Файл ${filePath} не найден в архиве`);
     }
     
-    // Проверяем метод сжатия файла (0 = STORED/несжатый, 8 = DEFLATE/сжатый)
     // Используем type assertion для доступа к внутренним свойствам PizZip
     const fileData = documentFile as any;
-    const compressionMethod = fileData.options?.compressionMethod ?? fileData._data?.compressionMethod ?? 8;
+    
+    // Проверяем метод сжатия файла (0 = STORED/несжатый, 8 = DEFLATE/сжатый)
+    // Пробуем разные способы получения метода сжатия
+    let compressionMethod = 8; // По умолчанию считаем сжатым
+    if (fileData._data?.compressionMethod !== undefined) {
+      compressionMethod = fileData._data.compressionMethod;
+    } else if (fileData.options?.compressionMethod !== undefined) {
+      compressionMethod = fileData.options.compressionMethod;
+    } else if (fileData._data?.compressedContent !== undefined && fileData._data.uncompressedSize === fileData._data.compressedSize) {
+      // Если размеры совпадают, файл не сжат
+      compressionMethod = 0;
+    }
+    
     const isUncompressed = compressionMethod === 0;
     
-    // Если файл не сжат, пытаемся читать напрямую из _data
-    if (isUncompressed && fileData._data && fileData._data.data) {
+    console.log('🔍 Информация о файле:', {
+      name: documentFile.name,
+      compressionMethod: compressionMethod,
+      isUncompressed: isUncompressed,
+      hasData: !!fileData._data,
+      dataKeys: fileData._data ? Object.keys(fileData._data) : []
+    });
+    
+    // Если файл не сжат, пытаемся читать напрямую из внутренних данных
+    if (isUncompressed && fileData._data) {
       try {
-        console.log('📖 Файл не сжат, читаем напрямую из _data...');
-        const rawData = fileData._data.data;
+        console.log('📖 Файл не сжат, пытаемся читать напрямую...');
         
-        // Если данные в виде строки, используем их напрямую
-        if (typeof rawData === 'string') {
-          return rawData;
-        } else if (rawData instanceof Uint8Array) {
-          // Если данные в виде Uint8Array, декодируем в UTF-8
-          const decoder = new TextDecoder('utf-8');
-          return decoder.decode(rawData);
-        } else if (rawData instanceof ArrayBuffer) {
-          // Если данные в виде ArrayBuffer, декодируем в UTF-8
-          const decoder = new TextDecoder('utf-8');
-          return decoder.decode(rawData);
+        // Пробуем разные способы получения данных
+        let rawData: any = null;
+        
+        // Способ 1: напрямую из _data.data
+        if (fileData._data.data !== undefined) {
+          rawData = fileData._data.data;
+        }
+        // Способ 2: из _data.uncompressedContent
+        else if (fileData._data.uncompressedContent !== undefined) {
+          rawData = fileData._data.uncompressedContent;
+        }
+        // Способ 3: из _data.compressedContent (если файл не сжат, это те же данные)
+        else if (fileData._data.compressedContent !== undefined && fileData._data.uncompressedSize === fileData._data.compressedSize) {
+          rawData = fileData._data.compressedContent;
+        }
+        // Способ 4: используем внутренний метод _readUint8Array если доступен
+        else if (typeof fileData._readUint8Array === 'function') {
+          try {
+            rawData = fileData._readUint8Array();
+          } catch (e) {
+            console.warn('⚠️ _readUint8Array не сработал:', e);
+          }
+        }
+        
+        if (rawData !== null) {
+          // Если данные в виде строки, используем их напрямую
+          if (typeof rawData === 'string') {
+            console.log('✅ Файл прочитан напрямую из _data (string)');
+            return rawData;
+          } else if (rawData instanceof Uint8Array) {
+            // Если данные в виде Uint8Array, декодируем в UTF-8
+            const decoder = new TextDecoder('utf-8');
+            const result = decoder.decode(rawData);
+            console.log('✅ Файл прочитан напрямую из _data (Uint8Array)');
+            return result;
+          } else if (rawData instanceof ArrayBuffer) {
+            // Если данные в виде ArrayBuffer, декодируем в UTF-8
+            const decoder = new TextDecoder('utf-8');
+            const result = decoder.decode(rawData);
+            console.log('✅ Файл прочитан напрямую из _data (ArrayBuffer)');
+            return result;
+          } else if (Array.isArray(rawData)) {
+            // Если данные в виде массива чисел, конвертируем в Uint8Array
+            const uint8Array = new Uint8Array(rawData);
+            const decoder = new TextDecoder('utf-8');
+            const result = decoder.decode(uint8Array);
+            console.log('✅ Файл прочитан напрямую из _data (Array)');
+            return result;
+          }
         }
       } catch (directReadError) {
         console.warn('⚠️ Ошибка при прямом чтении из _data, пробуем стандартные методы:', directReadError);
       }
     }
     
-    // Используем стандартные методы PizZip
+    // Используем стандартные методы PizZip с обработкой ошибок
     try {
       return documentFile.asText();
-    } catch (asTextError) {
+    } catch (asTextError: any) {
+      // Проверяем, не связана ли ошибка с несжатым файлом
+      if (asTextError?.message?.includes('inflateRaw') || asTextError?.message?.includes('undefined')) {
+        console.warn('⚠️ Ошибка inflateRaw, файл может быть несжатым. Пробуем альтернативные методы...');
+        
+        // Пробуем использовать внутренний метод для чтения несжатых файлов
+        if (fileData._data && fileData._data.uncompressedSize === fileData._data.compressedSize) {
+          // Файл точно не сжат, пробуем читать напрямую из ZIP структуры
+          try {
+            // Используем внутренний метод load для чтения несжатых данных
+            if (typeof fileData.load === 'function') {
+              fileData.load();
+              if (fileData._data?.data) {
+                const rawData = fileData._data.data;
+                if (rawData instanceof Uint8Array) {
+                  const decoder = new TextDecoder('utf-8');
+                  return decoder.decode(rawData);
+                }
+              }
+            }
+            
+            // Если есть доступ к исходному буферу ZIP, пробуем читать напрямую
+            if (zipBuffer) {
+              console.log('📖 Пробуем читать несжатый файл напрямую из ZIP архива...');
+              const directRead = this.readUncompressedFileFromZip(zipBuffer, filePath);
+              if (directRead) {
+                console.log('✅ Файл прочитан напрямую из ZIP архива');
+                return directRead;
+              }
+            }
+          } catch (loadError) {
+            console.warn('⚠️ Ошибка при load:', loadError);
+          }
+        }
+      }
+      
       // Если asText() не работает, пробуем альтернативные методы
       try {
         const arrayBuffer = documentFile.asArrayBuffer();
@@ -208,7 +355,14 @@ export class DocxTemplateProcessor {
         }
         const decoder = new TextDecoder('utf-8');
         return decoder.decode(arrayBuffer);
-      } catch (arrayBufferError) {
+      } catch (arrayBufferError: any) {
+        // Проверяем, не связана ли ошибка с несжатым файлом
+        if (arrayBufferError?.message?.includes('inflateRaw') || arrayBufferError?.message?.includes('undefined')) {
+          // Файл не сжат, но PizZip не может его прочитать
+          // Возвращаем более информативную ошибку с рекомендацией
+          throw new Error(`Файл ${filePath} не сжат (метод сжатия STORED), но библиотека PizZip не может его прочитать. Попробуйте пересохранить DOCX файл в Microsoft Word с включенным сжатием.`);
+        }
+        
         // Последняя попытка - через asBinary()
         if (typeof documentFile.asBinary === 'function') {
           try {
@@ -1828,8 +1982,9 @@ export class DocxTemplateProcessor {
    */
   async analyzeTemplateContent(templateFile: File): Promise<{ placeholders: string[]; hasTable: boolean; content: string }> {
     try {
-      const zip = new PizZip(await templateFile.arrayBuffer());
-      const documentXml = this.safeReadDocumentXml(zip);
+      const buffer = await templateFile.arrayBuffer();
+      const zip = new PizZip(buffer);
+      const documentXml = this.safeReadDocumentXml(zip, 'word/document.xml', buffer);
       
       console.log('Analyzing template content...');
       console.log('Document XML length:', documentXml.length);
@@ -1930,12 +2085,13 @@ export class DocxTemplateProcessor {
 
         let zip: PizZip;
         try {
-          // Пробуем создать PizZip с опциями для обработки сжатых файлов
+          // Пробуем создать PizZip с опциями для обработки сжатых и несжатых файлов
           // Используем опции для более надежной обработки
           zip = new PizZip(buffer, {
             // Опции для обработки сжатых файлов
             // base64: false,
             // checkCRC32: false, // Отключаем проверку CRC для проблемных файлов
+            // decodeFileName: (bytes) => { return bytes; } // Оставляем имена файлов как есть
           });
         } catch (pizzipError) {
           console.error('❌ Ошибка создания PizZip объекта:', pizzipError);
@@ -2003,7 +2159,8 @@ export class DocxTemplateProcessor {
           }
 
           // Пытаемся прочитать содержимое используя безопасный метод
-          const documentXml = this.safeReadDocumentXml(zip, 'word/document.xml');
+          // Передаем исходный буфер для чтения несжатых файлов
+          const documentXml = this.safeReadDocumentXml(zip, 'word/document.xml', buffer);
           
           // Логируем информацию о файле для диагностики
           const fileData = documentFile as any;
