@@ -97,7 +97,8 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     
     files.forEach(file => {
       const fileDataPoint = data.find(d => d.fileId === file);
-      const isExternal = fileDataPoint?.zoneNumber === 0;
+      const isExternal = fileDataPoint?.zoneNumber === 0 || 
+                         fileDataPoint?.loggerName?.toLowerCase().includes('внешний');
       if (isExternal) {
         externalFiles.push(file);
       } else {
@@ -326,13 +327,15 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
       {showLegend && dataByFile.size > 1 && (
         <div className="mb-2 p-2 bg-gray-50 rounded-lg">
           <div className="text-sm text-gray-700">
-            <span className="font-medium">Логгеры: </span>
+            <span className="font-medium">Номер логгера: </span>
             {Array.from(dataByFile.keys()).map(fileId => {
               const color = fileColors.get(fileId);
-              // Проверяем, является ли это внешним датчиком по zoneNumber
+              // Проверяем, является ли это внешним датчиком по zoneNumber или названию
               const fileData = data.find(d => d.fileId === fileId);
-              const isExternal = fileData?.zoneNumber === 0;
-              const displayColor = isExternal ? '#6B7280' : color;
+              const isExternal = fileData?.zoneNumber === 0 || 
+                                 fileData?.loggerName?.toLowerCase().includes('внешний');
+              // Для внешнего датчика всегда используем серый цвет
+              const displayColor = isExternal ? '#6B7280' : (color || '#3b82f6');
               // Используем название логгера, если оно есть, иначе fallback на fileId
               const displayName = fileData?.loggerName || fileId;
               return (
@@ -506,10 +509,15 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             </clipPath>
           </defs>
           {Array.from(dataByFile.entries()).map(([fileId, fileData]) => {
-            // Получаем цвет из fileColors (уже учитывает внешний датчик)
-            const pathColor = dataByFile.size > 1 
-              ? (fileColors.get(fileId) || color)
-              : color;
+            // Проверяем, является ли это внешним датчиком
+            const fileDataPoint = data.find(d => d.fileId === fileId);
+            const isExternal = fileDataPoint?.zoneNumber === 0 || 
+                               fileDataPoint?.loggerName?.toLowerCase().includes('внешний');
+            
+            // Для внешнего датчика всегда используем серый цвет
+            const pathColor = isExternal 
+              ? '#6B7280' 
+              : (dataByFile.size > 1 ? (fileColors.get(fileId) || color) : color);
             
             return (
               <path
