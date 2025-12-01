@@ -138,6 +138,64 @@ const Help: React.FC = () => {
             </div>
           </div>
 
+          {/* Фильтрация данных по маркерам */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">2.1. Фильтрация данных по маркерам</h3>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-green-800 mb-3">
+                <strong>Применяется для типов испытаний:</strong>
+              </p>
+              <ul className="space-y-1 text-sm text-green-800 list-disc list-inside mb-4">
+                <li>"Испытание на соответствие критериям в пустом объеме" (empty_volume)</li>
+                <li>"Испытание на соответствие критериям в загруженном объеме" (loaded_volume)</li>
+              </ul>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-2">Логика фильтрации:</h4>
+                <div className="space-y-3 text-sm text-gray-700">
+                  <div className="bg-white rounded p-3 border-l-4 border-blue-500">
+                    <p className="font-medium mb-1">1. Если маркеры типа 'test' не найдены:</p>
+                    <p className="text-gray-600">Используются все данные, отображенные на графике (с учетом зума, если он применен)</p>
+                  </div>
+                  
+                  <div className="bg-white rounded p-3 border-l-4 border-yellow-500">
+                    <p className="font-medium mb-1">2. Если найден только один маркер типа 'test':</p>
+                    <p className="text-gray-600">Используются все данные, отображенные на графике (с учетом зума, если он применен)</p>
+                  </div>
+                  
+                  <div className="bg-white rounded p-3 border-l-4 border-green-500">
+                    <p className="font-medium mb-1">3. Если найдены маркеры "Начало испытания" и "Завершение испытания":</p>
+                    <ul className="text-gray-600 space-y-1 mt-1 ml-4 list-disc">
+                      <li>Используются данные между этими маркерами (включительно)</li>
+                      <li>Диапазон определяется автоматически: от "Начало испытания" до "Завершение испытания"</li>
+                      <li>Если установлено несколько диапазонов — используются данные всех диапазонов (с учетом зума, если он применен)</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="bg-white rounded p-3 border-l-4 border-red-500">
+                    <p className="font-medium mb-1">4. Исключение данных между маркерами "Открытие двери":</p>
+                    <ul className="text-gray-600 space-y-1 mt-1 ml-4 list-disc">
+                      <li>Если в диапазоне испытания есть маркеры "Открытие двери", данные между ними исключаются из диапазона</li>
+                      <li>Исключаются только те диапазоны "Открытие двери", которые полностью находятся внутри диапазона испытания</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-semibold text-blue-900 mb-2">Технические детали:</h4>
+                <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
+                  <li>Поиск всех маркеров типа 'test' и формирование пар "Начало испытания" — "Завершение испытания"</li>
+                  <li>Поддержка множественных диапазонов испытаний</li>
+                  <li>Автоматическое исключение данных между парами маркеров "Открытие двери" внутри диапазонов испытаний</li>
+                  <li>Добавлено логирование для отладки процесса фильтрации</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           {/* Генерация отчетов */}
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-3">3. Генерация отчетов</h3>
