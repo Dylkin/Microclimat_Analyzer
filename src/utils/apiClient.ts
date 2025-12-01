@@ -134,7 +134,12 @@ class ApiClient {
         const errorData = await response.json().catch(() => ({
           error: response.statusText,
         }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        const errorMessage = errorData.error || `HTTP ${response.status}`;
+        const error = new Error(errorMessage);
+        // Добавляем статус код в объект ошибки для удобной проверки
+        (error as any).status = response.status;
+        (error as any).statusText = response.statusText;
+        throw error;
       }
 
       // Обрабатываем пустые ответы (204 No Content)

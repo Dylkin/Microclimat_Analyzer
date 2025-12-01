@@ -52,8 +52,9 @@ class DocumentationCheckService {
         console.log('DocumentationCheckService: Проверка документации загружена:', data);
         return this.mapFromApi(data);
       } catch (error: any) {
-        if (error.message?.includes('404') || error.message?.includes('не найдена')) {
-          console.log('DocumentationCheckService: Проверка документации не найдена');
+        // Обрабатываем 404 как нормальную ситуацию (проверка еще не создана)
+        if (error.status === 404 || error.message?.includes('404') || error.message?.includes('не найдена')) {
+          console.log('DocumentationCheckService: Проверка документации не найдена (это нормально для новых объектов)');
           return null;
         }
         throw error;
