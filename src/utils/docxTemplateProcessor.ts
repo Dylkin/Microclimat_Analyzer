@@ -204,24 +204,55 @@ export class DocxTemplateProcessor {
             console.log('📊 Размеры файла:', {
               compressed: compressedSize,
               uncompressed: uncompressedSize,
-              method: compressionMethod
+              method: compressionMethod,
+              bufferSize: zipBuffer.byteLength
             });
             
             // Пропускаем имя файла и extra field
             const dataStart = fileStart + fileNameLength + extraFieldLength;
             
-            if (dataStart + uncompressedSize > zipBuffer.byteLength) {
-              console.warn('⚠️ Выход за границы буфера при чтении данных файла');
+            // Для несжатых файлов (STORED = 0) читаем uncompressedSize
+            // Для сжатых файлов (DEFLATE = 8) читаем compressedSize, но не можем распаковать без библиотеки
+            if (compressionMethod === 0) {
+              // Файл не сжат, читаем напрямую
+              if (dataStart + uncompressedSize > zipBuffer.byteLength) {
+                console.warn('⚠️ Выход за границы буфера при чтении данных файла:', {
+                  dataStart,
+                  uncompressedSize,
+                  required: dataStart + uncompressedSize,
+                  available: zipBuffer.byteLength
+                });
+                return null;
+              }
+              
+              // Читаем данные напрямую
+              const fileData = new Uint8Array(zipBuffer.slice(dataStart, dataStart + uncompressedSize));
+              const decoder = new TextDecoder('utf-8');
+              const result = decoder.decode(fileData);
+              
+              console.log('✅ Файл прочитан напрямую из ZIP (STORED), длина:', result.length);
+              return result;
+            } else {
+              // Файл сжат, но PizZip не может его прочитать
+              // Попробуем использовать библиотеку pako для распаковки DEFLATE
+              console.warn('⚠️ Файл сжат (method =', compressionMethod, '), но PizZip не может его прочитать');
+              
+              // Проверяем границы для сжатых данных
+              if (dataStart + compressedSize > zipBuffer.byteLength) {
+                console.warn('⚠️ Выход за границы буфера при чтении сжатых данных:', {
+                  dataStart,
+                  compressedSize,
+                  required: dataStart + compressedSize,
+                  available: zipBuffer.byteLength
+                });
+                return null;
+              }
+              
+              // Для сжатых файлов мы не можем распаковать без библиотеки
+              // Возвращаем null, чтобы попробовать другие методы
+              console.warn('⚠️ Не можем распаковать DEFLATE без библиотеки распаковки');
               return null;
             }
-            
-            // Читаем данные напрямую
-            const fileData = new Uint8Array(zipBuffer.slice(dataStart, dataStart + uncompressedSize));
-            const decoder = new TextDecoder('utf-8');
-            const result = decoder.decode(fileData);
-            
-            console.log('✅ Файл прочитан напрямую из ZIP, длина:', result.length);
-            return result;
           }
           
           // Переходим к следующему файлу
@@ -372,9 +403,11 @@ export class DocxTemplateProcessor {
     try {
       return documentFile.asText();
     } catch (asTextError: any) {
-      // Проверяем, не связана ли ошибка с несжатым файлом
+      console.warn('⚠️ Ошибка при чтении через asText():', asTextError?.message);
+      
+      // Проверяем, не связана ли ошибка с несжатым файлом или проблемой распаковки
       if (asTextError?.message?.includes('inflateRaw') || asTextError?.message?.includes('undefined')) {
-        console.warn('⚠️ Ошибка inflateRaw, файл может быть несжатым. Пробуем альтернативные методы...');
+        console.warn('⚠️ Ошибка inflateRaw, пробуем альтернативные методы...');
         
         // Пробуем использовать внутренний метод для чтения несжатых файлов
         const sizesMatch = fileData._data && fileData._data.uncompressedSize === fileData._data.compressedSize;
@@ -415,6 +448,29 @@ export class DocxTemplateProcessor {
             }
           } catch (loadError) {
             console.warn('⚠️ Ошибка при попытке чтения несжатого файла:', loadError);
+          }
+        } else {
+          // Файл сжат, но PizZip не может его распаковать
+          // Попробуем принудительно перезагрузить файл через PizZip
+          console.warn('⚠️ Файл сжат, но PizZip не может его распаковать. Пробуем перезагрузить...');
+          
+          // Пробуем создать новый PizZip объект и прочитать файл заново
+          if (zipBuffer) {
+            try {
+              const newZip = new PizZip(zipBuffer);
+              const newFile = newZip.files[filePath];
+              if (newFile) {
+                try {
+                  const result = newFile.asText();
+                  console.log('✅ Файл прочитан через новый PizZip объект');
+                  return result;
+                } catch (retryError) {
+                  console.warn('⚠️ Повторная попытка также не удалась:', retryError);
+                }
+              }
+            } catch (newZipError) {
+              console.warn('⚠️ Ошибка при создании нового PizZip:', newZipError);
+            }
           }
         }
       }
