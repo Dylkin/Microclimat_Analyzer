@@ -81,8 +81,20 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 });
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+});
+
+// Обработка ошибок при запуске сервера
+server.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Порт ${PORT} уже занят. Остановите другой процесс или измените PORT в .env`);
+    console.error('Для поиска процесса используйте: lsof -i :' + PORT + ' или netstat -tlnp | grep :' + PORT);
+    process.exit(1);
+  } else {
+    console.error('❌ Ошибка запуска сервера:', error);
+    process.exit(1);
+  }
 });
 
 // Graceful shutdown
