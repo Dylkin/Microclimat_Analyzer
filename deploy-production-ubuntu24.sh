@@ -328,6 +328,26 @@ setup_database_schema() {
     print_success "Схема базы данных настроена"
 }
 
+# Создание пользователя по умолчанию
+create_default_user() {
+    print_info "Создание пользователя по умолчанию..."
+    
+    cd "$PROJECT_DIR"
+    
+    # Проверяем, существует ли скрипт
+    if [ -f "server/scripts/create-default-user.ts" ]; then
+        sudo -u "$PROJECT_USER" npm run create-default-user
+        
+        if [ $? -eq 0 ]; then
+            print_success "Пользователь по умолчанию создан"
+        else
+            print_warning "Ошибка при создании пользователя по умолчанию (возможно, уже существует)"
+        fi
+    else
+        print_warning "Скрипт создания пользователя по умолчанию не найден"
+    fi
+}
+
 # Сборка проекта
 build_project() {
     print_info "Сборка проекта..."
@@ -540,6 +560,7 @@ main() {
     create_env_file
     install_dependencies
     setup_database_schema
+    create_default_user
     build_project
     create_uploads_dir
     setup_nginx
