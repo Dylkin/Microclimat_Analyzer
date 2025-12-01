@@ -338,7 +338,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       qualificationObjectId,
       projectId,
       hasQualificationObject: !!qualificationObject,
-      measurementZonesCount: qualificationObject?.measurementZones?.length || 0
+      measurementZonesCount: qualificationObject?.measurementZones?.length || 0,
+      testType: contractFields.testType,
+      markersCount: markers.length
     });
     
     if (!data || !data.points.length) {
@@ -352,6 +354,40 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       filteredPoints = data.points.filter(point => 
         point.timestamp >= zoomState.startTime && point.timestamp <= zoomState.endTime
       );
+    }
+
+    // Для типов empty_volume и loaded_volume фильтруем данные по маркерам типа "Испытание"
+    if ((contractFields.testType === 'empty_volume' || contractFields.testType === 'loaded_volume') && markers.length > 0) {
+      const testMarkers = markers
+        .filter(m => m.type === 'test')
+        .sort((a, b) => a.timestamp - b.timestamp);
+      
+      if (testMarkers.length > 0) {
+        console.log('TimeSeriesAnalyzer: Filtering points by test markers', {
+          testMarkersCount: testMarkers.length,
+          markers: testMarkers.map(m => ({ id: m.id, timestamp: m.timestamp, label: m.label }))
+        });
+        
+        // Если есть несколько маркеров, используем диапазон между первым и последним
+        // Если маркер один, используем данные после этого маркера
+        if (testMarkers.length === 1) {
+          const startTime = testMarkers[0].timestamp;
+          filteredPoints = filteredPoints.filter(point => point.timestamp >= startTime);
+          console.log('TimeSeriesAnalyzer: Filtered by single marker, points after:', startTime, 'filtered count:', filteredPoints.length);
+        } else {
+          // Используем диапазон между первым и последним маркером
+          const startTime = testMarkers[0].timestamp;
+          const endTime = testMarkers[testMarkers.length - 1].timestamp;
+          filteredPoints = filteredPoints.filter(point => 
+            point.timestamp >= startTime && point.timestamp <= endTime
+          );
+          console.log('TimeSeriesAnalyzer: Filtered by marker range', {
+            startTime,
+            endTime,
+            filteredCount: filteredPoints.length
+          });
+        }
+      }
     }
 
     // Если есть данные из базы данных (qualificationObjectId и projectId), используем их
@@ -643,7 +679,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       if (b.zoneNumberRaw === 0) return -1; // Зона 0 всегда в конце
       return a.zoneNumberRaw - b.zoneNumberRaw; // Остальные зоны по возрастанию
     });
-  }, [data, files, limits, zoomState, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel]); // Добавляем qualificationObject и getLoggerNameForZoneAndLevel в зависимости
+  }, [data, files, limits, zoomState, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel, contractFields.testType, markers]); // Добавляем contractFields.testType и markers для фильтрации по маркерам
 
   // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
   const { globalMinTemp, globalMaxTemp } = useMemo(() => {
