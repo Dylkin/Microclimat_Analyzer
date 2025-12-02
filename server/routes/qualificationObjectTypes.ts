@@ -367,6 +367,61 @@ router.delete('/:id/protocol-template', async (req, res) => {
   }
 });
 
+// DELETE /api/qualification-object-types/:id/report-template - Удалить шаблон отчета
+router.delete('/:id/report-template', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Получаем информацию о файле
+    const typeResult = await pool.query(
+      'SELECT report_template_url FROM public.qualification_object_types WHERE id = $1',
+      [id]
+    );
+
+    if (typeResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Тип объекта квалификации не найден' });
+    }
+
+    const templateUrl = typeResult.rows[0].report_template_url;
+    
+    if (templateUrl) {
+      // Извлекаем путь к файлу из URL
+      const urlParts = templateUrl.split('/uploads/');
+      if (urlParts.length > 1) {
+        const relativePath = urlParts[1];
+        const uploadsRoot = path.join(process.cwd(), 'uploads');
+        const fullPath = path.join(uploadsRoot, relativePath);
+
+        try {
+          await fs.unlink(fullPath);
+        } catch (deleteError: any) {
+          if (deleteError.code !== 'ENOENT') {
+            console.error('Error deleting file from Storage:', deleteError);
+          }
+        }
+      }
+    }
+
+    // Обновляем запись в БД
+    await pool.query(`
+      UPDATE public.qualification_object_types
+      SET 
+        report_template_url = NULL,
+        report_template_filename = NULL,
+        report_template_uploaded_at = NULL,
+        report_template_uploaded_by = NULL,
+        report_template_uploaded_by_name = NULL,
+        updated_at = NOW()
+      WHERE id = $1
+    `, [id]);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting report template:', error);
+    res.status(500).json({ error: 'Ошибка удаления шаблона отчета' });
+  }
+});
+
 
 export default router;
 
