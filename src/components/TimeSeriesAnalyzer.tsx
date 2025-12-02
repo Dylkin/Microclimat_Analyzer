@@ -1649,7 +1649,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                   <Thermometer className="w-4 h-4" />
                   <span>Температура</span>
                 </button>
-                {data.hasHumidity && (
+                {data && data.hasHumidity && (
                   <button
                     onClick={() => setDataType('humidity')}
                     className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
