@@ -864,7 +864,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // Функция для вычисления времени восстановления после открытия двери (temperature_recovery)
   const calculateRecoveryTimeAfterDoorOpening = (
     points: TimeSeriesPoint[],
-    markerTimestamp: number,
+    doorMarkers: VerticalMarker[],
     minLimit: number | undefined,
     maxLimit: number | undefined
   ): { time: string; meetsCriterion: string } => {
@@ -872,61 +872,109 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return { time: '-', meetsCriterion: '-' };
     }
     
-    // Фильтруем точки после маркера открытия двери
-    const pointsAfterMarker = points
-      .filter(p => p.timestamp >= markerTimestamp && p.temperature !== undefined)
+    // Фильтруем точки с температурой
+    const pointsWithTemp = points
+      .filter(p => p.temperature !== undefined)
       .sort((a, b) => a.timestamp - b.timestamp);
     
-    if (pointsAfterMarker.length === 0) {
+    if (pointsWithTemp.length === 0) {
       return { time: '-', meetsCriterion: '-' };
     }
     
-    // Проверяем, выходила ли температура за пределы
-    let exceededLimits = false;
-    let exceededIndex = -1;
+    // Определяем диапазоны данных между маркерами "Открытие двери"
+    let filteredPoints: TimeSeriesPoint[] = [];
     
-    for (let i = 0; i < pointsAfterMarker.length; i++) {
-      const temp = pointsAfterMarker[i].temperature!;
-      if (temp < minLimit || temp > maxLimit) {
-        exceededLimits = true;
-        exceededIndex = i;
-        break; // Нашли первую точку, где температура вышла за пределы
+    if (doorMarkers.length === 0) {
+      // Если маркеров нет, используем все данные на графике
+      filteredPoints = pointsWithTemp;
+    } else if (doorMarkers.length === 1) {
+      // Если один маркер, используем данные после него
+      filteredPoints = pointsWithTemp.filter(p => p.timestamp >= doorMarkers[0].timestamp);
+    } else {
+      // Если несколько маркеров, используем данные между парами маркеров
+      const sortedMarkers = [...doorMarkers].sort((a, b) => a.timestamp - b.timestamp);
+      
+      // Формируем пары маркеров
+      for (let i = 0; i < sortedMarkers.length; i += 2) {
+        const startMarker = sortedMarkers[i];
+        const endMarker = sortedMarkers[i + 1];
+        
+        if (endMarker) {
+          // Данные между парой маркеров (включительно)
+          const rangePoints = pointsWithTemp.filter(p => 
+            p.timestamp >= startMarker.timestamp && p.timestamp <= endMarker.timestamp
+          );
+          filteredPoints.push(...rangePoints);
+        } else {
+          // Если нечетное количество маркеров, последний маркер - начало диапазона до конца данных
+          const rangePoints = pointsWithTemp.filter(p => p.timestamp >= startMarker.timestamp);
+          filteredPoints.push(...rangePoints);
+        }
+      }
+      
+      // Удаляем дубликаты и сортируем
+      filteredPoints = filteredPoints
+        .filter((point, index, self) => 
+          index === self.findIndex(p => p.timestamp === point.timestamp)
+        )
+        .sort((a, b) => a.timestamp - b.timestamp);
+    }
+    
+    if (filteredPoints.length === 0) {
+      return { time: '-', meetsCriterion: '-' };
+    }
+    
+    // Проверяем, выходили ли данные за пределы лимитов
+    let totalTimeOutsideLimits = 0; // Общее время нахождения за пределами в миллисекундах
+    let isCurrentlyOutside = false;
+    let outsideStartTime: number | null = null;
+    
+    for (let i = 0; i < filteredPoints.length; i++) {
+      const temp = filteredPoints[i].temperature!;
+      const isOutside = temp < minLimit || temp > maxLimit;
+      
+      if (isOutside && !isCurrentlyOutside) {
+        // Начало периода нахождения за пределами
+        isCurrentlyOutside = true;
+        outsideStartTime = filteredPoints[i].timestamp;
+      } else if (!isOutside && isCurrentlyOutside && outsideStartTime !== null) {
+        // Конец периода нахождения за пределами
+        const periodDuration = filteredPoints[i].timestamp - outsideStartTime;
+        totalTimeOutsideLimits += periodDuration;
+        isCurrentlyOutside = false;
+        outsideStartTime = null;
       }
     }
     
-    // Если температура не выходила за пределы
-    if (!exceededLimits) {
+    // Если период нахождения за пределами не закончился, учитываем время до последней точки
+    if (isCurrentlyOutside && outsideStartTime !== null && filteredPoints.length > 0) {
+      const lastPoint = filteredPoints[filteredPoints.length - 1];
+      const periodDuration = lastPoint.timestamp - outsideStartTime;
+      totalTimeOutsideLimits += periodDuration;
+    }
+    
+    // Если данные не выходили за пределы
+    if (totalTimeOutsideLimits === 0) {
       const acceptanceCriterion = contractFields.acceptanceCriterion 
         ? parseInt(contractFields.acceptanceCriterion) 
         : 0;
       // Если не выходили за пределы, считаем, что критерий выполнен
-      return { time: 'Не выходили за пределы', meetsCriterion: 'Да' };
+      return { time: 'за пределы не выходила', meetsCriterion: 'Да' };
     }
     
-    // Если выходила за пределы, ищем время возвращения в диапазон
-    // Ищем первую точку после exceededIndex, где температура снова входит в диапазон
-    for (let i = exceededIndex + 1; i < pointsAfterMarker.length; i++) {
-      const temp = pointsAfterMarker[i].temperature!;
-      if (temp >= minLimit && temp <= maxLimit) {
-        // Нашли точку возвращения в диапазон
-        const recoveryTime = pointsAfterMarker[i].timestamp - markerTimestamp;
-        const timeInMinutes = Math.floor(recoveryTime / (1000 * 60));
-        
-        // Используем критерий приемлемости из contractFields
-        const acceptanceCriterion = contractFields.acceptanceCriterion 
-          ? parseInt(contractFields.acceptanceCriterion) 
-          : 0;
-        const meetsCriterion = timeInMinutes <= acceptanceCriterion ? 'Да' : 'Нет';
-        
-        return { time: formatTimeDuration(recoveryTime), meetsCriterion };
-      }
-    }
+    // Вычисляем время в минутах
+    const timeInMinutes = Math.floor(totalTimeOutsideLimits / (1000 * 60));
     
-    // Температура вышла за пределы, но не вернулась в диапазон
+    // Используем критерий приемлемости из contractFields
     const acceptanceCriterion = contractFields.acceptanceCriterion 
       ? parseInt(contractFields.acceptanceCriterion) 
       : 0;
-    return { time: '-', meetsCriterion: 'Нет' };
+    const meetsCriterion = timeInMinutes <= acceptanceCriterion ? 'Да' : 'Нет';
+    
+    // Форматируем время в минутах
+    const timeString = `${timeInMinutes} мин.`;
+    
+    return { time: timeString, meetsCriterion };
   };
 
   // Получаем маркер для текущего типа испытания
@@ -2283,7 +2331,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {analysisResults.map((result, index) => {
-                  const testMarker = getTestMarker();
                   const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
                   const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
                   const filePoints = data?.points.filter(p => {
@@ -2292,10 +2339,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
                   }) || [];
                   
-                  const recoveryData = testMarker && limits.temperature
+                  // Получаем все маркеры типа "Открытие двери"
+                  const doorMarkers = markers.filter(m => m.type === 'door_opening');
+                  
+                  const recoveryData = limits.temperature
                     ? calculateRecoveryTimeAfterDoorOpening(
                         filePoints,
-                        testMarker.timestamp,
+                        doorMarkers,
                         limits.temperature.min,
                         limits.temperature.max
                       )
