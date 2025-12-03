@@ -10,6 +10,7 @@ import { DocxTemplateProcessor, TemplateReportData } from '../utils/docxTemplate
 import { reportService, ReportData } from '../utils/reportService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { qualificationObjectTypeService } from '../utils/qualificationObjectTypeService';
+import { equipmentService } from '../utils/equipmentService';
 import PizZip from 'pizzip';
 
 interface TimeSeriesAnalyzerProps {
@@ -90,6 +91,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   // Состояние для объекта квалификации с зонами измерения
   const [qualificationObject, setQualificationObject] = useState<any>(null);
+
+  // Состояние для Map оборудования (имя -> serial_number)
+  const [equipmentMap, setEquipmentMap] = useState<Map<string, string>>(new Map());
 
   // Состояние для шаблона из справочника
   const [templateFromDirectory, setTemplateFromDirectory] = useState<{
@@ -191,6 +195,33 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
     loadQualificationObject();
   }, [qualificationObjectId]);
+
+  // Загрузка оборудования при монтировании компонента
+  useEffect(() => {
+    const loadEquipment = async () => {
+      try {
+        if (equipmentService.isAvailable()) {
+          console.log('Загрузка оборудования для получения серийных номеров...');
+          const result = await equipmentService.getAllEquipment(1, 1000);
+          const map = new Map<string, string>();
+          result.equipment.forEach((eq: any) => {
+            if (eq.name && eq.serialNumber) {
+              map.set(eq.name, eq.serialNumber);
+              console.log(`Добавлено оборудование в Map: ${eq.name} -> ${eq.serialNumber}`);
+            }
+          });
+          setEquipmentMap(map);
+          console.log(`Загружено оборудования: ${map.size} записей`);
+        } else {
+          console.warn('EquipmentService недоступен');
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки оборудования:', error);
+      }
+    };
+
+    loadEquipment();
+  }, []);
 
   // Загрузка шаблона из справочника объектов квалификации
   useEffect(() => {
@@ -329,6 +360,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     // Возвращаем equipmentName, если он есть
     return level?.equipmentName || null;
   }, [qualificationObject]);
+
+  // Функция для получения серийного номера из measurement_equipment по equipmentName
+  const getSerialNumberByEquipmentName = useCallback((equipmentName: string | null): string | null => {
+    if (!equipmentName) {
+      return null;
+    }
+    return equipmentMap.get(equipmentName) || null;
+  }, [equipmentMap]);
 
   // Generate analysis results table data
   const analysisResults = useMemo(() => {
@@ -584,12 +623,25 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         // Используем equipmentName, если он есть, иначе используем данные из точек
         const loggerName = equipmentName || (points[0] as any)?.loggerName || (points[0] as any)?.deviceModel || 'Unknown';
 
+        // Получаем серийный номер только из measurement_equipment по equipmentName
+        const serialNumber = getSerialNumberByEquipmentName(equipmentName) || 'Не указан';
+        
+        // Логирование для отладки
+        if (equipmentName) {
+          console.log(`Получение серийного номера для зоны ${zoneNumber}, уровень ${measurementLevel}:`, {
+            equipmentName,
+            serialNumber,
+            equipmentMapSize: equipmentMap.size,
+            foundInMap: equipmentMap.has(equipmentName)
+          });
+        }
+
         return {
           zoneNumber: zoneNumber === 0 ? 'Внешний' : (zoneNumber !== null && zoneNumber !== undefined ? zoneNumber.toString() : 'Неизвестно'),
           zoneNumberRaw: zoneNumber, // Сохраняем исходный номер для сортировки
           measurementLevel: measurementLevel !== null && measurementLevel !== undefined ? measurementLevel.toString() : 'Неизвестно',
           loggerName: loggerName,
-          serialNumber: (points[0]?.serialNumber && !points[0]?.serialNumber.startsWith('XLS-Logger-')) ? points[0]?.serialNumber : 'Не указан',
+          serialNumber: serialNumber,
           minTemp: tempStats.min,
           maxTemp: tempStats.max,
           avgTemp: tempStats.avg,
@@ -623,13 +675,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       if (filePoints.length === 0) {
         // Используем equipmentName, если он есть, иначе используем данные из файла
         const loggerName = fileEquipmentName || file.parsedData?.deviceMetadata?.deviceModel || file.name;
+        const equipmentName = fileEquipmentName || file.parsedData?.deviceMetadata?.deviceModel || null;
+        const serialNumber = getSerialNumberByEquipmentName(equipmentName) || 'Не указан';
         
         return {
           zoneNumber: file.zoneNumber === 0 ? 'Внешний' : (file.zoneNumber || '-'),
           zoneNumberRaw: file.zoneNumber || 0, // Сохраняем исходный номер для сортировки
           measurementLevel: file.measurementLevel || '-',
           loggerName: loggerName,
-          serialNumber: (file.parsedData?.deviceMetadata?.serialNumber && !file.parsedData?.deviceMetadata?.serialNumber.startsWith('XLS-Logger-')) ? file.parsedData?.deviceMetadata?.serialNumber : 'Не указан',
+          serialNumber: serialNumber,
           minTemp: '-',
           maxTemp: '-',
           avgTemp: '-',
@@ -737,7 +791,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         zoneNumberRaw: file.zoneNumber || 0, // Сохраняем исходный номер для сортировки
         measurementLevel: file.measurementLevel || '-',
         loggerName: fileLoggerName, // Наименование логгера из объекта квалификации или из файла
-        serialNumber: file.parsedData?.deviceMetadata?.serialNumber || 'Unknown',
+        serialNumber: (() => {
+          const equipmentName = fileEquipmentName || file.parsedData?.deviceMetadata?.deviceModel || null;
+          const serialNumber = getSerialNumberByEquipmentName(equipmentName) || 'Не указан';
+          if (equipmentName) {
+            console.log(`Получение серийного номера для файла ${file.name}:`, {
+              equipmentName,
+              serialNumber,
+              equipmentMapSize: equipmentMap.size,
+              foundInMap: equipmentMap.has(equipmentName)
+            });
+          }
+          return serialNumber;
+        })(),
         minTemp: tempStats.min,
         maxTemp: tempStats.max,
         avgTemp: tempStats.avg,
@@ -754,7 +820,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       if (b.zoneNumberRaw === 0) return -1; // Зона 0 всегда в конце
       return a.zoneNumberRaw - b.zoneNumberRaw; // Остальные зоны по возрастанию
     });
-  }, [data, files, limits, zoomState, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel, contractFields.testType, markers]); // Добавляем contractFields.testType и markers для фильтрации по маркерам
+  }, [data, files, limits, zoomState, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel, getSerialNumberByEquipmentName, equipmentMap, contractFields.testType, markers]); // Добавляем getSerialNumberByEquipmentName и equipmentMap для получения серийных номеров
 
   // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
   const { globalMinTemp, globalMaxTemp } = useMemo(() => {
@@ -1004,12 +1070,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleAddMarker = useCallback((timestamp: number) => {
-    // Для temperature_recovery создаем только маркеры типа "Открытие двери"
+    // Для temperature_recovery создаем только маркеры типа "door_opening"
     if (contractFields.testType === 'temperature_recovery') {
       const newMarker: VerticalMarker = {
         id: Date.now().toString(),
         timestamp,
-        label: 'Открытие двери',
+        label: 'Открытие двери', // По умолчанию "Открытие двери", пользователь может изменить на "Восстановление температуры"
         color: '#000000', // Черный цвет для всех маркеров
         type: 'door_opening'
       };
@@ -1042,10 +1108,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const handleUpdateMarkerType = (id: string, type: MarkerType) => {
     // Все маркеры должны быть черного цвета
     const color = '#000000';
-    // Если тип изменен на "Открытие двери", автоматически устанавливаем название
-    const label = type === 'door_opening' ? 'Открытие двери' : undefined;
+    // Если тип изменен на "door_opening", сохраняем текущее название, если оно уже одно из допустимых
     setMarkers(prev => prev.map(m => {
       if (m.id === id) {
+        // Если маркер уже имеет одно из допустимых названий для door_opening, сохраняем его
+        const currentLabel = m.label;
+        const isDoorOpeningLabel = currentLabel === 'Открытие двери' || currentLabel === 'Восстановление температуры';
+        const label = type === 'door_opening' && !isDoorOpeningLabel 
+          ? 'Открытие двери' // По умолчанию "Открытие двери"
+          : (type === 'door_opening' ? currentLabel : undefined);
         return { ...m, type, color, ...(label !== undefined ? { label } : {}) };
       }
       return m;
@@ -1515,6 +1586,88 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleAutoFillConclusions = () => {
+    // Специальная логика для типа испытания "Испытание на восстановление температуры после открытия двери"
+    if (contractFields.testType === 'temperature_recovery') {
+      if (!data || !limits.temperature || !limits.temperature.min || !limits.temperature.max) {
+        setConclusions('Недостаточно данных для формирования выводов.');
+        return;
+      }
+
+      // Получаем все маркеры типа "Открытие двери"
+      const doorMarkers = markers.filter(m => m.type === 'door_opening');
+      
+      // Исключаем внешние датчики
+      const nonExternalResults = analysisResults.filter(result => !result.isExternal);
+      
+      if (nonExternalResults.length === 0) {
+        setConclusions('Недостаточно данных для формирования выводов.');
+        return;
+      }
+
+      // Для каждого логгера вычисляем время нахождения за пределами
+      const loggerRecoveryData = nonExternalResults.map(result => {
+        const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
+        const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
+        const filePoints = data.points.filter(p => {
+          const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+          const pLevel = p.measurementLevel?.toString() || 'unknown';
+          return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+        });
+        
+        const recoveryData = calculateRecoveryTimeAfterDoorOpening(
+          filePoints,
+          doorMarkers,
+          limits.temperature?.min,
+          limits.temperature?.max
+        );
+        
+        return {
+          loggerName: result.loggerName,
+          recoveryTime: recoveryData.time,
+          meetsCriterion: recoveryData.meetsCriterion,
+          timeInMinutes: recoveryData.time === 'за пределы не выходила' ? 0 : parseInt(recoveryData.time.replace(/\s*мин\./, '')) || 0
+        };
+      });
+
+      // Находим логгер с максимальным временем нахождения за пределами
+      const maxTimeLogger = loggerRecoveryData.reduce((max, current) => {
+        return current.timeInMinutes > max.timeInMinutes ? current : max;
+      }, loggerRecoveryData[0]);
+
+      // Определяем, выходила ли температура за пределы
+      const hasExceededLimits = loggerRecoveryData.some(logger => logger.timeInMinutes > 0);
+      
+      // Получаем критерий приемлемости
+      const acceptanceCriterion = contractFields.acceptanceCriterion 
+        ? parseInt(contractFields.acceptanceCriterion) 
+        : 0;
+
+      // Определяем общий результат испытания (соответствует/не соответствует)
+      // Если хотя бы один логгер не соответствует критерию, общий результат - не соответствует
+      const overallMeetsCriterion = loggerRecoveryData.every(logger => logger.meetsCriterion === 'Да');
+
+      // Формируем текст выводов с форматированием (жирный текст для постоянного, обычный для подставляемого)
+      let conclusionText = '';
+      
+      if (!hasExceededLimits) {
+        // Температура не выходила за пределы
+        conclusionText = `<b>За время проведения испытания температура за контролируемые пределы</b> не выходила, <b>что соответствует</b> установленному критерию приемлемости (<b>${acceptanceCriterion}</b> мин.). <b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
+      } else {
+        // Температура выходила за пределы
+        const maxTimeText = maxTimeLogger.timeInMinutes > 0 
+          ? `${maxTimeLogger.timeInMinutes} мин.`
+          : 'за пределы не выходила';
+        
+        const maxTimeMeetsCriterion = maxTimeLogger.meetsCriterion === 'Да' ? 'соответствует' : 'не соответствует';
+        
+        conclusionText = `<b>За время проведения испытания температура за контролируемые пределы</b> выходила, <b>максимальное время выхода зафиксировано логгером</b> ${maxTimeLogger.loggerName} <b>и составило</b> ${maxTimeText}, <b>что</b> ${maxTimeMeetsCriterion} <b>установленному критерию приемлемости</b> (<b>${acceptanceCriterion}</b> мин.). <b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
+      }
+
+      setConclusions(conclusionText);
+      return;
+    }
+
+    // Стандартная логика для других типов испытаний
     // Определяем временные рамки
     let startTime: Date;
     let endTime: Date;
@@ -1836,23 +1989,43 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     <div className="flex flex-col space-y-1 flex-1">
                       <div className="flex items-center space-x-3">
                         {editingMarker === marker.id ? (
-                          <input
-                            type="text"
-                            value={marker.label}
-                            onChange={(e) => setMarkers(prev => 
-                              prev.map(m => m.id === marker.id ? { ...m, label: e.target.value } : m)
-                            )}
-                            onBlur={() => setEditingMarker(null)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                setEditingMarker(null);
-                              }
-                            }}
-                            className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            autoFocus
-                            title="Название маркера"
-                            aria-label="Название маркера"
-                          />
+                          marker.type === 'door_opening' ? (
+                            <select
+                              value={marker.label}
+                              onChange={(e) => {
+                                const newLabel = e.target.value;
+                                setMarkers(prev => prev.map(m => 
+                                  m.id === marker.id ? { ...m, label: newLabel } : m
+                                ));
+                              }}
+                              onBlur={() => setEditingMarker(null)}
+                              className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              autoFocus
+                              title="Название маркера"
+                              aria-label="Название маркера"
+                            >
+                              <option value="Открытие двери">Открытие двери</option>
+                              <option value="Восстановление температуры">Восстановление температуры</option>
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={marker.label}
+                              onChange={(e) => setMarkers(prev => 
+                                prev.map(m => m.id === marker.id ? { ...m, label: e.target.value } : m)
+                              )}
+                              onBlur={() => setEditingMarker(null)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  setEditingMarker(null);
+                                }
+                              }}
+                              className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              autoFocus
+                              title="Название маркера"
+                              aria-label="Название маркера"
+                            />
+                          )
                         ) : (
                           <span className="font-medium">{marker.label}</span>
                         )}

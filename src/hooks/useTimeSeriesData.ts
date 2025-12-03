@@ -97,7 +97,12 @@ export const useTimeSeriesData = ({ files, qualificationObjectId, projectId }: U
               zoneNumber: summary.zone_number,
               measurementLevel: summary.measurement_level,
               deviceSerialNumber: record.device_serial_number || 'Unknown',
-              serialNumber: (summary.serial_number && !summary.serial_number.startsWith('XLS-Logger-')) ? summary.serial_number : 'Не указан', // Серийный номер из справочника оборудования
+              serialNumber: (summary.serial_number && 
+                             !summary.serial_number.startsWith('XLS-Logger-') && 
+                             summary.serial_number !== 'Не указан' &&
+                             summary.serial_number.trim() !== '') 
+                             ? summary.serial_number 
+                             : 'Не указан', // Серийный номер только из справочника оборудования (measurement_equipment)
               loggerName: summary.logger_name || `Логгер зона ${summary.zone_number} уровень ${summary.measurement_level}`
             };
           });

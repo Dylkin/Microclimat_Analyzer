@@ -675,6 +675,7 @@ export class DocxTemplateProcessor {
     // Создаем выводы если есть
     let previousConclusions = '';
     if (previousData.conclusions && previousData.conclusions.trim()) {
+      const formattedPreviousConclusions = this.convertHtmlBoldToDocx(previousData.conclusions);
       previousConclusions = `
         <w:p>
           <w:pPr>
@@ -693,9 +694,7 @@ export class DocxTemplateProcessor {
           <w:pPr>
             <w:spacing w:before="0" w:after="240"/>
           </w:pPr>
-          <w:r>
-            <w:t>${this.escapeXml(previousData.conclusions)}</w:t>
-          </w:r>
+          ${formattedPreviousConclusions}
         </w:p>`;
     }
 
@@ -1025,7 +1024,9 @@ export class DocxTemplateProcessor {
 
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
-      result = result.replace(/{Result}/g, this.escapeXml(data.conclusions));
+      // Преобразуем HTML-теги <b> в DOCX-формат перед экранированием
+      const formattedConclusions = this.convertHtmlBoldToDocx(data.conclusions);
+      result = result.replace(/{Result}/g, formattedConclusions);
     } else {
       result = result.replace(/{Result}/g, '');
     }
@@ -1179,6 +1180,70 @@ export class DocxTemplateProcessor {
         // Исправляем неэкранированные амперсанды
         result = result.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;');
         console.log('Fixed unescaped ampersands in final XML');
+      }
+    }
+    
+    return result;
+  }
+
+  /**
+   * Преобразование HTML-тегов <b> в DOCX-формат для жирного текста
+   */
+  private convertHtmlBoldToDocx(text: string): string {
+    if (!text) return '';
+    
+    // Разбиваем текст на части, разделенные тегами <b> и </b>
+    const parts: Array<{ text: string; isBold: boolean }> = [];
+    let currentIndex = 0;
+    let isBold = false;
+    
+    // Регулярное выражение для поиска открывающих и закрывающих тегов <b>
+    const tagRegex = /<\/?b>/gi;
+    let match;
+    
+    while ((match = tagRegex.exec(text)) !== null) {
+      // Добавляем текст до тега
+      if (match.index > currentIndex) {
+        const textPart = text.substring(currentIndex, match.index);
+        if (textPart) {
+          parts.push({ text: textPart, isBold });
+        }
+      }
+      
+      // Определяем, открывающий или закрывающий тег
+      if (match[0].toLowerCase() === '<b>') {
+        isBold = true;
+      } else if (match[0].toLowerCase() === '</b>') {
+        isBold = false;
+      }
+      
+      currentIndex = match.index + match[0].length;
+    }
+    
+    // Добавляем оставшийся текст
+    if (currentIndex < text.length) {
+      const textPart = text.substring(currentIndex);
+      if (textPart) {
+        parts.push({ text: textPart, isBold });
+      }
+    }
+    
+    // Если не было найдено тегов, возвращаем исходный текст с экранированием
+    if (parts.length === 0) {
+      return this.escapeXml(text);
+    }
+    
+    // Формируем DOCX XML для каждой части
+    let result = '';
+    for (const part of parts) {
+      const escapedText = this.escapeXml(part.text);
+      
+      if (part.isBold) {
+        // Жирный текст: <w:r><w:rPr><w:b/></w:rPr><w:t>текст</w:t></w:r>
+        result += `<w:r><w:rPr><w:b/></w:rPr><w:t>${escapedText}</w:t></w:r>`;
+      } else {
+        // Обычный текст: <w:r><w:t>текст</w:t></w:r>
+        result += `<w:r><w:t>${escapedText}</w:t></w:r>`;
       }
     }
     
@@ -1831,6 +1896,7 @@ export class DocxTemplateProcessor {
     // Создаем выводы если есть
     let conclusions = '';
     if (data.conclusions && data.conclusions.trim()) {
+      const formattedConclusions = this.convertHtmlBoldToDocx(data.conclusions);
       conclusions = `
         <w:p>
           <w:pPr>
@@ -1849,9 +1915,7 @@ export class DocxTemplateProcessor {
           <w:pPr>
             <w:spacing w:before="0" w:after="240"/>
           </w:pPr>
-          <w:r>
-            <w:t>${this.escapeXml(data.conclusions)}</w:t>
-          </w:r>
+          ${formattedConclusions}
         </w:p>`;
     }
 
