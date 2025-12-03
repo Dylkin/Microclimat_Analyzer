@@ -485,11 +485,11 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                           onClick={async () => {
                             try {
                               setLoadingObject(true);
-                              // Загружаем полные данные объекта из API перед открытием в режиме "выполнить"
+                              // Загружаем полные данные объекта из API перед открытием в режиме просмотра
                               const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id);
-                              setEditingObject(fullObject);
-                              setViewingObject(null); // Очищаем просмотр, если было открыто
-                              setObjectMode('edit'); // Режим редактирования, но с отображением всех блоков
+                              setViewingObject(fullObject);
+                              setEditingObject(null); // Очищаем редактирование, если было открыто
+                              setObjectMode('view'); // Режим просмотра
                             } catch (error) {
                               console.error('Ошибка загрузки объекта квалификации:', error);
                               alert(`Ошибка загрузки объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
