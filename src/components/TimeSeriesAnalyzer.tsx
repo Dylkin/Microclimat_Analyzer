@@ -2141,10 +2141,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <span>Не соответствует лимитам</span>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs bg-gray-200 px-2 py-1 rounded font-mono">DL-023</span>
-              <span>Наименование логгера (первые 6 символов файла)</span>
-            </div>
           </div>
           <div className="mt-3 text-xs text-gray-600">
             <strong>Примечание:</strong> При изменении масштаба графика статистика пересчитывается только для выбранного временного периода.
