@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, BarChart3 } from 'lucide-react';
+import { ArrowLeft, BarChart3, FileText } from 'lucide-react';
 import { Project } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject } from '../types/QualificationObject';
@@ -262,47 +262,127 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
                 <p className="text-gray-700">{selectedQualificationObject.type}</p>
               </div>
               <div>
-                <span className="font-medium text-gray-800">Производитель:</span>
-                <p className="text-gray-700">{selectedQualificationObject.manufacturer || 'Не указан'}</p>
-              </div>
-              <div>
                 <span className="font-medium text-gray-800">Наименование:</span>
                 <p className="text-gray-700">{selectedQualificationObject.name || 'Без названия'}</p>
               </div>
+              {selectedQualificationObject.manufacturer && (
+                <div>
+                  <span className="font-medium text-gray-800">Производитель:</span>
+                  <p className="text-gray-700">{selectedQualificationObject.manufacturer}</p>
+                </div>
+              )}
             </div>
+            
+            {/* Поля в зависимости от типа объекта */}
             <div className="grid grid-cols-2 gap-4 text-sm mt-4">
-              {selectedQualificationObject.type === 'автомобиль' ? (
+              {selectedQualificationObject.type === 'помещение' && (
                 <>
-                  <div>
-                    <span className="font-medium text-gray-800">VIN номер:</span>
-                    <p className="text-gray-700">{selectedQualificationObject.vin || 'Не указан'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-800">Регистрационный номер:</span>
-                    <p className="text-gray-700">{selectedQualificationObject.registrationNumber || 'Не указан'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-800">Объем кузова (м³):</span>
-                    <p className="text-gray-700">{selectedQualificationObject.bodyVolume ? `${selectedQualificationObject.bodyVolume}` : 'Не указан'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-800">Климатическая установка:</span>
-                    <p className="text-gray-700">{selectedQualificationObject.climateSystem || 'Не указана'}</p>
-                  </div>
+                  {selectedQualificationObject.address && (
+                    <div>
+                      <span className="font-medium text-gray-800">Адрес:</span>
+                      <p className="text-gray-700">{selectedQualificationObject.address}</p>
+                    </div>
+                  )}
+                  {selectedQualificationObject.area !== undefined && selectedQualificationObject.area !== null && (
+                    <div>
+                      <span className="font-medium text-gray-800">Площадь (м²):</span>
+                      <p className="text-gray-700">{selectedQualificationObject.area}</p>
+                    </div>
+                  )}
+                  {selectedQualificationObject.climateSystem && (
+                    <div>
+                      <span className="font-medium text-gray-800">Климатическая система:</span>
+                      <p className="text-gray-700">{selectedQualificationObject.climateSystem}</p>
+                    </div>
+                  )}
                 </>
-              ) : (
+              )}
+              
+              {selectedQualificationObject.type === 'автомобиль' && (
                 <>
-                  <div>
-                    <span className="font-medium text-gray-800">Серийный (Гос. номер):</span>
-                    <p className="text-gray-700">{selectedQualificationObject.serialNumber || selectedQualificationObject.vin || 'Не указан'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-800">Климатическая установка:</span>
-                    <p className="text-gray-700">{selectedQualificationObject.climateSystem || 'Не указана'}</p>
-                  </div>
+                  {selectedQualificationObject.vin && (
+                    <div>
+                      <span className="font-medium text-gray-800">VIN номер:</span>
+                      <p className="text-gray-700">{selectedQualificationObject.vin}</p>
+                    </div>
+                  )}
+                  {selectedQualificationObject.registrationNumber && (
+                    <div>
+                      <span className="font-medium text-gray-800">Регистрационный номер:</span>
+                      <p className="text-gray-700">{selectedQualificationObject.registrationNumber}</p>
+                    </div>
+                  )}
+                  {selectedQualificationObject.bodyVolume !== undefined && selectedQualificationObject.bodyVolume !== null && (
+                    <div>
+                      <span className="font-medium text-gray-800">Объем кузова (м³):</span>
+                      <p className="text-gray-700">{selectedQualificationObject.bodyVolume}</p>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              {selectedQualificationObject.type === 'холодильная_камера' && (
+                <>
+                  {selectedQualificationObject.address && (
+                    <div>
+                      <span className="font-medium text-gray-800">Адрес:</span>
+                      <p className="text-gray-700">{selectedQualificationObject.address}</p>
+                    </div>
+                  )}
+                  {selectedQualificationObject.chamberVolume !== undefined && selectedQualificationObject.chamberVolume !== null && (
+                    <div>
+                      <span className="font-medium text-gray-800">Объем камеры (м³):</span>
+                      <p className="text-gray-700">{selectedQualificationObject.chamberVolume}</p>
+                    </div>
+                  )}
+                  {selectedQualificationObject.climateSystem && (
+                    <div>
+                      <span className="font-medium text-gray-800">Климатическая система:</span>
+                      <p className="text-gray-700">{selectedQualificationObject.climateSystem}</p>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              {(selectedQualificationObject.type === 'холодильник' || selectedQualificationObject.type === 'морозильник') && (
+                <>
+                  {selectedQualificationObject.inventoryNumber && (
+                    <div>
+                      <span className="font-medium text-gray-800">Инвентарный номер:</span>
+                      <p className="text-gray-700">{selectedQualificationObject.inventoryNumber}</p>
+                    </div>
+                  )}
+                  {selectedQualificationObject.serialNumber && (
+                    <div>
+                      <span className="font-medium text-gray-800">Серийный номер:</span>
+                      <p className="text-gray-700">{selectedQualificationObject.serialNumber}</p>
+                    </div>
+                  )}
                 </>
               )}
             </div>
+            
+            {/* План объекта */}
+            {(selectedQualificationObject.planFileUrl || selectedQualificationObject.planFileName) && (
+              <div className="mt-4">
+                <span className="font-medium text-gray-800 block mb-2">План объекта:</span>
+                <div className="flex items-center space-x-2">
+                  {selectedQualificationObject.planFileUrl ? (
+                    <a
+                      href={selectedQualificationObject.planFileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline flex items-center space-x-1"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>{selectedQualificationObject.planFileName || 'Открыть файл'}</span>
+                    </a>
+                  ) : (
+                    <span className="text-gray-500">{selectedQualificationObject.planFileName || 'Файл не загружен'}</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Измерительное оборудование */}
