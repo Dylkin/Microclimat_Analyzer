@@ -1004,23 +1004,35 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleAddMarker = useCallback((timestamp: number) => {
-    // Определяем название маркера на основе количества существующих маркеров
-    // Нечётные по порядку (1, 3, 5, ...): "Начало испытания"
-    // Чётные по порядку (2, 4, 6, ...): "Завершение испытания"
-    const markerNumber = markers.length + 1;
-    const label = markerNumber % 2 === 1 
-      ? 'Начало испытания' 
-      : 'Завершение испытания';
-    
-    const newMarker: VerticalMarker = {
-      id: Date.now().toString(),
-      timestamp,
-      label,
-      color: '#000000', // Черный цвет для всех маркеров
-      type: 'test'
-    };
-    setMarkers(prev => [...prev, newMarker]);
-  }, [markers.length]);
+    // Для temperature_recovery создаем только маркеры типа "Открытие двери"
+    if (contractFields.testType === 'temperature_recovery') {
+      const newMarker: VerticalMarker = {
+        id: Date.now().toString(),
+        timestamp,
+        label: 'Открытие двери',
+        color: '#000000', // Черный цвет для всех маркеров
+        type: 'door_opening'
+      };
+      setMarkers(prev => [...prev, newMarker]);
+    } else {
+      // Для других типов испытаний определяем название маркера на основе количества существующих маркеров
+      // Нечётные по порядку (1, 3, 5, ...): "Начало испытания"
+      // Чётные по порядку (2, 4, 6, ...): "Завершение испытания"
+      const markerNumber = markers.length + 1;
+      const label = markerNumber % 2 === 1 
+        ? 'Начало испытания' 
+        : 'Завершение испытания';
+      
+      const newMarker: VerticalMarker = {
+        id: Date.now().toString(),
+        timestamp,
+        label,
+        color: '#000000', // Черный цвет для всех маркеров
+        type: 'test'
+      };
+      setMarkers(prev => [...prev, newMarker]);
+    }
+  }, [markers.length, contractFields.testType]);
 
   const handleUpdateMarker = (id: string, label: string) => {
     setMarkers(prev => prev.map(m => m.id === id ? { ...m, label } : m));
@@ -1956,14 +1968,32 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                             autoFocus
                             title="Тип маркера"
                             aria-label="Тип маркера"
+                            disabled={contractFields.testType === 'temperature_recovery'}
                           >
-                            <option value="test">Испытание</option>
-                            <option value="door_opening">Открытие двери</option>
+                            {contractFields.testType === 'temperature_recovery' ? (
+                              <option value="door_opening">Открытие двери</option>
+                            ) : (
+                              <>
+                                <option value="test">Испытание</option>
+                                <option value="door_opening">Открытие двери</option>
+                              </>
+                            )}
                           </select>
                         ) : (
                           <span 
-                            className="text-xs px-2 py-1 bg-white border border-gray-200 rounded cursor-pointer hover:bg-gray-50"
-                            onClick={() => setEditingMarkerType(marker.id)}
+                            className={`text-xs px-2 py-1 bg-white border border-gray-200 rounded ${
+                              contractFields.testType === 'temperature_recovery' 
+                                ? 'cursor-default' 
+                                : 'cursor-pointer hover:bg-gray-50'
+                            }`}
+                            onClick={() => {
+                              if (contractFields.testType !== 'temperature_recovery') {
+                                setEditingMarkerType(marker.id);
+                              }
+                            }}
+                            title={contractFields.testType === 'temperature_recovery' 
+                              ? 'Для типа испытания "Испытание на восстановление температуры после открытия двери" доступны только маркеры типа "Открытие двери"' 
+                              : 'Нажмите для изменения типа маркера'}
                           >
                             {getMarkerTypeLabel(marker.type)}
                           </span>
