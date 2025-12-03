@@ -1236,7 +1236,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           return dateStr;
         })(),
         reportNo: '',
-        reportDate: ''
+        reportDate: '',
+        registrationNumber: qualificationObject?.registrationNumber || ''
       };
       
       // Отладочная информация для {Table}

@@ -15,6 +15,7 @@ export interface TemplateReportData {
   testDate?: string;
   reportNo?: string;
   reportDate?: string;
+  registrationNumber?: string;
 }
 
 export class DocxTemplateProcessor {
@@ -1146,6 +1147,15 @@ export class DocxTemplateProcessor {
       result = result.replace(/{date}/g, '');
     }
     
+    // Обработка плейсхолдера {RegistrationNumber} для регистрационного номера автомобиля
+    if (data.registrationNumber) {
+      console.log('Replacing {RegistrationNumber} with:', data.registrationNumber);
+      result = result.replace(/{RegistrationNumber}/g, this.escapeXml(data.registrationNumber));
+    } else {
+      console.log('registrationNumber is empty or undefined:', data.registrationNumber, 'replacing {RegistrationNumber} with empty string');
+      result = result.replace(/{RegistrationNumber}/g, '');
+    }
+    
     // Исправляем неправильные плейсхолдеры с двойными скобками перед обработкой
     result = result.replace(/\{\{Table\}\}/g, '{Table}');
     result = result.replace(/\{\{Table\}/g, '{Table}');
@@ -1192,7 +1202,7 @@ export class DocxTemplateProcessor {
     
     // 2. Исправляем плейсхолдеры, разбитые XML тегами
     const placeholders = [
-      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'Table', 'Limits', 'Executor', 'TestDate', 'ReportNo', 'ReportDate', 'title', 'date'
+      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'Table', 'Limits', 'Executor', 'TestDate', 'ReportNo', 'ReportDate', 'title', 'date', 'RegistrationNumber'
     ];
     
     placeholders.forEach(placeholder => {
