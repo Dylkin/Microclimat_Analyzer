@@ -714,7 +714,11 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                             {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
                           </div>
                           {project.description && (
-                            <div className="text-xs text-gray-500 mt-1">{project.description}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {project.description.length > 35 
+                                ? `${project.description.substring(0, 35)}...` 
+                                : project.description}
+                            </div>
                           )}
                         </div>
                       )}
