@@ -224,6 +224,7 @@ export class XLSParser {
     idColumn: number;
     timestampColumn: number;
     temperatureColumn: number;
+    humidityColumn?: number; // Добавить опциональную колонку влажности
     deviceInfo?: {
       deviceName?: string;
       startTime?: string;
@@ -248,12 +249,20 @@ export class XLSParser {
       const temperatureIndex = row.findIndex(cell => 
         cell && String(cell).toLowerCase().includes('температура')
       );
+      
+      // Ищем колонку с влажностью (опционально)
+      const humidityIndex = row.findIndex(cell => 
+        cell && (String(cell).toLowerCase().includes('влажность') || 
+                 String(cell).toLowerCase().includes('humidity') ||
+                 String(cell).toLowerCase().includes('rh'))
+      );
 
       if (idIndex !== -1 && timestampIndex !== -1 && temperatureIndex !== -1) {
         console.log('XLSParser: Найдены заголовки в строке', rowIndex + 1, {
           id: idIndex,
           timestamp: timestampIndex,
-          temperature: temperatureIndex
+          temperature: temperatureIndex,
+          humidity: humidityIndex !== -1 ? humidityIndex : undefined
         });
 
         // Извлекаем информацию об устройстве из верхних строк
@@ -265,6 +274,7 @@ export class XLSParser {
           idColumn: idIndex,
           timestampColumn: timestampIndex,
           temperatureColumn: temperatureIndex,
+          humidityColumn: humidityIndex !== -1 ? humidityIndex : undefined, // Добавить колонку влажности
           deviceInfo
         };
       }
@@ -400,17 +410,30 @@ export class XLSParser {
         throw new Error('Не удалось извлечь значение температуры');
       }
 
+      // Получаем влажность (если есть)
+      let humidity: number | undefined;
+      if (structure.humidityColumn !== undefined && structure.humidityColumn !== null) {
+        const humidityValue = row[structure.humidityColumn];
+        if (humidityValue !== null && humidityValue !== undefined && humidityValue !== '') {
+          humidity = this.parseNumber(humidityValue) || undefined;
+        }
+      }
+
       // Валидация данных
       const validationErrors: string[] = [];
       
       if (temperature < -50 || temperature > 100) {
         validationErrors.push(`Температура вне допустимого диапазона: ${temperature}°C`);
       }
+      
+      if (humidity !== undefined && (humidity < 0 || humidity > 100)) {
+        validationErrors.push(`Влажность вне допустимого диапазона: ${humidity}%`);
+      }
 
       return {
         timestamp,
         temperature,
-        humidity: undefined, // В данной структуре влажность не предусмотрена
+        humidity, // Использовать реальное значение влажности вместо undefined
         isValid: validationErrors.length === 0,
         validationErrors: validationErrors.length > 0 ? validationErrors : undefined
       };
