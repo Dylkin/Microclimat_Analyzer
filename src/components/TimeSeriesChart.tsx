@@ -399,6 +399,76 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               </text>
             </g>
           ))}
+          
+          {/* Отображение лимитов на оси Y */}
+          {limits && limits[dataType] && (
+            <>
+              {limits[dataType]!.min !== undefined && (() => {
+                const minLimit = limits[dataType]!.min!;
+                const yPos = yScale(minLimit);
+                // Проверяем, не совпадает ли лимит с существующим тиком (с небольшой погрешностью)
+                const isNearTick = yScale.ticks(5).some(tick => Math.abs(yScale(tick) - yPos) < 2);
+                
+                return (
+                  <g key={`limit-min-${minLimit}`}>
+                    <text
+                      x={-10}
+                      y={yPos}
+                      dy="0.35em"
+                      textAnchor="end"
+                      fontSize="12"
+                      fill="#ef4444"
+                      fontWeight="bold"
+                    >
+                      {formatValue(minLimit)}
+                    </text>
+                    {!isNearTick && (
+                      <line
+                        x1={-5}
+                        y1={yPos}
+                        x2={0}
+                        y2={yPos}
+                        stroke="#ef4444"
+                        strokeWidth={2}
+                      />
+                    )}
+                  </g>
+                );
+              })()}
+              {limits[dataType]!.max !== undefined && (() => {
+                const maxLimit = limits[dataType]!.max!;
+                const yPos = yScale(maxLimit);
+                // Проверяем, не совпадает ли лимит с существующим тиком (с небольшой погрешностью)
+                const isNearTick = yScale.ticks(5).some(tick => Math.abs(yScale(tick) - yPos) < 2);
+                
+                return (
+                  <g key={`limit-max-${maxLimit}`}>
+                    <text
+                      x={-10}
+                      y={yPos}
+                      dy="0.35em"
+                      textAnchor="end"
+                      fontSize="12"
+                      fill="#ef4444"
+                      fontWeight="bold"
+                    >
+                      {formatValue(maxLimit)}
+                    </text>
+                    {!isNearTick && (
+                      <line
+                        x1={-5}
+                        y1={yPos}
+                        x2={0}
+                        y2={yPos}
+                        stroke="#ef4444"
+                        strokeWidth={2}
+                      />
+                    )}
+                  </g>
+                );
+              })()}
+            </>
+          )}
 
           {/* Вертикальные линии сетки */}
           {(() => {
