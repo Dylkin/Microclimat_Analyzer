@@ -49,7 +49,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   // UI state
   const [showSettings, setShowSettings] = useState(false);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
-  const [editingMarkerType, setEditingMarkerType] = useState<string | null>(null);
   const [editingMarkerTimestamp, setEditingMarkerTimestamp] = useState<string | null>(null);
   const [conclusions, setConclusions] = useState('');
   const [showAnalysisResults, setShowAnalysisResults] = useState(false);
@@ -920,14 +919,33 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   ): string => {
     if (!minLimit || !maxLimit || !data) return '-';
     
-    // Фильтруем точки после маркера включения
-    const pointsAfterMarker = points
-      .filter(p => p.timestamp >= markerTimestamp && p.temperature !== undefined)
+    // Фильтруем точки после маркера включения и в пределах zoomState (если есть)
+    let pointsAfterMarker = points
+      .filter(p => 
+        p.timestamp >= markerTimestamp && 
+        p.temperature !== undefined &&
+        (!zoomState || (p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime))
+      )
       .sort((a, b) => a.timestamp - b.timestamp);
     
     if (pointsAfterMarker.length === 0) return '-';
     
-    // Находим первую точку, где температура входит в диапазон
+    // Проверяем, выходила ли температура за пределы лимитов
+    let hasExceededLimits = false;
+    for (let i = 0; i < pointsAfterMarker.length; i++) {
+      const temp = pointsAfterMarker[i].temperature!;
+      if (temp < minLimit || temp > maxLimit) {
+        hasExceededLimits = true;
+        break;
+      }
+    }
+    
+    // Если температура не выходила за пределы, возвращаем "за пределы не выходила"
+    if (!hasExceededLimits) {
+      return 'за пределы не выходила';
+    }
+    
+    // Находим первую точку, где температура входит в диапазон (возвращается к лимитам)
     for (let i = 0; i < pointsAfterMarker.length; i++) {
       const temp = pointsAfterMarker[i].temperature!;
       if (temp >= minLimit && temp <= maxLimit) {
@@ -936,7 +954,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
     }
     
-    return '-'; // Температура не восстановилась
+    // Если температура выходила за пределы, но не вернулась в диапазон в выделенном периоде
+    return '-';
   };
 
   // Функция для вычисления времени восстановления после открытия двери (temperature_recovery)
@@ -1177,7 +1196,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
       return m;
     }));
-    setEditingMarkerType(null);
   };
 
   const handleUpdateMarkerTimestamp = (id: string, newTimestamp: number) => {
@@ -1389,7 +1407,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         registrationNumber: qualificationObject?.registrationNumber || '',
         points: data?.points || [], // Передаем точки данных для вычисления дополнительных значений
         markers: markers || [], // Передаем маркеры для вычисления дополнительных значений
-        acceptanceCriterion: contractFields.acceptanceCriterion || '' // Передаем критерий приемлемости
+        acceptanceCriterion: contractFields.acceptanceCriterion || '', // Передаем критерий приемлемости
+        zoomState: zoomState || undefined // Передаем выделенный диапазон данных (если есть)
       };
       
       // Отладочная информация для {Table}
@@ -1506,10 +1525,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportFilename: reportFilename
       }));
       
+      // ВАЖНО: Очищаем existingReport после успешного формирования
+      // Это гарантирует, что следующее формирование создаст новый отчет,
+      // а не будет добавлять данные в старый
+      processor.clearExistingReport();
+      console.log('Existing report cleared after successful generation');
+      
     } catch (error) {
       console.error('Ошибка генерации отчета по шаблону:', error);
       alert(`Ошибка при формировании отчета по шаблону: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       setReportStatus(prev => ({ ...prev, isGenerating: false }));
+      // Очищаем existingReport даже при ошибке
+      processor.clearExistingReport();
     }
   };
 
@@ -1668,7 +1695,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const doorMarkers = markers.filter(m => m.type === 'door_opening');
       
       // Исключаем внешние датчики
-      const nonExternalResults = analysisResults.filter(result => !result.isExternal);
+      const nonExternalResults = analysisResults.filter(result => {
+        const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
+        return !isExternal;
+      });
       
       if (nonExternalResults.length === 0) {
         setConclusions('Недостаточно данных для формирования выводов.');
@@ -1732,6 +1762,226 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         const maxTimeMeetsCriterion = maxTimeLogger.meetsCriterion === 'Да' ? 'соответствует' : 'не соответствует';
         
         conclusionText = `<b>За время проведения испытания температура за контролируемые пределы</b> выходила, <b>максимальное время выхода зафиксировано логгером</b> ${maxTimeLogger.loggerName} <b>и составило</b> ${maxTimeText}, <b>что</b> ${maxTimeMeetsCriterion} <b>установленному критерию приемлемости</b> (<b>${acceptanceCriterion}</b> мин.). <b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
+      }
+
+      setConclusions(conclusionText);
+      return;
+    }
+
+    // Специальная логика для типа испытания "Испытание на сбой электропитания (включение)"
+    if (contractFields.testType === 'power_on') {
+      if (!data || !limits.temperature || !limits.temperature.min || !limits.temperature.max) {
+        setConclusions('Недостаточно данных для формирования выводов.');
+        return;
+      }
+
+      const testMarker = getTestMarker();
+      if (!testMarker) {
+        setConclusions('Не найден маркер времени включения электропитания.');
+        return;
+      }
+
+      // Исключаем внешние датчики
+      const nonExternalResults = analysisResults.filter(result => {
+        const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
+        return !isExternal;
+      });
+      
+      if (nonExternalResults.length === 0) {
+        setConclusions('Недостаточно данных для формирования выводов.');
+        return;
+      }
+
+      // Для каждого логгера вычисляем время восстановления
+      const loggerRecoveryData = nonExternalResults.map(result => {
+        const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
+        const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
+        
+        // Фильтруем точки по зоне и уровню, учитывая выделенный диапазон (zoomState)
+        let filePoints = data.points.filter(p => {
+          const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+          const pLevel = p.measurementLevel?.toString() || 'unknown';
+          return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+        });
+        
+        // Если есть выделенный диапазон (zoomState), используем только эти данные
+        if (zoomState) {
+          filePoints = filePoints.filter(p => 
+            p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
+          );
+        }
+        
+        const recoveryTime = calculateRecoveryTimeAfterPowerOn(
+          filePoints,
+          testMarker.timestamp,
+          limits.temperature.min,
+          limits.temperature.max
+        );
+        
+        // Преобразуем время в миллисекунды для сравнения
+        let timeInMilliseconds = 0;
+        if (recoveryTime !== '-' && recoveryTime !== 'за пределы не выходила') {
+          // Формат: "n:nn" (часы:минуты) или "n часов nn минут"
+          if (recoveryTime.includes(':')) {
+            const parts = recoveryTime.split(':');
+            if (parts.length === 2) {
+              const hours = parseInt(parts[0]) || 0;
+              const minutes = parseInt(parts[1]) || 0;
+              timeInMilliseconds = (hours * 60 + minutes) * 60 * 1000;
+            }
+          } else {
+            // Парсим формат "n часов nn минут"
+            const hoursMatch = recoveryTime.match(/(\d+)\s*час/);
+            const minutesMatch = recoveryTime.match(/(\d+)\s*минут/);
+            const hours = hoursMatch ? parseInt(hoursMatch[1]) : 0;
+            const minutes = minutesMatch ? parseInt(minutesMatch[1]) : 0;
+            timeInMilliseconds = (hours * 60 + minutes) * 60 * 1000;
+          }
+        }
+        
+        return {
+          recoveryTime,
+          timeInMilliseconds,
+          isOutOfRange: recoveryTime === 'за пределы не выходила'
+        };
+      });
+
+      // Проверяем, все ли значения не выходили за пределы
+      const allWithinLimits = loggerRecoveryData.every(logger => logger.isOutOfRange);
+      
+      let conclusionText = '';
+      
+      if (allWithinLimits) {
+        // Все значения не выходили за пределы
+        conclusionText = 'За время проведения испытания температура не выходила за допустимые пределы.';
+      } else {
+        // Находим максимальное время восстановления (исключая "за пределы не выходила")
+        const validTimes = loggerRecoveryData.filter(logger => !logger.isOutOfRange && logger.timeInMilliseconds > 0);
+        
+        if (validTimes.length === 0) {
+          conclusionText = 'За время проведения испытания температура не выходила за допустимые пределы.';
+        } else {
+          const maxTimeLogger = validTimes.reduce((max, current) => {
+            return current.timeInMilliseconds > max.timeInMilliseconds ? current : max;
+          });
+          
+          // Форматируем время для вывода
+          const maxTimeText = formatTimeDuration(maxTimeLogger.timeInMilliseconds);
+          conclusionText = `Время восстановления температуры при включении электропитания составляет <b>${maxTimeText}</b>.`;
+        }
+      }
+
+      setConclusions(conclusionText);
+      return;
+    }
+
+    // Специальная логика для типа испытания "Испытание на сбой электропитания (отключение)"
+    if (contractFields.testType === 'power_off') {
+      if (!data || !limits.temperature || !limits.temperature.min || !limits.temperature.max) {
+        setConclusions('Недостаточно данных для формирования выводов.');
+        return;
+      }
+
+      const testMarker = getTestMarker();
+      if (!testMarker) {
+        setConclusions('Не найден маркер времени отключения электропитания.');
+        return;
+      }
+
+      // Исключаем внешние датчики
+      const nonExternalResults = analysisResults.filter(result => {
+        const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
+        return !isExternal;
+      });
+      
+      if (nonExternalResults.length === 0) {
+        setConclusions('Недостаточно данных для формирования выводов.');
+        return;
+      }
+
+      // Для каждого логгера вычисляем время нахождения в диапазоне
+      const loggerTimeData = nonExternalResults.map(result => {
+        const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
+        const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
+        
+        // Фильтруем точки по зоне и уровню, учитывая выделенный диапазон (zoomState)
+        let filePoints = data.points.filter(p => {
+          const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+          const pLevel = p.measurementLevel?.toString() || 'unknown';
+          return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+        });
+        
+        // Если есть выделенный диапазон (zoomState), используем только эти данные
+        if (zoomState) {
+          filePoints = filePoints.filter(p => 
+            p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
+          );
+        }
+        
+        const timeInRange = calculateTimeInRangeAfterPowerOff(
+          filePoints,
+          testMarker.timestamp,
+          limits.temperature.min,
+          limits.temperature.max
+        );
+        
+        // Преобразуем время в минуты для сравнения
+        let timeInMinutes = 0;
+        if (timeInRange !== '-' && timeInRange !== 'за пределы не выходила') {
+          // Формат: "n:nn" (часы:минуты)
+          const parts = timeInRange.split(':');
+          if (parts.length === 2) {
+            const hours = parseInt(parts[0]) || 0;
+            const minutes = parseInt(parts[1]) || 0;
+            timeInMinutes = hours * 60 + minutes;
+          }
+        }
+        
+        return {
+          timeInRange,
+          timeInMinutes,
+          isOutOfRange: timeInRange === 'за пределы не выходила'
+        };
+      });
+
+      // Проверяем, все ли значения не выходили за пределы
+      const allOutOfRange = loggerTimeData.every(logger => logger.isOutOfRange);
+      
+      let conclusionText = '';
+      
+      if (allOutOfRange) {
+        // Все значения не выходили за пределы
+        conclusionText = 'За время проведения испытания температура не выходила за допустимые пределы.';
+      } else {
+        // Находим минимальное время (исключая "за пределы не выходила")
+        const validTimes = loggerTimeData.filter(logger => !logger.isOutOfRange && logger.timeInMinutes > 0);
+        
+        if (validTimes.length === 0) {
+          conclusionText = 'За время проведения испытания температура не выходила за допустимые пределы.';
+        } else {
+          const minTimeLogger = validTimes.reduce((min, current) => {
+            return current.timeInMinutes < min.timeInMinutes ? current : min;
+          });
+          
+          // Преобразуем минуты в часы и минуты для вывода
+          const hours = Math.floor(minTimeLogger.timeInMinutes / 60);
+          const minutes = minTimeLogger.timeInMinutes % 60;
+          
+          let timeText = '';
+          if (hours > 0 && minutes > 0) {
+            const hoursText = hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов';
+            const minutesText = minutes === 1 ? 'минута' : minutes < 5 ? 'минуты' : 'минут';
+            timeText = `${hours} ${hoursText} ${minutes} ${minutesText}`;
+          } else if (hours > 0) {
+            const hoursText = hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов';
+            timeText = `${hours} ${hoursText}`;
+          } else {
+            const minutesText = minutes === 1 ? 'минута' : minutes < 5 ? 'минуты' : 'минут';
+            timeText = `${minutes} ${minutesText}`;
+          }
+          
+          conclusionText = `Минимальное время поддержания температуры при отключении электропитания составляет <b>${timeText}</b>.`;
+        }
       }
 
       setConclusions(conclusionText);
@@ -2256,50 +2506,46 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                       
                       <div className="flex items-center space-x-2">
                         <span className="text-xs text-gray-500">Тип:</span>
-                        {editingMarkerType === marker.id ? (
-                          <select
-                            value={marker.type}
-                            onChange={(e) => handleUpdateMarkerType(marker.id, e.target.value as MarkerType)}
-                            onBlur={() => setEditingMarkerType(null)}
-                            className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            autoFocus
-                            title="Тип маркера"
-                            aria-label="Тип маркера"
-                            disabled={contractFields.testType === 'temperature_recovery' || contractFields.testType === 'power_off' || contractFields.testType === 'power_on'}
-                          >
-                            {contractFields.testType === 'temperature_recovery' ? (
-                              <option value="door_opening">Открытие двери</option>
-                            ) : contractFields.testType === 'power_off' || contractFields.testType === 'power_on' ? (
-                              <option value="power">Электропитание</option>
-                            ) : (
-                              <>
-                                <option value="test">Испытание</option>
-                                <option value="door_opening">Открытие двери</option>
-                              </>
-                            )}
-                          </select>
-                        ) : (
+                        {contractFields.testType === 'temperature_recovery' || contractFields.testType === 'power_off' || contractFields.testType === 'power_on' ? (
+                          // Для фиксированных типов просто показываем текст
                           <span 
-                            className={`text-xs px-2 py-1 bg-white border border-gray-200 rounded ${
-                              contractFields.testType === 'temperature_recovery' || contractFields.testType === 'power_off' || contractFields.testType === 'power_on'
-                                ? 'cursor-default' 
-                                : 'cursor-pointer hover:bg-gray-50'
-                            }`}
-                            onClick={() => {
-                              if (contractFields.testType !== 'temperature_recovery' && contractFields.testType !== 'power_off' && contractFields.testType !== 'power_on') {
-                                setEditingMarkerType(marker.id);
-                              }
-                            }}
+                            className="text-xs px-2 py-1 bg-white border border-gray-200 rounded cursor-default"
                             title={contractFields.testType === 'temperature_recovery' 
                               ? 'Для типа испытания "Испытание на восстановление температуры после открытия двери" доступны только маркеры типа "Открытие двери"'
                               : contractFields.testType === 'power_off'
                               ? 'Для типа испытания "Испытание на сбой электропитания (отключение)" доступны только маркеры типа "Электропитание" с наименованием "Отключение"'
-                              : contractFields.testType === 'power_on'
-                              ? 'Для типа испытания "Испытание на сбой электропитания (включение)" доступны только маркеры типа "Электропитание" с наименованием "Включение"' 
-                              : 'Нажмите для изменения типа маркера'}
+                              : 'Для типа испытания "Испытание на сбой электропитания (включение)" доступны только маркеры типа "Электропитание" с наименованием "Включение"'}
                           >
                             {getMarkerTypeLabel(marker.type)}
                           </span>
+                        ) : (
+                          // Для типов с выбором используем переключатель
+                          <div className="flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'test')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'test'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Испытание"
+                            >
+                              Испытание
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'door_opening')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'door_opening'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Открытие двери"
+                            >
+                              Открытие двери
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -2367,12 +2613,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Результаты анализа и Выводы</h3>
-          <button
-            onClick={handleAutoFillConclusions}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
-          >
-            Заполнить
-          </button>
+          {contractFields.testType && (
+            <button
+              onClick={handleAutoFillConclusions}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+            >
+              Заполнить
+            </button>
+          )}
         </div>
         
         {showAnalysisResults ? (
@@ -2525,22 +2773,34 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {analysisResults.map((result, index) => {
+                  const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
                   const testMarker = getTestMarker();
                   const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(result.zoneNumber.toString()) || 0);
-                  const filePoints = data?.points.filter(p => {
-                    const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
-                    const pLevel = p.measurementLevel?.toString() || 'unknown';
-                    return `${pZone}_${pLevel}` === `${zoneNumber}_${result.measurementLevel.toString()}`;
-                  }) || [];
                   
-                  const timeInRange = testMarker && limits.temperature
-                    ? calculateTimeInRangeAfterPowerOff(
-                        filePoints,
-                        testMarker.timestamp,
-                        limits.temperature.min,
-                        limits.temperature.max
-                      )
-                    : '-';
+                  // Для внешних датчиков не рассчитываем время
+                  let timeInRange = '-';
+                  if (!isExternal && testMarker && limits.temperature) {
+                    // Фильтруем точки по зоне и уровню, учитывая выделенный диапазон (zoomState)
+                    let filePoints = data?.points.filter(p => {
+                      const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+                      const pLevel = p.measurementLevel?.toString() || 'unknown';
+                      return `${pZone}_${pLevel}` === `${zoneNumber}_${result.measurementLevel.toString()}`;
+                    }) || [];
+                    
+                    // Если есть выделенный диапазон (zoomState), используем только эти данные
+                    if (zoomState) {
+                      filePoints = filePoints.filter(p => 
+                        p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
+                      );
+                    }
+                    
+                    timeInRange = calculateTimeInRangeAfterPowerOff(
+                      filePoints,
+                      testMarker.timestamp,
+                      limits.temperature.min,
+                      limits.temperature.max
+                    );
+                  }
                   
                   return (
                     <tr key={index} className="hover:bg-gray-50">
@@ -2594,23 +2854,35 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {analysisResults.map((result, index) => {
+                  const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
                   const testMarker = getTestMarker();
                   const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
                   const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
-                  const filePoints = data?.points.filter(p => {
-                    const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
-                    const pLevel = p.measurementLevel?.toString() || 'unknown';
-                    return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
-                  }) || [];
                   
-                  const recoveryTime = testMarker && limits.temperature
-                    ? calculateRecoveryTimeAfterPowerOn(
-                        filePoints,
-                        testMarker.timestamp,
-                        limits.temperature.min,
-                        limits.temperature.max
-                      )
-                    : '-';
+                  // Для внешних датчиков не рассчитываем время
+                  let recoveryTime = '-';
+                  if (!isExternal && testMarker && limits.temperature) {
+                    // Фильтруем точки по зоне и уровню, учитывая выделенный диапазон (zoomState)
+                    let filePoints = data?.points.filter(p => {
+                      const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+                      const pLevel = p.measurementLevel?.toString() || 'unknown';
+                      return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+                    }) || [];
+                    
+                    // Если есть выделенный диапазон (zoomState), используем только эти данные
+                    if (zoomState) {
+                      filePoints = filePoints.filter(p => 
+                        p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
+                      );
+                    }
+                    
+                    recoveryTime = calculateRecoveryTimeAfterPowerOn(
+                      filePoints,
+                      testMarker.timestamp,
+                      limits.temperature.min,
+                      limits.temperature.max
+                    );
+                  }
                   
                   return (
                     <tr key={index} className="hover:bg-gray-50">
@@ -2667,25 +2939,30 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {analysisResults.map((result, index) => {
+                  const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
                   const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
                   const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
-                  const filePoints = data?.points.filter(p => {
-                    const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
-                    const pLevel = p.measurementLevel?.toString() || 'unknown';
-                    return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
-                  }) || [];
                   
-                  // Получаем все маркеры типа "Открытие двери"
-                  const doorMarkers = markers.filter(m => m.type === 'door_opening');
+                  // Для внешних датчиков не рассчитываем время и соответствие критерию
+                  let recoveryData = { time: '-', meetsCriterion: '-' };
                   
-                  const recoveryData = limits.temperature
-                    ? calculateRecoveryTimeAfterDoorOpening(
-                        filePoints,
-                        doorMarkers,
-                        limits.temperature.min,
-                        limits.temperature.max
-                      )
-                    : { time: '-', meetsCriterion: '-' };
+                  if (!isExternal && limits.temperature) {
+                    const filePoints = data?.points.filter(p => {
+                      const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+                      const pLevel = p.measurementLevel?.toString() || 'unknown';
+                      return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+                    }) || [];
+                    
+                    // Получаем все маркеры типа "Открытие двери"
+                    const doorMarkers = markers.filter(m => m.type === 'door_opening');
+                    
+                    recoveryData = calculateRecoveryTimeAfterDoorOpening(
+                      filePoints,
+                      doorMarkers,
+                      limits.temperature.min,
+                      limits.temperature.max
+                    );
+                  }
                   
                   return (
                     <tr key={index} className="hover:bg-gray-50">

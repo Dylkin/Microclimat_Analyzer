@@ -345,7 +345,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                     style={{ backgroundColor: displayColor }}
                     title={`Цвет для ${displayName}`}
                   ></div>
-                  <span>{displayName}{isExternal ? ' (Внешний)' : ''}</span>
+                  <span>{displayName}</span>
                 </span>
               );
             })}

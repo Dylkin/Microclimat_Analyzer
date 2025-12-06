@@ -20,6 +20,7 @@ export interface TemplateReportData {
   points?: any[]; // Точки данных для вычисления дополнительных значений
   markers?: any[]; // Маркеры для вычисления дополнительных значений
   acceptanceCriterion?: string; // Критерий приемлемости для temperature_recovery
+  zoomState?: { startTime: number; endTime: number; scale: number }; // Выделенный диапазон данных на графике
 }
 
 export class DocxTemplateProcessor {
@@ -435,7 +436,8 @@ export class DocxTemplateProcessor {
       zip.file('word/document.xml', updatedDocumentXml);
 
       // Обрабатываем другие плейсхолдеры
-      const finalDocumentXml = this.processTextPlaceholders(updatedDocumentXml, data);
+      // Для нового отчета заменяем все плейсхолдеры {Table}
+      const finalDocumentXml = this.processTextPlaceholders(updatedDocumentXml, data, true);
       zip.file('word/document.xml', finalDocumentXml);
 
       // Обрабатываем плейсхолдеры в колонтитулах
@@ -800,20 +802,28 @@ export class DocxTemplateProcessor {
       // Читаем содержимое шаблона для получения структуры новых данных (с поддержкой несжатых файлов)
       const templateDocumentXml = await this.safeReadDocumentXml(templateZip);
       
-      // Обрабатываем шаблон с новыми данными
+      // ВАЖНО: Обрабатываем ТОЛЬКО шаблон с новыми данными, не затрагивая существующий документ
+      // Сначала заменяем плейсхолдер графика в шаблоне
       let processedTemplateXml = this.replaceChartPlaceholder(templateDocumentXml, newRelationshipId);
-      processedTemplateXml = this.processTextPlaceholders(processedTemplateXml, data);
+      
+      // Затем обрабатываем текстовые плейсхолдеры ТОЛЬКО в шаблоне
+      // Это гарантирует, что существующий контент не будет затронут
+      // Для добавления в существующий отчет заменяем только первый плейсхолдер {Table}
+      processedTemplateXml = this.processTextPlaceholders(processedTemplateXml, data, false);
       
       // Читаем существующий документ (с поддержкой несжатых файлов)
+      // ВАЖНО: НЕ обрабатываем существующий документ, только читаем его как есть
       const existingDocumentXml = await this.safeReadDocumentXml(existingZip);
       
-      // Добавляем новый контент в существующий документ
+      // Добавляем обработанный контент из шаблона в конец существующего документа
+      // Существующий контент остается нетронутым
       const updatedDocumentXml = this.appendContentToDocument(existingDocumentXml, processedTemplateXml);
       
       // Сохраняем обновленный документ
       existingZip.file('word/document.xml', updatedDocumentXml);
       
-      // Обрабатываем плейсхолдеры в колонтитулах
+      // Обрабатываем плейсхолдеры в колонтитулах ТОЛЬКО для новых данных
+      // (не затрагивая существующие колонтитулы, если они уже обработаны)
       await this.processHeaderFooterPlaceholders(existingZip, data);
       
       // Генерируем обновленный DOCX файл
@@ -1008,8 +1018,11 @@ export class DocxTemplateProcessor {
 
   /**
    * Обработка текстовых плейсхолдеров
+   * @param documentXml - XML документ
+   * @param data - данные для шаблона
+   * @param replaceAllTables - если true, заменяет все плейсхолдеры {Table}, иначе только первый (по умолчанию false)
    */
-  private processTextPlaceholders(documentXml: string, data: TemplateReportData): string {
+  private processTextPlaceholders(documentXml: string, data: TemplateReportData, replaceAllTables: boolean = false): string {
     console.log('Processing text placeholders, data.testType:', data.testType);
    console.log('Processing text placeholders, data.limits:', data.limits);
    console.log('Processing text placeholders, data.dataType:', data.dataType);
@@ -1171,7 +1184,8 @@ export class DocxTemplateProcessor {
     result = result.replace(/\{Table\}\}/g, '{Table}');
     
     // Обработка плейсхолдера {Table}
-    result = this.processTablePlaceholder(result, data);
+    // Для нового отчета заменяем все плейсхолдеры, для добавления в существующий - только первый
+    result = this.processTablePlaceholder(result, data, replaceAllTables);
     
     console.log('Final result after placeholder processing contains {NameTest}:', result.includes('{NameTest}'));
    console.log('Final result after placeholder processing contains {Limits}:', result.includes('{Limits}'));
@@ -1326,12 +1340,60 @@ export class DocxTemplateProcessor {
     
     // 3. Специальная обработка для Table
     // Ищем случаи, где Table может быть в XML тегах без фигурных скобок
+    // НО только если это не внутри уже существующей таблицы (w:tbl)
     const tableInXml = /<w:t[^>]*>Table<\/w:t>/gi;
-    result = result.replace(tableInXml, '<w:t>{Table}</w:t>');
+    // Заменяем только если это не внутри тега w:tbl
+    result = result.replace(tableInXml, (match, offset, string) => {
+      // Проверяем, не находимся ли мы внутри тега w:tbl
+      const beforeMatch = string.substring(0, offset);
+      const lastTblOpen = beforeMatch.lastIndexOf('<w:tbl');
+      const lastTblClose = beforeMatch.lastIndexOf('</w:tbl>');
+      
+      // Если последний открывающий тег w:tbl идет после последнего закрывающего, значит мы внутри таблицы
+      if (lastTblOpen > lastTblClose) {
+        return match; // Не заменяем, если внутри таблицы
+      }
+      
+      // Дополнительная проверка: не заменяем, если это часть уже обработанной таблицы
+      // Проверяем, есть ли после этого места закрывающий тег таблицы без открывающего
+      const afterMatch = string.substring(offset);
+      const nextTblClose = afterMatch.indexOf('</w:tbl>');
+      const nextTblOpen = afterMatch.indexOf('<w:tbl');
+      
+      // Если следующий закрывающий тег таблицы идет раньше следующего открывающего, значит мы внутри таблицы
+      if (nextTblClose !== -1 && (nextTblOpen === -1 || nextTblClose < nextTblOpen)) {
+        return match; // Не заменяем, если внутри таблицы
+      }
+      
+      return '<w:t>{Table}</w:t>';
+    });
     
     // Ищем случаи, где Table может быть просто "Table" без фигурных скобок
+    // НО только если это не внутри уже существующей таблицы
     const tableNoBrackets = /(?<!\{)Table(?!\})/gi;
-    result = result.replace(tableNoBrackets, '{Table}');
+    result = result.replace(tableNoBrackets, (match, offset, string) => {
+      // Проверяем, не находимся ли мы внутри тега w:tbl
+      const beforeMatch = string.substring(0, offset);
+      const lastTblOpen = beforeMatch.lastIndexOf('<w:tbl');
+      const lastTblClose = beforeMatch.lastIndexOf('</w:tbl>');
+      
+      // Если последний открывающий тег w:tbl идет после последнего закрывающего, значит мы внутри таблицы
+      if (lastTblOpen > lastTblClose) {
+        return match; // Не заменяем, если внутри таблицы
+      }
+      
+      // Дополнительная проверка: не заменяем, если это часть уже обработанной таблицы
+      const afterMatch = string.substring(offset);
+      const nextTblClose = afterMatch.indexOf('</w:tbl>');
+      const nextTblOpen = afterMatch.indexOf('<w:tbl');
+      
+      // Если следующий закрывающий тег таблицы идет раньше следующего открывающего, значит мы внутри таблицы
+      if (nextTblClose !== -1 && (nextTblOpen === -1 || nextTblClose < nextTblOpen)) {
+        return match; // Не заменяем, если внутри таблицы
+      }
+      
+      return '{Table}';
+    });
     
     // 4. Исправляем двойные скобки
     result = result.replace(/\{\{([^}]+)\}\}/g, '{$1}');
@@ -1347,11 +1409,15 @@ export class DocxTemplateProcessor {
 
   /**
    * Обработка плейсхолдера {Table} для вставки таблицы результатов анализа
+   * @param documentXml - XML документ
+   * @param data - данные для шаблона
+   * @param replaceAll - если true, заменяет все плейсхолдеры {Table}, иначе только первый (по умолчанию false)
    */
-  private processTablePlaceholder(documentXml: string, data: TemplateReportData): string {
+  private processTablePlaceholder(documentXml: string, data: TemplateReportData, replaceAll: boolean = false): string {
     console.log('Processing {Table} placeholder...');
     console.log('Document contains {Table}:', documentXml.includes('{Table}'));
     console.log('Analysis results count:', data.analysisResults?.length || 0);
+    console.log('Replace all placeholders:', replaceAll);
     
     // Диагностика: найдем все плейсхолдеры в документе
     const placeholderRegex = /\{[^}]+\}/g;
@@ -1401,13 +1467,17 @@ export class DocxTemplateProcessor {
       data.points || [],
       data.markers || [],
       data.limits,
-      data.acceptanceCriterion || ''
+      data.acceptanceCriterion || '',
+      data.zoomState
     );
     console.log('Generated table XML length:', tableXml.length);
     console.log('Table XML preview:', tableXml.substring(0, 200) + '...');
     
-    // Заменяем плейсхолдер на таблицу
-    const result = documentXml.replace(/{Table}/g, tableXml);
+    // Заменяем плейсхолдер(ы) {Table} на таблицу
+    // Для нового отчета заменяем все, для добавления в существующий - только первый
+    const result = replaceAll 
+      ? documentXml.replace(/{Table}/g, tableXml)
+      : documentXml.replace(/{Table}/, tableXml);
     console.log('{Table} placeholder replaced successfully');
     
     // Проверяем, что XML валиден
@@ -1438,6 +1508,7 @@ export class DocxTemplateProcessor {
    * @param markers - маркеры для вычисления дополнительных значений
    * @param limits - лимиты температуры/влажности
    * @param acceptanceCriterion - критерий приемлемости для temperature_recovery
+   * @param zoomState - выделенный диапазон данных на графике (если есть)
    */
   public createResultsTableXml(
     results: any[], 
@@ -1446,7 +1517,8 @@ export class DocxTemplateProcessor {
     points: any[] = [],
     markers: any[] = [],
     limits: any = {},
-    acceptanceCriterion: string = ''
+    acceptanceCriterion: string = '',
+    zoomState?: { startTime: number; endTime: number; scale: number }
   ): string {
     console.log('Creating results table XML...');
     console.log('Results count:', results?.length || 0);
@@ -1523,12 +1595,30 @@ export class DocxTemplateProcessor {
     ): string => {
       if (!minLimit || !maxLimit || !points || points.length === 0) return '-';
       
+      // Фильтруем точки после маркера включения
+      // Примечание: zoomState уже применен к points перед вызовом этой функции
       const pointsAfterMarker = points
         .filter((p: any) => p.timestamp >= markerTimestamp && p.temperature !== undefined)
         .sort((a: any, b: any) => a.timestamp - b.timestamp);
       
       if (pointsAfterMarker.length === 0) return '-';
       
+      // Проверяем, выходила ли температура за пределы лимитов
+      let hasExceededLimits = false;
+      for (let i = 0; i < pointsAfterMarker.length; i++) {
+        const temp = pointsAfterMarker[i].temperature!;
+        if (temp < minLimit || temp > maxLimit) {
+          hasExceededLimits = true;
+          break;
+        }
+      }
+      
+      // Если температура не выходила за пределы, возвращаем "за пределы не выходила"
+      if (!hasExceededLimits) {
+        return 'за пределы не выходила';
+      }
+      
+      // Находим первую точку, где температура входит в диапазон (возвращается к лимитам)
       for (let i = 0; i < pointsAfterMarker.length; i++) {
         const temp = pointsAfterMarker[i].temperature!;
         if (temp >= minLimit && temp <= maxLimit) {
@@ -1537,6 +1627,7 @@ export class DocxTemplateProcessor {
         }
       }
       
+      // Если температура выходила за пределы, но не вернулась в диапазон
       return '-';
     };
 
@@ -1632,12 +1723,13 @@ export class DocxTemplateProcessor {
     };
 
     // Создаем таблицу в зависимости от типа испытания
+    // zoomState уже передан как параметр функции
     if (testType === 'power_off') {
-      return this.createPowerOffTableXml(results, points, markers, limits, escapeXml, calculateTimeInRangeAfterPowerOff);
+      return this.createPowerOffTableXml(results, points, markers, limits, escapeXml, calculateTimeInRangeAfterPowerOff, zoomState);
     } else if (testType === 'power_on') {
-      return this.createPowerOnTableXml(results, points, markers, limits, escapeXml, calculateRecoveryTimeAfterPowerOn);
+      return this.createPowerOnTableXml(results, points, markers, limits, escapeXml, calculateRecoveryTimeAfterPowerOn, zoomState);
     } else if (testType === 'temperature_recovery') {
-      return this.createTemperatureRecoveryTableXml(results, points, markers, limits, acceptanceCriterion, escapeXml, (points, doorMarkers, minLimit, maxLimit) => calculateRecoveryTimeAfterDoorOpening(points, doorMarkers, minLimit, maxLimit, acceptanceCriterion));
+      return this.createTemperatureRecoveryTableXml(results, points, markers, limits, acceptanceCriterion, escapeXml, (points, doorMarkers, minLimit, maxLimit) => calculateRecoveryTimeAfterDoorOpening(points, doorMarkers, minLimit, maxLimit, acceptanceCriterion), zoomState);
     } else {
       // Стандартная таблица для empty_volume и loaded_volume
       return this.createStandardTableXml(results, dataType, escapeXml);
@@ -1980,7 +2072,8 @@ export class DocxTemplateProcessor {
     markers: any[],
     limits: any,
     escapeXml: (text: string) => string,
-    calculateTimeInRange: (points: any[], markerTimestamp: number, minLimit: number | undefined, maxLimit: number | undefined) => string
+    calculateTimeInRange: (points: any[], markerTimestamp: number, minLimit: number | undefined, maxLimit: number | undefined) => string,
+    zoomState?: { startTime: number; endTime: number; scale: number }
   ): string {
     // Находим маркер типа 'power' с наименованием 'Отключение'
     const testMarker = markers.find((m: any) => m.type === 'power' && m.label === 'Отключение');
@@ -1997,15 +2090,31 @@ export class DocxTemplateProcessor {
         <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Питание отключено. Время, в течение которого температура находится в требуемом диапазоне, (час: мин)</w:t></w:r></w:p></w:tc>
       </w:tr>`;
 
+    // Показываем все датчики, но для внешних не рассчитываем время
     const dataRows = results.map(result => {
+      const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
       const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(result.zoneNumber.toString()) || 0);
-      const filePoints = points.filter((p: any) => {
-        const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
-        const pLevel = p.measurementLevel?.toString() || 'unknown';
-        return `${pZone}_${pLevel}` === `${zoneNumber}_${result.measurementLevel.toString()}`;
-      });
       
-      const timeInRange = calculateTimeInRange(filePoints, testMarker.timestamp, limits.temperature.min, limits.temperature.max);
+      // Для внешних датчиков не рассчитываем время
+      let timeInRange = '-';
+      if (!isExternal) {
+        // Фильтруем точки по зоне и уровню
+        let filePoints = points.filter((p: any) => {
+          const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+          const pLevel = p.measurementLevel?.toString() || 'unknown';
+          return `${pZone}_${pLevel}` === `${zoneNumber}_${result.measurementLevel.toString()}`;
+        });
+        
+        // ВАЖНО: Если есть выделенный диапазон (zoomState), используем только эти данные
+        // Это гарантирует соответствие данных в отчете данным на странице
+        if (zoomState) {
+          filePoints = filePoints.filter((p: any) => 
+            p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
+          );
+        }
+        
+        timeInRange = calculateTimeInRange(filePoints, testMarker.timestamp, limits.temperature.min, limits.temperature.max);
+      }
       
       return `
         <w:tr>
@@ -2034,7 +2143,8 @@ export class DocxTemplateProcessor {
     markers: any[],
     limits: any,
     escapeXml: (text: string) => string,
-    calculateRecoveryTime: (points: any[], markerTimestamp: number, minLimit: number | undefined, maxLimit: number | undefined) => string
+    calculateRecoveryTime: (points: any[], markerTimestamp: number, minLimit: number | undefined, maxLimit: number | undefined) => string,
+    zoomState?: { startTime: number; endTime: number; scale: number }
   ): string {
     // Находим маркер типа 'power' с наименованием 'Включение'
     const testMarker = markers.find((m: any) => m.type === 'power' && m.label === 'Включение');
@@ -2051,16 +2161,31 @@ export class DocxTemplateProcessor {
         <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Питание включено. Время восстановления до требуемого диапазона температур, (час: мин)</w:t></w:r></w:p></w:tc>
       </w:tr>`;
 
+    // Показываем все датчики, но для внешних не рассчитываем время
     const dataRows = results.map(result => {
+      const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
       const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
       const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
-      const filePoints = points.filter((p: any) => {
-        const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
-        const pLevel = p.measurementLevel?.toString() || 'unknown';
-        return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
-      });
       
-      const recoveryTime = calculateRecoveryTime(filePoints, testMarker.timestamp, limits.temperature.min, limits.temperature.max);
+      // Для внешних датчиков не рассчитываем время
+      let recoveryTime = '-';
+      if (!isExternal) {
+        // Фильтруем точки по зоне и уровню
+        let filePoints = points.filter((p: any) => {
+          const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+          const pLevel = p.measurementLevel?.toString() || 'unknown';
+          return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+        });
+        
+        // ВАЖНО: Если есть выделенный диапазон (zoomState), используем только эти данные
+        if (zoomState) {
+          filePoints = filePoints.filter((p: any) => 
+            p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
+          );
+        }
+        
+        recoveryTime = calculateRecoveryTime(filePoints, testMarker.timestamp, limits.temperature.min, limits.temperature.max);
+      }
       
       return `
         <w:tr>
@@ -2090,7 +2215,8 @@ export class DocxTemplateProcessor {
     limits: any,
     acceptanceCriterion: string,
     escapeXml: (text: string) => string,
-    calculateRecoveryTime: (points: any[], doorMarkers: any[], minLimit: number | undefined, maxLimit: number | undefined) => { time: string; meetsCriterion: string }
+    calculateRecoveryTime: (points: any[], doorMarkers: any[], minLimit: number | undefined, maxLimit: number | undefined) => { time: string; meetsCriterion: string },
+    zoomState?: { startTime: number; endTime: number; scale: number }
   ): string {
     if (!limits.temperature) {
       return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
@@ -2109,16 +2235,32 @@ export class DocxTemplateProcessor {
       </w:tr>`;
 
     const dataRows = results.map(result => {
+      const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
       const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
       const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
-      const filePoints = points.filter((p: any) => {
-        const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
-        const pLevel = p.measurementLevel?.toString() || 'unknown';
-        return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
-      });
       
-      const recoveryData = calculateRecoveryTime(filePoints, doorMarkers, limits.temperature.min, limits.temperature.max);
-      const complianceColor = recoveryData.meetsCriterion === 'Да' ? 'C6EFCE' : recoveryData.meetsCriterion === 'Нет' ? 'FFC7CE' : 'FFFFFF';
+      // Для внешних датчиков не рассчитываем время и соответствие критерию
+      let recoveryData = { time: '-', meetsCriterion: '-' };
+      let complianceColor = 'FFFFFF';
+      
+      if (!isExternal) {
+        // Фильтруем точки по зоне и уровню
+        let filePoints = points.filter((p: any) => {
+          const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+          const pLevel = p.measurementLevel?.toString() || 'unknown';
+          return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+        });
+        
+        // ВАЖНО: Если есть выделенный диапазон (zoomState), используем только эти данные
+        if (zoomState) {
+          filePoints = filePoints.filter((p: any) => 
+            p.timestamp >= zoomState.startTime && p.timestamp <= zoomState.endTime
+          );
+        }
+        
+        recoveryData = calculateRecoveryTime(filePoints, doorMarkers, limits.temperature.min, limits.temperature.max);
+        complianceColor = recoveryData.meetsCriterion === 'Да' ? 'C6EFCE' : recoveryData.meetsCriterion === 'Нет' ? 'FFC7CE' : 'FFFFFF';
+      }
       
       return `
         <w:tr>
