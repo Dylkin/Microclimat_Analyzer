@@ -31,7 +31,7 @@ export interface ChartLimits {
   };
 }
 
-export type MarkerType = 'test' | 'door_opening';
+export type MarkerType = 'test' | 'door_opening' | 'power';
 
 export interface VerticalMarker {
   id: string;

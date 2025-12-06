@@ -28,11 +28,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     projectId 
   });
 
-  // Отладочная информация
-  console.log('TimeSeriesAnalyzer: props:', { files, qualificationObjectId, projectId });
-  console.log('TimeSeriesAnalyzer: data:', data);
-  console.log('TimeSeriesAnalyzer: loading:', loading);
-  console.log('TimeSeriesAnalyzer: error:', error);
+  // Отладочная информация (убрана для продакшена)
+  // console.log('TimeSeriesAnalyzer: props:', { files, qualificationObjectId, projectId });
+  // console.log('TimeSeriesAnalyzer: data:', data);
+  // console.log('TimeSeriesAnalyzer: loading:', loading);
+  // console.log('TimeSeriesAnalyzer: error:', error);
   
   // Chart settings
   const [dataType, setDataType] = useState<DataType>('temperature');
@@ -52,6 +52,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [editingMarkerType, setEditingMarkerType] = useState<string | null>(null);
   const [editingMarkerTimestamp, setEditingMarkerTimestamp] = useState<string | null>(null);
   const [conclusions, setConclusions] = useState('');
+  const [showAnalysisResults, setShowAnalysisResults] = useState(false);
   const [reportStatus, setReportStatus] = useState<{
     isGenerating: boolean;
     hasReport: boolean;
@@ -371,20 +372,22 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   // Generate analysis results table data
   const analysisResults = useMemo(() => {
-    console.log('TimeSeriesAnalyzer: analysisResults useMemo called', { 
-      hasData: !!data, 
-      pointsLength: data?.points?.length || 0,
-      filesLength: files.length,
-      qualificationObjectId,
-      projectId,
-      hasQualificationObject: !!qualificationObject,
-      measurementZonesCount: qualificationObject?.measurementZones?.length || 0,
-      testType: contractFields.testType,
-      markersCount: markers.length
-    });
+    // Отладочная информация (убрана для продакшена)
+    // console.log('TimeSeriesAnalyzer: analysisResults useMemo called', { 
+    //   hasData: !!data, 
+    //   pointsLength: data?.points?.length || 0,
+    //   filesLength: files.length,
+    //   qualificationObjectId,
+    //   projectId,
+    //   hasQualificationObject: !!qualificationObject,
+    //   measurementZonesCount: qualificationObject?.measurementZones?.length || 0,
+    //   testType: contractFields.testType,
+    //   markersCount: markers.length
+    // });
     
     if (!data || !data.points.length) {
-      console.log('TimeSeriesAnalyzer: No data or points, returning empty array');
+      // Отладочная информация (убрана для продакшена)
+      // console.log('TimeSeriesAnalyzer: No data or points, returning empty array');
       return [];
     }
 
@@ -401,16 +404,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Находим все маркеры типа "test"
       const testMarkers = markers.filter(m => m.type === 'test');
       
-      console.log('TimeSeriesAnalyzer: Processing test markers', {
-        testMarkersCount: testMarkers.length,
-        allMarkers: markers.map(m => ({ id: m.id, type: m.type, label: m.label, timestamp: m.timestamp }))
-      });
+      // Отладочная информация (убрана для продакшена)
+      // console.log('TimeSeriesAnalyzer: Processing test markers', {
+      //   testMarkersCount: testMarkers.length,
+      //   allMarkers: markers.map(m => ({ id: m.id, type: m.type, label: m.label, timestamp: m.timestamp }))
+      // });
       
       // Если маркеры типа 'test' не найдены или найден только один - используем все данные
       if (testMarkers.length === 0 || testMarkers.length === 1) {
-        console.log('TimeSeriesAnalyzer: No test markers or single marker, using all data', {
-          testMarkersCount: testMarkers.length
-        });
+        // Отладочная информация (убрана для продакшена)
+        // console.log('TimeSeriesAnalyzer: No test markers or single marker, using all data', {
+        //   testMarkersCount: testMarkers.length
+        // });
         // filteredPoints уже содержит все данные (с учетом зума)
       } else {
         // Находим все пары "Начало испытания" - "Завершение испытания"
@@ -426,11 +431,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           .filter(m => m.type === 'door_opening')
           .sort((a, b) => a.timestamp - b.timestamp);
         
-        console.log('TimeSeriesAnalyzer: Found marker pairs', {
-          startMarkersCount: startMarkers.length,
-          endMarkersCount: endMarkers.length,
-          doorMarkersCount: doorMarkers.length
-        });
+        // Отладочная информация (убрана для продакшена)
+        // console.log('TimeSeriesAnalyzer: Found marker pairs', {
+        //   startMarkersCount: startMarkers.length,
+        //   endMarkersCount: endMarkers.length,
+        //   doorMarkersCount: doorMarkers.length
+        // });
         
         if (startMarkers.length > 0 && endMarkers.length > 0) {
           // Формируем диапазоны из пар маркеров
@@ -506,7 +512,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
     // Если есть данные из базы данных (qualificationObjectId и projectId), используем их
     if (qualificationObjectId && projectId) {
-      console.log('TimeSeriesAnalyzer: Generating analysis results from database data');
+      // Отладочная информация (убрана для продакшена)
+      // console.log('TimeSeriesAnalyzer: Generating analysis results from database data');
       
       // Группируем точки по zone_number и measurement_level
       const groupedPoints = filteredPoints.reduce((acc, point) => {
@@ -518,7 +525,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         return acc;
       }, {} as Record<string, typeof filteredPoints>);
 
-      console.log('TimeSeriesAnalyzer: Grouped points:', Object.keys(groupedPoints).length, 'groups');
+      // Отладочная информация (убрана для продакшена)
+      // console.log('TimeSeriesAnalyzer: Grouped points:', Object.keys(groupedPoints).length, 'groups');
 
       return Object.entries(groupedPoints).map(([key, points]) => {
         // Нормализуем zoneNumber: null/undefined -> 0 (зона "Внешний датчик")
@@ -536,11 +544,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           .filter(p => p.temperature !== undefined && p.temperature !== null && !isNaN(p.temperature) && isFinite(p.temperature))
           .map(p => p.temperature!);
         
-        console.log(`TimeSeriesAnalyzer: Processing zone ${zoneNumber} level ${measurementLevel}`, {
-          totalPoints: points.length,
-          validTemperaturePoints: temperatures.length,
-          sampleTemps: temperatures.slice(0, 5)
-        });
+        // Отладочная информация (убрана для продакшена)
+        // console.log(`TimeSeriesAnalyzer: Processing zone ${zoneNumber} level ${measurementLevel}`, {
+        //   totalPoints: points.length,
+        //   validTemperaturePoints: temperatures.length,
+        //   sampleTemps: temperatures.slice(0, 5)
+        // });
         
         const humidities = points
           .filter(p => p.humidity !== undefined && p.humidity !== null)
@@ -882,21 +891,24 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     
     if (pointsAfterMarker.length === 0) return '-';
     
-    // Находим последнюю точку, где температура еще в диапазоне
-    let lastInRangeIndex = -1;
+    // Находим первую точку, где температура вышла за пределы лимитов
+    let firstOutOfRangeIndex = -1;
     for (let i = 0; i < pointsAfterMarker.length; i++) {
       const temp = pointsAfterMarker[i].temperature!;
-      if (temp >= minLimit && temp <= maxLimit) {
-        lastInRangeIndex = i;
-      } else {
-        break; // Прерываем, если температура вышла из диапазона
+      if (temp < minLimit || temp > maxLimit) {
+        firstOutOfRangeIndex = i;
+        break; // Нашли первую точку выхода за пределы
       }
     }
     
-    if (lastInRangeIndex === -1) return '-';
+    // Если не нашли точку выхода за пределы, значит все время в диапазоне
+    if (firstOutOfRangeIndex === -1) {
+      return 'за пределы не выходила';
+    }
     
-    const timeInRange = pointsAfterMarker[lastInRangeIndex].timestamp - markerTimestamp;
-    return formatTimeDuration(timeInRange);
+    // Вычисляем время от маркера до момента выхода за пределы
+    const timeToOutOfRange = pointsAfterMarker[firstOutOfRangeIndex].timestamp - markerTimestamp;
+    return formatTimeDuration(timeToOutOfRange);
   };
 
   // Функция для вычисления времени восстановления до диапазона после включения питания (power_on)
@@ -1047,15 +1059,27 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const getTestMarker = (): VerticalMarker | null => {
     if (!contractFields.testType || markers.length === 0) return null;
     
-    // Для power_off и power_on ищем маркер типа 'test'
+    // Для power_off ищем маркер типа 'power' с наименованием 'Отключение'
+    if (contractFields.testType === 'power_off') {
+      const powerMarkers = markers.filter(m => m.type === 'power' && m.label === 'Отключение');
+      return powerMarkers.length > 0 ? powerMarkers[0] : null;
+    }
+    
+    // Для power_on ищем маркер типа 'power' с наименованием 'Включение'
+    if (contractFields.testType === 'power_on') {
+      const powerMarkers = markers.filter(m => m.type === 'power' && m.label === 'Включение');
+      return powerMarkers.length > 0 ? powerMarkers[0] : null;
+    }
+    
     // Для temperature_recovery ищем маркер типа 'door_opening'
-    const markerType = contractFields.testType === 'temperature_recovery' ? 'door_opening' : 'test';
-    const testMarkers = markers.filter(m => m.type === markerType);
+    if (contractFields.testType === 'temperature_recovery') {
+      const doorMarkers = markers.filter(m => m.type === 'door_opening');
+      return doorMarkers.length > 0 ? doorMarkers[0] : null;
+    }
     
-    if (testMarkers.length === 0) return null;
-    
-    // Берем первый маркер (можно улучшить логику выбора)
-    return testMarkers[0];
+    // Для других типов ищем маркер типа 'test'
+    const testMarkers = markers.filter(m => m.type === 'test');
+    return testMarkers.length > 0 ? testMarkers[0] : null;
   };
 
   const handleLimitChange = (type: DataType, limitType: 'min' | 'max', value: string) => {
@@ -1078,6 +1102,26 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         label: 'Открытие двери', // По умолчанию "Открытие двери", пользователь может изменить на "Восстановление температуры"
         color: '#000000', // Черный цвет для всех маркеров
         type: 'door_opening'
+      };
+      setMarkers(prev => [...prev, newMarker]);
+    } else if (contractFields.testType === 'power_off') {
+      // Для power_off создаем маркер типа "power" с наименованием "Отключение"
+      const newMarker: VerticalMarker = {
+        id: Date.now().toString(),
+        timestamp,
+        label: 'Отключение',
+        color: '#000000', // Черный цвет для всех маркеров
+        type: 'power'
+      };
+      setMarkers(prev => [...prev, newMarker]);
+    } else if (contractFields.testType === 'power_on') {
+      // Для power_on создаем маркер типа "power" с наименованием "Включение"
+      const newMarker: VerticalMarker = {
+        id: Date.now().toString(),
+        timestamp,
+        label: 'Включение',
+        color: '#000000', // Черный цвет для всех маркеров
+        type: 'power'
       };
       setMarkers(prev => [...prev, newMarker]);
     } else {
@@ -1108,16 +1152,28 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const handleUpdateMarkerType = (id: string, type: MarkerType) => {
     // Все маркеры должны быть черного цвета
     const color = '#000000';
-    // Если тип изменен на "door_opening", сохраняем текущее название, если оно уже одно из допустимых
     setMarkers(prev => prev.map(m => {
       if (m.id === id) {
-        // Если маркер уже имеет одно из допустимых названий для door_opening, сохраняем его
         const currentLabel = m.label;
-        const isDoorOpeningLabel = currentLabel === 'Открытие двери' || currentLabel === 'Восстановление температуры';
-        const label = type === 'door_opening' && !isDoorOpeningLabel 
-          ? 'Открытие двери' // По умолчанию "Открытие двери"
-          : (type === 'door_opening' ? currentLabel : undefined);
-        return { ...m, type, color, ...(label !== undefined ? { label } : {}) };
+        let label = currentLabel;
+        
+        // Если тип изменен на "door_opening", сохраняем текущее название, если оно уже одно из допустимых
+        if (type === 'door_opening') {
+          const isDoorOpeningLabel = currentLabel === 'Открытие двери' || currentLabel === 'Восстановление температуры';
+          label = isDoorOpeningLabel ? currentLabel : 'Открытие двери';
+        }
+        // Если тип изменен на "power", устанавливаем соответствующее наименование в зависимости от типа испытания
+        else if (type === 'power') {
+          if (contractFields.testType === 'power_off') {
+            label = 'Отключение';
+          } else if (contractFields.testType === 'power_on') {
+            label = 'Включение';
+          } else {
+            label = currentLabel || 'Отключение'; // По умолчанию, если тип испытания не определен
+          }
+        }
+        
+        return { ...m, type, color, label };
       }
       return m;
     }));
@@ -1144,6 +1200,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         return 'Испытание';
       case 'door_opening':
         return 'Открытие двери';
+      case 'power':
+        return 'Электропитание';
       default:
         return 'Неизвестно';
     }
@@ -1162,6 +1220,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       ...prev,
       [field]: value
     }));
+    
+    // При смене типа испытания очищаем выводы, скрываем результаты анализа и сбрасываем маркеры
+    if (field === 'testType') {
+      setConclusions('');
+      setShowAnalysisResults(false);
+      setMarkers([]); // Сбрасываем все маркеры времени при смене типа испытания
+    }
   };
 
   const handleTemplateUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1308,7 +1373,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         conclusions,
         researchObject: qualificationObject?.name || 'Не указан',
         conditioningSystem: qualificationObject?.climateSystem || '',
-       testType: convertedTestType || '',
+       testType: contractFields.testType || '', // Передаем исходный testType (empty_volume, loaded_volume и т.д.) для логики
+        testTypeLabel: convertedTestType || '', // Передаем преобразованное название для плейсхолдера {NameTest}
         limits: limits,
         executor: user?.fullName || '',
         testDate: (() => {
@@ -1320,7 +1386,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         })(),
         reportNo: '',
         reportDate: '',
-        registrationNumber: qualificationObject?.registrationNumber || ''
+        registrationNumber: qualificationObject?.registrationNumber || '',
+        points: data?.points || [], // Передаем точки данных для вычисления дополнительных значений
+        markers: markers || [], // Передаем маркеры для вычисления дополнительных значений
+        acceptanceCriterion: contractFields.acceptanceCriterion || '' // Передаем критерий приемлемости
       };
       
       // Отладочная информация для {Table}
@@ -1586,6 +1655,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleAutoFillConclusions = () => {
+    // Показываем результаты анализа и выводы
+    setShowAnalysisResults(true);
     // Специальная логика для типа испытания "Испытание на восстановление температуры после открытия двери"
     if (contractFields.testType === 'temperature_recovery') {
       if (!data || !limits.temperature || !limits.temperature.min || !limits.temperature.max) {
@@ -1749,26 +1820,52 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
 
     // Формируем текст выводов
-    const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })}
+    // Для empty_volume и loaded_volume применяем форматирование с жирным шрифтом для определенных фраз
+    if (contractFields.testType === 'empty_volume' || contractFields.testType === 'loaded_volume') {
+      const startTimeStr = startTime.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      const endTimeStr = endTime.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      const minValueStr = `${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.`;
+      const maxValueStr = `${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.`;
+      const resultStr = `${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
+      
+      const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Длительность испытания: </b>${durationText}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
+      
+      setConclusions(conclusionText);
+    } else {
+      // Для других типов испытаний используем стандартное форматирование
+      const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}.
 Завершение испытания: ${endTime.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })}
-Длительность испытания: ${durationText}
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}.
+Длительность испытания: ${durationText}.
 Зафиксированное минимальное значение: ${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
-Зафиксированное максимальное значение: ${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.
+Зафиксированное максимальное значение: ${maxTempResult.maxTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
 Результаты испытания ${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
 
-    setConclusions(conclusionText);
+      setConclusions(conclusionText);
+    }
   };
 
   if (loading) {
@@ -2007,6 +2104,33 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                               <option value="Открытие двери">Открытие двери</option>
                               <option value="Восстановление температуры">Восстановление температуры</option>
                             </select>
+                          ) : marker.type === 'power' ? (
+                            <select
+                              value={marker.label}
+                              onChange={(e) => {
+                                const newLabel = e.target.value;
+                                setMarkers(prev => prev.map(m => 
+                                  m.id === marker.id ? { ...m, label: newLabel } : m
+                                ));
+                              }}
+                              onBlur={() => setEditingMarker(null)}
+                              className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              autoFocus
+                              title="Название маркера"
+                              aria-label="Название маркера"
+                              disabled={contractFields.testType === 'power_off' || contractFields.testType === 'power_on'}
+                            >
+                              {contractFields.testType === 'power_off' ? (
+                                <option value="Отключение">Отключение</option>
+                              ) : contractFields.testType === 'power_on' ? (
+                                <option value="Включение">Включение</option>
+                              ) : (
+                                <>
+                                  <option value="Отключение">Отключение</option>
+                                  <option value="Включение">Включение</option>
+                                </>
+                              )}
+                            </select>
                           ) : (
                             <input
                               type="text"
@@ -2141,10 +2265,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                             autoFocus
                             title="Тип маркера"
                             aria-label="Тип маркера"
-                            disabled={contractFields.testType === 'temperature_recovery'}
+                            disabled={contractFields.testType === 'temperature_recovery' || contractFields.testType === 'power_off' || contractFields.testType === 'power_on'}
                           >
                             {contractFields.testType === 'temperature_recovery' ? (
                               <option value="door_opening">Открытие двери</option>
+                            ) : contractFields.testType === 'power_off' || contractFields.testType === 'power_on' ? (
+                              <option value="power">Электропитание</option>
                             ) : (
                               <>
                                 <option value="test">Испытание</option>
@@ -2155,17 +2281,21 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                         ) : (
                           <span 
                             className={`text-xs px-2 py-1 bg-white border border-gray-200 rounded ${
-                              contractFields.testType === 'temperature_recovery' 
+                              contractFields.testType === 'temperature_recovery' || contractFields.testType === 'power_off' || contractFields.testType === 'power_on'
                                 ? 'cursor-default' 
                                 : 'cursor-pointer hover:bg-gray-50'
                             }`}
                             onClick={() => {
-                              if (contractFields.testType !== 'temperature_recovery') {
+                              if (contractFields.testType !== 'temperature_recovery' && contractFields.testType !== 'power_off' && contractFields.testType !== 'power_on') {
                                 setEditingMarkerType(marker.id);
                               }
                             }}
                             title={contractFields.testType === 'temperature_recovery' 
-                              ? 'Для типа испытания "Испытание на восстановление температуры после открытия двери" доступны только маркеры типа "Открытие двери"' 
+                              ? 'Для типа испытания "Испытание на восстановление температуры после открытия двери" доступны только маркеры типа "Открытие двери"'
+                              : contractFields.testType === 'power_off'
+                              ? 'Для типа испытания "Испытание на сбой электропитания (отключение)" доступны только маркеры типа "Электропитание" с наименованием "Отключение"'
+                              : contractFields.testType === 'power_on'
+                              ? 'Для типа испытания "Испытание на сбой электропитания (включение)" доступны только маркеры типа "Электропитание" с наименованием "Включение"' 
                               : 'Нажмите для изменения типа маркера'}
                           >
                             {getMarkerTypeLabel(marker.type)}
@@ -2222,23 +2352,40 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                     <span>Открытие двери</span>
                   </div>
+                  <div className="flex items-center space-x-1">
+                    <div className="w-3 h-3 rounded-full bg-black"></div>
+                    <span>Электропитание</span>
+                  </div>
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
-      {/* Analysis Results Table - условный рендеринг в зависимости от типа испытания */}
-      {(() => {
-        const testType = contractFields.testType;
+      
+      {/* Объединенный блок Результаты анализа и Выводы */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Результаты анализа и Выводы</h3>
+          <button
+            onClick={handleAutoFillConclusions}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+          >
+            Заполнить
+          </button>
+        </div>
+        
+        {showAnalysisResults ? (
+          <>
+            {/* Analysis Results Table - условный рендеринг в зависимости от типа испытания */}
+            {(() => {
+              const testType = contractFields.testType;
         
         // Стандартная таблица для empty_volume и loaded_volume
         if (testType === 'empty_volume' || testType === 'loaded_volume') {
           return (
-            <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
-          
-          <div className="overflow-x-auto">
+            <>
+            <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -2348,17 +2495,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <div className="mt-3 text-xs text-gray-600">
             <strong>Примечание:</strong> При изменении масштаба графика статистика пересчитывается только для выбранного временного периода.
           </div>
-            </div>
+          </>
           );
         }
         
         // Таблица для power_off: Испытание на сбой электропитания (отключение)
         if (testType === 'power_off') {
           return (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
-              
-              <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -2375,7 +2519,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     Серийный № логгера
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Питание выключено. Время, в течение которого температура находится в требуемом диапазоне, (час: мин)
+                    Питание отключено. Время, в течение которого температура находится в требуемом диапазоне, (час: мин)
                   </th>
                 </tr>
               </thead>
@@ -2420,7 +2564,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 })}
               </tbody>
             </table>
-              </div>
             </div>
           );
         }
@@ -2428,10 +2571,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         // Таблица для power_on: Испытание на сбой электропитания (включение)
         if (testType === 'power_on') {
           return (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
-              
-              <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -2494,7 +2634,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 })}
               </tbody>
             </table>
-              </div>
             </div>
           );
         }
@@ -2502,10 +2641,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         // Таблица для temperature_recovery: Испытание по восстановлению температуры после открытия двери
         if (testType === 'temperature_recovery') {
           return (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Результаты анализа</h3>
-              
-              <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -2584,34 +2720,34 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 })}
               </tbody>
             </table>
-              </div>
             </div>
           );
         }
         
-        // Если тип испытания не выбран или не соответствует ни одному из типов, не показываем таблицу
-        return null;
-      })()}
+              // Если тип испытания не выбран или не соответствует ни одному из типов, не показываем таблицу
+              return null;
+            })()}
 
-      {/* Поле для выводов */}
-      <div className="mt-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Выводы
-          </label>
-          <textarea
-            value={conclusions}
-            onChange={(e) => setConclusions(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            rows={4}
-            placeholder="Введите выводы по результатам анализа..."
-          />
-          <button
-            onClick={handleAutoFillConclusions}
-            className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
-          >
-            Заполнить
-          </button>
-        </div>
+            {/* Поле для выводов */}
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Выводы
+              </label>
+              <textarea
+                value={conclusions}
+                onChange={(e) => setConclusions(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                rows={4}
+                placeholder="Введите выводы по результатам анализа..."
+              />
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <p className="text-sm mb-4">Нажмите кнопку "Заполнить" для отображения результатов анализа и выводов</p>
+          </div>
+        )}
+      </div>
 
       {/* Кнопка формирования отчета */}
       <div className="bg-white rounded-lg shadow p-6">
@@ -2778,41 +2914,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 </>
               )}
             </button>
-          </div>
-          
-          
-          {/* Информация о плейсхолдерах для шаблона */}
-          <div className="w-full max-w-2xl bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">
-              Поддерживаемые плейсхолдеры в шаблоне:
-            </h4>
-            <div className="text-xs text-blue-800 space-y-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div>
-                  <p><strong>Основные:</strong></p>
-                  <p>• <code>{'{chart}'}</code> - изображение графика (PNG)</p>
-                  <p>• <code>{'{Table}'}</code> - таблица результатов анализа</p>
-                  <p>• <code>{'{Result}'}</code> - текст выводов из поля "Выводы"</p>
-                  <p>• <code>{'{Object}'}</code> - наименование объекта квалификации</p>
-                  <p>• <code>{'{ConditioningSystem}'}</code> - климатическая установка</p>
-                  <p>• <code>{'{System}'}</code> - климатическая установка (альтернативный)</p>
-                  <p>• <code>{'{NameTest}'}</code> - тип испытания</p>
-                </div>
-                <div>
-                  <p><strong>Дополнительные:</strong></p>
-                  <p>• <code>{'{Limits}'}</code> - установленные лимиты с единицами измерения</p>
-                  <p>• <code>{'{Executor}'}</code> - ФИО исполнителя (текущий пользователь)</p>
-                  <p>• <code>{'{TestDate}'}</code> - дата испытания (текущая дата)</p>
-                  <p>• <code>{'{ReportNo}'}</code> - номер договора из настроек анализа</p>
-                  <p>• <code>{'{ReportDate}'}</code> - дата договора из настроек анализа</p>
-                  <p>• <code>{'{title}'}</code> - заголовок отчета</p>
-                  <p>• <code>{'{date}'}</code> - дата создания отчета</p>
-                </div>
-              </div>
-            </div>
-            <p className="text-xs mt-2"><strong>Важно:</strong> Плейсхолдер <code>{'{chart}'}</code> обязателен для корректной работы шаблона. Изображение будет вставлено с высоким разрешением и повернуто на 90° против часовой стрелки.</p>
-            <p className="text-xs mt-1"><strong>Таблица результатов:</strong> Для вставки таблицы результатов анализа используйте плейсхолдер <code>{'{Table}'}</code>. Если плейсхолдер отсутствует в шаблоне, таблица не будет вставлена.</p>
-            <p className="text-xs mt-1"><strong>Колонтитулы:</strong> Все плейсхолдеры также работают в верхних и нижних колонтитулах документа (header1.xml, header2.xml, header3.xml, footer1.xml, footer2.xml, footer3.xml).</p>
           </div>
         </div>
 

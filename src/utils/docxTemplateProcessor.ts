@@ -9,13 +9,17 @@ export interface TemplateReportData {
   conclusions?: string;
   researchObject?: string;
   conditioningSystem?: string;
-  testType?: string;
+  testType?: string; // Код типа испытания (empty_volume, loaded_volume и т.д.) - используется для логики
+  testTypeLabel?: string; // Читаемое название типа испытания - используется для плейсхолдера {NameTest}
  limits?: any;
   executor?: string;
   testDate?: string;
   reportNo?: string;
   reportDate?: string;
   registrationNumber?: string;
+  points?: any[]; // Точки данных для вычисления дополнительных значений
+  markers?: any[]; // Маркеры для вычисления дополнительных значений
+  acceptanceCriterion?: string; // Критерий приемлемости для temperature_recovery
 }
 
 export class DocxTemplateProcessor {
@@ -675,7 +679,8 @@ export class DocxTemplateProcessor {
     // Создаем выводы если есть
     let previousConclusions = '';
     if (previousData.conclusions && previousData.conclusions.trim()) {
-      const formattedPreviousConclusions = this.convertHtmlBoldToDocx(previousData.conclusions);
+      // Все выводы формируются с размером шрифта 12 (Times New Roman 12pt)
+      const formattedPreviousConclusions = this.convertHtmlBoldToDocx(previousData.conclusions, true);
       previousConclusions = `
         <w:p>
           <w:pPr>
@@ -1025,7 +1030,8 @@ export class DocxTemplateProcessor {
     // Обработка плейсхолдера {Result} для выводов
     if (data.conclusions) {
       // Преобразуем HTML-теги <b> в DOCX-формат перед экранированием
-      const formattedConclusions = this.convertHtmlBoldToDocx(data.conclusions);
+      // Все выводы формируются с размером шрифта 12 (Times New Roman 12pt)
+      const formattedConclusions = this.convertHtmlBoldToDocx(data.conclusions, true);
       result = result.replace(/{Result}/g, formattedConclusions);
     } else {
       result = result.replace(/{Result}/g, '');
@@ -1053,9 +1059,11 @@ export class DocxTemplateProcessor {
     }
 
     // Обработка плейсхолдера {NameTest} для типа испытания
-    if (data.testType) {
-      console.log('Replacing {NameTest} with:', data.testType);
-      result = result.replace(/{NameTest}/g, this.escapeXml(data.testType));
+    // Используем testTypeLabel (читаемое название) если доступно, иначе testType (код)
+    const testTypeName = data.testTypeLabel || data.testType;
+    if (testTypeName) {
+      console.log('Replacing {NameTest} with:', testTypeName);
+      result = result.replace(/{NameTest}/g, this.escapeXml(testTypeName));
     } else {
       console.log('testType is empty or undefined:', data.testType, 'replacing {NameTest} with empty string');
       result = result.replace(/{NameTest}/g, '');
@@ -1188,30 +1196,35 @@ export class DocxTemplateProcessor {
 
   /**
    * Преобразование HTML-тегов <b> в DOCX-формат для жирного текста
+   * @param text - текст с HTML тегами
+   * @param applyFontStyle - применять ли стили Times New Roman 12pt (по умолчанию true для выводов)
    */
-  private convertHtmlBoldToDocx(text: string): string {
+  private convertHtmlBoldToDocx(text: string, applyFontStyle: boolean = true): string {
     if (!text) return '';
     
-    // Разбиваем текст на части, разделенные тегами <b> и </b>
-    const parts: Array<{ text: string; isBold: boolean }> = [];
+    // Разбиваем текст на части, разделенные тегами <b> и </b>, и переносами строк
+    const parts: Array<{ text: string; isBold: boolean; isLineBreak: boolean }> = [];
     let currentIndex = 0;
     let isBold = false;
     
-    // Регулярное выражение для поиска открывающих и закрывающих тегов <b>
-    const tagRegex = /<\/?b>/gi;
+    // Регулярное выражение для поиска открывающих и закрывающих тегов <b> и переносов строк
+    const tagRegex = /<\/?b>|\n/gi;
     let match;
     
     while ((match = tagRegex.exec(text)) !== null) {
-      // Добавляем текст до тега
+      // Добавляем текст до тега или переноса строки
       if (match.index > currentIndex) {
         const textPart = text.substring(currentIndex, match.index);
         if (textPart) {
-          parts.push({ text: textPart, isBold });
+          parts.push({ text: textPart, isBold, isLineBreak: false });
         }
       }
       
-      // Определяем, открывающий или закрывающий тег
-      if (match[0].toLowerCase() === '<b>') {
+      // Обрабатываем найденный элемент
+      if (match[0] === '\n') {
+        // Перенос строки
+        parts.push({ text: '', isBold: false, isLineBreak: true });
+      } else if (match[0].toLowerCase() === '<b>') {
         isBold = true;
       } else if (match[0].toLowerCase() === '</b>') {
         isBold = false;
@@ -1224,26 +1237,52 @@ export class DocxTemplateProcessor {
     if (currentIndex < text.length) {
       const textPart = text.substring(currentIndex);
       if (textPart) {
-        parts.push({ text: textPart, isBold });
+        parts.push({ text: textPart, isBold, isLineBreak: false });
       }
     }
     
-    // Если не было найдено тегов, возвращаем исходный текст с экранированием
+    // Если не было найдено тегов и переносов строк, возвращаем исходный текст с экранированием
     if (parts.length === 0) {
-      return this.escapeXml(text);
+      const escapedText = this.escapeXml(text);
+      // Используем xml:space="preserve" для сохранения пробелов
+      const spacePreserve = ' xml:space="preserve"';
+      if (applyFontStyle) {
+        // Применяем стили Times New Roman 12pt
+        return `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t${spacePreserve}>${escapedText}</w:t></w:r>`;
+      }
+      return `<w:r><w:t${spacePreserve}>${escapedText}</w:t></w:r>`;
     }
     
     // Формируем DOCX XML для каждой части
     let result = '';
     for (const part of parts) {
-      const escapedText = this.escapeXml(part.text);
-      
-      if (part.isBold) {
-        // Жирный текст: <w:r><w:rPr><w:b/></w:rPr><w:t>текст</w:t></w:r>
-        result += `<w:r><w:rPr><w:b/></w:rPr><w:t>${escapedText}</w:t></w:r>`;
+      if (part.isLineBreak) {
+        // Перенос строки: <w:br/>
+        result += '<w:br/>';
       } else {
-        // Обычный текст: <w:r><w:t>текст</w:t></w:r>
-        result += `<w:r><w:t>${escapedText}</w:t></w:r>`;
+        const escapedText = this.escapeXml(part.text);
+        // Используем xml:space="preserve" для сохранения пробелов (особенно в конце текста)
+        const spacePreserve = ' xml:space="preserve"';
+        
+        if (applyFontStyle) {
+          // Применяем стили Times New Roman 12pt
+          if (part.isBold) {
+            // Жирный текст с Times New Roman 12pt: <w:r><w:rPr><w:rFonts.../><w:sz.../><w:b/></w:rPr><w:t xml:space="preserve">текст</w:t></w:r>
+            result += `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:b/></w:rPr><w:t${spacePreserve}>${escapedText}</w:t></w:r>`;
+          } else {
+            // Обычный текст с Times New Roman 12pt: <w:r><w:rPr><w:rFonts.../><w:sz.../></w:rPr><w:t xml:space="preserve">текст</w:t></w:r>
+            result += `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t${spacePreserve}>${escapedText}</w:t></w:r>`;
+          }
+        } else {
+          // Без применения стилей шрифта
+          if (part.isBold) {
+            // Жирный текст: <w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">текст</w:t></w:r>
+            result += `<w:r><w:rPr><w:b/></w:rPr><w:t${spacePreserve}>${escapedText}</w:t></w:r>`;
+          } else {
+            // Обычный текст: <w:r><w:t xml:space="preserve">текст</w:t></w:r>
+            result += `<w:r><w:t${spacePreserve}>${escapedText}</w:t></w:r>`;
+          }
+        }
       }
     }
     
@@ -1354,8 +1393,16 @@ export class DocxTemplateProcessor {
       return documentXml;
     }
 
-    // Создаем XML структуру таблицы
-    const tableXml = this.createResultsTableXml(data.analysisResults, data.dataType);
+    // Создаем XML структуру таблицы с учетом типа испытания
+    const tableXml = this.createResultsTableXml(
+      data.analysisResults, 
+      data.dataType, 
+      data.testType || '',
+      data.points || [],
+      data.markers || [],
+      data.limits,
+      data.acceptanceCriterion || ''
+    );
     console.log('Generated table XML length:', tableXml.length);
     console.log('Table XML preview:', tableXml.substring(0, 200) + '...');
     
@@ -1384,34 +1431,33 @@ export class DocxTemplateProcessor {
 
   /**
    * Создание XML структуры таблицы результатов анализа
+   * @param results - результаты анализа
+   * @param dataType - тип данных (temperature/humidity)
+   * @param testType - тип испытания (empty_volume, loaded_volume, power_off, power_on, temperature_recovery)
+   * @param points - точки данных для вычисления дополнительных значений
+   * @param markers - маркеры для вычисления дополнительных значений
+   * @param limits - лимиты температуры/влажности
+   * @param acceptanceCriterion - критерий приемлемости для temperature_recovery
    */
-  public createResultsTableXml(results: any[], dataType: 'temperature' | 'humidity'): string {
+  public createResultsTableXml(
+    results: any[], 
+    dataType: 'temperature' | 'humidity',
+    testType: string = '',
+    points: any[] = [],
+    markers: any[] = [],
+    limits: any = {},
+    acceptanceCriterion: string = ''
+  ): string {
     console.log('Creating results table XML...');
     console.log('Results count:', results?.length || 0);
     console.log('DataType:', dataType);
+    console.log('TestType:', testType);
     console.log('Results data:', results);
     
     if (!results || results.length === 0) {
       console.log('No results to create table');
       return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
     }
-    
-    // Находим глобальные минимальные и максимальные значения (исключая внешние датчики)
-    const nonExternalResults = results.filter(result => !result.isExternal);
-    console.log('Non-external results count:', nonExternalResults.length);
-    
-    const minTempValues = nonExternalResults
-      .map(result => parseFloat(result.minTemp))
-      .filter(val => !isNaN(val));
-    const maxTempValues = nonExternalResults
-      .map(result => parseFloat(result.maxTemp))
-      .filter(val => !isNaN(val));
-    
-    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
-    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
-    
-    console.log('Global min temp:', globalMinTemp);
-    console.log('Global max temp:', globalMaxTemp);
 
     // Функция для экранирования XML символов
     const escapeXml = (text: string): string => {
@@ -1425,6 +1471,195 @@ export class DocxTemplateProcessor {
         .replace(/°C/g, '&#176;C') // Специальная обработка для °C
         .replace(/\u00B0/g, '&#176;'); // Символ градуса
     };
+
+    // Функция для форматирования времени
+    const formatTimeDuration = (milliseconds: number): string => {
+      const totalMinutes = Math.floor(milliseconds / (1000 * 60));
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      return `${hours}:${minutes.toString().padStart(2, '0')}`;
+    };
+
+    // Вспомогательные функции для вычислений (копии из TimeSeriesAnalyzer)
+    const calculateTimeInRangeAfterPowerOff = (
+      points: any[],
+      markerTimestamp: number,
+      minLimit: number | undefined,
+      maxLimit: number | undefined
+    ): string => {
+      if (!minLimit || !maxLimit || !points || points.length === 0) return '-';
+      
+      const pointsAfterMarker = points
+        .filter((p: any) => p.timestamp >= markerTimestamp && p.temperature !== undefined)
+        .sort((a: any, b: any) => a.timestamp - b.timestamp);
+      
+      if (pointsAfterMarker.length === 0) return '-';
+      
+      // Находим первую точку, где температура вышла за пределы лимитов
+      let firstOutOfRangeIndex = -1;
+      for (let i = 0; i < pointsAfterMarker.length; i++) {
+        const temp = pointsAfterMarker[i].temperature!;
+        if (temp < minLimit || temp > maxLimit) {
+          firstOutOfRangeIndex = i;
+          break; // Нашли первую точку выхода за пределы
+        }
+      }
+      
+      // Если не нашли точку выхода за пределы, значит все время в диапазоне
+      if (firstOutOfRangeIndex === -1) {
+        return 'за пределы не выходила';
+      }
+      
+      // Вычисляем время от маркера до момента выхода за пределы
+      const timeToOutOfRange = pointsAfterMarker[firstOutOfRangeIndex].timestamp - markerTimestamp;
+      return formatTimeDuration(timeToOutOfRange);
+    };
+
+    const calculateRecoveryTimeAfterPowerOn = (
+      points: any[],
+      markerTimestamp: number,
+      minLimit: number | undefined,
+      maxLimit: number | undefined
+    ): string => {
+      if (!minLimit || !maxLimit || !points || points.length === 0) return '-';
+      
+      const pointsAfterMarker = points
+        .filter((p: any) => p.timestamp >= markerTimestamp && p.temperature !== undefined)
+        .sort((a: any, b: any) => a.timestamp - b.timestamp);
+      
+      if (pointsAfterMarker.length === 0) return '-';
+      
+      for (let i = 0; i < pointsAfterMarker.length; i++) {
+        const temp = pointsAfterMarker[i].temperature!;
+        if (temp >= minLimit && temp <= maxLimit) {
+          const recoveryTime = pointsAfterMarker[i].timestamp - markerTimestamp;
+          return formatTimeDuration(recoveryTime);
+        }
+      }
+      
+      return '-';
+    };
+
+    const calculateRecoveryTimeAfterDoorOpening = (
+      points: any[],
+      doorMarkers: any[],
+      minLimit: number | undefined,
+      maxLimit: number | undefined,
+      acceptanceCriterionValue: string
+    ): { time: string; meetsCriterion: string } => {
+      if (!minLimit || !maxLimit || !points || points.length === 0) {
+        return { time: '-', meetsCriterion: '-' };
+      }
+      
+      const pointsWithTemp = points
+        .filter((p: any) => p.temperature !== undefined)
+        .sort((a: any, b: any) => a.timestamp - b.timestamp);
+      
+      if (pointsWithTemp.length === 0) {
+        return { time: '-', meetsCriterion: '-' };
+      }
+      
+      let filteredPoints: any[] = [];
+      
+      if (doorMarkers.length === 0) {
+        filteredPoints = pointsWithTemp;
+      } else if (doorMarkers.length === 1) {
+        filteredPoints = pointsWithTemp.filter((p: any) => p.timestamp >= doorMarkers[0].timestamp);
+      } else {
+        const sortedMarkers = [...doorMarkers].sort((a: any, b: any) => a.timestamp - b.timestamp);
+        
+        for (let i = 0; i < sortedMarkers.length; i += 2) {
+          const startMarker = sortedMarkers[i];
+          const endMarker = sortedMarkers[i + 1];
+          
+          if (endMarker) {
+            const rangePoints = pointsWithTemp.filter((p: any) => 
+              p.timestamp >= startMarker.timestamp && p.timestamp <= endMarker.timestamp
+            );
+            filteredPoints.push(...rangePoints);
+          } else {
+            const rangePoints = pointsWithTemp.filter((p: any) => p.timestamp >= startMarker.timestamp);
+            filteredPoints.push(...rangePoints);
+          }
+        }
+        
+        filteredPoints = filteredPoints
+          .filter((point: any, index: number, self: any[]) => 
+            index === self.findIndex((p: any) => p.timestamp === point.timestamp)
+          )
+          .sort((a: any, b: any) => a.timestamp - b.timestamp);
+      }
+      
+      if (filteredPoints.length === 0) {
+        return { time: '-', meetsCriterion: '-' };
+      }
+      
+      let totalTimeOutsideLimits = 0;
+      let isCurrentlyOutside = false;
+      let outsideStartTime: number | null = null;
+      
+      for (let i = 0; i < filteredPoints.length; i++) {
+        const temp = filteredPoints[i].temperature!;
+        const isOutside = temp < minLimit || temp > maxLimit;
+        
+        if (isOutside && !isCurrentlyOutside) {
+          isCurrentlyOutside = true;
+          outsideStartTime = filteredPoints[i].timestamp;
+        } else if (!isOutside && isCurrentlyOutside && outsideStartTime !== null) {
+          const periodDuration = filteredPoints[i].timestamp - outsideStartTime;
+          totalTimeOutsideLimits += periodDuration;
+          isCurrentlyOutside = false;
+          outsideStartTime = null;
+        }
+      }
+      
+      if (isCurrentlyOutside && outsideStartTime !== null && filteredPoints.length > 0) {
+        const lastPoint = filteredPoints[filteredPoints.length - 1];
+        const periodDuration = lastPoint.timestamp - outsideStartTime;
+        totalTimeOutsideLimits += periodDuration;
+      }
+      
+      if (totalTimeOutsideLimits === 0) {
+        return { time: 'за пределы не выходила', meetsCriterion: 'Да' };
+      }
+      
+      const timeInMinutes = Math.floor(totalTimeOutsideLimits / (1000 * 60));
+      const criterionValue = acceptanceCriterionValue ? parseInt(acceptanceCriterionValue) : 0;
+      const meetsCriterion = timeInMinutes <= criterionValue ? 'Да' : 'Нет';
+      const timeString = `${timeInMinutes} мин.`;
+      
+      return { time: timeString, meetsCriterion };
+    };
+
+    // Создаем таблицу в зависимости от типа испытания
+    if (testType === 'power_off') {
+      return this.createPowerOffTableXml(results, points, markers, limits, escapeXml, calculateTimeInRangeAfterPowerOff);
+    } else if (testType === 'power_on') {
+      return this.createPowerOnTableXml(results, points, markers, limits, escapeXml, calculateRecoveryTimeAfterPowerOn);
+    } else if (testType === 'temperature_recovery') {
+      return this.createTemperatureRecoveryTableXml(results, points, markers, limits, acceptanceCriterion, escapeXml, (points, doorMarkers, minLimit, maxLimit) => calculateRecoveryTimeAfterDoorOpening(points, doorMarkers, minLimit, maxLimit, acceptanceCriterion));
+    } else {
+      // Стандартная таблица для empty_volume и loaded_volume
+      return this.createStandardTableXml(results, dataType, escapeXml);
+    }
+  }
+
+  /**
+   * Создание стандартной таблицы для empty_volume и loaded_volume
+   */
+  private createStandardTableXml(results: any[], dataType: 'temperature' | 'humidity', escapeXml: (text: string) => string): string {
+    // Находим глобальные минимальные и максимальные значения (исключая внешние датчики)
+    const nonExternalResults = results.filter(result => !result.isExternal);
+    
+    const minTempValues = nonExternalResults
+      .map(result => parseFloat(result.minTemp))
+      .filter(val => !isNaN(val));
+    const maxTempValues = nonExternalResults
+      .map(result => parseFloat(result.maxTemp))
+      .filter(val => !isNaN(val));
+    
+    const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
+    const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
 
     // Заголовок таблицы
     const headerRow = `
@@ -1737,6 +1972,174 @@ export class DocxTemplateProcessor {
   }
 
   /**
+   * Создание таблицы для power_off: Испытание на сбой электропитания (отключение)
+   */
+  private createPowerOffTableXml(
+    results: any[],
+    points: any[],
+    markers: any[],
+    limits: any,
+    escapeXml: (text: string) => string,
+    calculateTimeInRange: (points: any[], markerTimestamp: number, minLimit: number | undefined, maxLimit: number | undefined) => string
+  ): string {
+    // Находим маркер типа 'power' с наименованием 'Отключение'
+    const testMarker = markers.find((m: any) => m.type === 'power' && m.label === 'Отключение');
+    if (!testMarker || !limits.temperature) {
+      return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
+    }
+
+    const headerRow = `
+      <w:tr>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Номер логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Серийный № логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Питание отключено. Время, в течение которого температура находится в требуемом диапазоне, (час: мин)</w:t></w:r></w:p></w:tc>
+      </w:tr>`;
+
+    const dataRows = results.map(result => {
+      const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(result.zoneNumber.toString()) || 0);
+      const filePoints = points.filter((p: any) => {
+        const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+        const pLevel = p.measurementLevel?.toString() || 'unknown';
+        return `${pZone}_${pLevel}` === `${zoneNumber}_${result.measurementLevel.toString()}`;
+      });
+      
+      const timeInRange = calculateTimeInRange(filePoints, testMarker.timestamp, limits.temperature.min, limits.temperature.max);
+      
+      return `
+        <w:tr>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешний' : result.zoneNumber)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ','))}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.loggerName)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.serialNumber)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(timeInRange)}</w:t></w:r></w:p></w:tc>
+        </w:tr>`;
+    }).join('');
+
+    return `
+      <w:tbl>
+        <w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tblBorders><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr>
+        <w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:gridCol w:w="4000"/></w:tblGrid>
+        ${headerRow}${dataRows}
+      </w:tbl>`;
+  }
+
+  /**
+   * Создание таблицы для power_on: Испытание на сбой электропитания (включение)
+   */
+  private createPowerOnTableXml(
+    results: any[],
+    points: any[],
+    markers: any[],
+    limits: any,
+    escapeXml: (text: string) => string,
+    calculateRecoveryTime: (points: any[], markerTimestamp: number, minLimit: number | undefined, maxLimit: number | undefined) => string
+  ): string {
+    // Находим маркер типа 'power' с наименованием 'Включение'
+    const testMarker = markers.find((m: any) => m.type === 'power' && m.label === 'Включение');
+    if (!testMarker || !limits.temperature) {
+      return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
+    }
+
+    const headerRow = `
+      <w:tr>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Номер логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Серийный № логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Питание включено. Время восстановления до требуемого диапазона температур, (час: мин)</w:t></w:r></w:p></w:tc>
+      </w:tr>`;
+
+    const dataRows = results.map(result => {
+      const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
+      const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
+      const filePoints = points.filter((p: any) => {
+        const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+        const pLevel = p.measurementLevel?.toString() || 'unknown';
+        return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+      });
+      
+      const recoveryTime = calculateRecoveryTime(filePoints, testMarker.timestamp, limits.temperature.min, limits.temperature.max);
+      
+      return `
+        <w:tr>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешний' : result.zoneNumber)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ','))}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.loggerName)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.serialNumber)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(recoveryTime)}</w:t></w:r></w:p></w:tc>
+        </w:tr>`;
+    }).join('');
+
+    return `
+      <w:tbl>
+        <w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tblBorders><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr>
+        <w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:gridCol w:w="4000"/></w:tblGrid>
+        ${headerRow}${dataRows}
+      </w:tbl>`;
+  }
+
+  /**
+   * Создание таблицы для temperature_recovery: Испытание по восстановлению температуры после открытия двери
+   */
+  private createTemperatureRecoveryTableXml(
+    results: any[],
+    points: any[],
+    markers: any[],
+    limits: any,
+    acceptanceCriterion: string,
+    escapeXml: (text: string) => string,
+    calculateRecoveryTime: (points: any[], doorMarkers: any[], minLimit: number | undefined, maxLimit: number | undefined) => { time: string; meetsCriterion: string }
+  ): string {
+    if (!limits.temperature) {
+      return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
+    }
+
+    const doorMarkers = markers.filter((m: any) => m.type === 'door_opening');
+
+    const headerRow = `
+      <w:tr>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Номер логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Серийный № логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Время восстановления до заданного диапазона температур, (час: мин)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Соответствует критерию</w:t></w:r></w:p></w:tc>
+      </w:tr>`;
+
+    const dataRows = results.map(result => {
+      const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
+      const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
+      const filePoints = points.filter((p: any) => {
+        const pZone = p.zoneNumber !== null && p.zoneNumber !== undefined ? p.zoneNumber : 0;
+        const pLevel = p.measurementLevel?.toString() || 'unknown';
+        return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
+      });
+      
+      const recoveryData = calculateRecoveryTime(filePoints, doorMarkers, limits.temperature.min, limits.temperature.max);
+      const complianceColor = recoveryData.meetsCriterion === 'Да' ? 'C6EFCE' : recoveryData.meetsCriterion === 'Нет' ? 'FFC7CE' : 'FFFFFF';
+      
+      return `
+        <w:tr>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешний' : result.zoneNumber)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ','))}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.loggerName)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.serialNumber)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(recoveryData.time)}</w:t></w:r></w:p></w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="${complianceColor}"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(recoveryData.meetsCriterion)}</w:t></w:r></w:p></w:tc>
+        </w:tr>`;
+    }).join('');
+
+    return `
+      <w:tbl>
+        <w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tblBorders><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr>
+        <w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:gridCol w:w="2000"/><w:gridCol w:w="4000"/><w:gridCol w:w="2000"/></w:tblGrid>
+        ${headerRow}${dataRows}
+      </w:tbl>`;
+  }
+
+  /**
    * Форматирование текста лимитов для вставки в документ
    */
   private formatLimitsText(limits: any, dataType: 'temperature' | 'humidity'): string {
@@ -1896,7 +2299,8 @@ export class DocxTemplateProcessor {
     // Создаем выводы если есть
     let conclusions = '';
     if (data.conclusions && data.conclusions.trim()) {
-      const formattedConclusions = this.convertHtmlBoldToDocx(data.conclusions);
+      // Все выводы формируются с размером шрифта 12 (Times New Roman 12pt)
+      const formattedConclusions = this.convertHtmlBoldToDocx(data.conclusions, true);
       conclusions = `
         <w:p>
           <w:pPr>

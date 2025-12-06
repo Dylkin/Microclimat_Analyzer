@@ -206,38 +206,38 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                             {onView && (
                               <button
                                 onClick={() => onView(obj)}
-                                className="text-blue-600 hover:text-blue-900"
+                                className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-md transition-colors"
                                 title="Просмотреть"
                               >
-                                <Eye className="w-4 h-4" />
+                                <Eye className="w-5 h-5" />
                               </button>
                             )}
                           </div>
                         ) : (
-                          // В обычном режиме показываем кнопки редактирования и удаления
+                          // В обычном режиме показываем кнопки просмотра, редактирования и удаления
                           <div className="flex justify-end space-x-2">
                             {onView && (
                               <button
                                 onClick={() => onView(obj)}
-                                className="text-blue-600 hover:text-blue-900"
+                                className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-md transition-colors"
                                 title="Просмотреть"
                               >
-                                <Eye className="w-4 h-4" />
+                                <Eye className="w-5 h-5" />
                               </button>
                             )}
                             <button
                               onClick={() => onEdit(obj)}
-                              className="text-indigo-600 hover:text-indigo-900"
+                              className="p-2 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-md transition-colors"
                               title="Редактировать"
                             >
-                              <Edit2 className="w-4 h-4" />
+                              <Edit2 className="w-5 h-5" />
                             </button>
                             <button
                               onClick={() => onDelete(obj.id)}
-                              className="text-red-600 hover:text-red-900"
+                              className="p-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-md transition-colors"
                               title="Удалить"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-5 h-5" />
                             </button>
                           </div>
                         )}
