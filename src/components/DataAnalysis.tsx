@@ -7,6 +7,7 @@ import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { projectService } from '../utils/projectService';
 import { loggerDataService } from '../utils/loggerDataService';
+import { qualificationWorkScheduleService, QualificationWorkStage } from '../utils/qualificationWorkScheduleService';
 import { TimeSeriesAnalyzer } from './TimeSeriesAnalyzer';
 
 interface DataAnalysisProps {
@@ -26,6 +27,7 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loggerCount, setLoggerCount] = useState<number>(0);
+  const [workScheduleStages, setWorkScheduleStages] = useState<QualificationWorkStage[]>([]);
 
   // Загрузка полной информации о проекте
   const loadFullProject = async () => {
@@ -139,6 +141,35 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
     }
   };
 
+  // Загрузка этапов плана-графика квалификационных работ
+  const loadWorkScheduleStages = async () => {
+    if (!qualificationWorkScheduleService.isAvailable()) {
+      console.warn('QualificationWorkScheduleService не доступен');
+      return;
+    }
+
+    if (!analysisData?.qualificationObjectId || !fullProject?.id) {
+      console.warn('Недостаточно данных для загрузки плана-графика');
+      return;
+    }
+
+    try {
+      const stages = await qualificationWorkScheduleService.getWorkSchedule(
+        analysisData.qualificationObjectId,
+        fullProject.id
+      );
+      
+      // Фильтруем только этапы с заполненными датами
+      const filledStages = stages.filter(stage => stage.startDate || stage.endDate);
+      setWorkScheduleStages(filledStages);
+      console.log('DataAnalysis: Загружено этапов плана-графика:', filledStages.length);
+    } catch (error) {
+      console.error('Ошибка загрузки плана-графика:', error);
+      // Не устанавливаем ошибку, так как это не критично для работы страницы
+      setWorkScheduleStages([]);
+    }
+  };
+
   // Загрузка данных при инициализации
   useEffect(() => {
     const loadData = async () => {
@@ -178,10 +209,11 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
     }
   }, [fullProject]);
 
-  // Загрузка количества логгеров после загрузки объекта квалификации
+  // Загрузка количества логгеров и плана-графика после загрузки объекта квалификации
   useEffect(() => {
     if (selectedQualificationObject && fullProject) {
       loadLoggerCount();
+      loadWorkScheduleStages();
     }
   }, [selectedQualificationObject, fullProject]);
 
@@ -384,6 +416,45 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
               </div>
             )}
           </div>
+
+          {/* План график проведения квалификационных работ */}
+          {workScheduleStages.length > 0 && (
+            <div className="pt-4 border-t border-gray-200">
+              <h4 className="text-sm font-medium text-gray-800 mb-3">План график проведения квалификационных работ</h4>
+              <div className="space-y-2 text-sm">
+                {workScheduleStages.map((stage) => {
+                  const formatDate = (dateString?: string) => {
+                    if (!dateString) return '';
+                    try {
+                      const date = new Date(dateString);
+                      return date.toLocaleDateString('ru-RU');
+                    } catch {
+                      return dateString;
+                    }
+                  };
+
+                  const startDate = formatDate(stage.startDate);
+                  const endDate = formatDate(stage.endDate);
+                  
+                  let dateDisplay = '';
+                  if (startDate && endDate) {
+                    dateDisplay = `${startDate} - ${endDate}`;
+                  } else if (startDate) {
+                    dateDisplay = startDate;
+                  } else if (endDate) {
+                    dateDisplay = endDate;
+                  }
+
+                  return (
+                    <div key={stage.id} className="text-gray-700">
+                      <span className="font-medium">{stage.stageName}</span>
+                      {dateDisplay && <span className="ml-2">– {dateDisplay}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Измерительное оборудование */}
           <div className="pt-4 border-t border-gray-200">

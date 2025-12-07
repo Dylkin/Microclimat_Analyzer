@@ -11,7 +11,10 @@ import { reportService, ReportData } from '../utils/reportService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { qualificationObjectTypeService } from '../utils/qualificationObjectTypeService';
 import { equipmentService } from '../utils/equipmentService';
+import { qualificationWorkScheduleService } from '../utils/qualificationWorkScheduleService';
+import { loggerDataService } from '../utils/loggerDataService';
 import PizZip from 'pizzip';
+import JSZip from 'jszip';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -74,6 +77,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     reportUrl: string | null;
     reportFilename: string | null;
   }>({
+    hasReport: false,
+    reportUrl: null,
+    reportFilename: null
+  });
+
+  // Состояние для формирования приложения свидетельства о поверке
+  const [verificationReportStatus, setVerificationReportStatus] = useState<{
+    isGenerating: boolean;
+    hasReport: boolean;
+    reportUrl: string | null;
+    reportFilename: string | null;
+  }>({
+    isGenerating: false,
     hasReport: false,
     reportUrl: null,
     reportFilename: null
@@ -1541,6 +1557,540 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     }
   };
 
+  // Функция для поворота изображения на 90° против часовой стрелки
+  const rotateImage90CounterClockwise = async (imageUrl: string): Promise<Blob> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        // Если это blob URL, используем его напрямую
+        // Если это обычный URL, пытаемся загрузить через fetch
+        let blob: Blob | null = null;
+        
+        if (imageUrl.startsWith('blob:')) {
+          // Для blob URL используем напрямую через Image
+          // Устанавливаем таймаут для загрузки
+          const timeout = setTimeout(() => {
+            reject(new Error('Таймаут загрузки изображения из blob URL'));
+          }, 10000); // 10 секунд
+          
+          img.onload = () => {
+            clearTimeout(timeout);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error('Не удалось получить контекст canvas'));
+              return;
+            }
+            
+            // Меняем местами ширину и высоту для поворота на 90°
+            canvas.width = img.height;
+            canvas.height = img.width;
+            
+            // Поворачиваем на 90° против часовой стрелки
+            ctx.translate(0, canvas.height);
+            ctx.rotate(-Math.PI / 2);
+            ctx.drawImage(img, 0, 0);
+            
+            canvas.toBlob((blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('Не удалось создать blob из canvas'));
+              }
+            }, 'image/png');
+          };
+          
+          img.onerror = () => {
+            clearTimeout(timeout);
+            reject(new Error('Не удалось загрузить изображение из blob URL. Возможно, blob URL уже недействителен.'));
+          };
+          
+          img.src = imageUrl;
+        } else {
+          // Для обычных URL загружаем через fetch
+          try {
+            const response = await fetch(imageUrl);
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                URL.revokeObjectURL(url);
+                reject(new Error('Не удалось получить контекст canvas'));
+                return;
+              }
+              
+              // Меняем местами ширину и высоту для поворота на 90°
+              canvas.width = img.height;
+              canvas.height = img.width;
+              
+              // Поворачиваем на 90° против часовой стрелки
+              ctx.translate(0, canvas.height);
+              ctx.rotate(-Math.PI / 2);
+              ctx.drawImage(img, 0, 0);
+              
+              URL.revokeObjectURL(url);
+              
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  resolve(blob);
+                } else {
+                  reject(new Error('Не удалось создать blob из canvas'));
+                }
+              }, 'image/png');
+            };
+            
+            img.onerror = () => {
+              URL.revokeObjectURL(url);
+              reject(new Error('Не удалось загрузить изображение'));
+            };
+            
+            img.src = url;
+          } catch (fetchError) {
+            // Если fetch не удался, пробуем использовать URL напрямую
+            console.warn('Не удалось загрузить через fetch, пробуем напрямую:', fetchError);
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                reject(new Error('Не удалось получить контекст canvas'));
+                return;
+              }
+              
+              canvas.width = img.height;
+              canvas.height = img.width;
+              
+              ctx.translate(0, canvas.height);
+              ctx.rotate(-Math.PI / 2);
+              ctx.drawImage(img, 0, 0);
+              
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  resolve(blob);
+                } else {
+                  reject(new Error('Не удалось создать blob из canvas'));
+                }
+              }, 'image/png');
+            };
+            
+            img.onerror = () => {
+              reject(new Error('Не удалось загрузить изображение'));
+            };
+            
+            img.src = imageUrl;
+          }
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  // Функция создания Docx файла со свидетельствами о поверке
+  const handleGenerateVerificationReport = async () => {
+    if (!projectId || !qualificationObjectId) {
+      alert('Необходимо указать проект и объект квалификации');
+      return;
+    }
+
+    setVerificationReportStatus(prev => ({ ...prev, isGenerating: true }));
+
+    try {
+      // 1. Получаем дату из этапа "Расстановка логгеров" из плана-графика
+      const workSchedule = await qualificationWorkScheduleService.getWorkSchedule(
+        qualificationObjectId,
+        projectId
+      );
+      const loggerPlacementStage = workSchedule.find(
+        stage => stage.stageName === 'Расстановка логгеров'
+      );
+      
+      if (!loggerPlacementStage || !loggerPlacementStage.startDate) {
+        alert('Не найдена дата этапа "Расстановка логгеров" в плане-графике');
+        setVerificationReportStatus(prev => ({ ...prev, isGenerating: false }));
+        return;
+      }
+
+      const placementDate = new Date(loggerPlacementStage.startDate);
+      console.log('Дата расстановки логгеров:', placementDate.toLocaleDateString('ru-RU'));
+      
+      // Нормализуем дату расстановки (только дата, без времени)
+      const placementDateOnly = new Date(placementDate);
+      placementDateOnly.setHours(0, 0, 0, 0);
+      
+      // 2. Получаем все оборудование и ищем верификации с периодом, включающим дату расстановки
+      // Вместо поиска по серийным номерам из логгеров, берем все оборудование с верификациями
+      const verificationFiles: Array<{ equipment: any; verification: any; imageBlob: Blob }> = [];
+      
+      // Получаем все оборудование
+      const allEquipment = await equipmentService.getAllEquipment(1, 1000);
+      console.log(`Получено оборудования: ${allEquipment.equipment.length}`);
+      
+      // Проходим по всему оборудованию и ищем верификации с периодом, включающим дату расстановки
+      for (const equipment of allEquipment.equipment) {
+        try {
+          if (!equipment.verifications || equipment.verifications.length === 0) {
+            continue;
+          }
+          
+          console.log(`Проверка оборудования: ${equipment.name}, серийный номер: ${equipment.serialNumber}, верификаций: ${equipment.verifications.length}`);
+          
+          // Фильтруем верификации, период которых включает дату расстановки
+          const relevantVerifications = equipment.verifications.filter(verification => {
+            if (!verification.verificationStartDate || !verification.verificationEndDate) {
+              return false;
+            }
+            
+            const startDate = new Date(verification.verificationStartDate);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(verification.verificationEndDate);
+            endDate.setHours(23, 59, 59, 999);
+            
+            const isInRange = placementDateOnly >= startDate && placementDateOnly <= endDate;
+            console.log(`  Верификация: ${startDate.toLocaleDateString('ru-RU')} - ${endDate.toLocaleDateString('ru-RU')}, дата расстановки: ${placementDateOnly.toLocaleDateString('ru-RU')}, входит: ${isInRange}`);
+            
+            return isInRange;
+          });
+          
+          if (relevantVerifications.length > 0) {
+            console.log(`  Найдено релевантных верификаций для ${equipment.name}: ${relevantVerifications.length}`);
+          }
+
+          // Для каждой релевантной верификации загружаем и поворачиваем изображение
+          for (const verification of relevantVerifications) {
+            if (verification.verificationFileUrl) {
+              try {
+                console.log(`  Загрузка изображения: ${verification.verificationFileUrl}`);
+                
+                // Проверяем, является ли URL действительным blob URL или обычным URL
+                const isBlobUrl = verification.verificationFileUrl.startsWith('blob:');
+                const isHttpUrl = verification.verificationFileUrl.startsWith('http://') || verification.verificationFileUrl.startsWith('https://');
+                const isLocalUrl = verification.verificationFileUrl.startsWith('/uploads/');
+                
+                if (!isBlobUrl && !isHttpUrl && !isLocalUrl) {
+                  console.warn(`  Некорректный URL для ${equipment.name}: ${verification.verificationFileUrl}`);
+                  continue;
+                }
+                
+                const rotatedImage = await rotateImage90CounterClockwise(verification.verificationFileUrl);
+                verificationFiles.push({
+                  equipment,
+                  verification,
+                  imageBlob: rotatedImage
+                });
+                console.log(`  Изображение успешно обработано для ${equipment.name}`);
+              } catch (error) {
+                console.error(`  Ошибка обработки изображения для оборудования ${equipment.name}:`, error);
+                // Продолжаем обработку других файлов, не прерывая весь процесс
+              }
+            } else {
+              console.log(`  Верификация для ${equipment.name} не имеет файла`);
+            }
+          }
+        } catch (error) {
+          console.error(`Ошибка обработки оборудования ${equipment.name}:`, error);
+        }
+      }
+
+      if (verificationFiles.length === 0) {
+        const placementDateStr = placementDate.toLocaleDateString('ru-RU');
+        alert(`Не удалось загрузить файлы метрологической аттестации.\n\nВозможные причины:\n1. Файлы не были загружены на сервер (используются только локальные blob URL)\n2. Период аттестации не включает дату расстановки логгеров: ${placementDateStr}\n\nРекомендация: Перезагрузите файлы метрологической аттестации в справочнике оборудования, чтобы они были сохранены на сервере.\n\nДата расстановки логгеров берется из этапа "Расстановка логгеров" в плане-графике квалификационных работ.`);
+        setVerificationReportStatus(prev => ({ ...prev, isGenerating: false }));
+        return;
+      }
+      
+      console.log(`Успешно обработано ${verificationFiles.length} файлов метрологической аттестации`);
+
+      // 4. Создаем Docx файл с изображениями (2 на листе)
+      const zip = new JSZip();
+      
+      // Создаем базовую структуру DOCX
+      const wordFolder = zip.folder('word');
+      if (!wordFolder) {
+        throw new Error('Не удалось создать папку word');
+      }
+
+      const mediaFolder = wordFolder.folder('media');
+      if (!mediaFolder) {
+        throw new Error('Не удалось создать папку media');
+      }
+
+      // Создаем document.xml с изображениями
+      let documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+           xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+           xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+           xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>`;
+
+      // Размещаем изображения по 2 на листе
+      for (let i = 0; i < verificationFiles.length; i += 2) {
+        const file1 = verificationFiles[i];
+        const file2 = verificationFiles[i + 1];
+        
+        // Добавляем изображения в media папку
+        const imageId1 = `image_${i}`;
+        const imageId2 = file2 ? `image_${i + 1}` : null;
+        
+        mediaFolder.file(`${imageId1}.png`, file1.imageBlob);
+        if (file2) {
+          mediaFolder.file(`${imageId2}.png`, file2.imageBlob);
+        }
+
+        // Создаем таблицу с двумя изображениями рядом (или одно изображение)
+        const columnCount = file2 ? 2 : 1;
+        documentXml += `
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="0" w:type="auto"/>
+        <w:tblBorders>
+          <w:top w:val="none" w:sz="0" w:space="0" w:color="auto"/>
+          <w:left w:val="none" w:sz="0" w:space="0" w:color="auto"/>
+          <w:bottom w:val="none" w:sz="0" w:space="0" w:color="auto"/>
+          <w:right w:val="none" w:sz="0" w:space="0" w:color="auto"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tr>`;
+
+        // Первое изображение
+        documentXml += `
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="${file2 ? '4750' : '9500'}" w:type="dxa"/>
+          </w:tcPr>
+          <w:p>
+            <w:r>
+              <w:drawing>
+                <wp:inline distT="0" distB="0" distL="0" distR="0">
+                  <wp:extent cx="4500000" cy="3000000"/>
+                  <wp:effectExtent l="0" t="0" r="0" b="0"/>
+                  <wp:docPr id="${i * 2 + 1}" name="Picture ${i * 2 + 1}"/>
+                  <wp:cNvGraphicFramePr>
+                    <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+                  </wp:cNvGraphicFramePr>
+                  <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                    <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                      <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                        <pic:nvPicPr>
+                          <pic:cNvPr id="0" name="Picture"/>
+                          <pic:cNvPicPr/>
+                        </pic:nvPicPr>
+                        <pic:blipFill>
+                          <a:blip r:embed="rId${i * 2 + 1}"/>
+                          <a:stretch>
+                            <a:fillRect/>
+                          </a:stretch>
+                        </pic:blipFill>
+                        <pic:spPr>
+                          <a:xfrm>
+                            <a:off x="0" y="0"/>
+                            <a:ext cx="4500000" cy="3000000"/>
+                          </a:xfrm>
+                          <a:prstGeom prst="rect">
+                            <a:avLst/>
+                          </a:prstGeom>
+                        </pic:spPr>
+                      </pic:pic>
+                    </a:graphicData>
+                  </a:graphic>
+                </wp:inline>
+              </w:drawing>
+            </w:r>
+          </w:p>
+        </w:tc>`;
+
+        // Второе изображение (если есть)
+        if (file2) {
+          documentXml += `
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4750" w:type="dxa"/>
+          </w:tcPr>
+          <w:p>
+            <w:r>
+              <w:drawing>
+                <wp:inline distT="0" distB="0" distL="0" distR="0">
+                  <wp:extent cx="4500000" cy="3000000"/>
+                  <wp:effectExtent l="0" t="0" r="0" b="0"/>
+                  <wp:docPr id="${i * 2 + 2}" name="Picture ${i * 2 + 2}"/>
+                  <wp:cNvGraphicFramePr>
+                    <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+                  </wp:cNvGraphicFramePr>
+                  <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                    <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                      <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                        <pic:nvPicPr>
+                          <pic:cNvPr id="0" name="Picture"/>
+                          <pic:cNvPicPr/>
+                        </pic:nvPicPr>
+                        <pic:blipFill>
+                          <a:blip r:embed="rId${i * 2 + 2}"/>
+                          <a:stretch>
+                            <a:fillRect/>
+                          </a:stretch>
+                        </pic:blipFill>
+                        <pic:spPr>
+                          <a:xfrm>
+                            <a:off x="0" y="0"/>
+                            <a:ext cx="4500000" cy="3000000"/>
+                          </a:xfrm>
+                          <a:prstGeom prst="rect">
+                            <a:avLst/>
+                          </a:prstGeom>
+                        </pic:spPr>
+                      </pic:pic>
+                    </a:graphicData>
+                  </a:graphic>
+                </wp:inline>
+              </w:drawing>
+            </w:r>
+          </w:p>
+        </w:tc>`;
+        }
+        
+        documentXml += `
+      </w:tr>
+    </w:tbl>`;
+      }
+
+      documentXml += `
+  </w:body>
+</w:document>`;
+
+      wordFolder.file('document.xml', documentXml);
+
+      // Создаем relationships для изображений
+      let relationshipsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`;
+
+      for (let i = 0; i < verificationFiles.length; i++) {
+        relationshipsXml += `
+  <Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image_${i}.png"/>`;
+      }
+
+      relationshipsXml += `
+</Relationships>`;
+
+      wordFolder.file('_rels/document.xml.rels', relationshipsXml);
+
+      // Создаем базовые файлы DOCX
+      zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Default Extension="png" ContentType="image/png"/>
+</Types>`);
+
+      zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
+
+      // Генерируем DOCX файл
+      const docxBlob = await zip.generateAsync({
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
+
+      // Создаем URL для скачивания
+      const now = new Date();
+      const reportUrl = URL.createObjectURL(docxBlob);
+      const reportFilename = `приложение_свидетельства_о_поверке_${now.toISOString().slice(0, 10)}.docx`;
+
+      // Сохраняем отчет в базу данных
+      if (reportService.isAvailable() && projectId && qualificationObjectId && user?.id) {
+        try {
+          const reportName = 'Приложение свидетельства о поверке';
+          const existingReport = await reportService.findExistingReport(
+            projectId,
+            qualificationObjectId,
+            reportName
+          );
+
+          // Сохраняем blob в localStorage для надежности (как для других отчетов)
+          const verificationReportKey = `verification_report_${existingReport?.id || 'new'}`;
+          const reportArrayBuffer = await docxBlob.arrayBuffer();
+          localStorage.setItem(verificationReportKey, JSON.stringify(Array.from(new Uint8Array(reportArrayBuffer))));
+
+          if (existingReport) {
+            await reportService.updateReport(existingReport.id!, {
+              reportUrl,
+              reportFilename,
+              reportData: {
+                placementDate: placementDate.toISOString(),
+                equipmentCount: allEquipment.equipment.length,
+                verificationCount: verificationFiles.length
+              }
+            });
+            // Обновляем ключ localStorage с правильным ID
+            if (existingReport.id) {
+              const correctKey = `verification_report_${existingReport.id}`;
+              localStorage.setItem(correctKey, JSON.stringify(Array.from(new Uint8Array(reportArrayBuffer))));
+              localStorage.removeItem(verificationReportKey);
+            }
+          } else {
+            const savedReport = await reportService.saveReport({
+              projectId,
+              qualificationObjectId,
+              reportName,
+              reportType: 'template',
+              reportUrl,
+              reportFilename,
+              reportData: {
+                placementDate: placementDate.toISOString(),
+                equipmentCount: allEquipment.equipment.length,
+                verificationCount: verificationFiles.length
+              },
+              createdBy: user.id
+            });
+            // Обновляем ключ localStorage с правильным ID после сохранения
+            if (savedReport.id) {
+              const correctKey = `verification_report_${savedReport.id}`;
+              localStorage.setItem(correctKey, JSON.stringify(Array.from(new Uint8Array(reportArrayBuffer))));
+              localStorage.removeItem(verificationReportKey);
+            }
+          }
+
+          // Перезагружаем список отчетов
+          await loadSavedReports();
+        } catch (error) {
+          console.error('Ошибка сохранения отчета в базу данных:', error);
+        }
+      }
+
+      // Обновляем состояние
+      setVerificationReportStatus({
+        isGenerating: false,
+        hasReport: true,
+        reportUrl,
+        reportFilename
+      });
+
+      // Автоматически скачиваем файл
+      const link = document.createElement('a');
+      link.href = reportUrl;
+      link.download = reportFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+    } catch (error) {
+      console.error('Ошибка генерации приложения свидетельства о поверке:', error);
+      alert(`Ошибка при формировании приложения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      setVerificationReportStatus(prev => ({ ...prev, isGenerating: false }));
+    }
+  };
+
   const handleDownloadReport = () => {
     if (reportStatus.reportUrl && reportStatus.reportFilename) {
       const link = document.createElement('a');
@@ -1658,22 +2208,66 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     try {
       console.log('Скачиваем отчет:', report);
       
-      // Проверяем, есть ли URL отчета
-      if (!report.reportUrl) {
-        alert('Ссылка на отчет недоступна');
+      let reportBlob: Blob | null = null;
+      
+      // Сначала пытаемся использовать URL из базы данных
+      if (report.reportUrl) {
+        try {
+          const response = await fetch(report.reportUrl);
+          if (response.ok) {
+            reportBlob = await response.blob();
+            console.log('Отчет загружен из URL');
+          }
+        } catch (error) {
+          console.warn('Не удалось загрузить отчет по URL, пробуем localStorage:', error);
+        }
+      }
+      
+      // Если не удалось загрузить по URL, пробуем localStorage
+      if (!reportBlob && report.id) {
+        // Определяем ключ в зависимости от типа отчета
+        let reportKey: string;
+        if (report.reportName.includes('Сводный отчет')) {
+          reportKey = `summary_report_${report.id}`;
+        } else if (report.reportName.includes('Отчет по испытанию')) {
+          reportKey = `trial_report_${report.id}`;
+        } else if (report.reportName.includes('Приложение свидетельства о поверке')) {
+          reportKey = `verification_report_${report.id}`;
+        } else {
+          reportKey = `report_${report.id}`;
+        }
+        
+        const storedData = localStorage.getItem(reportKey);
+        
+        if (storedData) {
+          try {
+            const arrayBuffer = new Uint8Array(JSON.parse(storedData));
+            reportBlob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+            console.log('Отчет загружен из localStorage');
+          } catch (error) {
+            console.error('Ошибка восстановления отчета из localStorage:', error);
+          }
+        }
+      }
+      
+      if (!reportBlob) {
+        alert('Отчет недоступен для скачивания. Попробуйте сформировать отчет заново.');
         return;
       }
 
       // Создаем временную ссылку для скачивания
+      const blobUrl = URL.createObjectURL(reportBlob);
       const link = document.createElement('a');
-      link.href = report.reportUrl;
+      link.href = blobUrl;
       link.download = report.reportFilename || 'отчет.docx';
-      link.target = '_blank';
       
       // Добавляем ссылку в DOM, кликаем и удаляем
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // Освобождаем blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
       console.log('Отчет скачан:', report.reportFilename);
     } catch (error) {
@@ -3168,8 +3762,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             )}
           </div>
 
-          {/* Кнопка генерации отчета */}
-          <div className="flex justify-center">
+          {/* Кнопки генерации отчетов */}
+          <div className="flex justify-center gap-4 flex-wrap">
             <button
               onClick={handleGenerateTemplateReport}
               disabled={Boolean(
@@ -3188,7 +3782,25 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               ) : (
                 <>
                   <FileText className="w-5 h-5" />
-                  <span>Сформировать отчет</span>
+                  <span>Сформировать приложение о испытаниях</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleGenerateVerificationReport}
+              disabled={verificationReportStatus.isGenerating || !projectId || !qualificationObjectId}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+              title="Сформировать приложение свидетельства о поверке"
+            >
+              {verificationReportStatus.isGenerating ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <span>Формирование...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-5 h-5" />
+                  <span>Сформировать приложение свидетельства о поверке</span>
                 </>
               )}
             </button>
@@ -3200,7 +3812,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
               <FileText className="w-5 h-5 mr-2 text-indigo-600" />
-              Сохраненные отчеты
+              Приложения к отчету
             </h3>
             
             {loadingReports ? (

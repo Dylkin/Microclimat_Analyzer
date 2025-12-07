@@ -183,7 +183,21 @@ const EquipmentDirectory: React.FC = () => {
         alert('Все верификации должны иметь даты начала и окончания');
         return;
       }
-      if (verification.verificationStartDate > verification.verificationEndDate) {
+      
+      // Проверяем валидность дат
+      const startDate = verification.verificationStartDate instanceof Date 
+        ? verification.verificationStartDate 
+        : new Date(verification.verificationStartDate);
+      const endDate = verification.verificationEndDate instanceof Date 
+        ? verification.verificationEndDate 
+        : new Date(verification.verificationEndDate);
+      
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        alert('Одна или несколько дат верификации имеют неверный формат');
+        return;
+      }
+      
+      if (startDate > endDate) {
         alert('Дата начала верификации не может быть позже даты окончания');
         return;
       }
@@ -371,11 +385,28 @@ const EquipmentDirectory: React.FC = () => {
                   <label className="block text-xs text-gray-500 mb-1">Дата начала *</label>
                   <input
                     type="date"
-                    value={verification.verificationStartDate instanceof Date 
-                      ? verification.verificationStartDate.toISOString().split('T')[0]
-                      : verification.verificationStartDate
-                    }
-                    onChange={(e) => updateVerification(index, 'verificationStartDate', new Date(e.target.value), isEdit)}
+                    value={(() => {
+                      if (verification.verificationStartDate instanceof Date) {
+                        // Проверяем валидность даты перед вызовом toISOString()
+                        if (!isNaN(verification.verificationStartDate.getTime())) {
+                          return verification.verificationStartDate.toISOString().split('T')[0];
+                        }
+                        return '';
+                      }
+                      return verification.verificationStartDate || '';
+                    })()}
+                    onChange={(e) => {
+                      const dateValue = e.target.value;
+                      if (dateValue) {
+                        const newDate = new Date(dateValue);
+                        // Проверяем валидность даты перед сохранением
+                        if (!isNaN(newDate.getTime())) {
+                          updateVerification(index, 'verificationStartDate', newDate, isEdit);
+                        }
+                      } else {
+                        updateVerification(index, 'verificationStartDate', null, isEdit);
+                      }
+                    }}
                     className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
                     title="Дата начала поверки"
@@ -386,11 +417,28 @@ const EquipmentDirectory: React.FC = () => {
                   <label className="block text-xs text-gray-500 mb-1">Дата окончания *</label>
                   <input
                     type="date"
-                    value={verification.verificationEndDate instanceof Date 
-                      ? verification.verificationEndDate.toISOString().split('T')[0]
-                      : verification.verificationEndDate
-                    }
-                    onChange={(e) => updateVerification(index, 'verificationEndDate', new Date(e.target.value), isEdit)}
+                    value={(() => {
+                      if (verification.verificationEndDate instanceof Date) {
+                        // Проверяем валидность даты перед вызовом toISOString()
+                        if (!isNaN(verification.verificationEndDate.getTime())) {
+                          return verification.verificationEndDate.toISOString().split('T')[0];
+                        }
+                        return '';
+                      }
+                      return verification.verificationEndDate || '';
+                    })()}
+                    onChange={(e) => {
+                      const dateValue = e.target.value;
+                      if (dateValue) {
+                        const newDate = new Date(dateValue);
+                        // Проверяем валидность даты перед сохранением
+                        if (!isNaN(newDate.getTime())) {
+                          updateVerification(index, 'verificationEndDate', newDate, isEdit);
+                        }
+                      } else {
+                        updateVerification(index, 'verificationEndDate', null, isEdit);
+                      }
+                    }}
                     className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
                     title="Дата окончания поверки"
@@ -937,13 +985,27 @@ const EquipmentDirectory: React.FC = () => {
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Дата начала</label>
                         <p className="text-sm text-gray-900">
-                          {verification.verificationStartDate.toLocaleDateString('ru-RU')}
+                          {(() => {
+                            const date = verification.verificationStartDate instanceof Date 
+                              ? verification.verificationStartDate 
+                              : new Date(verification.verificationStartDate);
+                            return !isNaN(date.getTime()) 
+                              ? date.toLocaleDateString('ru-RU') 
+                              : 'Не указана';
+                          })()}
                         </p>
                       </div>
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Дата окончания</label>
                         <p className="text-sm text-gray-900">
-                          {verification.verificationEndDate.toLocaleDateString('ru-RU')}
+                          {(() => {
+                            const date = verification.verificationEndDate instanceof Date 
+                              ? verification.verificationEndDate 
+                              : new Date(verification.verificationEndDate);
+                            return !isNaN(date.getTime()) 
+                              ? date.toLocaleDateString('ru-RU') 
+                              : 'Не указана';
+                          })()}
                         </p>
                       </div>
                     </div>
@@ -988,20 +1050,34 @@ const EquipmentDirectory: React.FC = () => {
                     {/* Статус аттестации */}
                     <div className="mt-3">
                       <div className="flex items-center space-x-2">
-                        {verification.verificationEndDate > new Date() ? (
-                          <>
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                            <span className="text-sm text-green-700 font-medium">Действительна</span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertTriangle className="w-4 h-4 text-red-500" />
-                            <span className="text-sm text-red-700 font-medium">Просрочена</span>
-                          </>
-                        )}
-                        <span className="text-xs text-gray-500">
-                          (до {verification.verificationEndDate.toLocaleDateString('ru-RU')})
-                        </span>
+                        {(() => {
+                          const endDate = verification.verificationEndDate instanceof Date 
+                            ? verification.verificationEndDate 
+                            : new Date(verification.verificationEndDate);
+                          const isValidDate = !isNaN(endDate.getTime());
+                          const isFuture = isValidDate && endDate > new Date();
+                          
+                          return (
+                            <>
+                              {isFuture ? (
+                                <>
+                                  <CheckCircle className="w-4 h-4 text-green-500" />
+                                  <span className="text-sm text-green-700 font-medium">Действительна</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                                  <span className="text-sm text-red-700 font-medium">Просрочена</span>
+                                </>
+                              )}
+                              <span className="text-xs text-gray-500">
+                                {isValidDate 
+                                  ? `(до ${endDate.toLocaleDateString('ru-RU')})`
+                                  : '(дата не указана)'}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
