@@ -1536,6 +1536,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       alert(`Ошибка при формировании отчета по шаблону: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
       setReportStatus(prev => ({ ...prev, isGenerating: false }));
       // Очищаем existingReport даже при ошибке
+      const processor = DocxTemplateProcessor.getInstance();
       processor.clearExistingReport();
     }
   };
@@ -1814,8 +1815,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         const recoveryTime = calculateRecoveryTimeAfterPowerOn(
           filePoints,
           testMarker.timestamp,
-          limits.temperature.min,
-          limits.temperature.max
+          limits.temperature?.min,
+          limits.temperature?.max
         );
         
         // Преобразуем время в миллисекунды для сравнения
@@ -1921,8 +1922,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         const timeInRange = calculateTimeInRangeAfterPowerOff(
           filePoints,
           testMarker.timestamp,
-          limits.temperature.min,
-          limits.temperature.max
+          limits.temperature?.min,
+          limits.temperature?.max
         );
         
         // Преобразуем время в минуты для сравнения
@@ -2225,15 +2226,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 )}
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Управление масштабом</label>
-              <button
-                onClick={handleResetZoom}
-                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors w-full"
-              >
-                Сбросить масштаб
-              </button>
-            </div>
           </div>
         </div>
 
@@ -2291,6 +2283,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <option value="power_off">Испытание на сбой электропитания (отключение)</option>
                 <option value="power_on">Испытание на сбой электропитания (включение)</option>
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Управление масштабом</label>
+              <button
+                onClick={handleResetZoom}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors w-full"
+              >
+                Сбросить масштаб
+              </button>
             </div>
             {contractFields.testType === 'temperature_recovery' && (
               <div>
