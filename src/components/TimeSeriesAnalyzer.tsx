@@ -442,15 +442,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
       
       if (ranges.length > 0) {
-        // Для типов empty_volume и loaded_volume также исключаем данные между маркерами "Открытие двери"
-        if (contractFields.testType === 'empty_volume' || contractFields.testType === 'loaded_volume') {
-          // Находим маркеры "Открытие двери" для исключения
+        // Для типа loaded_volume исключаем данные между "Открытие двери" и "Восстановление температуры"
+        if (contractFields.testType === 'loaded_volume') {
+          // Находим маркеры "Открытие двери" и "Восстановление температуры"
           const doorMarkers = markers
             .filter(m => m.type === 'door_opening')
             .sort((a, b) => a.timestamp - b.timestamp);
+          const recoveryMarkers = markers
+            .filter(m => m.type === 'temperature_recovery')
+            .sort((a, b) => a.timestamp - b.timestamp);
           
           // Фильтруем точки, которые попадают в любой из диапазонов
-          // и не попадают в диапазоны между маркерами "Открытие двери"
+          // и не попадают в диапазоны между "Открытие двери" и "Восстановление температуры"
           filteredPoints = filteredPoints.filter(point => {
             // Проверяем, попадает ли точка в какой-либо диапазон испытания
             const inTestRange = ranges.some(range => 
@@ -461,20 +464,56 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               return false;
             }
             
-            // Если точка в диапазоне испытания, проверяем, не попадает ли она в диапазон между маркерами "Открытие двери"
-            // Исключаем данные между парами маркеров "Открытие двери" внутри диапазона испытания
+            // Если точка в диапазоне испытания, проверяем, не попадает ли она в диапазон 
+            // между "Открытие двери" и следующим "Восстановление температуры"
+            for (const doorMarker of doorMarkers) {
+              // Ищем первое "Восстановление температуры" после "Открытие двери"
+              const recoveryMarker = recoveryMarkers.find(r => r.timestamp >= doorMarker.timestamp);
+              
+              if (recoveryMarker) {
+                // Проверяем, что этот диапазон находится внутри диапазона испытания
+                const inTestRangeWithDoor = ranges.some(range => 
+                  doorMarker.timestamp >= range.start && recoveryMarker.timestamp <= range.end
+                );
+                
+                if (inTestRangeWithDoor) {
+                  // Исключаем точку, если она попадает в диапазон между "Открытие двери" и "Восстановление температуры"
+                  if (point.timestamp >= doorMarker.timestamp && point.timestamp <= recoveryMarker.timestamp) {
+                    return false;
+                  }
+                }
+              }
+            }
+            
+            return true;
+          });
+        } else if (contractFields.testType === 'empty_volume') {
+          // Для empty_volume сохраняем старую логику (исключаем данные между парами "Открытие двери")
+          const doorMarkers = markers
+            .filter(m => m.type === 'door_opening')
+            .sort((a, b) => a.timestamp - b.timestamp);
+          
+          filteredPoints = filteredPoints.filter(point => {
+            const inTestRange = ranges.some(range => 
+              point.timestamp >= range.start && point.timestamp <= range.end
+            );
+            
+            if (!inTestRange) {
+              return false;
+            }
+            
+            // Исключаем данные между парами маркеров "Открытие двери"
             for (let i = 0; i < doorMarkers.length - 1; i += 2) {
               const doorStart = doorMarkers[i].timestamp;
               const doorEnd = doorMarkers[i + 1]?.timestamp;
               
               if (doorEnd && point.timestamp >= doorStart && point.timestamp <= doorEnd) {
-                // Проверяем, что этот диапазон двери находится внутри диапазона испытания
                 const inTestRangeWithDoor = ranges.some(range => 
                   doorStart >= range.start && doorEnd <= range.end
                 );
                 
                 if (inTestRangeWithDoor) {
-                  return false; // Исключаем точку, если она в диапазоне открытия двери внутри испытания
+                  return false;
                 }
               }
             }
@@ -503,9 +542,52 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         startMarkersCount: startMarkers.length,
         filteredCount: filteredPoints.length
       });
+      
+      // Для loaded_volume также исключаем данные между "Открытие двери" и "Восстановление температуры"
+      if (contractFields.testType === 'loaded_volume') {
+        const doorMarkers = markers
+          .filter(m => m.type === 'door_opening')
+          .sort((a, b) => a.timestamp - b.timestamp);
+        const recoveryMarkers = markers
+          .filter(m => m.type === 'temperature_recovery')
+          .sort((a, b) => a.timestamp - b.timestamp);
+        
+        filteredPoints = filteredPoints.filter(point => {
+          // Проверяем, не попадает ли точка в диапазон между "Открытие двери" и "Восстановление температуры"
+          for (const doorMarker of doorMarkers) {
+            const recoveryMarker = recoveryMarkers.find(r => r.timestamp >= doorMarker.timestamp);
+            
+            if (recoveryMarker && point.timestamp >= doorMarker.timestamp && point.timestamp <= recoveryMarker.timestamp) {
+              return false; // Исключаем точку
+            }
+          }
+          return true;
+        });
+      }
     }
     
-    // Логика фильтрации данных по маркерам уже обработана выше
+    // Для loaded_volume, если нет маркеров начала/завершения, но есть зум или данные, 
+    // исключаем данные между "Открытие двери" и "Восстановление температуры"
+    if (contractFields.testType === 'loaded_volume' && startMarkers.length === 0 && endMarkers.length === 0) {
+      const doorMarkers = markers
+        .filter(m => m.type === 'door_opening')
+        .sort((a, b) => a.timestamp - b.timestamp);
+      const recoveryMarkers = markers
+        .filter(m => m.type === 'temperature_recovery')
+        .sort((a, b) => a.timestamp - b.timestamp);
+      
+      filteredPoints = filteredPoints.filter(point => {
+        // Проверяем, не попадает ли точка в диапазон между "Открытие двери" и "Восстановление температуры"
+        for (const doorMarker of doorMarkers) {
+          const recoveryMarker = recoveryMarkers.find(r => r.timestamp >= doorMarker.timestamp);
+          
+          if (recoveryMarker && point.timestamp >= doorMarker.timestamp && point.timestamp <= recoveryMarker.timestamp) {
+            return false; // Исключаем точку
+          }
+        }
+        return true;
+      });
+    }
 
     // Если есть данные из базы данных (qualificationObjectId и projectId), используем их
     if (qualificationObjectId && projectId) {
