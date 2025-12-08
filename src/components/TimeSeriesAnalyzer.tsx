@@ -414,116 +414,98 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       );
     }
 
-    // Для типов empty_volume и loaded_volume фильтруем данные по маркерам типа "Испытание"
-    if (contractFields.testType === 'empty_volume' || contractFields.testType === 'loaded_volume') {
-      // Находим все маркеры типа "test"
-      const testMarkers = markers.filter(m => m.type === 'test');
+    // Для всех типов испытаний фильтруем данные по маркерам типа "Начало испытания" и "Завершение испытания"
+    // Находим все маркеры типа "test_start" и "test_end"
+    const startMarkers = markers
+      .filter(m => m.type === 'test_start')
+      .sort((a, b) => a.timestamp - b.timestamp);
+    const endMarkers = markers
+      .filter(m => m.type === 'test_end')
+      .sort((a, b) => a.timestamp - b.timestamp);
+    
+    // Если есть маркеры начала и завершения, ограничиваем данные
+    if (startMarkers.length > 0 && endMarkers.length > 0) {
+      // Формируем диапазоны из пар маркеров
+      const ranges: Array<{ start: number; end: number }> = [];
       
-      // Отладочная информация (убрана для продакшена)
-      // console.log('TimeSeriesAnalyzer: Processing test markers', {
-      //   testMarkersCount: testMarkers.length,
-      //   allMarkers: markers.map(m => ({ id: m.id, type: m.type, label: m.label, timestamp: m.timestamp }))
-      // });
-      
-      // Если маркеры типа 'test' не найдены или найден только один - используем все данные
-      if (testMarkers.length === 0 || testMarkers.length === 1) {
-        // Отладочная информация (убрана для продакшена)
-        // console.log('TimeSeriesAnalyzer: No test markers or single marker, using all data', {
-        //   testMarkersCount: testMarkers.length
-        // });
-        // filteredPoints уже содержит все данные (с учетом зума)
-      } else {
-        // Находим все пары "Начало испытания" - "Завершение испытания"
-        const startMarkers = testMarkers
-          .filter(m => m.label && m.label.trim() === 'Начало испытания')
-          .sort((a, b) => a.timestamp - b.timestamp);
-        const endMarkers = testMarkers
-          .filter(m => m.label && m.label.trim() === 'Завершение испытания')
-          .sort((a, b) => a.timestamp - b.timestamp);
+      // Для каждого "Начало испытания" ищем ближайшее "Завершение испытания" после него
+      for (const startMarker of startMarkers) {
+        // Ищем первое "Завершение испытания" после "Начало испытания"
+        const endMarker = endMarkers.find(e => e.timestamp >= startMarker.timestamp);
         
-        // Находим маркеры "Открытие двери" для исключения
-        const doorMarkers = markers
-          .filter(m => m.type === 'door_opening')
-          .sort((a, b) => a.timestamp - b.timestamp);
-        
-        // Отладочная информация (убрана для продакшена)
-        // console.log('TimeSeriesAnalyzer: Found marker pairs', {
-        //   startMarkersCount: startMarkers.length,
-        //   endMarkersCount: endMarkers.length,
-        //   doorMarkersCount: doorMarkers.length
-        // });
-        
-        if (startMarkers.length > 0 && endMarkers.length > 0) {
-          // Формируем диапазоны из пар маркеров
-          const ranges: Array<{ start: number; end: number }> = [];
-          
-          // Для каждого "Начало испытания" ищем ближайшее "Завершение испытания" после него
-          for (const startMarker of startMarkers) {
-            // Ищем первое "Завершение испытания" после "Начало испытания"
-            const endMarker = endMarkers.find(e => e.timestamp >= startMarker.timestamp);
-            
-            if (endMarker) {
-              ranges.push({
-                start: startMarker.timestamp,
-                end: endMarker.timestamp
-              });
-            }
-          }
-          
-          console.log('TimeSeriesAnalyzer: Created ranges', {
-            rangesCount: ranges.length,
-            ranges: ranges.map(r => ({ start: r.start, end: r.end }))
+        if (endMarker) {
+          ranges.push({
+            start: startMarker.timestamp,
+            end: endMarker.timestamp
           });
-          
-          if (ranges.length > 0) {
-            // Фильтруем точки, которые попадают в любой из диапазонов
-            // и не попадают в диапазоны между маркерами "Открытие двери"
-            filteredPoints = filteredPoints.filter(point => {
-              // Проверяем, попадает ли точка в какой-либо диапазон испытания
-              const inTestRange = ranges.some(range => 
-                point.timestamp >= range.start && point.timestamp <= range.end
-              );
-              
-              if (!inTestRange) {
-                return false;
-              }
-              
-              // Если точка в диапазоне испытания, проверяем, не попадает ли она в диапазон между маркерами "Открытие двери"
-              // Исключаем данные между парами маркеров "Открытие двери" внутри диапазона испытания
-              for (let i = 0; i < doorMarkers.length - 1; i += 2) {
-                const doorStart = doorMarkers[i].timestamp;
-                const doorEnd = doorMarkers[i + 1]?.timestamp;
-                
-                if (doorEnd && point.timestamp >= doorStart && point.timestamp <= doorEnd) {
-                  // Проверяем, что этот диапазон двери находится внутри диапазона испытания
-                  const inTestRangeWithDoor = ranges.some(range => 
-                    doorStart >= range.start && doorEnd <= range.end
-                  );
-                  
-                  if (inTestRangeWithDoor) {
-                    return false; // Исключаем точку, если она в диапазоне открытия двери внутри испытания
-                  }
-                }
-              }
-              
-              return true;
-            });
-            
-            console.log('TimeSeriesAnalyzer: Filtered by marker ranges', {
-              rangesCount: ranges.length,
-              doorMarkersCount: doorMarkers.length,
-              filteredCount: filteredPoints.length
-            });
-          } else {
-            // Если не удалось сформировать пары, используем все данные
-            console.log('TimeSeriesAnalyzer: Could not form marker pairs, using all data');
-          }
-        } else {
-          // Если не найдены пары "Начало испытания" - "Завершение испытания", используем все данные
-          console.log('TimeSeriesAnalyzer: No start/end marker pairs found, using all data');
         }
       }
+      
+      if (ranges.length > 0) {
+        // Для типов empty_volume и loaded_volume также исключаем данные между маркерами "Открытие двери"
+        if (contractFields.testType === 'empty_volume' || contractFields.testType === 'loaded_volume') {
+          // Находим маркеры "Открытие двери" для исключения
+          const doorMarkers = markers
+            .filter(m => m.type === 'door_opening')
+            .sort((a, b) => a.timestamp - b.timestamp);
+          
+          // Фильтруем точки, которые попадают в любой из диапазонов
+          // и не попадают в диапазоны между маркерами "Открытие двери"
+          filteredPoints = filteredPoints.filter(point => {
+            // Проверяем, попадает ли точка в какой-либо диапазон испытания
+            const inTestRange = ranges.some(range => 
+              point.timestamp >= range.start && point.timestamp <= range.end
+            );
+            
+            if (!inTestRange) {
+              return false;
+            }
+            
+            // Если точка в диапазоне испытания, проверяем, не попадает ли она в диапазон между маркерами "Открытие двери"
+            // Исключаем данные между парами маркеров "Открытие двери" внутри диапазона испытания
+            for (let i = 0; i < doorMarkers.length - 1; i += 2) {
+              const doorStart = doorMarkers[i].timestamp;
+              const doorEnd = doorMarkers[i + 1]?.timestamp;
+              
+              if (doorEnd && point.timestamp >= doorStart && point.timestamp <= doorEnd) {
+                // Проверяем, что этот диапазон двери находится внутри диапазона испытания
+                const inTestRangeWithDoor = ranges.some(range => 
+                  doorStart >= range.start && doorEnd <= range.end
+                );
+                
+                if (inTestRangeWithDoor) {
+                  return false; // Исключаем точку, если она в диапазоне открытия двери внутри испытания
+                }
+              }
+            }
+            
+            return true;
+          });
+        } else {
+          // Для других типов испытаний просто ограничиваем данными между началом и завершением
+          filteredPoints = filteredPoints.filter(point => {
+            return ranges.some(range => 
+              point.timestamp >= range.start && point.timestamp <= range.end
+            );
+          });
+        }
+        
+        console.log('TimeSeriesAnalyzer: Filtered by marker ranges', {
+          rangesCount: ranges.length,
+          filteredCount: filteredPoints.length
+        });
+      }
+    } else if (startMarkers.length > 0) {
+      // Если есть только маркеры начала, ограничиваем данные от начала до конца доступных данных
+      const earliestStart = Math.min(...startMarkers.map(m => m.timestamp));
+      filteredPoints = filteredPoints.filter(point => point.timestamp >= earliestStart);
+      console.log('TimeSeriesAnalyzer: Filtered by start markers only', {
+        startMarkersCount: startMarkers.length,
+        filteredCount: filteredPoints.length
+      });
     }
+    
+    // Логика фильтрации данных по маркерам уже обработана выше
 
     // Если есть данные из базы данных (qualificationObjectId и projectId), используем их
     if (qualificationObjectId && projectId) {
@@ -1112,9 +1094,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return recoveryMarkers.length > 0 ? recoveryMarkers[0] : null;
     }
     
-    // Для других типов ищем маркер типа 'test'
-    const testMarkers = markers.filter(m => m.type === 'test');
-    return testMarkers.length > 0 ? testMarkers[0] : null;
+    // Для других типов испытаний ищем маркер типа 'test_start'
+    const testStartMarkers = markers.filter(m => m.type === 'test_start');
+    return testStartMarkers.length > 0 ? testStartMarkers[0] : null;
   };
 
   const handleLimitChange = (type: DataType, limitType: 'min' | 'max', value: string) => {
@@ -1160,24 +1142,54 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       };
       setMarkers(prev => [...prev, newMarker]);
     } else {
-      // Для других типов испытаний определяем название маркера на основе количества существующих маркеров
-      // Нечётные по порядку (1, 3, 5, ...): "Начало испытания"
-      // Чётные по порядку (2, 4, 6, ...): "Завершение испытания"
-      const markerNumber = markers.length + 1;
-      const label = markerNumber % 2 === 1 
-        ? 'Начало испытания' 
-        : 'Завершение испытания';
+      // Для других типов испытаний создаем маркеры "Начало испытания" и "Завершение испытания"
+      // Проверяем, есть ли уже маркер "Начало испытания"
+      const hasStartMarker = markers.some(m => m.type === 'test_start');
       
-      const newMarker: VerticalMarker = {
-        id: Date.now().toString(),
-        timestamp,
-        label,
-        color: '#000000', // Черный цвет для всех маркеров
-        type: 'test'
-      };
-      setMarkers(prev => [...prev, newMarker]);
+      if (!hasStartMarker) {
+        // Если нет маркера начала, создаем "Начало испытания"
+        const newMarker: VerticalMarker = {
+          id: Date.now().toString(),
+          timestamp,
+          label: 'Начало испытания',
+          color: '#000000', // Черный цвет для всех маркеров
+          type: 'test_start'
+        };
+        setMarkers(prev => [...prev, newMarker]);
+      } else {
+        // Если есть маркер начала, проверяем, можно ли создать "Завершение испытания"
+        // Находим последний маркер "Начало испытания"
+        const startMarkers = markers
+          .filter(m => m.type === 'test_start')
+          .sort((a, b) => a.timestamp - b.timestamp);
+        const lastStartMarker = startMarkers[startMarkers.length - 1];
+        
+        // Проверяем, что новый маркер идет после последнего "Начало испытания"
+        if (timestamp > lastStartMarker.timestamp) {
+          // Проверяем, нет ли уже "Завершение испытания" после этого "Начало испытания"
+          const hasEndMarkerAfterStart = markers.some(m => 
+            m.type === 'test_end' && m.timestamp > lastStartMarker.timestamp
+          );
+          
+          if (!hasEndMarkerAfterStart) {
+            // Создаем "Завершение испытания"
+            const newMarker: VerticalMarker = {
+              id: Date.now().toString(),
+              timestamp,
+              label: 'Завершение испытания',
+              color: '#000000', // Черный цвет для всех маркеров
+              type: 'test_end'
+            };
+            setMarkers(prev => [...prev, newMarker]);
+          } else {
+            alert('Для данного "Начало испытания" уже установлено "Завершение испытания". Создайте новое "Начало испытания" перед установкой следующего "Завершение испытания".');
+          }
+        } else {
+          alert('"Завершение испытания" должно быть установлено после "Начало испытания".');
+        }
+      }
     }
-  }, [markers.length, contractFields.testType]);
+  }, [markers, contractFields.testType]);
 
   const handleUpdateMarker = (id: string, label: string) => {
     setMarkers(prev => prev.map(m => m.id === id ? { ...m, label } : m));
@@ -1203,6 +1215,25 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         // Если тип изменен на "door_closing", устанавливаем название "Закрытие двери"
         else if (type === 'door_closing') {
           label = 'Закрытие двери';
+        }
+        // Если тип изменен на "test_start", устанавливаем название "Начало испытания"
+        else if (type === 'test_start') {
+          label = 'Начало испытания';
+        }
+        // Если тип изменен на "test_end", устанавливаем название "Завершение испытания"
+        else if (type === 'test_end') {
+          // Проверяем, что есть маркер "Начало испытания" перед этим маркером
+          const marker = prev.find(m => m.id === id);
+          if (marker) {
+            const hasStartBefore = prev.some(m => 
+              m.type === 'test_start' && m.timestamp < marker.timestamp
+            );
+            if (!hasStartBefore) {
+              alert('Нельзя установить "Завершение испытания" без предшествующего "Начало испытания".');
+              return m; // Не изменяем тип
+            }
+          }
+          label = 'Завершение испытания';
         }
         // Если тип изменен на "power", устанавливаем соответствующее наименование в зависимости от типа испытания
         else if (type === 'power') {
@@ -1237,8 +1268,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   const getMarkerTypeLabel = (type: MarkerType): string => {
     switch (type) {
-      case 'test':
-        return 'Испытание';
+      case 'test_start':
+        return 'Начало испытания';
+      case 'test_end':
+        return 'Завершение испытания';
       case 'door_opening':
         return 'Открытие двери';
       case 'door_closing':
@@ -2632,14 +2665,38 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     let endTime: Date;
     let duration: number;
 
-    // Исключаем маркеры типа "door_closing" из формирования выводов
-    const filteredMarkers = markers.filter(m => m.type !== 'door_closing');
+    // Используем маркеры "Начало испытания" и "Завершение испытания" для определения временных рамок
+    const startMarkers = markers
+      .filter(m => m.type === 'test_start')
+      .sort((a, b) => a.timestamp - b.timestamp);
+    const endMarkers = markers
+      .filter(m => m.type === 'test_end')
+      .sort((a, b) => a.timestamp - b.timestamp);
 
-    if (filteredMarkers.length >= 2) {
-      // Если есть маркеры, используем первый и последний (исключая door_closing)
-      const sortedMarkers = [...filteredMarkers].sort((a, b) => a.timestamp - b.timestamp);
-      startTime = new Date(sortedMarkers[0].timestamp);
-      endTime = new Date(sortedMarkers[sortedMarkers.length - 1].timestamp);
+    if (startMarkers.length > 0 && endMarkers.length > 0) {
+      // Используем первый маркер начала и последний маркер завершения
+      startTime = new Date(startMarkers[0].timestamp);
+      // Находим последний маркер завершения, который идет после первого начала
+      const lastEndMarker = endMarkers
+        .filter(e => e.timestamp >= startMarkers[0].timestamp)
+        .sort((a, b) => b.timestamp - a.timestamp)[0];
+      if (lastEndMarker) {
+        endTime = new Date(lastEndMarker.timestamp);
+      } else {
+        // Если нет завершения после начала, используем последний доступный маркер завершения
+        endTime = new Date(endMarkers[endMarkers.length - 1].timestamp);
+      }
+    } else if (startMarkers.length > 0) {
+      // Если есть только начало, используем его и конец данных
+      startTime = new Date(startMarkers[0].timestamp);
+      if (zoomState) {
+        endTime = new Date(zoomState.endTime);
+      } else if (data && data.points.length > 0) {
+        const sortedPoints = [...data.points].sort((a, b) => b.timestamp - a.timestamp);
+        endTime = new Date(sortedPoints[0].timestamp);
+      } else {
+        endTime = new Date();
+      }
     } else if (zoomState) {
       // Если применен зум, используем его границы
       startTime = new Date(zoomState.startTime);
@@ -3181,15 +3238,27 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                           <div className="flex items-center space-x-2">
                             <button
                               type="button"
-                              onClick={() => handleUpdateMarkerType(marker.id, 'test')}
+                              onClick={() => handleUpdateMarkerType(marker.id, 'test_start')}
                               className={`text-xs px-3 py-1 rounded transition-colors ${
-                                marker.type === 'test'
+                                marker.type === 'test_start'
                                   ? 'bg-blue-600 text-white font-medium'
                                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                               }`}
-                              title="Тип маркера: Испытание"
+                              title="Тип маркера: Начало испытания"
                             >
-                              Испытание
+                              Начало испытания
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'test_end')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'test_end'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Завершение испытания"
+                            >
+                              Завершение испытания
                             </button>
                             <button
                               type="button"

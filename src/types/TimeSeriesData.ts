@@ -31,7 +31,7 @@ export interface ChartLimits {
   };
 }
 
-export type MarkerType = 'test' | 'door_opening' | 'door_closing' | 'power' | 'temperature_recovery';
+export type MarkerType = 'test_start' | 'test_end' | 'door_opening' | 'door_closing' | 'power' | 'temperature_recovery';
 
 export interface VerticalMarker {
   id: string;
