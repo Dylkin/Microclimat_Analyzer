@@ -337,7 +337,11 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               // Для внешнего датчика всегда используем серый цвет
               const displayColor = isExternal ? '#6B7280' : (color || '#3b82f6');
               // Используем название логгера, если оно есть, иначе fallback на fileId
-              const displayName = fileData?.loggerName || fileId;
+              // Для внешнего датчика добавляем "Внешний" к названию
+              let displayName = fileData?.loggerName || fileId;
+              if (isExternal) {
+                displayName = displayName ? `${displayName} Внешний` : 'Внешний';
+              }
               return (
                 <span key={fileId} className="inline-flex items-center space-x-1 mr-3">
                   <div 
