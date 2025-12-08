@@ -570,6 +570,64 @@ export class DocxTemplateProcessor {
   }
 
   /**
+   * Копирование необходимых файлов из шаблона в существующий архив
+   */
+  private async copyRequiredFilesFromTemplate(templateZip: JSZip, existingZip: JSZip): Promise<void> {
+    try {
+      const requiredFiles = [
+        'word/styles.xml',
+        'word/settings.xml',
+        'word/webSettings.xml',
+        'word/fontTable.xml',
+        'word/theme/theme1.xml',
+        'docProps/app.xml',
+        'docProps/core.xml'
+      ];
+      
+      for (const fileName of requiredFiles) {
+        const templateFile = templateZip.file(fileName);
+        const existingFile = existingZip.file(fileName);
+        
+        // Копируем файл только если его нет в существующем архиве
+        if (templateFile && !existingFile && !templateFile.dir) {
+          try {
+            const fileData = await templateFile.async('arraybuffer');
+            existingZip.file(fileName, fileData);
+            console.log(`Скопирован необходимый файл из шаблона: ${fileName}`);
+          } catch (error) {
+            console.warn(`Не удалось скопировать файл ${fileName}:`, error);
+            // Не прерываем выполнение, так как это не критично
+          }
+        }
+      }
+      
+      // Также копируем все файлы из word/_rels, если их нет
+      const templateFiles = Object.keys(templateZip.files);
+      for (const fileName of templateFiles) {
+        if (fileName.startsWith('word/_rels/') && fileName !== 'word/_rels/document.xml.rels') {
+          const templateFile = templateZip.file(fileName);
+          const existingFile = existingZip.file(fileName);
+          
+          if (templateFile && !existingFile && !templateFile.dir) {
+            try {
+              const fileData = await templateFile.async('arraybuffer');
+              existingZip.file(fileName, fileData);
+              console.log(`Скопирован файл связей из шаблона: ${fileName}`);
+            } catch (error) {
+              console.warn(`Не удалось скопировать файл ${fileName}:`, error);
+            }
+          }
+        }
+      }
+      
+      console.log('Необходимые файлы из шаблона скопированы');
+    } catch (error) {
+      console.error('Ошибка при копировании необходимых файлов из шаблона:', error);
+      // Не прерываем выполнение, так как это не критично
+    }
+  }
+
+  /**
    * Копирование медиафайлов из нового отчета в существующий
    */
   private async copyMediaFiles(sourceZip: JSZip, targetZip: JSZip): Promise<void> {
@@ -828,6 +886,10 @@ export class DocxTemplateProcessor {
       // Сохраняем обновленный документ
       existingZip.file('word/document.xml', updatedDocumentXml);
       
+      // Копируем необходимые файлы из шаблона в существующий архив
+      // (стили, темы, настройки и т.д., если их нет в существующем архиве)
+      await this.copyRequiredFilesFromTemplate(templateZip, existingZip);
+      
       // Обрабатываем плейсхолдеры в колонтитулах ТОЛЬКО для новых данных
       // (не затрагивая существующие колонтитулы, если они уже обработаны)
       await this.processHeaderFooterPlaceholders(existingZip, data);
@@ -879,19 +941,29 @@ export class DocxTemplateProcessor {
   private appendContentToDocument(existingXml: string, newContentXml: string): string {
     try {
       // Извлекаем контент из шаблона (все что между <w:body> и </w:body>)
-      const bodyStartTag = '<w:body>';
+      const bodyStartTag = '<w:body';
       const bodyEndTag = '</w:body>';
       
+      // Ищем начало body с учетом возможных атрибутов
       const newContentStart = newContentXml.indexOf(bodyStartTag);
-      const newContentEnd = newContentXml.indexOf(bodyEndTag);
+      if (newContentStart === -1) {
+        throw new Error('Не удалось найти начало body в шаблоне');
+      }
       
-      if (newContentStart === -1 || newContentEnd === -1) {
-        throw new Error('Не удалось найти тело документа в шаблоне');
+      // Находим закрывающий тег > после <w:body
+      const bodyTagEnd = newContentXml.indexOf('>', newContentStart);
+      if (bodyTagEnd === -1) {
+        throw new Error('Не удалось найти конец тега body в шаблоне');
+      }
+      
+      const newContentEnd = newContentXml.lastIndexOf(bodyEndTag);
+      if (newContentEnd === -1) {
+        throw new Error('Не удалось найти конец body в шаблоне');
       }
       
       // Извлекаем только содержимое body (без тегов)
       const newBodyContent = newContentXml.substring(
-        newContentStart + bodyStartTag.length,
+        bodyTagEnd + 1,
         newContentEnd
       );
       
@@ -903,16 +975,27 @@ export class DocxTemplateProcessor {
           </w:r>
         </w:p>`;
       
+      // Используем lastIndexOf для поиска последнего вхождения </w:body> в существующем документе
+      const existingBodyEndIndex = existingXml.lastIndexOf(bodyEndTag);
+      if (existingBodyEndIndex === -1) {
+        throw new Error('Не удалось найти конец body в существующем документе');
+      }
+      
       // Вставляем новый контент перед закрывающим тегом </w:body>
-      const updatedXml = existingXml.replace(
-        bodyEndTag,
-        pageBreak + newBodyContent + bodyEndTag
-      );
+      const beforeBody = existingXml.substring(0, existingBodyEndIndex);
+      const afterBody = existingXml.substring(existingBodyEndIndex);
+      
+      const updatedXml = beforeBody + pageBreak + newBodyContent + afterBody;
+      
+      // Проверяем, что XML остался валидным (базовая проверка)
+      if (!updatedXml.includes('<w:body') || !updatedXml.includes('</w:body>')) {
+        throw new Error('Структура XML нарушена после добавления контента');
+      }
       
       return updatedXml;
     } catch (error) {
       console.error('Ошибка добавления контента в документ:', error);
-      throw new Error('Не удалось добавить новый контент в существующий документ');
+      throw new Error(`Не удалось добавить новый контент в существующий документ: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
