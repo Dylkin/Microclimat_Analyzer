@@ -9,12 +9,16 @@ export interface ReportData {
   reportUrl: string;
   reportFilename: string;
   reportData: {
-    dataType: string;
-    analysisResults: any;
-    contractFields: any;
-    conclusions: string;
-    markers: any[];
-    limits: any;
+    dataType?: string;
+    analysisResults?: any;
+    contractFields?: any;
+    conclusions?: string;
+    markers?: any[];
+    limits?: any;
+    placementDate?: string;
+    equipmentCount?: number;
+    verificationCount?: number;
+    [key: string]: any;
   };
   createdBy: string;
   createdAt: Date;
@@ -29,12 +33,16 @@ export interface CreateReportData {
   reportUrl: string;
   reportFilename: string;
   reportData: {
-    dataType: string;
-    analysisResults: any;
-    contractFields: any;
-    conclusions: string;
-    markers: any[];
-    limits: any;
+    dataType?: string;
+    analysisResults?: any;
+    contractFields?: any;
+    conclusions?: string;
+    markers?: any[];
+    limits?: any;
+    placementDate?: string;
+    equipmentCount?: number;
+    verificationCount?: number;
+    [key: string]: any;
   };
   createdBy: string;
 }

@@ -8,7 +8,7 @@ set -e  # Остановка при ошибке
 echo "🚀 Начало обновления Microclimat Analyzer..."
 
 # Определяем директорию проекта (можно изменить)
-PROJECT_DIR="${PROJECT_DIR:-/home/stas/Microclimat_Analyzer}"
+PROJECT_DIR="${PROJECT_DIR:-/home/opt/Microclimat_Analyzer}"
 PROJECT_USER="${PROJECT_USER:-stas}"
 
 # Переходим в директорию проекта
