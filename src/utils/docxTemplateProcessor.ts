@@ -418,6 +418,9 @@ export class DocxTemplateProcessor {
 
       // Обновляем файл связей
       await this.updateRelationships(zip, relationshipId, `media/${imageName}`);
+      
+      // Обновляем [Content_Types].xml для изображения
+      await this.updateContentTypes(zip, imageName);
 
       // Заменяем плейсхолдер на XML изображения
       const updatedDocumentXml = this.replaceChartPlaceholder(documentXml, relationshipId);
@@ -799,6 +802,9 @@ export class DocxTemplateProcessor {
       // Обновляем файл связей в существующем отчете
       await this.updateRelationships(existingZip, newRelationshipId, `media/${newImageName}`);
       
+      // Обновляем [Content_Types].xml для нового изображения
+      await this.updateContentTypes(existingZip, newImageName);
+      
       // Читаем содержимое шаблона для получения структуры новых данных (с поддержкой несжатых файлов)
       const templateDocumentXml = await this.safeReadDocumentXml(templateZip);
       
@@ -826,12 +832,37 @@ export class DocxTemplateProcessor {
       // (не затрагивая существующие колонтитулы, если они уже обработаны)
       await this.processHeaderFooterPlaceholders(existingZip, data);
       
+      // Валидация DOCX структуры перед генерацией
+      console.log('Валидация DOCX структуры перед генерацией...');
+      const validationErrors = await this.validateDocxStructure(existingZip);
+      if (validationErrors.length > 0) {
+        console.error('DOCX validation errors:', validationErrors);
+        throw new Error(`DOCX structure validation failed: ${validationErrors.join('; ')}`);
+      } else {
+        console.log('DOCX structure validation passed');
+      }
+      
+      // Проверяем валидность XML перед генерацией
+      try {
+        const finalXml = await this.safeReadDocumentXml(existingZip);
+        // Проверяем на незакрытые теги
+        const openTags = (finalXml.match(/<w:[^/>]+>/g) || []).length;
+        const closeTags = (finalXml.match(/<\/w:[^>]+>/g) || []).length;
+        if (Math.abs(openTags - closeTags) > 10) { // Допускаем небольшую разницу из-за самозакрывающихся тегов
+          console.warn(`XML tag mismatch: ${openTags} open tags, ${closeTags} close tags`);
+        }
+      } catch (xmlError) {
+        console.error('XML validation error:', xmlError);
+        throw new Error(`XML validation failed: ${xmlError instanceof Error ? xmlError.message : 'Unknown error'}`);
+      }
+      
       // Генерируем обновленный DOCX файл
       console.log('Генерируем обновленный DOCX файл...');
       const buffer = await existingZip.generateAsync({ 
         type: 'blob',
         compression: 'DEFLATE',
-        compressionOptions: { level: 6 }
+        compressionOptions: { level: 6 },
+        streamFiles: false // Важно: отключаем потоковую генерацию для корректной структуры
       });
       
       console.log('Данные успешно добавлены в существующий отчет, размер:', buffer.size, 'байт');
@@ -940,6 +971,57 @@ export class DocxTemplateProcessor {
     
     zip.file(relsPath, relsXml);
     console.log('Обновлен файл связей:', relsPath, 'с ID:', relationshipId);
+  }
+
+  /**
+   * Обновление [Content_Types].xml для добавления нового файла
+   */
+  private async updateContentTypes(zip: JSZip, fileName: string): Promise<void> {
+    const contentTypesPath = '[Content_Types].xml';
+    let contentTypesXml: string;
+    
+    const contentTypesFile = zip.file(contentTypesPath);
+    if (!contentTypesFile) {
+      console.warn('[Content_Types].xml not found, creating default');
+      contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="png" ContentType="image/png"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+    } else {
+      contentTypesXml = await contentTypesFile.async('string');
+    }
+
+    // Определяем тип контента по расширению файла
+    const extension = fileName.split('.').pop()?.toLowerCase() || '';
+    let contentType = '';
+    let partName = '';
+    
+    if (extension === 'png' || extension === 'jpg' || extension === 'jpeg') {
+      contentType = 'image/png';
+      if (extension === 'jpg' || extension === 'jpeg') {
+        contentType = 'image/jpeg';
+      }
+      partName = `/word/media/${fileName}`;
+    } else if (extension === 'xml') {
+      contentType = 'application/xml';
+      partName = `/word/${fileName}`;
+    }
+
+    // Проверяем, не добавлен ли уже этот файл
+    if (partName && !contentTypesXml.includes(`PartName="${partName}"`)) {
+      // Добавляем Override для конкретного файла перед закрывающим тегом
+      const overrideEntry = `  <Override PartName="${partName}" ContentType="${contentType}"/>
+`;
+      contentTypesXml = contentTypesXml.replace('</Types>', `${overrideEntry}</Types>`);
+      
+      zip.file(contentTypesPath, contentTypesXml);
+      console.log('Обновлен [Content_Types].xml для файла:', fileName);
+    } else if (partName) {
+      console.log('Файл уже присутствует в [Content_Types].xml:', fileName);
+    }
   }
 
   /**
