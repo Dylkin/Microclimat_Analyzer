@@ -2207,6 +2207,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const handleDownloadSavedReport = async (report: ReportData) => {
     try {
       console.log('Скачиваем отчет:', report);
+      console.log('reportFilename:', report.reportFilename);
+      console.log('reportName:', report.reportName);
       
       let reportBlob: Blob | null = null;
       
@@ -2259,7 +2261,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const blobUrl = URL.createObjectURL(reportBlob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = report.reportFilename || 'отчет.docx';
+      
+      // Определяем имя файла: используем reportFilename, если есть, иначе генерируем из reportName
+      let filename = report.reportFilename;
+      if (!filename || filename === 'null' || filename === 'undefined') {
+        // Генерируем имя файла из названия отчета
+        const sanitizedName = report.reportName
+          .replace(/[<>:"/\\|?*]/g, '_') // Заменяем недопустимые символы
+          .replace(/\s+/g, '_') // Заменяем пробелы на подчеркивания
+          .toLowerCase();
+        filename = `${sanitizedName}.docx`;
+      }
+      
+      link.download = filename;
       
       // Добавляем ссылку в DOM, кликаем и удаляем
       document.body.appendChild(link);
@@ -2269,7 +2283,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Освобождаем blob URL
       setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
-      console.log('Отчет скачан:', report.reportFilename);
+      console.log('Отчет скачан:', filename);
     } catch (error) {
       console.error('Ошибка скачивания отчета:', error);
       alert('Ошибка при скачивании отчета');
