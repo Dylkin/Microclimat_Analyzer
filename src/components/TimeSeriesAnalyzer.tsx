@@ -3856,10 +3856,17 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               disabled={Boolean(
                 reportStatus.isGenerating || 
                 !reportStatus.templateFile || 
-                (reportStatus.templateValidation && !reportStatus.templateValidation.isValid)
+                (reportStatus.templateValidation && !reportStatus.templateValidation.isValid) ||
+                !showAnalysisResults ||
+                analysisResults.length === 0 ||
+                !conclusions.trim()
               )}
               className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-              title="Сформировать отчет по загруженному шаблону"
+              title={
+                !showAnalysisResults || analysisResults.length === 0 || !conclusions.trim()
+                  ? "Необходимо заполнить блоки 'Результаты анализа' и 'Выводы'"
+                  : "Сформировать отчет по загруженному шаблону"
+              }
             >
               {reportStatus.isGenerating ? (
                 <>
