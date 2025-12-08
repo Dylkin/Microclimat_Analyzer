@@ -1106,10 +1106,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return powerMarkers.length > 0 ? powerMarkers[0] : null;
     }
     
-    // Для temperature_recovery ищем маркер типа 'door_opening'
+    // Для temperature_recovery ищем маркер типа 'temperature_recovery'
     if (contractFields.testType === 'temperature_recovery') {
-      const doorMarkers = markers.filter(m => m.type === 'door_opening');
-      return doorMarkers.length > 0 ? doorMarkers[0] : null;
+      const recoveryMarkers = markers.filter(m => m.type === 'temperature_recovery');
+      return recoveryMarkers.length > 0 ? recoveryMarkers[0] : null;
     }
     
     // Для других типов ищем маркер типа 'test'
@@ -1129,14 +1129,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleAddMarker = useCallback((timestamp: number) => {
-    // Для temperature_recovery создаем только маркеры типа "door_opening"
+    // Для temperature_recovery создаем маркеры типа "temperature_recovery" (вместо door_opening)
     if (contractFields.testType === 'temperature_recovery') {
       const newMarker: VerticalMarker = {
         id: Date.now().toString(),
         timestamp,
-        label: 'Открытие двери', // По умолчанию "Открытие двери", пользователь может изменить на "Восстановление температуры"
+        label: 'Восстановление температуры', // Тип маркера теперь temperature_recovery, label для отображения
         color: '#000000', // Черный цвет для всех маркеров
-        type: 'door_opening'
+        type: 'temperature_recovery'
       };
       setMarkers(prev => [...prev, newMarker]);
     } else if (contractFields.testType === 'power_off') {
@@ -1192,10 +1192,17 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         const currentLabel = m.label;
         let label = currentLabel;
         
-        // Если тип изменен на "door_opening", сохраняем текущее название, если оно уже одно из допустимых
+        // Если тип изменен на "door_opening", устанавливаем соответствующее название
         if (type === 'door_opening') {
-          const isDoorOpeningLabel = currentLabel === 'Открытие двери' || currentLabel === 'Восстановление температуры';
-          label = isDoorOpeningLabel ? currentLabel : 'Открытие двери';
+          label = currentLabel === 'Восстановление температуры' ? 'Восстановление температуры' : 'Открытие двери';
+        }
+        // Если тип изменен на "temperature_recovery", устанавливаем название "Восстановление температуры"
+        else if (type === 'temperature_recovery') {
+          label = 'Восстановление температуры';
+        }
+        // Если тип изменен на "door_closing", устанавливаем название "Закрытие двери"
+        else if (type === 'door_closing') {
+          label = 'Закрытие двери';
         }
         // Если тип изменен на "power", устанавливаем соответствующее наименование в зависимости от типа испытания
         else if (type === 'power') {
@@ -1234,6 +1241,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         return 'Испытание';
       case 'door_opening':
         return 'Открытие двери';
+      case 'door_closing':
+        return 'Закрытие двери';
+      case 'temperature_recovery':
+        return 'Восстановление температуры';
       case 'power':
         return 'Электропитание';
       default:
@@ -2300,8 +2311,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         return;
       }
 
-      // Получаем все маркеры типа "Открытие двери"
-      const doorMarkers = markers.filter(m => m.type === 'door_opening');
+      // Получаем все маркеры типа "temperature_recovery" (ранее использовался door_opening)
+      const doorMarkers = markers.filter(m => m.type === 'temperature_recovery' || m.type === 'door_opening');
       
       // Исключаем внешние датчики
       const nonExternalResults = analysisResults.filter(result => {
@@ -2603,9 +2614,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     let endTime: Date;
     let duration: number;
 
-    if (markers.length >= 2) {
-      // Если есть маркеры, используем первый и последний
-      const sortedMarkers = [...markers].sort((a, b) => a.timestamp - b.timestamp);
+    // Исключаем маркеры типа "door_closing" из формирования выводов
+    const filteredMarkers = markers.filter(m => m.type !== 'door_closing');
+
+    if (filteredMarkers.length >= 2) {
+      // Если есть маркеры, используем первый и последний (исключая door_closing)
+      const sortedMarkers = [...filteredMarkers].sort((a, b) => a.timestamp - b.timestamp);
       startTime = new Date(sortedMarkers[0].timestamp);
       endTime = new Date(sortedMarkers[sortedMarkers.length - 1].timestamp);
     } else if (zoomState) {
@@ -2699,7 +2713,22 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const maxValueStr = `${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.`;
       const resultStr = `${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
       
-      const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Длительность испытания: </b>${durationText}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
+      // Форматируем лимиты для loaded_volume
+      let limitsText = '';
+      if (contractFields.testType === 'loaded_volume' && limits.temperature) {
+        const unit = '°C';
+        const parts: string[] = [];
+        if (limits.temperature.min !== undefined && limits.temperature.max !== undefined) {
+          parts.push(`Температура: от ${limits.temperature.min}${unit} до ${limits.temperature.max}${unit}`);
+        } else if (limits.temperature.min !== undefined) {
+          parts.push(`Температура: минимум ${limits.temperature.min}${unit}`);
+        } else if (limits.temperature.max !== undefined) {
+          parts.push(`Температура: максимум ${limits.temperature.max}${unit}`);
+        }
+        limitsText = parts.length > 0 ? `<b>Лимиты: </b>${parts.join(', ')}.\n` : '';
+      }
+      
+      const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Длительность испытания: </b>${durationText}.\n${limitsText}<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
       
       setConclusions(conclusionText);
     } else {
@@ -2945,13 +2974,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     <div className="flex flex-col space-y-1 flex-1">
                       <div className="flex items-center space-x-3">
                         {editingMarker === marker.id ? (
-                          marker.type === 'door_opening' ? (
+                          (marker.type === 'door_opening' || marker.type === 'temperature_recovery') ? (
                             <select
                               value={marker.label}
                               onChange={(e) => {
                                 const newLabel = e.target.value;
+                                // Если выбран "Восстановление температуры", меняем тип на temperature_recovery
+                                const newType = newLabel === 'Восстановление температуры' ? 'temperature_recovery' : 'door_opening';
                                 setMarkers(prev => prev.map(m => 
-                                  m.id === marker.id ? { ...m, label: newLabel } : m
+                                  m.id === marker.id ? { ...m, label: newLabel, type: newType } : m
                                 ));
                               }}
                               onBlur={() => setEditingMarker(null)}
@@ -3120,7 +3151,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                           <span 
                             className="text-xs px-2 py-1 bg-white border border-gray-200 rounded cursor-default"
                             title={contractFields.testType === 'temperature_recovery' 
-                              ? 'Для типа испытания "Испытание на восстановление температуры после открытия двери" доступны только маркеры типа "Открытие двери"'
+                              ? 'Для типа испытания "Испытание на восстановление температуры после открытия двери" доступны только маркеры типа "Восстановление температуры"'
                               : contractFields.testType === 'power_off'
                               ? 'Для типа испытания "Испытание на сбой электропитания (отключение)" доступны только маркеры типа "Электропитание" с наименованием "Отключение"'
                               : 'Для типа испытания "Испытание на сбой электропитания (включение)" доступны только маркеры типа "Электропитание" с наименованием "Включение"'}
@@ -3153,6 +3184,30 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                               title="Тип маркера: Открытие двери"
                             >
                               Открытие двери
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'door_closing')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'door_closing'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Закрытие двери (не участвует в формировании выводов)"
+                            >
+                              Закрытие двери
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'temperature_recovery')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'temperature_recovery'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Восстановление температуры"
+                            >
+                              Восстановление температуры
                             </button>
                           </div>
                         )}
@@ -3562,8 +3617,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                       return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
                     }) || [];
                     
-                    // Получаем все маркеры типа "Открытие двери"
-                    const doorMarkers = markers.filter(m => m.type === 'door_opening');
+                    // Получаем все маркеры типа "temperature_recovery" или "door_opening" (для обратной совместимости)
+                    const doorMarkers = markers.filter(m => m.type === 'temperature_recovery' || m.type === 'door_opening');
                     
                     recoveryData = calculateRecoveryTimeAfterDoorOpening(
                       filePoints,
