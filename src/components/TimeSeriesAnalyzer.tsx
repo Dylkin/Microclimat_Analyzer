@@ -2469,17 +2469,26 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Проверяем, все ли значения не выходили за пределы
       const allWithinLimits = loggerRecoveryData.every(logger => logger.isOutOfRange);
       
+      // Форматируем дату и время начала испытания
+      const startTimeStr = new Date(testMarker.timestamp).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      
       let conclusionText = '';
       
       if (allWithinLimits) {
         // Все значения не выходили за пределы
-        conclusionText = 'За время проведения испытания температура не выходила за допустимые пределы.';
+        conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\nЗа время проведения испытания температура не выходила за допустимые пределы.`;
       } else {
         // Находим максимальное время восстановления (исключая "за пределы не выходила")
         const validTimes = loggerRecoveryData.filter(logger => !logger.isOutOfRange && logger.timeInMilliseconds > 0);
         
         if (validTimes.length === 0) {
-          conclusionText = 'За время проведения испытания температура не выходила за допустимые пределы.';
+          conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\nЗа время проведения испытания температура не выходила за допустимые пределы.`;
         } else {
           const maxTimeLogger = validTimes.reduce((max, current) => {
             return current.timeInMilliseconds > max.timeInMilliseconds ? current : max;
@@ -2487,7 +2496,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           
           // Форматируем время для вывода
           const maxTimeText = formatTimeDuration(maxTimeLogger.timeInMilliseconds);
-          conclusionText = `Время восстановления температуры при включении электропитания составляет <b>${maxTimeText}</b>.`;
+          conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\nВремя восстановления температуры при включении электропитания составляет <b>${maxTimeText}</b>.`;
         }
       }
 
@@ -2567,17 +2576,26 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Проверяем, все ли значения не выходили за пределы
       const allOutOfRange = loggerTimeData.every(logger => logger.isOutOfRange);
       
+      // Форматируем дату и время начала испытания
+      const startTimeStr = new Date(testMarker.timestamp).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      
       let conclusionText = '';
       
       if (allOutOfRange) {
         // Все значения не выходили за пределы
-        conclusionText = 'За время проведения испытания температура не выходила за допустимые пределы.';
+        conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\nЗа время проведения испытания температура не выходила за допустимые пределы.`;
       } else {
         // Находим минимальное время (исключая "за пределы не выходила")
         const validTimes = loggerTimeData.filter(logger => !logger.isOutOfRange && logger.timeInMinutes > 0);
         
         if (validTimes.length === 0) {
-          conclusionText = 'За время проведения испытания температура не выходила за допустимые пределы.';
+          conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\nЗа время проведения испытания температура не выходила за допустимые пределы.`;
         } else {
           const minTimeLogger = validTimes.reduce((min, current) => {
             return current.timeInMinutes < min.timeInMinutes ? current : min;
@@ -2600,7 +2618,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             timeText = `${minutes} ${minutesText}`;
           }
           
-          conclusionText = `Минимальное время поддержания температуры при отключении электропитания составляет <b>${timeText}</b>.`;
+          conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\nМинимальное время поддержания температуры при отключении электропитания составляет <b>${timeText}</b>.`;
         }
       }
 
