@@ -92,9 +92,9 @@ export const useTimeSeriesData = ({ files, qualificationObjectId, projectId }: U
               timestamp: new Date(record.timestamp).getTime(),
               temperature: !isNaN(temperature as number) && isFinite(temperature as number) ? temperature : undefined,
               humidity: !isNaN(humidity as number) && isFinite(humidity as number) ? humidity : undefined,
-              fileId: `zone-${summary.zone_number}-level-${summary.measurement_level}`,
+              fileId: `zone-${normalizedZoneNumber}-level-${summary.measurement_level}`,
               originalIndex: index,
-              zoneNumber: summary.zone_number,
+              zoneNumber: normalizedZoneNumber, // Нормализованное значение: null -> 0 для внешних датчиков
               measurementLevel: summary.measurement_level,
               deviceSerialNumber: record.device_serial_number || 'Unknown',
               serialNumber: (summary.serial_number && 
@@ -103,7 +103,7 @@ export const useTimeSeriesData = ({ files, qualificationObjectId, projectId }: U
                              summary.serial_number.trim() !== '') 
                              ? summary.serial_number 
                              : 'Не указан', // Серийный номер только из справочника оборудования (measurement_equipment)
-              loggerName: summary.logger_name || `Логгер зона ${summary.zone_number} уровень ${summary.measurement_level}`
+              loggerName: summary.logger_name || `Логгер зона ${normalizedZoneNumber} уровень ${summary.measurement_level}`
             };
           });
           

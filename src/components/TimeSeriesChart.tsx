@@ -333,6 +333,8 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               // Проверяем, является ли это внешним датчиком по zoneNumber или названию
               const fileData = data.find(d => d.fileId === fileId);
               const isExternal = fileData?.zoneNumber === 0 || 
+                                 fileData?.zoneNumber === null ||
+                                 fileData?.zoneNumber === undefined ||
                                  fileData?.loggerName?.toLowerCase().includes('внешний');
               // Для внешнего датчика всегда используем серый цвет
               const displayColor = isExternal ? '#6B7280' : (color || '#3b82f6');
