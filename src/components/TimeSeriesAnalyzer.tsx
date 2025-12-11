@@ -740,11 +740,32 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           isExternal: zoneNumber === 0
         };
       }).sort((a, b) => {
-        // Сортируем: сначала зоны от 1 и выше (по возрастанию), затем зона 0 (Внешний) в конце
-        if (a.zoneNumberRaw === 0 && b.zoneNumberRaw === 0) return 0;
-        if (a.zoneNumberRaw === 0) return 1; // Зона 0 всегда в конце
-        if (b.zoneNumberRaw === 0) return -1; // Зона 0 всегда в конце
-        return a.zoneNumberRaw - b.zoneNumberRaw; // Остальные зоны по возрастанию
+        const parseLevel = (level: any) => {
+          const num = parseFloat(level);
+          return isNaN(num) ? null : num;
+        };
+
+        const aZone = a.zoneNumberRaw ?? 0;
+        const bZone = b.zoneNumberRaw ?? 0;
+        const aExternal = aZone === 0;
+        const bExternal = bZone === 0;
+
+        // Внешние зоны всегда в конце
+        if (aExternal && bExternal) return 0;
+        if (aExternal) return 1;
+        if (bExternal) return -1;
+
+        // Сначала сортируем по зоне
+        if (aZone !== bZone) return aZone - bZone;
+
+        // Внутри зоны сортируем по уровню измерения по возрастанию
+        const aLevel = parseLevel(a.measurementLevel);
+        const bLevel = parseLevel(b.measurementLevel);
+
+        if (aLevel !== null && bLevel !== null && aLevel !== bLevel) return aLevel - bLevel;
+        if (aLevel !== null && bLevel === null) return -1;
+        if (aLevel === null && bLevel !== null) return 1;
+        return 0;
       });
     }
 
@@ -902,11 +923,32 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         isExternal: file.zoneNumber === 0
       };
     }).sort((a, b) => {
-      // Сортируем: сначала зоны от 1 и выше (по возрастанию), затем зона 0 (Внешний) в конце
-      if (a.zoneNumberRaw === 0 && b.zoneNumberRaw === 0) return 0;
-      if (a.zoneNumberRaw === 0) return 1; // Зона 0 всегда в конце
-      if (b.zoneNumberRaw === 0) return -1; // Зона 0 всегда в конце
-      return a.zoneNumberRaw - b.zoneNumberRaw; // Остальные зоны по возрастанию
+      const parseLevel = (level: any) => {
+        const num = parseFloat(level);
+        return isNaN(num) ? null : num;
+      };
+
+      const aZone = a.zoneNumberRaw ?? 0;
+      const bZone = b.zoneNumberRaw ?? 0;
+      const aExternal = aZone === 0;
+      const bExternal = bZone === 0;
+
+      // Внешние зоны всегда в конце
+      if (aExternal && bExternal) return 0;
+      if (aExternal) return 1;
+      if (bExternal) return -1;
+
+      // Сначала сортируем по зоне
+      if (aZone !== bZone) return aZone - bZone;
+
+      // Внутри зоны сортируем по уровню измерения по возрастанию
+      const aLevel = parseLevel(a.measurementLevel);
+      const bLevel = parseLevel(b.measurementLevel);
+
+      if (aLevel !== null && bLevel !== null && aLevel !== bLevel) return aLevel - bLevel;
+      if (aLevel !== null && bLevel === null) return -1;
+      if (aLevel === null && bLevel !== null) return 1;
+      return 0;
     });
   }, [data, files, limits, zoomState, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel, getSerialNumberByEquipmentName, equipmentMap, contractFields.testType, markers]); // Добавляем getSerialNumberByEquipmentName и equipmentMap для получения серийных номеров
 
