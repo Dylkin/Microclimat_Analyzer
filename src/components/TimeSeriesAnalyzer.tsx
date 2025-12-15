@@ -55,6 +55,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [editingMarkerTimestamp, setEditingMarkerTimestamp] = useState<string | null>(null);
   const [conclusions, setConclusions] = useState('');
   const [showAnalysisResults, setShowAnalysisResults] = useState(false);
+  const [analysisResultsRefreshKey, setAnalysisResultsRefreshKey] = useState(0); // Ключ для принудительного обновления результатов анализа
   const [reportStatus, setReportStatus] = useState<{
     isGenerating: boolean;
     hasReport: boolean;
@@ -950,7 +951,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       if (aLevel === null && bLevel !== null) return 1;
       return 0;
     });
-  }, [data, files, limits, zoomState, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel, getSerialNumberByEquipmentName, equipmentMap, contractFields.testType, markers]); // Добавляем getSerialNumberByEquipmentName и equipmentMap для получения серийных номеров
+  }, [data, files, limits, zoomState, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel, getSerialNumberByEquipmentName, equipmentMap, contractFields.testType, markers, analysisResultsRefreshKey]); // Добавляем analysisResultsRefreshKey для принудительного обновления при нажатии "Заполнить"
 
   // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
   const { globalMinTemp, globalMaxTemp } = useMemo(() => {
@@ -2459,6 +2460,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleAutoFillConclusions = () => {
+    // Принудительно обновляем результаты анализа при каждом нажатии кнопки
+    setAnalysisResultsRefreshKey(prev => prev + 1);
     // Показываем результаты анализа и выводы
     setShowAnalysisResults(true);
     // Специальная логика для типа испытания "Испытание на восстановление температуры после открытия двери"
@@ -2912,22 +2915,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const maxValueStr = `${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.`;
       const resultStr = `${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
       
-      // Форматируем лимиты для loaded_volume
-      let limitsText = '';
-      if (contractFields.testType === 'loaded_volume' && limits.temperature) {
-        const unit = '°C';
-        const parts: string[] = [];
-        if (limits.temperature.min !== undefined && limits.temperature.max !== undefined) {
-          parts.push(`Температура: от ${limits.temperature.min}${unit} до ${limits.temperature.max}${unit}`);
-        } else if (limits.temperature.min !== undefined) {
-          parts.push(`Температура: минимум ${limits.temperature.min}${unit}`);
-        } else if (limits.temperature.max !== undefined) {
-          parts.push(`Температура: максимум ${limits.temperature.max}${unit}`);
-        }
-        limitsText = parts.length > 0 ? `<b>Лимиты: </b>${parts.join(', ')}.\n` : '';
-      }
-      
-      const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Длительность испытания: </b>${durationText}.\n${limitsText}<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
+      const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Длительность испытания: </b>${durationText}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
       
       setConclusions(conclusionText);
     } else {
