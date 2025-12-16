@@ -1101,43 +1101,49 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return { time: '-', meetsCriterion: '-' };
     }
     
-    // Определяем диапазоны данных между маркерами "Открытие двери"
+    // Определяем диапазоны данных между маркерами "Закрытие двери" и "Восстановление температуры"
     let filteredPoints: TimeSeriesPoint[] = [];
     
     if (doorMarkers.length === 0) {
       // Если маркеров нет, используем все данные на графике
       filteredPoints = pointsWithTemp;
-    } else if (doorMarkers.length === 1) {
-      // Если один маркер, используем данные после него
-      filteredPoints = pointsWithTemp.filter(p => p.timestamp >= doorMarkers[0].timestamp);
     } else {
-      // Если несколько маркеров, используем данные между парами маркеров
+      // Сортируем маркеры по времени
       const sortedMarkers = [...doorMarkers].sort((a, b) => a.timestamp - b.timestamp);
       
-      // Формируем пары маркеров
-      for (let i = 0; i < sortedMarkers.length; i += 2) {
-        const startMarker = sortedMarkers[i];
-        const endMarker = sortedMarkers[i + 1];
-        
-        if (endMarker) {
-          // Данные между парой маркеров (включительно)
-          const rangePoints = pointsWithTemp.filter(p => 
-            p.timestamp >= startMarker.timestamp && p.timestamp <= endMarker.timestamp
-          );
-          filteredPoints.push(...rangePoints);
-        } else {
-          // Если нечетное количество маркеров, последний маркер - начало диапазона до конца данных
-          const rangePoints = pointsWithTemp.filter(p => p.timestamp >= startMarker.timestamp);
-          filteredPoints.push(...rangePoints);
-        }
-      }
+      // Находим пары маркеров: Закрытие двери -> Восстановление температуры
+      const closingMarkers = sortedMarkers.filter(m => m.type === 'door_closing');
+      const recoveryMarkers = sortedMarkers.filter(m => m.type === 'temperature_recovery');
       
-      // Удаляем дубликаты и сортируем
-      filteredPoints = filteredPoints
-        .filter((point, index, self) => 
-          index === self.findIndex(p => p.timestamp === point.timestamp)
-        )
-        .sort((a, b) => a.timestamp - b.timestamp);
+      if (closingMarkers.length === 0 || recoveryMarkers.length === 0) {
+        // Если нет нужных маркеров, используем все данные
+        filteredPoints = pointsWithTemp;
+      } else {
+        // Для каждой пары "Закрытие двери" - "Восстановление температуры" используем данные между ними
+        for (const closingMarker of closingMarkers) {
+          // Находим ближайший маркер "Восстановление температуры" после "Закрытие двери"
+          const recoveryMarker = recoveryMarkers.find(m => m.timestamp > closingMarker.timestamp);
+          
+          if (recoveryMarker) {
+            // Данные между "Закрытие двери" и "Восстановление температуры" (включительно)
+            const rangePoints = pointsWithTemp.filter(p => 
+              p.timestamp >= closingMarker.timestamp && p.timestamp <= recoveryMarker.timestamp
+            );
+            filteredPoints.push(...rangePoints);
+          } else {
+            // Если нет маркера восстановления после закрытия, используем данные от закрытия до конца
+            const rangePoints = pointsWithTemp.filter(p => p.timestamp >= closingMarker.timestamp);
+            filteredPoints.push(...rangePoints);
+          }
+        }
+        
+        // Удаляем дубликаты и сортируем
+        filteredPoints = filteredPoints
+          .filter((point, index, self) => 
+            index === self.findIndex(p => p.timestamp === point.timestamp)
+          )
+          .sort((a, b) => a.timestamp - b.timestamp);
+      }
     }
     
     if (filteredPoints.length === 0) {
@@ -1236,15 +1242,69 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   };
 
   const handleAddMarker = useCallback((timestamp: number) => {
-    // Для temperature_recovery создаем маркеры типа "temperature_recovery" (вместо door_opening)
+    // Для temperature_recovery добавляем маркеры в порядке: Открытие двери -> Закрытие двери -> Восстановление температуры
     if (contractFields.testType === 'temperature_recovery') {
-      const newMarker: VerticalMarker = {
-        id: Date.now().toString(),
-        timestamp,
-        label: 'Восстановление температуры', // Тип маркера теперь temperature_recovery, label для отображения
-        color: '#000000', // Черный цвет для всех маркеров
-        type: 'temperature_recovery'
-      };
+      // Проверяем, какие маркеры уже есть
+      const doorOpeningMarkers = markers.filter(m => m.type === 'door_opening');
+      const doorClosingMarkers = markers.filter(m => m.type === 'door_closing');
+      const recoveryMarkers = markers.filter(m => m.type === 'temperature_recovery');
+      
+      // Определяем, какой маркер нужно добавить
+      let newMarker: VerticalMarker;
+      
+      // Если нет маркеров "Открытие двери", добавляем его
+      if (doorOpeningMarkers.length === 0) {
+        newMarker = {
+          id: Date.now().toString(),
+          timestamp,
+          label: 'Открытие двери',
+          color: '#000000',
+          type: 'door_opening'
+        };
+      }
+      // Если есть "Открытие двери", но нет "Закрытие двери", добавляем "Закрытие двери"
+      else if (doorClosingMarkers.length === 0) {
+        // Проверяем, что новый маркер идет после последнего "Открытие двери"
+        const lastOpeningMarker = doorOpeningMarkers.sort((a, b) => b.timestamp - a.timestamp)[0];
+        if (timestamp > lastOpeningMarker.timestamp) {
+          newMarker = {
+            id: Date.now().toString(),
+            timestamp,
+            label: 'Закрытие двери',
+            color: '#000000',
+            type: 'door_closing'
+          };
+        } else {
+          alert('"Закрытие двери" должно быть установлено после "Открытие двери".');
+          return;
+        }
+      }
+      // Если есть "Открытие двери" и "Закрытие двери", добавляем "Восстановление температуры"
+      else {
+        // Проверяем, что новый маркер идет после последнего "Закрытие двери"
+        const lastClosingMarker = doorClosingMarkers.sort((a, b) => b.timestamp - a.timestamp)[0];
+        if (timestamp > lastClosingMarker.timestamp) {
+          // Проверяем, нет ли уже "Восстановление температуры" после этого "Закрытие двери"
+          const hasRecoveryAfterClosing = recoveryMarkers.some(m => m.timestamp > lastClosingMarker.timestamp);
+          
+          if (!hasRecoveryAfterClosing) {
+            newMarker = {
+              id: Date.now().toString(),
+              timestamp,
+              label: 'Восстановление температуры',
+              color: '#000000',
+              type: 'temperature_recovery'
+            };
+          } else {
+            alert('Для данного "Закрытие двери" уже установлено "Восстановление температуры". Создайте новую последовательность маркеров.');
+            return;
+          }
+        } else {
+          alert('"Восстановление температуры" должно быть установлено после "Закрытие двери".');
+          return;
+        }
+      }
+      
       setMarkers(prev => [...prev, newMarker]);
     } else if (contractFields.testType === 'power_off') {
       // Для power_off создаем маркер типа "power" с наименованием "Отключение"
@@ -2471,8 +2531,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         return;
       }
 
-      // Получаем все маркеры типа "temperature_recovery" (ранее использовался door_opening)
-      const doorMarkers = markers.filter(m => m.type === 'temperature_recovery' || m.type === 'door_opening');
+      // Получаем маркеры в последовательности: Открытие двери -> Закрытие двери -> Восстановление температуры
+      const doorMarkers = markers.filter(m => 
+        m.type === 'door_opening' || m.type === 'door_closing' || m.type === 'temperature_recovery'
+      ).sort((a, b) => a.timestamp - b.timestamp);
       
       // Исключаем внешние датчики
       const nonExternalResults = analysisResults.filter(result => {
@@ -3161,27 +3223,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     <div className="flex flex-col space-y-1 flex-1">
                       <div className="flex items-center space-x-3">
                         {editingMarker === marker.id ? (
-                          (marker.type === 'door_opening' || marker.type === 'temperature_recovery') ? (
-                            <select
-                              value={marker.label}
-                              onChange={(e) => {
-                                const newLabel = e.target.value;
-                                // Если выбран "Восстановление температуры", меняем тип на temperature_recovery
-                                const newType = newLabel === 'Восстановление температуры' ? 'temperature_recovery' : 'door_opening';
-                                setMarkers(prev => prev.map(m => 
-                                  m.id === marker.id ? { ...m, label: newLabel, type: newType } : m
-                                ));
-                              }}
-                              onBlur={() => setEditingMarker(null)}
-                              className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                              autoFocus
-                              title="Название маркера"
-                              aria-label="Название маркера"
-                            >
-                              <option value="Открытие двери">Открытие двери</option>
-                              <option value="Восстановление температуры">Восстановление температуры</option>
-                            </select>
-                          ) : marker.type === 'power' ? (
+                          marker.type === 'power' ? (
                             <select
                               value={marker.label}
                               onChange={(e) => {
@@ -3333,13 +3375,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                       
                       <div className="flex items-center space-x-2">
                         <span className="text-xs text-gray-500">Тип:</span>
-                        {contractFields.testType === 'temperature_recovery' || contractFields.testType === 'power_off' || contractFields.testType === 'power_on' ? (
+                        {contractFields.testType === 'power_off' || contractFields.testType === 'power_on' ? (
                           // Для фиксированных типов просто показываем текст
                           <span 
                             className="text-xs px-2 py-1 bg-white border border-gray-200 rounded cursor-default"
-                            title={contractFields.testType === 'temperature_recovery' 
-                              ? 'Для типа испытания "Испытание на восстановление температуры после открытия двери" доступны только маркеры типа "Восстановление температуры"'
-                              : contractFields.testType === 'power_off'
+                            title={contractFields.testType === 'power_off'
                               ? 'Для типа испытания "Испытание на сбой электропитания (отключение)" доступны только маркеры типа "Электропитание" с наименованием "Отключение"'
                               : 'Для типа испытания "Испытание на сбой электропитания (включение)" доступны только маркеры типа "Электропитание" с наименованием "Включение"'}
                           >
@@ -3816,8 +3856,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                       return `${pZone}_${pLevel}` === `${zoneNumber}_${resultLevel}`;
                     }) || [];
                     
-                    // Получаем все маркеры типа "temperature_recovery" или "door_opening" (для обратной совместимости)
-                    const doorMarkers = markers.filter(m => m.type === 'temperature_recovery' || m.type === 'door_opening');
+                    // Получаем маркеры в последовательности: Открытие двери -> Закрытие двери -> Восстановление температуры
+                    const doorMarkers = markers.filter(m => 
+                      m.type === 'door_opening' || m.type === 'door_closing' || m.type === 'temperature_recovery'
+                    ).sort((a, b) => a.timestamp - b.timestamp);
                     
                     recoveryData = calculateRecoveryTimeAfterDoorOpening(
                       filePoints,

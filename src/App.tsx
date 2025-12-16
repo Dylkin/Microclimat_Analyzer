@@ -12,6 +12,7 @@ const UserDirectory = lazy(() => import('./components/admin-panels').then(m => (
 const ContractorDirectory = lazy(() => import('./components/admin-panels').then(m => ({ default: m.ContractorDirectory })));
 const ProjectDirectory = lazy(() => import('./components/ProjectDirectory'));
 const EquipmentDirectory = lazy(() => import('./components/equipment-management').then(m => ({ default: m.EquipmentDirectory })));
+const ProductsPage = lazy(() => import('./components/ProductsPage'));
 const ContractNegotiation = lazy(() => import('./components/ContractNegotiation'));
 const TestingExecution = lazy(() => import('./components/testing-management').then(m => ({ default: m.TestingExecution })));
 const CreatingReport = lazy(() => import('./components/CreatingReport'));
@@ -175,6 +176,8 @@ const AppContent: React.FC = () => {
         return hasAccess('analyzer') ? wrapWithSuspense(<ProjectDirectory onPageChange={handlePageChange} />) : <div>Доступ запрещен</div>;
       case 'equipment':
         return hasAccess('analyzer') ? wrapWithSuspense(<EquipmentDirectory />) : <div>Доступ запрещен</div>;
+      case 'products':
+        return hasAccess('analyzer') ? wrapWithSuspense(<ProductsPage />) : <div>Доступ запрещен</div>;
       case 'qualification-objects':
         return hasAccess('analyzer') ? wrapWithSuspense(<QualificationObjectTypes />) : <div>Доступ запрещен</div>;
       case 'tender-search':

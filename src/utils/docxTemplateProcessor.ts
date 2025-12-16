@@ -1818,32 +1818,45 @@ export class DocxTemplateProcessor {
       let filteredPoints: any[] = [];
       
       if (doorMarkers.length === 0) {
+        // Если маркеров нет, используем все данные
         filteredPoints = pointsWithTemp;
-      } else if (doorMarkers.length === 1) {
-        filteredPoints = pointsWithTemp.filter((p: any) => p.timestamp >= doorMarkers[0].timestamp);
       } else {
+        // Сортируем маркеры по времени
         const sortedMarkers = [...doorMarkers].sort((a: any, b: any) => a.timestamp - b.timestamp);
         
-        for (let i = 0; i < sortedMarkers.length; i += 2) {
-          const startMarker = sortedMarkers[i];
-          const endMarker = sortedMarkers[i + 1];
-          
-          if (endMarker) {
-            const rangePoints = pointsWithTemp.filter((p: any) => 
-              p.timestamp >= startMarker.timestamp && p.timestamp <= endMarker.timestamp
-            );
-            filteredPoints.push(...rangePoints);
-          } else {
-            const rangePoints = pointsWithTemp.filter((p: any) => p.timestamp >= startMarker.timestamp);
-            filteredPoints.push(...rangePoints);
-          }
-        }
+        // Находим пары маркеров: Закрытие двери -> Восстановление температуры
+        const closingMarkers = sortedMarkers.filter((m: any) => m.type === 'door_closing');
+        const recoveryMarkers = sortedMarkers.filter((m: any) => m.type === 'temperature_recovery');
         
-        filteredPoints = filteredPoints
-          .filter((point: any, index: number, self: any[]) => 
-            index === self.findIndex((p: any) => p.timestamp === point.timestamp)
-          )
-          .sort((a: any, b: any) => a.timestamp - b.timestamp);
+        if (closingMarkers.length === 0 || recoveryMarkers.length === 0) {
+          // Если нет нужных маркеров, используем все данные
+          filteredPoints = pointsWithTemp;
+        } else {
+          // Для каждой пары "Закрытие двери" - "Восстановление температуры" используем данные между ними
+          for (const closingMarker of closingMarkers) {
+            // Находим ближайший маркер "Восстановление температуры" после "Закрытие двери"
+            const recoveryMarker = recoveryMarkers.find((m: any) => m.timestamp > closingMarker.timestamp);
+            
+            if (recoveryMarker) {
+              // Данные между "Закрытие двери" и "Восстановление температуры" (включительно)
+              const rangePoints = pointsWithTemp.filter((p: any) => 
+                p.timestamp >= closingMarker.timestamp && p.timestamp <= recoveryMarker.timestamp
+              );
+              filteredPoints.push(...rangePoints);
+            } else {
+              // Если нет маркера восстановления после закрытия, используем данные от закрытия до конца
+              const rangePoints = pointsWithTemp.filter((p: any) => p.timestamp >= closingMarker.timestamp);
+              filteredPoints.push(...rangePoints);
+            }
+          }
+          
+          // Удаляем дубликаты и сортируем
+          filteredPoints = filteredPoints
+            .filter((point: any, index: number, self: any[]) => 
+              index === self.findIndex((p: any) => p.timestamp === point.timestamp)
+            )
+            .sort((a: any, b: any) => a.timestamp - b.timestamp);
+        }
       }
       
       if (filteredPoints.length === 0) {
@@ -2421,7 +2434,10 @@ export class DocxTemplateProcessor {
       return '<w:p><w:r><w:t>Нет данных для отображения</w:t></w:r></w:p>';
     }
 
-    const doorMarkers = markers.filter((m: any) => m.type === 'door_opening');
+    // Получаем маркеры в последовательности: Открытие двери -> Закрытие двери -> Восстановление температуры
+    const doorMarkers = markers.filter((m: any) => 
+      m.type === 'door_opening' || m.type === 'door_closing' || m.type === 'temperature_recovery'
+    ).sort((a: any, b: any) => a.timestamp - b.timestamp);
 
     const headerRow = `
       <w:tr>
