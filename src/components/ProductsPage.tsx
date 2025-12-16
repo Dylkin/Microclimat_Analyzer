@@ -986,7 +986,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
                 setCardForm({
                   sectionId: '',
                   name: '',
-                  description: '',
                   manufacturer: '',
                   series: '',
       channelsCount: undefined,
