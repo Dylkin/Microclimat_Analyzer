@@ -1,4 +1,4 @@
-﻿import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas';
 import JSZip from 'jszip';
 
 export interface TemplateReportData {
@@ -1895,7 +1895,8 @@ export class DocxTemplateProcessor {
       const timeInMinutes = Math.floor(totalTimeOutsideLimits / (1000 * 60));
       const criterionValue = acceptanceCriterionValue ? parseInt(acceptanceCriterionValue) : 0;
       const meetsCriterion = timeInMinutes <= criterionValue ? 'Да' : 'Нет';
-      const timeString = `${timeInMinutes} мин.`;
+      // Форматируем время в формате "час:мин"
+      const timeString = formatTimeDuration(totalTimeOutsideLimits);
       
       return { time: timeString, meetsCriterion };
     };

@@ -3,6 +3,8 @@ import { X, Plus, Trash2, Search } from 'lucide-react';
 import { Contractor, ContractorRole } from '../types/Contractor';
 import { contractorService } from '../utils/contractorService';
 import { CreateProjectData } from '../types/Project';
+import { EquipmentCard } from '../types/EquipmentSections';
+import { equipmentSectionsService } from '../utils/equipmentSectionsService';
 
 interface SaleProjectFormProps {
   contractors: Contractor[];
@@ -34,9 +36,14 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [supplierSearches, setSupplierSearches] = useState<Record<number, string>>({});
   const [showSupplierDropdowns, setShowSupplierDropdowns] = useState<Record<number, boolean>>({});
+  const [productSearches, setProductSearches] = useState<Record<number, string>>({});
+  const [showProductDropdowns, setShowProductDropdowns] = useState<Record<number, boolean>>({});
+  const [productSearchResults, setProductSearchResults] = useState<Record<number, EquipmentCard[]>>({});
+  const [productSearchLoading, setProductSearchLoading] = useState<Record<number, boolean>>({});
   
   const contractorDropdownRef = useRef<HTMLDivElement>(null);
   const supplierDropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const productDropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   // Закрытие выпадающих списков при клике вне области
   useEffect(() => {
@@ -49,6 +56,13 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
         const ref = supplierDropdownRefs.current[parseInt(index)];
         if (ref && !ref.contains(event.target as Node)) {
           setShowSupplierDropdowns(prev => ({ ...prev, [parseInt(index)]: false }));
+        }
+      });
+      
+      Object.keys(productDropdownRefs.current).forEach(index => {
+        const ref = productDropdownRefs.current[parseInt(index)];
+        if (ref && !ref.contains(event.target as Node)) {
+          setShowProductDropdowns(prev => ({ ...prev, [parseInt(index)]: false }));
         }
       });
     };
@@ -115,12 +129,24 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
   // Удаление товара
   const handleRemoveItem = (index: number) => {
     setItems(prev => prev.filter((_, i) => i !== index));
-    const newSearches = { ...supplierSearches };
-    const newDropdowns = { ...showSupplierDropdowns };
-    delete newSearches[index];
-    delete newDropdowns[index];
-    setSupplierSearches(newSearches);
-    setShowSupplierDropdowns(newDropdowns);
+    const newSupplierSearches = { ...supplierSearches };
+    const newSupplierDropdowns = { ...showSupplierDropdowns };
+    const newProductSearches = { ...productSearches };
+    const newProductDropdowns = { ...showProductDropdowns };
+    const newProductResults = { ...productSearchResults };
+    const newProductLoading = { ...productSearchLoading };
+    delete newSupplierSearches[index];
+    delete newSupplierDropdowns[index];
+    delete newProductSearches[index];
+    delete newProductDropdowns[index];
+    delete newProductResults[index];
+    delete newProductLoading[index];
+    setSupplierSearches(newSupplierSearches);
+    setShowSupplierDropdowns(newSupplierDropdowns);
+    setProductSearches(newProductSearches);
+    setShowProductDropdowns(newProductDropdowns);
+    setProductSearchResults(newProductResults);
+    setProductSearchLoading(newProductLoading);
   };
 
   // Обновление товара
@@ -143,6 +169,52 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
     return supplierContractors.filter(s =>
       s.name.toLowerCase().includes(search.toLowerCase())
     );
+  };
+
+  // Поиск товаров по справочнику
+  useEffect(() => {
+    const searchTimeouts: Record<number, NodeJS.Timeout> = {};
+    
+    Object.keys(productSearches).forEach(indexStr => {
+      const index = parseInt(indexStr);
+      const search = productSearches[index];
+      
+      if (search && search.trim().length > 0) {
+        // Очищаем предыдущий таймаут для этого индекса
+        if (searchTimeouts[index]) {
+          clearTimeout(searchTimeouts[index]);
+        }
+        
+        // Устанавливаем новый таймаут для поиска
+        searchTimeouts[index] = setTimeout(async () => {
+          setProductSearchLoading(prev => ({ ...prev, [index]: true }));
+          try {
+            const cards = await equipmentSectionsService.getCards(search);
+            setProductSearchResults(prev => ({ ...prev, [index]: cards }));
+            setShowProductDropdowns(prev => ({ ...prev, [index]: true }));
+          } catch (error) {
+            console.error('Ошибка поиска товаров:', error);
+            setProductSearchResults(prev => ({ ...prev, [index]: [] }));
+          } finally {
+            setProductSearchLoading(prev => ({ ...prev, [index]: false }));
+          }
+        }, 300);
+      } else {
+        setProductSearchResults(prev => ({ ...prev, [index]: [] }));
+        setShowProductDropdowns(prev => ({ ...prev, [index]: false }));
+      }
+    });
+    
+    return () => {
+      Object.values(searchTimeouts).forEach(timeout => clearTimeout(timeout));
+    };
+  }, [productSearches]);
+
+  // Обработка выбора товара из справочника
+  const handleProductSelect = (itemIndex: number, product: EquipmentCard) => {
+    handleUpdateItem(itemIndex, 'name', product.name);
+    setProductSearches(prev => ({ ...prev, [itemIndex]: product.name }));
+    setShowProductDropdowns(prev => ({ ...prev, [itemIndex]: false }));
   };
 
   // Сохранение проекта
@@ -343,15 +415,57 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Наименование */}
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-2 relative">
                       <label className="block text-xs text-gray-500 mb-1">Наименование *</label>
-                      <input
-                        type="text"
-                        value={item.name}
-                        onChange={(e) => handleUpdateItem(index, 'name', e.target.value)}
-                        placeholder="Введите наименование товара"
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      />
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => {
+                            handleUpdateItem(index, 'name', e.target.value);
+                            setProductSearches(prev => ({ ...prev, [index]: e.target.value }));
+                            if (e.target.value.trim().length > 0) {
+                              setShowProductDropdowns(prev => ({ ...prev, [index]: true }));
+                            }
+                          }}
+                          onFocus={() => {
+                            if (productSearches[index] && productSearches[index].trim().length > 0) {
+                              setShowProductDropdowns(prev => ({ ...prev, [index]: true }));
+                            }
+                          }}
+                          placeholder="Поиск по справочнику товаров или введите наименование"
+                          className="w-full pl-8 pr-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                        {showProductDropdowns[index] && productSearches[index] && productSearches[index].trim().length > 0 && (
+                          <div 
+                            ref={el => productDropdownRefs.current[index] = el}
+                            className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto"
+                          >
+                            {productSearchLoading[index] ? (
+                              <div className="px-4 py-2 text-gray-500 text-sm">Поиск...</div>
+                            ) : productSearchResults[index]?.length > 0 ? (
+                              productSearchResults[index].map(product => (
+                                <div
+                                  key={product.id}
+                                  onClick={() => handleProductSelect(index, product)}
+                                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                >
+                                  <div className="font-medium text-sm">{product.name}</div>
+                                  {product.manufacturer && (
+                                    <div className="text-xs text-gray-500">Производитель: {product.manufacturer}</div>
+                                  )}
+                                  {product.sectionName && (
+                                    <div className="text-xs text-gray-500">Раздел: {product.sectionName}</div>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="px-4 py-2 text-gray-500 text-sm">Товары не найдены</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Количество */}

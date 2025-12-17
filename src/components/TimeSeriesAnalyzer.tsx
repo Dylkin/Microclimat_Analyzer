@@ -1197,8 +1197,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       : 0;
     const meetsCriterion = timeInMinutes <= acceptanceCriterion ? 'Да' : 'Нет';
     
-    // Форматируем время в минутах
-    const timeString = `${timeInMinutes} мин.`;
+    // Форматируем время в формате "час:мин"
+    const timeString = formatTimeDuration(totalTimeOutsideLimits);
     
     return { time: timeString, meetsCriterion };
   };
@@ -2564,11 +2564,22 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           limits.temperature?.max
         );
         
+        // Парсим время из формата "час:мин" или "за пределы не выходила"
+        let timeInMinutes = 0;
+        if (recoveryData.time !== 'за пределы не выходила' && recoveryData.time !== '-') {
+          const timeMatch = recoveryData.time.match(/(\d+):(\d+)/);
+          if (timeMatch) {
+            const hours = parseInt(timeMatch[1]) || 0;
+            const minutes = parseInt(timeMatch[2]) || 0;
+            timeInMinutes = hours * 60 + minutes;
+          }
+        }
+        
         return {
           loggerName: result.loggerName,
           recoveryTime: recoveryData.time,
           meetsCriterion: recoveryData.meetsCriterion,
-          timeInMinutes: recoveryData.time === 'за пределы не выходила' ? 0 : parseInt(recoveryData.time.replace(/\s*мин\./, '')) || 0
+          timeInMinutes: timeInMinutes
         };
       });
 
@@ -2589,21 +2600,48 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       // Если хотя бы один логгер не соответствует критерию, общий результат - не соответствует
       const overallMeetsCriterion = loggerRecoveryData.every(logger => logger.meetsCriterion === 'Да');
 
+      // Получаем маркеры времени для вывода
+      const openingMarkers = doorMarkers.filter(m => m.type === 'door_opening');
+      const closingMarkers = doorMarkers.filter(m => m.type === 'door_closing');
+      
+      // Формируем информацию о маркерах времени с точностью до минут (без секунд)
+      let markersInfo = '';
+      if (openingMarkers.length > 0) {
+        const openingMarker = openingMarkers[0]; // Берем первый маркер открытия
+        const openingTimeStr = new Date(openingMarker.timestamp).toLocaleString('ru-RU', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        markersInfo += `<b>Открытие двери:</b> ${openingTimeStr}. `;
+      }
+      if (closingMarkers.length > 0) {
+        const closingMarker = closingMarkers[0]; // Берем первый маркер закрытия
+        const closingTimeStr = new Date(closingMarker.timestamp).toLocaleString('ru-RU', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        markersInfo += `\n<b>Закрытие двери:</b> ${closingTimeStr}. `;
+      }
+
       // Формируем текст выводов с форматированием (жирный текст для постоянного, обычный для подставляемого)
       let conclusionText = '';
       
       if (!hasExceededLimits) {
         // Температура не выходила за пределы
-        conclusionText = `<b>За время проведения испытания температура за контролируемые пределы</b> не выходила, <b>что соответствует</b> установленному критерию приемлемости (<b>${acceptanceCriterion}</b> мин.). <b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
+        conclusionText = `${markersInfo}<b>За время проведения испытания температура за контролируемые пределы</b> не выходила, <b>что соответствует</b> установленному критерию приемлемости (<b>${acceptanceCriterion}</b> мин.).\n<b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
       } else {
         // Температура выходила за пределы
-        const maxTimeText = maxTimeLogger.timeInMinutes > 0 
-          ? `${maxTimeLogger.timeInMinutes} мин.`
-          : 'за пределы не выходила';
+        const maxTimeText = maxTimeLogger.recoveryTime;
         
         const maxTimeMeetsCriterion = maxTimeLogger.meetsCriterion === 'Да' ? 'соответствует' : 'не соответствует';
         
-        conclusionText = `<b>За время проведения испытания температура за контролируемые пределы</b> выходила, <b>максимальное время выхода зафиксировано логгером</b> ${maxTimeLogger.loggerName} <b>и составило</b> ${maxTimeText}, <b>что</b> ${maxTimeMeetsCriterion} <b>установленному критерию приемлемости</b> (<b>${acceptanceCriterion}</b> мин.). <b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
+        conclusionText = `${markersInfo}<b>За время проведения испытания температура за контролируемые пределы</b> выходила, <b>максимальное время выхода зафиксировано логгером</b> ${maxTimeLogger.loggerName} <b>и составило</b> ${maxTimeText}, <b>что</b> ${maxTimeMeetsCriterion} <b>установленному критерию приемлемости</b> (<b>${acceptanceCriterion}</b> мин.).\n<b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
       }
 
       setConclusions(conclusionText);
@@ -2716,9 +2754,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             return current.timeInMilliseconds > max.timeInMilliseconds ? current : max;
           });
           
-          // Форматируем время для вывода
-          const maxTimeText = formatTimeDuration(maxTimeLogger.timeInMilliseconds);
-          conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\nВремя восстановления температуры при включении электропитания составляет <b>${maxTimeText}</b>.`;
+          // Форматируем время для вывода в формате "X минут"
+          const totalMinutes = Math.floor(maxTimeLogger.timeInMilliseconds / (1000 * 60));
+          const maxTimeText = `${totalMinutes} минут`;
+          conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\n<b>Максимальное время восстановления температуры при включении электропитания составляет:</b> ${maxTimeText}.`;
         }
       }
 
