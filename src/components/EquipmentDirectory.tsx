@@ -355,7 +355,9 @@ const EquipmentDirectory: React.FC = () => {
       updateVerification(index, 'verificationFileName', file.name, isEdit);
       
       // Загружаем файл на сервер
-      const fileName = `equipment-verifications/${Date.now()}-${file.name}`;
+      // Заменяем пробелы на подчеркивания в имени файла для избежания проблем с URL
+      const sanitizedFileName = file.name.replace(/\s+/g, '_');
+      const fileName = `equipment-verifications/${Date.now()}-${sanitizedFileName}`;
       const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
         bucket: 'documents',
         path: fileName

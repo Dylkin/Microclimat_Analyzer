@@ -47,6 +47,7 @@
     "apply-section-fields-migration": "tsx server/scripts/apply-section-fields-migration.ts",
     "migrate-products-dev-to-prod": "tsx server/scripts/migrate-products-dev-to-prod.ts",
     "check-verification-files": "tsx server/scripts/check-verification-files.ts",
+    "fix-verification-file-names": "tsx server/scripts/fix-verification-file-names.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
