@@ -2160,7 +2160,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
            xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
   <w:body>`;
 
-      // Размещаем изображения по 2 на листе
+      // Размещаем изображения друг над другом, каждое занимает половину листа
       // Отслеживаем реальный индекс для relationships и список добавленных изображений
       let relationshipIndex = 1;
       const addedImages: Array<{ imageId: string; rId: number }> = [];
@@ -2195,32 +2195,52 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           }
         }
 
-        // Создаем таблицу с двумя изображениями рядом (или одно изображение)
+        // Создаем таблицу с двумя изображениями друг над другом (каждое занимает половину листа)
         const hasSecondImage = rId2 !== null;
+        // Размеры для половины страницы A4 (в EMU: 1 inch = 914400 EMU)
+        // A4 ширина: ~8.27 inch = 7559064 EMU, высота: ~11.69 inch = 10683360 EMU
+        // Половина высоты: ~5341680 EMU, ширина: ~7559064 EMU (с учетом полей используем ~7000000)
+        // Уменьшено на 5% от размера после предыдущего уменьшения на 3%
+        const imageWidth = 6450500;  // ~7.06 inch (уменьшено на 5% от 6790000)
+        const imageHeight = 4607500; // ~5.04 inch (уменьшено на 5% от 4850000)
+        
         documentXml += `
     <w:tbl>
       <w:tblPr>
-        <w:tblW w:w="0" w:type="auto"/>
+        <w:tblW w:w="10080" w:type="dxa"/>
+        <w:tblInd w:w="0" w:type="dxa"/>
+        <w:jc w:val="left"/>
         <w:tblBorders>
           <w:top w:val="none" w:sz="0" w:space="0" w:color="auto"/>
           <w:left w:val="none" w:sz="0" w:space="0" w:color="auto"/>
           <w:bottom w:val="none" w:sz="0" w:space="0" w:color="auto"/>
           <w:right w:val="none" w:sz="0" w:space="0" w:color="auto"/>
         </w:tblBorders>
-      </w:tblPr>
-      <w:tr>`;
+      </w:tblPr>`;
 
-        // Первое изображение
+        // Первое изображение - первая строка
         documentXml += `
+      <w:tr>
         <w:tc>
           <w:tcPr>
-            <w:tcW w:w="${hasSecondImage ? '4750' : '9500'}" w:type="dxa"/>
+            <w:tcW w:w="9500" w:type="dxa"/>
+            <w:vAlign w:val="center"/>
+            <w:tcMar>
+              <w:top w:w="0" w:type="dxa"/>
+              <w:left w:w="0" w:type="dxa"/>
+              <w:bottom w:w="0" w:type="dxa"/>
+              <w:right w:w="0" w:type="dxa"/>
+            </w:tcMar>
           </w:tcPr>
           <w:p>
+            <w:pPr>
+              <w:spacing w:before="0" w:after="0"/>
+              <w:ind w:left="0" w:right="0" w:firstLine="0"/>
+            </w:pPr>
             <w:r>
               <w:drawing>
                 <wp:inline distT="0" distB="0" distL="0" distR="0">
-                  <wp:extent cx="4500000" cy="3000000"/>
+                  <wp:extent cx="${imageWidth}" cy="${imageHeight}"/>
                   <wp:effectExtent l="0" t="0" r="0" b="0"/>
                   <wp:docPr id="${rId1}" name="Picture ${rId1}"/>
                   <wp:cNvGraphicFramePr>
@@ -2242,7 +2262,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                         <pic:spPr>
                           <a:xfrm>
                             <a:off x="0" y="0"/>
-                            <a:ext cx="4500000" cy="3000000"/>
+                            <a:ext cx="${imageWidth}" cy="${imageHeight}"/>
                           </a:xfrm>
                           <a:prstGeom prst="rect">
                             <a:avLst/>
@@ -2255,20 +2275,33 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </w:drawing>
             </w:r>
           </w:p>
-        </w:tc>`;
+        </w:tc>
+      </w:tr>`;
 
-        // Второе изображение (только если валидно)
+        // Второе изображение - вторая строка (только если валидно)
         if (hasSecondImage && rId2 !== null) {
           documentXml += `
+      <w:tr>
         <w:tc>
           <w:tcPr>
-            <w:tcW w:w="4750" w:type="dxa"/>
+            <w:tcW w:w="9500" w:type="dxa"/>
+            <w:vAlign w:val="center"/>
+            <w:tcMar>
+              <w:top w:w="0" w:type="dxa"/>
+              <w:left w:w="0" w:type="dxa"/>
+              <w:bottom w:w="0" w:type="dxa"/>
+              <w:right w:w="0" w:type="dxa"/>
+            </w:tcMar>
           </w:tcPr>
           <w:p>
+            <w:pPr>
+              <w:spacing w:before="0" w:after="0"/>
+              <w:ind w:left="0" w:right="0" w:firstLine="0"/>
+            </w:pPr>
             <w:r>
               <w:drawing>
                 <wp:inline distT="0" distB="0" distL="0" distR="0">
-                  <wp:extent cx="4500000" cy="3000000"/>
+                  <wp:extent cx="${imageWidth}" cy="${imageHeight}"/>
                   <wp:effectExtent l="0" t="0" r="0" b="0"/>
                   <wp:docPr id="${rId2}" name="Picture ${rId2}"/>
                   <wp:cNvGraphicFramePr>
@@ -2290,7 +2323,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                         <pic:spPr>
                           <a:xfrm>
                             <a:off x="0" y="0"/>
-                            <a:ext cx="4500000" cy="3000000"/>
+                            <a:ext cx="${imageWidth}" cy="${imageHeight}"/>
                           </a:xfrm>
                           <a:prstGeom prst="rect">
                             <a:avLst/>
@@ -2303,16 +2336,37 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               </w:drawing>
             </w:r>
           </w:p>
-        </w:tc>`;
+        </w:tc>
+      </w:tr>`;
         }
         
         documentXml += `
-      </w:tr>
     </w:tbl>`;
+        
+        // Добавляем разрыв страницы после каждой пары изображений (кроме последней)
+        if (i + 2 < verificationFiles.length) {
+          documentXml += `
+    <w:p>
+      <w:r>
+        <w:br w:type="page"/>
+      </w:r>
+    </w:p>`;
+        }
       }
 
+      // Добавляем настройки страницы с левым и правым полем 1,27 см
+      // 1,27 см = 0.5 дюйма = 720 twips (1 дюйм = 1440 twips, 1 см = 567 twips)
+      // Стандартные поля: верхнее/нижнее 1440 twips (1 дюйм)
       documentXml += `
   </w:body>
+  <w:sectPr>
+    <w:pgMar w:left="720" w:right="720" w:top="1440" w:bottom="1440" w:header="708" w:footer="708" w:gutter="0"/>
+    <w:pgSz w:w="11906" w:h="16838"/>
+    <w:pgNumType w:start="1"/>
+    <w:formProt w:val="false"/>
+    <w:textDirection w:val="lrTb"/>
+    <w:docGrid w:linePitch="360"/>
+  </w:sectPr>
 </w:document>`;
 
       wordFolder.file('document.xml', documentXml);
