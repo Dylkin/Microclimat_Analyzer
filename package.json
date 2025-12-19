@@ -45,6 +45,8 @@
     "parse-product-specifications-from-url": "tsx server/scripts/parse-product-specifications-from-url.ts",
     "clean-dash-values": "tsx server/scripts/clean-dash-values.ts",
     "apply-section-fields-migration": "tsx server/scripts/apply-section-fields-migration.ts",
+    "migrate-products-dev-to-prod": "tsx server/scripts/migrate-products-dev-to-prod.ts",
+    "check-verification-files": "tsx server/scripts/check-verification-files.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

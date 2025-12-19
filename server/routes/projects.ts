@@ -126,14 +126,39 @@ router.get('/', (req, res, next) => {
       `);
       
       if (itemsTableCheck.rows[0].exists) {
-        const itemsResult = await pool.query(`
-          SELECT pi.id, pi.name, pi.quantity, pi.declared_price, pi.supplier_id, pi.supplier_price, pi.description,
-                 pi.created_at, pi.updated_at, c.name as supplier_name
+        // Проверяем наличие новых колонок для технических характеристик
+        const columnsCheck = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_schema = 'public' 
+          AND table_name = 'project_items'
+          AND column_name IN ('category_id', 'channels_count', 'dosing_volume', 'volume_step', 
+                              'dosing_accuracy', 'reproducibility', 'autoclavable', 'in_registry_si')
+        `);
+        const hasNewColumns = columnsCheck.rows.length > 0;
+        const newColumnsList = columnsCheck.rows.map(r => r.column_name);
+        const hasCategoryId = newColumnsList.includes('category_id');
+        
+        // Формируем список колонок для SELECT
+        let selectColumns = 'pi.id, pi.name, pi.quantity, pi.declared_price, pi.supplier_id, pi.supplier_price, pi.description, pi.created_at, pi.updated_at, c.name as supplier_name';
+        if (hasNewColumns) {
+          selectColumns += ', pi.category_id, pi.channels_count, pi.dosing_volume, pi.volume_step, pi.dosing_accuracy, pi.reproducibility, pi.autoclavable, pi.in_registry_si';
+        }
+        if (hasCategoryId) {
+          selectColumns += ', es.name as category_name';
+        }
+        
+        let itemsQuery = `
+          SELECT ${selectColumns}
           FROM project_items pi
           LEFT JOIN contractors c ON pi.supplier_id = c.id
-          WHERE pi.project_id = $1
-          ORDER BY pi.created_at
-        `, [row.id]);
+        `;
+        if (hasCategoryId) {
+          itemsQuery += ' LEFT JOIN equipment_sections es ON pi.category_id = es.id';
+        }
+        itemsQuery += ' WHERE pi.project_id = $1 ORDER BY pi.created_at';
+        
+        const itemsResult = await pool.query(itemsQuery, [row.id]);
         
         items = itemsResult.rows.map(item => ({
           id: item.id,
@@ -145,6 +170,15 @@ router.get('/', (req, res, next) => {
           supplierName: item.supplier_name,
           supplierPrice: item.supplier_price ? parseFloat(item.supplier_price) : undefined,
           description: item.description,
+          categoryId: hasNewColumns ? item.category_id : undefined,
+          categoryName: hasCategoryId ? item.category_name : undefined,
+          channelsCount: hasNewColumns ? item.channels_count : undefined,
+          dosingVolume: hasNewColumns ? item.dosing_volume : undefined,
+          volumeStep: hasNewColumns ? item.volume_step : undefined,
+          dosingAccuracy: hasNewColumns ? item.dosing_accuracy : undefined,
+          reproducibility: hasNewColumns ? item.reproducibility : undefined,
+          autoclavable: hasNewColumns ? item.autoclavable : undefined,
+          inRegistrySI: hasNewColumns ? item.in_registry_si : undefined,
           createdAt: new Date(item.created_at),
           updatedAt: new Date(item.updated_at)
         }));
@@ -173,9 +207,28 @@ router.get('/', (req, res, next) => {
     res.json(projects);
   } catch (error: any) {
     console.error('Error fetching projects:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint,
+      position: error.position,
+      internalPosition: error.internalPosition,
+      internalQuery: error.internalQuery,
+      where: error.where,
+      schema: error.schema,
+      table: error.table,
+      column: error.column,
+      dataType: error.dataType,
+      constraint: error.constraint,
+      file: error.file,
+      line: error.line,
+      routine: error.routine
+    });
     res.status(500).json({
       error: 'Ошибка получения проектов',
-      details: error.message || String(error),
+      details: process.env.NODE_ENV === 'development' ? (error.message || String(error)) : undefined,
     });
   }
 });
@@ -251,28 +304,92 @@ router.get('/:id', requireAuth, async (req, res) => {
     `);
     
     if (itemsTableCheck.rows[0].exists) {
-      const itemsResult = await pool.query(`
-        SELECT pi.id, pi.name, pi.quantity, pi.declared_price, pi.supplier_id, pi.supplier_price, pi.description,
-               pi.created_at, pi.updated_at, c.name as supplier_name
+      // Проверяем наличие новых колонок для технических характеристик
+      const columnsCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'project_items'
+        AND column_name IN ('category_id', 'channels_count', 'dosing_volume', 'volume_step', 
+                            'dosing_accuracy', 'reproducibility', 'autoclavable', 'in_registry_si')
+      `);
+      const hasNewColumns = columnsCheck.rows.length > 0;
+      const newColumnsList = columnsCheck.rows.map(r => r.column_name);
+      const hasCategoryId = newColumnsList.includes('category_id');
+      
+      // Формируем список колонок для SELECT
+      let selectColumns = 'pi.id, pi.name, pi.quantity, pi.declared_price, pi.supplier_id, pi.supplier_price, pi.description, pi.created_at, pi.updated_at, c.name as supplier_name';
+      if (hasNewColumns) {
+        selectColumns += ', pi.category_id, pi.channels_count, pi.dosing_volume, pi.volume_step, pi.dosing_accuracy, pi.reproducibility, pi.autoclavable, pi.in_registry_si';
+      }
+      if (hasCategoryId) {
+        selectColumns += ', es.name as category_name';
+      }
+      
+      let itemsQuery = `
+        SELECT ${selectColumns}
         FROM project_items pi
         LEFT JOIN contractors c ON pi.supplier_id = c.id
-        WHERE pi.project_id = $1
-        ORDER BY pi.created_at
-      `, [id]);
+      `;
+      if (hasCategoryId) {
+        itemsQuery += ' LEFT JOIN equipment_sections es ON pi.category_id = es.id';
+      }
+      itemsQuery += ' WHERE pi.project_id = $1 ORDER BY pi.created_at';
       
-      projectItems = itemsResult.rows.map(item => ({
-        id: item.id,
-        projectId: id,
-        name: item.name,
-        quantity: item.quantity,
-        declaredPrice: parseFloat(item.declared_price),
-        supplierId: item.supplier_id,
-        supplierName: item.supplier_name,
-        supplierPrice: item.supplier_price ? parseFloat(item.supplier_price) : undefined,
-        description: item.description,
-        createdAt: new Date(item.created_at),
-        updatedAt: new Date(item.updated_at)
-      }));
+      const itemsResult = await pool.query(itemsQuery, [id]);
+      
+      console.log('GET /api/projects/:id - Результат запроса товаров:', {
+        hasNewColumns,
+        hasCategoryId,
+        newColumnsList,
+        rowsCount: itemsResult.rows.length,
+        firstRow: itemsResult.rows[0] ? {
+          id: itemsResult.rows[0].id,
+          name: itemsResult.rows[0].name,
+          category_id: itemsResult.rows[0].category_id,
+          category_id_type: typeof itemsResult.rows[0].category_id,
+          category_name: itemsResult.rows[0].category_name,
+          allColumns: Object.keys(itemsResult.rows[0])
+        } : null
+      });
+      
+      projectItems = itemsResult.rows.map(item => {
+        const mappedItem = {
+          id: item.id,
+          projectId: id,
+          name: item.name,
+          quantity: item.quantity,
+          declaredPrice: parseFloat(item.declared_price),
+          supplierId: item.supplier_id,
+          supplierName: item.supplier_name,
+          supplierPrice: item.supplier_price ? parseFloat(item.supplier_price) : undefined,
+          description: item.description,
+          categoryId: hasNewColumns ? item.category_id : undefined,
+          categoryName: hasCategoryId ? item.category_name : undefined,
+          channelsCount: hasNewColumns ? item.channels_count : undefined,
+          dosingVolume: hasNewColumns ? item.dosing_volume : undefined,
+          volumeStep: hasNewColumns ? item.volume_step : undefined,
+          dosingAccuracy: hasNewColumns ? item.dosing_accuracy : undefined,
+          reproducibility: hasNewColumns ? item.reproducibility : undefined,
+          autoclavable: hasNewColumns ? item.autoclavable : undefined,
+          inRegistrySI: hasNewColumns ? item.in_registry_si : undefined,
+          createdAt: new Date(item.created_at),
+          updatedAt: new Date(item.updated_at)
+        };
+        console.log('GET /api/projects/:id - Загружен товар:', {
+          itemName: mappedItem.name,
+          hasNewColumns,
+          hasCategoryId,
+          categoryId: mappedItem.categoryId,
+          categoryIdType: typeof mappedItem.categoryId,
+          categoryName: mappedItem.categoryName,
+          rawCategoryId: item.category_id,
+          rawCategoryIdType: typeof item.category_id,
+          rawCategoryName: item.category_name,
+          selectColumns: selectColumns
+        });
+        return mappedItem;
+      });
     }
     
     // Получаем назначения этапов (если таблица существует)
@@ -442,25 +559,73 @@ router.post('/', requireAuth, async (req, res) => {
       `);
 
       if (itemsTableCheck.rows[0].exists) {
+        // Проверяем наличие новых колонок перед вставкой
+        const insertColumnsCheck = await client.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_schema = 'public' 
+          AND table_name = 'project_items'
+          AND column_name IN ('category_id', 'channels_count', 'dosing_volume', 'volume_step', 
+                              'dosing_accuracy', 'reproducibility', 'autoclavable', 'in_registry_si')
+        `);
+        const hasNewColumnsForInsert = insertColumnsCheck.rows.length > 0;
+        
         for (const item of projectItemsData) {
           try {
-            await client.query(
-              `
-              INSERT INTO project_items
-                (project_id, name, quantity, declared_price, supplier_id, supplier_price, description)
-              VALUES
-                ($1, $2, $3, $4, $5, $6, $7)
-              `,
-              [
-                projectId,
-                item.name,
-                item.quantity,
-                item.declaredPrice ?? 0,
-                item.supplierId || null,
-                item.supplierPrice ?? null,
-                item.description || null,
-              ],
-            );
+            console.log('POST /api/projects - Сохранение товара:', {
+              itemName: item.name,
+              categoryId: item.categoryId,
+              hasNewColumnsForInsert
+            });
+            if (hasNewColumnsForInsert) {
+              await client.query(
+                `
+                INSERT INTO project_items
+                  (project_id, name, quantity, declared_price, supplier_id, supplier_price, description,
+                   category_id, channels_count, dosing_volume, volume_step, dosing_accuracy, 
+                   reproducibility, autoclavable, in_registry_si)
+                VALUES
+                  ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                `,
+                [
+                  projectId,
+                  item.name,
+                  item.quantity,
+                  item.declaredPrice ?? 0,
+                  item.supplierId || null,
+                  item.supplierPrice ?? null,
+                  item.description || null,
+                  item.categoryId || null,
+                  item.channelsCount || null,
+                  item.dosingVolume || null,
+                  item.volumeStep || null,
+                  item.dosingAccuracy || null,
+                  item.reproducibility || null,
+                  item.autoclavable !== undefined ? item.autoclavable : null,
+                  item.inRegistrySI || false,
+                ],
+              );
+              console.log('POST /api/projects - Товар сохранен с categoryId:', item.categoryId);
+            } else {
+              // Старый вариант без новых колонок
+              await client.query(
+                `
+                INSERT INTO project_items
+                  (project_id, name, quantity, declared_price, supplier_id, supplier_price, description)
+                VALUES
+                  ($1, $2, $3, $4, $5, $6, $7)
+                `,
+                [
+                  projectId,
+                  item.name,
+                  item.quantity,
+                  item.declaredPrice ?? 0,
+                  item.supplierId || null,
+                  item.supplierPrice ?? null,
+                  item.description || null,
+                ],
+              );
+            }
           } catch (itemError: any) {
             console.error('Ошибка добавления товара проекта:', {
               error: itemError,
@@ -537,14 +702,39 @@ router.post('/', requireAuth, async (req, res) => {
     `);
     
     if (itemsTableCheck.rows[0].exists) {
-      const itemsResult = await pool.query(`
-        SELECT pi.id, pi.name, pi.quantity, pi.declared_price, pi.supplier_id, pi.supplier_price, pi.description,
-               pi.created_at, pi.updated_at, c.name as supplier_name
+      // Проверяем наличие новых колонок для технических характеристик
+      const columnsCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'project_items'
+        AND column_name IN ('category_id', 'channels_count', 'dosing_volume', 'volume_step', 
+                            'dosing_accuracy', 'reproducibility', 'autoclavable', 'in_registry_si')
+      `);
+      const hasNewColumns = columnsCheck.rows.length > 0;
+      const newColumnsList = columnsCheck.rows.map(r => r.column_name);
+      const hasCategoryId = newColumnsList.includes('category_id');
+      
+      // Формируем список колонок для SELECT
+      let selectColumns = 'pi.id, pi.name, pi.quantity, pi.declared_price, pi.supplier_id, pi.supplier_price, pi.description, pi.created_at, pi.updated_at, c.name as supplier_name';
+      if (hasNewColumns) {
+        selectColumns += ', pi.category_id, pi.channels_count, pi.dosing_volume, pi.volume_step, pi.dosing_accuracy, pi.reproducibility, pi.autoclavable, pi.in_registry_si';
+      }
+      if (hasCategoryId) {
+        selectColumns += ', es.name as category_name';
+      }
+      
+      let itemsQuery = `
+        SELECT ${selectColumns}
         FROM project_items pi
         LEFT JOIN contractors c ON pi.supplier_id = c.id
-        WHERE pi.project_id = $1
-        ORDER BY pi.created_at
-      `, [projectId]);
+      `;
+      if (hasCategoryId) {
+        itemsQuery += ' LEFT JOIN equipment_sections es ON pi.category_id = es.id';
+      }
+      itemsQuery += ' WHERE pi.project_id = $1 ORDER BY pi.created_at';
+      
+      const itemsResult = await pool.query(itemsQuery, [projectId]);
       
       savedItems = itemsResult.rows.map(item => ({
         id: item.id,
@@ -556,6 +746,15 @@ router.post('/', requireAuth, async (req, res) => {
         supplierName: item.supplier_name,
         supplierPrice: item.supplier_price ? parseFloat(item.supplier_price) : undefined,
         description: item.description,
+        categoryId: hasNewColumns ? item.category_id : undefined,
+        categoryName: hasCategoryId ? item.category_name : undefined,
+        channelsCount: hasNewColumns ? item.channels_count : undefined,
+        dosingVolume: hasNewColumns ? item.dosing_volume : undefined,
+        volumeStep: hasNewColumns ? item.volume_step : undefined,
+        dosingAccuracy: hasNewColumns ? item.dosing_accuracy : undefined,
+        reproducibility: hasNewColumns ? item.reproducibility : undefined,
+        autoclavable: hasNewColumns ? item.autoclavable : undefined,
+        inRegistrySI: hasNewColumns ? item.in_registry_si : undefined,
         createdAt: new Date(item.created_at),
         updatedAt: new Date(item.updated_at)
       }));

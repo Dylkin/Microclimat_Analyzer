@@ -5,7 +5,8 @@ import {
 } from 'lucide-react';
 import { 
   EquipmentSection, EquipmentCard, 
-  CreateEquipmentSectionData, CreateEquipmentCardData 
+  CreateEquipmentSectionData, CreateEquipmentCardData,
+  TechnicalSpecsRanges, TechnicalSpecRange
 } from '../types/EquipmentSections';
 import { equipmentSectionsService } from '../utils/equipmentSectionsService';
 import { contractorService } from '../utils/contractorService';
@@ -43,8 +44,31 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
     description: '',
     manufacturers: [],
     website: '',
-    supplierIds: []
+    supplierIds: [],
+    channelsCount: undefined,
+    dosingVolume: '',
+    volumeStep: '',
+    dosingAccuracy: '',
+    reproducibility: '',
+    autoclavable: undefined,
+    inRegistrySI: false,
+    technicalSpecsRanges: {}
   });
+  
+  // Список доступных технических характеристик
+  const availableSpecs = [
+    { key: 'channelsCount', label: 'Количество каналов', defaultValues: ['1', '8', '12'] },
+    { key: 'dosingVolume', label: 'Объем дозирования', defaultValues: [
+      '0,1-2,5 мкл', '0,5-10 мкл', '2-10 мкл', '2-20 мкл', '5 мкл', '5-50 мкл',
+      '10 мкл', '10-100 мкл', '20 мкл', '20-200 мкл', '25 мкл', '30-300 мкл',
+      '50 мкл', '50-200 мкл', '50-300 мкл', '100 мкл', '100-1000 мкл', '200 мкл',
+      '200-1000 мкл', '250 мкл', '500 мкл', '1000 мкл', '1000-5000 мкл', '5000 мкл'
+    ]},
+    { key: 'autoclavable', label: 'Автоклавируемость', defaultValues: ['Нет', 'Частичная', 'Полная'] },
+    { key: 'volumeStep', label: 'Шаг установки объема дозы', defaultValues: [] },
+    { key: 'dosingAccuracy', label: 'Точность дозирования', defaultValues: [] },
+    { key: 'reproducibility', label: 'Воспроизводимость', defaultValues: [] }
+  ];
 
   // Данные для выбора поставщиков
   const [suppliers, setSuppliers] = useState<Contractor[]>([]);
@@ -74,7 +98,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
       const data = await equipmentSectionsService.getSections(sectionSearchTerm || undefined);
       setSections(data);
     } catch (err) {
-      console.error('Ошибка загрузки разделов:', err);
+      console.error('Ошибка загрузки категорий:', err);
       setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
     } finally {
       setLoading(false);
@@ -131,7 +155,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
     return () => clearTimeout(timeoutId);
   }, [cardSearchTerm]);
 
-  // Управление разделами
+  // Управление категориями
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => {
       const newSet = new Set(prev);
@@ -149,7 +173,21 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
   };
 
   const handleAddSection = () => {
-    setSectionForm({ name: '', description: '', manufacturers: [], website: '', supplierIds: [] });
+    setSectionForm({ 
+      name: '', 
+      description: '', 
+      manufacturers: [], 
+      website: '', 
+      supplierIds: [],
+      channelsCount: undefined,
+      dosingVolume: '',
+      volumeStep: '',
+      dosingAccuracy: '',
+      reproducibility: '',
+      autoclavable: undefined,
+      inRegistrySI: false,
+      technicalSpecsRanges: {}
+    });
     setEditingSection(null);
     setShowSectionForm(true);
   };
@@ -160,7 +198,15 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
       description: section.description || '',
       manufacturers: section.manufacturers || [],
       website: section.website || '',
-      supplierIds: section.supplierIds || []
+      supplierIds: section.supplierIds || [],
+      channelsCount: section.channelsCount,
+      dosingVolume: section.dosingVolume || '',
+      volumeStep: section.volumeStep || '',
+      dosingAccuracy: section.dosingAccuracy || '',
+      reproducibility: section.reproducibility || '',
+      autoclavable: section.autoclavable,
+      inRegistrySI: section.inRegistrySI || false,
+      technicalSpecsRanges: section.technicalSpecsRanges || {}
     });
     setEditingSection(section);
     setShowSectionForm(true);
@@ -168,7 +214,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
 
   const handleSaveSection = async () => {
     if (!sectionForm.name.trim()) {
-      alert('Наименование раздела обязательно');
+      alert('Наименование категории обязательно');
       return;
     }
 
@@ -183,10 +229,24 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
       await loadSections();
       setShowSectionForm(false);
       setEditingSection(null);
-      setSectionForm({ name: '', description: '', manufacturers: [], website: '', supplierIds: [] });
+      setSectionForm({ 
+        name: '', 
+        description: '', 
+        manufacturers: [], 
+        website: '', 
+        supplierIds: [],
+        channelsCount: undefined,
+        dosingVolume: '',
+        volumeStep: '',
+        dosingAccuracy: '',
+        reproducibility: '',
+        autoclavable: undefined,
+        inRegistrySI: false,
+        technicalSpecsRanges: {}
+      });
       setSupplierSearchTerm('');
       setShowSupplierDropdown(false);
-      alert(`Раздел ${editingSection ? 'обновлен' : 'создан'} успешно`);
+      alert(`Категория ${editingSection ? 'обновлена' : 'создана'} успешно`);
     } catch (err) {
       alert(`Ошибка: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`);
     } finally {
@@ -195,7 +255,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
   };
 
   const handleDeleteSection = async (sectionId: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот раздел? Все карточки в нем также будут удалены.')) {
+    if (!confirm('Вы уверены, что хотите удалить эту категорию? Все карточки в ней также будут удалены.')) {
       return;
     }
 
@@ -246,7 +306,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
     }
 
     if (!cardForm.sectionId) {
-      alert('Необходимо выбрать раздел');
+      alert('Необходимо выбрать категорию');
       return;
     }
 
@@ -300,7 +360,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
     }
   };
 
-  // Фильтрация карточек по выбранному разделу
+  // Фильтрация карточек по выбранной категории
   const displayedCards = selectedSectionId
     ? filteredCards.filter(card => card.sectionId === selectedSectionId)
     : filteredCards;
@@ -334,7 +394,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
         >
           <Plus className="w-4 h-4" />
-          <span>Добавить раздел</span>
+          <span>Добавить категорию</span>
         </button>
       </div>
 
@@ -360,7 +420,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
             value={sectionSearchTerm}
             onChange={(e) => setSectionSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Поиск по наименованию раздела..."
+            placeholder="Поиск по наименованию категории..."
           />
         </div>
       </div>
@@ -370,7 +430,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">
-              {editingSection ? 'Редактировать раздел' : 'Добавить раздел'}
+              {editingSection ? 'Редактировать категорию' : 'Добавить категорию'}
             </h2>
             <button
               onClick={() => {
@@ -396,7 +456,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
                 value={sectionForm.name}
                 onChange={(e) => setSectionForm({ ...sectionForm, name: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Введите наименование раздела"
+                placeholder="Введите наименование категории"
               />
             </div>
 
@@ -409,8 +469,192 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
                 onChange={(e) => setSectionForm({ ...sectionForm, description: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 rows={3}
-                placeholder="Введите описание раздела"
+                placeholder="Введите описание категории"
               />
+            </div>
+
+            {/* Технические характеристики */}
+            <div className="border-t pt-4 mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Технические характеристики</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Добавляем новую характеристику
+                    const specKey = `custom_${Date.now()}`;
+                    const newRanges = {
+                      ...(sectionForm.technicalSpecsRanges || {}),
+                      [specKey]: {
+                        enabled: true,
+                        values: ['']
+                      }
+                    };
+                    setSectionForm({
+                      ...sectionForm,
+                      technicalSpecsRanges: newRanges
+                    });
+                  }}
+                  className="flex items-center space-x-1 text-sm text-indigo-600 hover:text-indigo-800"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Добавить характеристику</span>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Отображение доступных характеристик */}
+                {availableSpecs.map((spec) => {
+                  const specRange = sectionForm.technicalSpecsRanges?.[spec.key] || {
+                    enabled: false,
+                    values: spec.defaultValues.length > 0 ? [...spec.defaultValues] : ['']
+                  };
+                  
+                  if (!specRange.enabled) return null;
+                  
+                  return (
+                    <div key={spec.key} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {spec.label}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newRanges = { ...(sectionForm.technicalSpecsRanges || {}) };
+                            delete newRanges[spec.key];
+                            setSectionForm({
+                              ...sectionForm,
+                              technicalSpecsRanges: newRanges
+                            });
+                          }}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      {/* Управление диапазоном значений */}
+                      <div className="space-y-2">
+                        {specRange.values.map((value, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={value}
+                              onChange={(e) => {
+                                const newRanges = { ...(sectionForm.technicalSpecsRanges || {}) };
+                                const newValues = [...specRange.values];
+                                newValues[index] = e.target.value;
+                                newRanges[spec.key] = {
+                                  ...specRange,
+                                  values: newValues
+                                };
+                                setSectionForm({
+                                  ...sectionForm,
+                                  technicalSpecsRanges: newRanges
+                                });
+                              }}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder={`Введите значение для ${spec.label.toLowerCase()}`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newRanges = { ...(sectionForm.technicalSpecsRanges || {}) };
+                                const newValues = specRange.values.filter((_, i) => i !== index);
+                                if (newValues.length === 0) {
+                                  newValues.push('');
+                                }
+                                newRanges[spec.key] = {
+                                  ...specRange,
+                                  values: newValues
+                                };
+                                setSectionForm({
+                                  ...sectionForm,
+                                  technicalSpecsRanges: newRanges
+                                });
+                              }}
+                              className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newRanges = { ...(sectionForm.technicalSpecsRanges || {}) };
+                            newRanges[spec.key] = {
+                              ...specRange,
+                              values: [...specRange.values, '']
+                            };
+                            setSectionForm({
+                              ...sectionForm,
+                              technicalSpecsRanges: newRanges
+                            });
+                          }}
+                          className="flex items-center space-x-1 text-sm text-indigo-600 hover:text-indigo-800"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Добавить значение</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Кнопка для добавления доступных характеристик */}
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Добавить характеристику:
+                  </label>
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const specKey = e.target.value;
+                        const spec = availableSpecs.find(s => s.key === specKey);
+                        if (spec && !sectionForm.technicalSpecsRanges?.[specKey]?.enabled) {
+                          const newRanges = {
+                            ...(sectionForm.technicalSpecsRanges || {}),
+                            [specKey]: {
+                              enabled: true,
+                              values: spec.defaultValues.length > 0 ? [...spec.defaultValues] : ['']
+                            }
+                          };
+                          setSectionForm({
+                            ...sectionForm,
+                            technicalSpecsRanges: newRanges
+                          });
+                        }
+                        e.target.value = '';
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    defaultValue=""
+                  >
+                    <option value="">Выберите характеристику...</option>
+                    {availableSpecs
+                      .filter(spec => !sectionForm.technicalSpecsRanges?.[spec.key]?.enabled)
+                      .map((spec) => (
+                        <option key={spec.key} value={spec.key}>
+                          {spec.label}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+              
+              {/* Наличие в реестре СИ */}
+              <div className="mt-4">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={sectionForm.inRegistrySI || false}
+                    onChange={(e) => setSectionForm({ ...sectionForm, inRegistrySI: e.target.checked })}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Наличие в реестре СИ</span>
+                </label>
+              </div>
             </div>
 
             <div>
@@ -572,7 +816,20 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
               onClick={() => {
                 setShowSectionForm(false);
                 setEditingSection(null);
-                setSectionForm({ name: '', description: '', manufacturers: [], website: '', supplierIds: [] });
+                setSectionForm({ 
+                  name: '', 
+                  description: '', 
+                  manufacturers: [], 
+                  website: '', 
+                  supplierIds: [],
+                  channelsCount: undefined,
+                  dosingVolume: '',
+                  volumeStep: '',
+                  dosingAccuracy: '',
+                  reproducibility: '',
+                  autoclavable: undefined,
+                  inRegistrySI: false
+                });
                 setSupplierSearchTerm('');
                 setShowSupplierDropdown(false);
               }}
@@ -591,7 +848,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
         </div>
       )}
 
-      {/* Список разделов */}
+      {/* Список категорий */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading ? (
           <div className="p-8 text-center">
@@ -601,7 +858,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
         ) : sections.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             <FolderOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>Разделы не найдены</p>
+            <p>Категории не найдены</p>
             {sectionSearchTerm && (
               <p className="text-sm mt-1">Попробуйте изменить поисковый запрос</p>
             )}
@@ -685,7 +942,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
                   </div>
                 </div>
 
-                {/* Карточки раздела */}
+                {/* Карточки категории */}
                 {expandedSections.has(section.id) && (
                   <div className="mt-4 ml-8 space-y-4">
                     {/* Поиск карточек */}
@@ -815,7 +1072,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Раздел *
+                Категория *
               </label>
               <select
                 value={cardForm.sectionId}
@@ -823,7 +1080,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 disabled={!!editingCard}
               >
-                <option value="">Выберите раздел</option>
+                <option value="">Выберите категорию</option>
                 {sections.map((section) => (
                   <option key={section.id} value={section.id}>
                     {section.name}

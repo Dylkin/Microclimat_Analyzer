@@ -39,6 +39,15 @@ export interface ProjectItem {
   supplierName?: string;
   supplierPrice?: number;
   description?: string;
+  categoryId?: string;
+  categoryName?: string;
+  channelsCount?: number;
+  dosingVolume?: string;
+  volumeStep?: string;
+  dosingAccuracy?: string;
+  reproducibility?: string;
+  autoclavable?: boolean;
+  inRegistrySI?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

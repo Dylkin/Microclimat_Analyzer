@@ -1,3 +1,12 @@
+export interface TechnicalSpecRange {
+  enabled: boolean;
+  values: string[];
+}
+
+export interface TechnicalSpecsRanges {
+  [key: string]: TechnicalSpecRange;
+}
+
 export interface EquipmentSection {
   id: string;
   name: string;
@@ -5,6 +14,14 @@ export interface EquipmentSection {
   manufacturers?: string[];
   website?: string;
   supplierIds?: string[];
+  channelsCount?: number;
+  dosingVolume?: string;
+  volumeStep?: string;
+  dosingAccuracy?: string;
+  reproducibility?: string;
+  autoclavable?: boolean;
+  inRegistrySI?: boolean;
+  technicalSpecsRanges?: TechnicalSpecsRanges;
   cardsCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -35,6 +52,14 @@ export interface CreateEquipmentSectionData {
   manufacturers?: string[];
   website?: string;
   supplierIds?: string[];
+  channelsCount?: number;
+  dosingVolume?: string;
+  volumeStep?: string;
+  dosingAccuracy?: string;
+  reproducibility?: string;
+  autoclavable?: boolean;
+  inRegistrySI?: boolean;
+  technicalSpecsRanges?: TechnicalSpecsRanges;
 }
 
 export interface UpdateEquipmentSectionData {
@@ -43,6 +68,14 @@ export interface UpdateEquipmentSectionData {
   manufacturers?: string[];
   website?: string;
   supplierIds?: string[];
+  channelsCount?: number;
+  dosingVolume?: string;
+  volumeStep?: string;
+  dosingAccuracy?: string;
+  reproducibility?: string;
+  autoclavable?: boolean;
+  inRegistrySI?: boolean;
+  technicalSpecsRanges?: TechnicalSpecsRanges;
 }
 
 export interface CreateEquipmentCardData {

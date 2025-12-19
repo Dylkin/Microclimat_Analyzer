@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Wrench, Plus, Edit2, Trash2, Save, X, Search, Eye, AlertTriangle, Loader, ChevronLeft, ChevronRight, Upload, Download, Calendar, FileImage, CheckCircle } from 'lucide-react';
 import { Equipment, EquipmentType, EquipmentTypeLabels, EquipmentTypeColors, CreateEquipmentData, EquipmentVerification } from '../types/Equipment';
 import { equipmentService } from '../utils/equipmentService';
+import { apiClient } from '../utils/apiClient';
 
 const EquipmentDirectory: React.FC = () => {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -347,11 +348,30 @@ const EquipmentDirectory: React.FC = () => {
       return;
     }
 
-    // Создаем URL для предварительного просмотра
-    const fileUrl = URL.createObjectURL(file);
-    
-    updateVerification(index, 'verificationFileUrl', fileUrl, isEdit);
-    updateVerification(index, 'verificationFileName', file.name, isEdit);
+    try {
+      // Создаем временный blob URL для предварительного просмотра
+      const previewUrl = URL.createObjectURL(file);
+      updateVerification(index, 'verificationFileUrl', previewUrl, isEdit);
+      updateVerification(index, 'verificationFileName', file.name, isEdit);
+      
+      // Загружаем файл на сервер
+      const fileName = `equipment-verifications/${Date.now()}-${file.name}`;
+      const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
+        bucket: 'documents',
+        path: fileName
+      });
+      
+      const serverUrl = uploadResult.data?.publicUrl || `/uploads/documents/${fileName}`;
+      
+      // Обновляем URL на серверный
+      updateVerification(index, 'verificationFileUrl', serverUrl, isEdit);
+      
+      // Освобождаем временный blob URL
+      URL.revokeObjectURL(previewUrl);
+    } catch (error) {
+      console.error('Ошибка загрузки файла верификации:', error);
+      alert(`Ошибка загрузки файла: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    }
   };
 
   // Функция для рендеринга блока аттестаций
@@ -451,35 +471,53 @@ const EquipmentDirectory: React.FC = () => {
               <div className="mb-3">
                 <label className="block text-xs text-gray-500 mb-1">Свидетельство о поверке</label>
                 {verification.verificationFileUrl ? (
-                  <div className="flex items-center justify-between bg-white p-2 border border-gray-300 rounded">
-                    <div className="flex items-center space-x-2">
-                      <FileImage className="w-4 h-4 text-green-600" />
-                      <span className="text-sm text-gray-700">
-                        {verification.verificationFileName || 'Файл загружен'}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => window.open(verification.verificationFileUrl, '_blank')}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="Просмотреть"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          updateVerification(index, 'verificationFileUrl', undefined, isEdit);
-                          updateVerification(index, 'verificationFileName', undefined, isEdit);
-                        }}
-                        className="text-red-600 hover:text-red-800"
-                        title="Удалить файл"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+                  (() => {
+                    const isBlobUrl = verification.verificationFileUrl.startsWith('blob:');
+                    return (
+                      <div className={`flex items-center justify-between p-2 border rounded ${isBlobUrl ? 'bg-yellow-50 border-yellow-300' : 'bg-white border-gray-300'}`}>
+                        <div className="flex items-center space-x-2 flex-1">
+                          {isBlobUrl ? (
+                            <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                          ) : (
+                            <FileImage className="w-4 h-4 text-green-600" />
+                          )}
+                          <div className="flex-1">
+                            <span className={`text-sm ${isBlobUrl ? 'text-yellow-800 font-medium' : 'text-gray-700'}`}>
+                              {verification.verificationFileName || 'Файл загружен'}
+                            </span>
+                            {isBlobUrl && (
+                              <div className="text-xs text-yellow-700 mt-1">
+                                ⚠️ Файл не загружен на сервер. Перезагрузите файл для корректной работы.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {!isBlobUrl && (
+                            <button
+                              type="button"
+                              onClick={() => window.open(verification.verificationFileUrl, '_blank')}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="Просмотреть"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateVerification(index, 'verificationFileUrl', undefined, isEdit);
+                              updateVerification(index, 'verificationFileName', undefined, isEdit);
+                            }}
+                            className="text-red-600 hover:text-red-800"
+                            title="Удалить файл"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div className="border-2 border-dashed border-gray-300 rounded p-3">
                     <input
@@ -1013,37 +1051,57 @@ const EquipmentDirectory: React.FC = () => {
                     {verification.verificationFileUrl && (
                       <div>
                         <label className="block text-xs text-gray-500 mb-2">Свидетельство о поверке</label>
-                        <div className="flex items-center justify-between bg-white p-3 border border-gray-200 rounded">
-                          <div className="flex items-center space-x-2">
-                            <FileImage className="w-4 h-4 text-green-600" />
-                            <span className="text-sm text-gray-700">
-                              {verification.verificationFileName || 'Файл свидетельства'}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => window.open(verification.verificationFileUrl, '_blank')}
-                              className="text-blue-600 hover:text-blue-800 transition-colors"
-                              title="Открыть файл"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = verification.verificationFileUrl!;
-                                link.download = verification.verificationFileName || 'verification.jpg';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                              }}
-                              className="text-green-600 hover:text-green-800 transition-colors"
-                              title="Скачать файл"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
+                        {(() => {
+                          const isBlobUrl = verification.verificationFileUrl.startsWith('blob:');
+                          return (
+                            <div className={`flex items-center justify-between p-3 border rounded ${isBlobUrl ? 'bg-yellow-50 border-yellow-300' : 'bg-white border-gray-200'}`}>
+                              <div className="flex items-center space-x-2 flex-1">
+                                {isBlobUrl ? (
+                                  <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                                ) : (
+                                  <FileImage className="w-4 h-4 text-green-600" />
+                                )}
+                                <div className="flex-1">
+                                  <span className={`text-sm ${isBlobUrl ? 'text-yellow-800 font-medium' : 'text-gray-700'}`}>
+                                    {verification.verificationFileName || 'Файл свидетельства'}
+                                  </span>
+                                  {isBlobUrl && (
+                                    <div className="text-xs text-yellow-700 mt-1">
+                                      ⚠️ Файл не загружен на сервер. Откройте редактирование и перезагрузите файл.
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                {!isBlobUrl && (
+                                  <>
+                                    <button
+                                      onClick={() => window.open(verification.verificationFileUrl, '_blank')}
+                                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                                      title="Открыть файл"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const link = document.createElement('a');
+                                        link.href = verification.verificationFileUrl!;
+                                        link.download = verification.verificationFileName || 'verification.jpg';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                      }}
+                                      className="text-green-600 hover:text-green-800 transition-colors"
+                                      title="Скачать файл"
+                                    >
+                                      <Download className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                     

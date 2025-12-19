@@ -3,7 +3,7 @@ import { X, Plus, Trash2, Search } from 'lucide-react';
 import { Contractor, ContractorRole } from '../types/Contractor';
 import { contractorService } from '../utils/contractorService';
 import { CreateProjectData } from '../types/Project';
-import { EquipmentCard } from '../types/EquipmentSections';
+import { EquipmentCard, EquipmentSection } from '../types/EquipmentSections';
 import { equipmentSectionsService } from '../utils/equipmentSectionsService';
 
 interface SaleProjectFormProps {
@@ -20,6 +20,14 @@ interface ProjectItem {
   supplierId?: string;
   supplierPrice?: number;
   description?: string;
+  categoryId?: string;
+  channelsCount?: number;
+  dosingVolume?: string;
+  volumeStep?: string;
+  dosingAccuracy?: string;
+  reproducibility?: string;
+  autoclavable?: boolean;
+  inRegistrySI?: boolean;
 }
 
 export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
@@ -40,6 +48,12 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
   const [showProductDropdowns, setShowProductDropdowns] = useState<Record<number, boolean>>({});
   const [productSearchResults, setProductSearchResults] = useState<Record<number, EquipmentCard[]>>({});
   const [productSearchLoading, setProductSearchLoading] = useState<Record<number, boolean>>({});
+  const [categories, setCategories] = useState<EquipmentSection[]>([]);
+  const [allCategoryProducts, setAllCategoryProducts] = useState<Record<number, EquipmentCard[]>>({});
+  // Отслеживаем, были ли изменены технические характеристики пользователем (для определения, применять ли фильтрацию)
+  const [userModifiedSpecs, setUserModifiedSpecs] = useState<Record<number, boolean>>({});
+  // Отслеживаем, когда пользователь выбрал "Добавить новое значение" для каждого поля
+  const [showCustomInputs, setShowCustomInputs] = useState<Record<string, boolean>>({});
   
   const contractorDropdownRef = useRef<HTMLDivElement>(null);
   const supplierDropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -114,6 +128,19 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
     }
   };
 
+  // Загрузка категорий
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const data = await equipmentSectionsService.getSections();
+        setCategories(data);
+      } catch (error) {
+        console.error('Ошибка загрузки категорий:', error);
+      }
+    };
+    loadCategories();
+  }, []);
+
   // Добавление товара
   const handleAddItem = () => {
     setItems(prev => [...prev, {
@@ -122,7 +149,15 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
       declaredPrice: 0,
       supplierId: undefined,
       supplierPrice: undefined,
-      description: ''
+      description: '',
+      categoryId: undefined,
+      channelsCount: undefined,
+      dosingVolume: '',
+      volumeStep: '',
+      dosingAccuracy: '',
+      reproducibility: '',
+      autoclavable: undefined,
+      inRegistrySI: false
     }]);
   };
 
@@ -171,44 +206,106 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
     );
   };
 
-  // Поиск товаров по справочнику
-  useEffect(() => {
-    const searchTimeouts: Record<number, NodeJS.Timeout> = {};
+  // Функция фильтрации товаров по техническим характеристикам
+  // Фильтруем только по тем полям, которые пользователь явно изменил (не пустые строки и не undefined для числовых)
+  const filterCardsBySpecs = (cards: EquipmentCard[], item: ProjectItem): EquipmentCard[] => {
+    if (!item.categoryId) return cards;
     
-    Object.keys(productSearches).forEach(indexStr => {
-      const index = parseInt(indexStr);
-      const search = productSearches[index];
-      
-      if (search && search.trim().length > 0) {
-        // Очищаем предыдущий таймаут для этого индекса
-        if (searchTimeouts[index]) {
-          clearTimeout(searchTimeouts[index]);
+    // Если нет заполненных технических характеристик, возвращаем все товары
+    const hasFilters = 
+      (item.channelsCount !== undefined && item.channelsCount !== null) ||
+      (item.dosingVolume && item.dosingVolume.trim()) ||
+      (item.volumeStep && item.volumeStep.trim()) ||
+      (item.dosingAccuracy && item.dosingAccuracy.trim()) ||
+      (item.reproducibility && item.reproducibility.trim()) ||
+      (item.autoclavable !== undefined && item.autoclavable !== null);
+    
+    if (!hasFilters) {
+      return cards;
+    }
+    
+    return cards.filter(card => {
+      // Фильтрация по техническим характеристикам
+      // Количество каналов - фильтруем только если явно указано
+      if (item.channelsCount !== undefined && item.channelsCount !== null && card.channelsCount !== item.channelsCount) {
+        return false;
+      }
+      // Объем дозирования - фильтруем только если указано и не пустая строка
+      if (item.dosingVolume && item.dosingVolume.trim() && card.dosingVolume && !card.dosingVolume.toLowerCase().includes(item.dosingVolume.toLowerCase())) {
+        return false;
+      }
+      // Шаг установки объема - фильтруем только если указано и не пустая строка
+      if (item.volumeStep && item.volumeStep.trim() && card.volumeStep && !card.volumeStep.toLowerCase().includes(item.volumeStep.toLowerCase())) {
+        return false;
+      }
+      // Точность дозирования - фильтруем только если указано и не пустая строка
+      if (item.dosingAccuracy && item.dosingAccuracy.trim() && card.dosingAccuracy && !card.dosingAccuracy.toLowerCase().includes(item.dosingAccuracy.toLowerCase())) {
+        return false;
+      }
+      // Воспроизводимость - фильтруем только если указано и не пустая строка
+      if (item.reproducibility && item.reproducibility.trim() && card.reproducibility && !card.reproducibility.toLowerCase().includes(item.reproducibility.toLowerCase())) {
+        return false;
+      }
+      // Автоклавируемость - фильтруем только если явно указано (не undefined)
+      if (item.autoclavable !== undefined && item.autoclavable !== null && card.autoclavable !== item.autoclavable) {
+        return false;
+      }
+      return true;
+    });
+  };
+
+  // Загрузка товаров при выборе категории или изменении технических характеристик
+  useEffect(() => {
+    const loadTimeouts: Record<number, NodeJS.Timeout> = {};
+    
+    items.forEach((item, index) => {
+      if (item.categoryId) {
+        // Очищаем предыдущий таймаут
+        if (loadTimeouts[index]) {
+          clearTimeout(loadTimeouts[index]);
         }
         
-        // Устанавливаем новый таймаут для поиска
-        searchTimeouts[index] = setTimeout(async () => {
+        // Загружаем товары категории с фильтрацией по техническим характеристикам
+        loadTimeouts[index] = setTimeout(async () => {
           setProductSearchLoading(prev => ({ ...prev, [index]: true }));
           try {
-            const cards = await equipmentSectionsService.getCards(search);
-            setProductSearchResults(prev => ({ ...prev, [index]: cards }));
+            // Получаем все товары категории (без поискового запроса)
+            const cards = await equipmentSectionsService.getCards(undefined, item.categoryId);
+            
+            // Сохраняем все товары категории для последующей фильтрации
+            setAllCategoryProducts(prev => ({ ...prev, [index]: cards }));
+            
+            // Фильтруем по техническим характеристикам только если пользователь их изменил
+            // При первоначальной загрузке (после выбора категории) показываем все товары
+            const filteredCards = userModifiedSpecs[index] 
+              ? filterCardsBySpecs(cards, item)
+              : cards;
+            
+            setProductSearchResults(prev => ({ ...prev, [index]: filteredCards }));
+            // Автоматически показываем список товаров при загрузке, если есть товары в категории
+            // Показываем список даже если после фильтрации товаров нет - пользователь может изменить фильтры
             setShowProductDropdowns(prev => ({ ...prev, [index]: true }));
           } catch (error) {
-            console.error('Ошибка поиска товаров:', error);
+            console.error('Ошибка загрузки товаров категории:', error);
             setProductSearchResults(prev => ({ ...prev, [index]: [] }));
+            setAllCategoryProducts(prev => ({ ...prev, [index]: [] }));
           } finally {
             setProductSearchLoading(prev => ({ ...prev, [index]: false }));
           }
         }, 300);
       } else {
+        // Если категория не выбрана, очищаем результаты
         setProductSearchResults(prev => ({ ...prev, [index]: [] }));
+        setAllCategoryProducts(prev => ({ ...prev, [index]: [] }));
         setShowProductDropdowns(prev => ({ ...prev, [index]: false }));
       }
     });
     
     return () => {
-      Object.values(searchTimeouts).forEach(timeout => clearTimeout(timeout));
+      Object.values(loadTimeouts).forEach(timeout => clearTimeout(timeout));
     };
-  }, [productSearches]);
+  }, [items.map(item => `${item.categoryId}-${item.channelsCount}-${item.dosingVolume}-${item.volumeStep}-${item.dosingAccuracy}-${item.reproducibility}-${item.autoclavable}`).join('|'), userModifiedSpecs]);
+
 
   // Обработка выбора товара из справочника
   const handleProductSelect = (itemIndex: number, product: EquipmentCard) => {
@@ -216,6 +313,7 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
     setProductSearches(prev => ({ ...prev, [itemIndex]: product.name }));
     setShowProductDropdowns(prev => ({ ...prev, [itemIndex]: false }));
   };
+
 
   // Сохранение проекта
   const handleSave = async () => {
@@ -231,8 +329,9 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
 
     // Проверка заполненности товаров
     for (const item of items) {
-      if (!item.name.trim()) {
-        alert('Заполните наименование всех товаров');
+      // Если наименование не указано, проверяем, что выбрана категория
+      if (!item.name.trim() && !item.categoryId) {
+        alert('Заполните наименование товара или выберите категорию');
         return;
       }
       if (item.quantity <= 0) {
@@ -256,14 +355,56 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
       tenderLink: tenderLink || undefined,
       tenderDate: tenderDate ? new Date(tenderDate) : undefined,
       qualificationObjectIds: [],
-      items: items.map(item => ({
-        name: item.name,
-        quantity: item.quantity,
-        declaredPrice: item.declaredPrice,
-        supplierId: item.supplierId,
-        supplierPrice: item.supplierPrice,
-        description: item.description || undefined
-      }))
+      items: items.map((item, itemIndex) => {
+        // Если наименование указано пользователем, используем его
+        let itemName = item.name.trim();
+        
+        // Если наименование не указано, но выбрана категория, генерируем наименование на основе категории
+        if (!itemName && item.categoryId) {
+          const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
+          if (category) {
+            itemName = category.name;
+            // Добавляем технические характеристики к наименованию, если они указаны пользователем
+            const specs: string[] = [];
+            if (userModifiedSpecs[itemIndex] && item.channelsCount !== undefined && item.channelsCount !== null) {
+              specs.push(`${item.channelsCount} канал(ов)`);
+            }
+            if (userModifiedSpecs[itemIndex] && item.dosingVolume && item.dosingVolume.trim()) {
+              specs.push(`объем: ${item.dosingVolume}`);
+            }
+            if (userModifiedSpecs[itemIndex] && item.autoclavable !== undefined && item.autoclavable !== null) {
+              specs.push(item.autoclavable ? 'автоклавируемый' : 'не автоклавируемый');
+            }
+            if (specs.length > 0) {
+              itemName += ` (${specs.join(', ')})`;
+            }
+          } else {
+            itemName = 'Товар без наименования';
+          }
+        }
+        
+        // Если наименование все еще пустое (нет категории и нет наименования), используем значение по умолчанию
+        if (!itemName) {
+          itemName = 'Товар без наименования';
+        }
+        
+        return {
+          name: itemName,
+          quantity: item.quantity,
+          declaredPrice: item.declaredPrice,
+          supplierId: item.supplierId,
+          supplierPrice: item.supplierPrice,
+          description: item.description || undefined,
+          categoryId: item.categoryId,
+          channelsCount: item.channelsCount,
+          dosingVolume: item.dosingVolume,
+          volumeStep: item.volumeStep,
+          dosingAccuracy: item.dosingAccuracy,
+          reproducibility: item.reproducibility,
+          autoclavable: item.autoclavable,
+          inRegistrySI: item.inRegistrySI
+        };
+      })
     };
 
     await onSave(projectData);
@@ -290,9 +431,10 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
             Дата создания
           </label>
           <input
-            type="text"
-            value={new Date().toLocaleDateString('ru-RU')}
+            type="date"
+            value={new Date().toISOString().split('T')[0]}
             disabled
+            title="Дата создания"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
           />
         </div>
@@ -414,9 +556,645 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Категория */}
+                    <div className="md:col-span-2">
+                      <label className="block text-xs text-gray-500 mb-1">Категория</label>
+                      <select
+                        value={item.categoryId || ''}
+                        onChange={(e) => {
+                          const categoryId = e.target.value || undefined;
+                          handleUpdateItem(index, 'categoryId', categoryId);
+                          // Если выбрана категория, загружаем её технические характеристики
+                          if (categoryId) {
+                            const category = categories.find((c: EquipmentSection) => c.id === categoryId);
+                            if (category) {
+                              handleUpdateItem(index, 'channelsCount', category.channelsCount);
+                              handleUpdateItem(index, 'dosingVolume', category.dosingVolume || '');
+                              handleUpdateItem(index, 'volumeStep', category.volumeStep || '');
+                              handleUpdateItem(index, 'dosingAccuracy', category.dosingAccuracy || '');
+                              handleUpdateItem(index, 'reproducibility', category.reproducibility || '');
+                              handleUpdateItem(index, 'autoclavable', category.autoclavable);
+                              handleUpdateItem(index, 'inRegistrySI', category.inRegistrySI || false);
+                            }
+                            // Сбрасываем флаг изменений технических характеристик при выборе новой категории
+                            setUserModifiedSpecs(prev => ({ ...prev, [index]: false }));
+                            // Показываем список товаров при выборе категории (товары загрузятся автоматически)
+                            // Список будет показан после загрузки товаров в useEffect
+                          } else {
+                            // Очищаем технические характеристики при снятии выбора категории
+                            handleUpdateItem(index, 'channelsCount', undefined);
+                            handleUpdateItem(index, 'dosingVolume', '');
+                            handleUpdateItem(index, 'volumeStep', '');
+                            handleUpdateItem(index, 'dosingAccuracy', '');
+                            handleUpdateItem(index, 'reproducibility', '');
+                            handleUpdateItem(index, 'autoclavable', undefined);
+                            handleUpdateItem(index, 'inRegistrySI', false);
+                            handleUpdateItem(index, 'name', '');
+                            setProductSearches(prev => ({ ...prev, [index]: '' }));
+                            setShowProductDropdowns(prev => ({ ...prev, [index]: false }));
+                            setProductSearchResults(prev => ({ ...prev, [index]: [] }));
+                          }
+                        }}
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="">Выберите категорию</option>
+                        {categories.map((category: EquipmentSection) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Технические характеристики - показываем только если выбрана категория */}
+                    {item.categoryId && (
+                      <>
+                        <div className="md:col-span-2 border-t pt-3 mt-2">
+                          <h4 className="text-xs font-semibold text-gray-700 mb-2">Технические характеристики</h4>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Количество каналов</label>
+                          {(() => {
+                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
+                            const specRange = category?.technicalSpecsRanges?.['channelsCount'];
+                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
+                            const currentValue = item.channelsCount?.toString() || '';
+                            const inputKey = `channelsCount_${index}`;
+                            const showCustomInput = showCustomInputs[inputKey] || (!availableValues.includes(currentValue) && currentValue !== '');
+                            
+                            return (
+                              <div className="space-y-1">
+                                <select
+                                  value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
+                                  onChange={(e) => {
+                                    if (e.target.value === '__custom__') {
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
+                                    } else if (e.target.value === '') {
+                                      handleUpdateItem(index, 'channelsCount', undefined);
+                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                    } else {
+                                      handleUpdateItem(index, 'channelsCount', parseInt(e.target.value));
+                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                    }
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                >
+                                  <option value="">Не указано</option>
+                                  {availableValues.map((val) => (
+                                    <option key={val} value={val}>{val}</option>
+                                  ))}
+                                  <option value="__custom__">+ Добавить новое значение</option>
+                                </select>
+                                {showCustomInput && (
+                                  <div className="flex items-center space-x-1">
+                                    <input
+                                      type="number"
+                                      value={currentValue}
+                                      onChange={(e) => {
+                                        handleUpdateItem(index, 'channelsCount', e.target.value ? parseInt(e.target.value) : undefined);
+                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      }}
+                                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      min="1"
+                                      placeholder="Введите количество каналов"
+                                    />
+                                    {category && (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (currentValue && !availableValues.includes(currentValue)) {
+                                            try {
+                                              const updatedRanges = {
+                                                ...(category.technicalSpecsRanges || {}),
+                                                channelsCount: {
+                                                  enabled: true,
+                                                  values: [...availableValues, currentValue]
+                                                }
+                                              };
+                                              await equipmentSectionsService.updateSection(category.id, {
+                                                technicalSpecsRanges: updatedRanges
+                                              });
+                                              // Обновляем локальный список категорий
+                                              const updatedCategories = categories.map(c => 
+                                                c.id === category.id 
+                                                  ? { ...c, technicalSpecsRanges: updatedRanges }
+                                                  : c
+                                              );
+                                              setCategories(updatedCategories);
+                                            } catch (error) {
+                                              console.error('Ошибка сохранения нового значения:', error);
+                                              alert('Ошибка сохранения нового значения');
+                                            }
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
+                                        title="Сохранить новое значение в категорию"
+                                      >
+                                        Сохранить
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Объем дозирования</label>
+                          {(() => {
+                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
+                            const specRange = category?.technicalSpecsRanges?.['dosingVolume'];
+                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
+                            const currentValue = item.dosingVolume || '';
+                            const inputKey = `dosingVolume_${index}`;
+                            const showCustomInput = showCustomInputs[inputKey] || (!availableValues.includes(currentValue) && currentValue !== '');
+                            
+                            return (
+                              <div className="space-y-1">
+                                <select
+                                  value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
+                                  onChange={(e) => {
+                                    if (e.target.value === '__custom__') {
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
+                                    } else if (e.target.value === '') {
+                                      handleUpdateItem(index, 'dosingVolume', '');
+                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                    } else {
+                                      handleUpdateItem(index, 'dosingVolume', e.target.value);
+                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                    }
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                >
+                                  <option value="">Не указано</option>
+                                  {availableValues.map((val) => (
+                                    <option key={val} value={val}>{val}</option>
+                                  ))}
+                                  <option value="__custom__">+ Добавить новое значение</option>
+                                </select>
+                                {showCustomInput && (
+                                  <div className="flex items-center space-x-1">
+                                    <input
+                                      type="text"
+                                      value={currentValue}
+                                      onChange={(e) => {
+                                        handleUpdateItem(index, 'dosingVolume', e.target.value);
+                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      }}
+                                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      placeholder="например, 0,1-2,5 мкл"
+                                    />
+                                    {category && (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (currentValue && !availableValues.includes(currentValue)) {
+                                            try {
+                                              const updatedRanges = {
+                                                ...(category.technicalSpecsRanges || {}),
+                                                dosingVolume: {
+                                                  enabled: true,
+                                                  values: [...availableValues, currentValue]
+                                                }
+                                              };
+                                              await equipmentSectionsService.updateSection(category.id, {
+                                                technicalSpecsRanges: updatedRanges
+                                              });
+                                              const updatedCategories = categories.map(c => 
+                                                c.id === category.id 
+                                                  ? { ...c, technicalSpecsRanges: updatedRanges }
+                                                  : c
+                                              );
+                                              setCategories(updatedCategories);
+                                              setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                            } catch (error) {
+                                              console.error('Ошибка сохранения нового значения:', error);
+                                              alert('Ошибка сохранения нового значения');
+                                            }
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
+                                        title="Сохранить новое значение в категорию"
+                                      >
+                                        Сохранить
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Шаг установки объема дозы</label>
+                          {(() => {
+                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
+                            const specRange = category?.technicalSpecsRanges?.['volumeStep'];
+                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
+                            const currentValue = item.volumeStep || '';
+                            const inputKey = `volumeStep_${index}`;
+                            const showCustomInput = showCustomInputs[inputKey] || (!availableValues.includes(currentValue) && currentValue !== '');
+                            
+                            return (
+                              <div className="space-y-1">
+                                <select
+                                  value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
+                                  onChange={(e) => {
+                                    if (e.target.value === '__custom__') {
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
+                                    } else if (e.target.value === '') {
+                                      handleUpdateItem(index, 'volumeStep', '');
+                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                    } else {
+                                      handleUpdateItem(index, 'volumeStep', e.target.value);
+                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                    }
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                >
+                                  <option value="">Не указано</option>
+                                  {availableValues.map((val) => (
+                                    <option key={val} value={val}>{val}</option>
+                                  ))}
+                                  <option value="__custom__">+ Добавить новое значение</option>
+                                </select>
+                                {showCustomInput && (
+                                  <div className="flex items-center space-x-1">
+                                    <input
+                                      type="text"
+                                      value={currentValue}
+                                      onChange={(e) => {
+                                        handleUpdateItem(index, 'volumeStep', e.target.value);
+                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      }}
+                                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      placeholder="Введите шаг установки"
+                                    />
+                                    {category && (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (currentValue && !availableValues.includes(currentValue)) {
+                                            try {
+                                              const updatedRanges = {
+                                                ...(category.technicalSpecsRanges || {}),
+                                                volumeStep: {
+                                                  enabled: true,
+                                                  values: [...availableValues, currentValue]
+                                                }
+                                              };
+                                              await equipmentSectionsService.updateSection(category.id, {
+                                                technicalSpecsRanges: updatedRanges
+                                              });
+                                              const updatedCategories = categories.map(c => 
+                                                c.id === category.id 
+                                                  ? { ...c, technicalSpecsRanges: updatedRanges }
+                                                  : c
+                                              );
+                                              setCategories(updatedCategories);
+                                            } catch (error) {
+                                              console.error('Ошибка сохранения нового значения:', error);
+                                              alert('Ошибка сохранения нового значения');
+                                            }
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
+                                        title="Сохранить новое значение в категорию"
+                                      >
+                                        Сохранить
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Точность дозирования</label>
+                          {(() => {
+                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
+                            const specRange = category?.technicalSpecsRanges?.['dosingAccuracy'];
+                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
+                            const currentValue = item.dosingAccuracy || '';
+                            const inputKey = `dosingAccuracy_${index}`;
+                            const showCustomInput = showCustomInputs[inputKey] || (!availableValues.includes(currentValue) && currentValue !== '');
+                            
+                            return (
+                              <div className="space-y-1">
+                                <select
+                                  value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
+                                  onChange={(e) => {
+                                    if (e.target.value === '__custom__') {
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
+                                    } else if (e.target.value === '') {
+                                      handleUpdateItem(index, 'dosingAccuracy', '');
+                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                    } else {
+                                      handleUpdateItem(index, 'dosingAccuracy', e.target.value);
+                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                    }
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                >
+                                  <option value="">Не указано</option>
+                                  {availableValues.map((val) => (
+                                    <option key={val} value={val}>{val}</option>
+                                  ))}
+                                  <option value="__custom__">+ Добавить новое значение</option>
+                                </select>
+                                {showCustomInput && (
+                                  <div className="flex items-center space-x-1">
+                                    <input
+                                      type="text"
+                                      value={currentValue}
+                                      onChange={(e) => {
+                                        handleUpdateItem(index, 'dosingAccuracy', e.target.value);
+                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      }}
+                                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      placeholder="Введите точность дозирования"
+                                    />
+                                    {category && (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (currentValue && !availableValues.includes(currentValue)) {
+                                            try {
+                                              const updatedRanges = {
+                                                ...(category.technicalSpecsRanges || {}),
+                                                dosingAccuracy: {
+                                                  enabled: true,
+                                                  values: [...availableValues, currentValue]
+                                                }
+                                              };
+                                              await equipmentSectionsService.updateSection(category.id, {
+                                                technicalSpecsRanges: updatedRanges
+                                              });
+                                              const updatedCategories = categories.map(c => 
+                                                c.id === category.id 
+                                                  ? { ...c, technicalSpecsRanges: updatedRanges }
+                                                  : c
+                                              );
+                                              setCategories(updatedCategories);
+                                              setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                            } catch (error) {
+                                              console.error('Ошибка сохранения нового значения:', error);
+                                              alert('Ошибка сохранения нового значения');
+                                            }
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
+                                        title="Сохранить новое значение в категорию"
+                                      >
+                                        Сохранить
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Воспроизводимость</label>
+                          {(() => {
+                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
+                            const specRange = category?.technicalSpecsRanges?.['reproducibility'];
+                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
+                            const currentValue = item.reproducibility || '';
+                            const inputKey = `reproducibility_${index}`;
+                            const showCustomInput = showCustomInputs[inputKey] || (!availableValues.includes(currentValue) && currentValue !== '');
+                            
+                            return (
+                              <div className="space-y-1">
+                                <select
+                                  value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
+                                  onChange={(e) => {
+                                    if (e.target.value === '__custom__') {
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
+                                    } else if (e.target.value === '') {
+                                      handleUpdateItem(index, 'reproducibility', '');
+                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                    } else {
+                                      handleUpdateItem(index, 'reproducibility', e.target.value);
+                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                    }
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                >
+                                  <option value="">Не указано</option>
+                                  {availableValues.map((val) => (
+                                    <option key={val} value={val}>{val}</option>
+                                  ))}
+                                  <option value="__custom__">+ Добавить новое значение</option>
+                                </select>
+                                {showCustomInput && (
+                                  <div className="flex items-center space-x-1">
+                                    <input
+                                      type="text"
+                                      value={currentValue}
+                                      onChange={(e) => {
+                                        handleUpdateItem(index, 'reproducibility', e.target.value);
+                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      }}
+                                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      placeholder="Введите воспроизводимость"
+                                    />
+                                    {category && (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (currentValue && !availableValues.includes(currentValue)) {
+                                            try {
+                                              const updatedRanges = {
+                                                ...(category.technicalSpecsRanges || {}),
+                                                reproducibility: {
+                                                  enabled: true,
+                                                  values: [...availableValues, currentValue]
+                                                }
+                                              };
+                                              await equipmentSectionsService.updateSection(category.id, {
+                                                technicalSpecsRanges: updatedRanges
+                                              });
+                                              const updatedCategories = categories.map(c => 
+                                                c.id === category.id 
+                                                  ? { ...c, technicalSpecsRanges: updatedRanges }
+                                                  : c
+                                              );
+                                              setCategories(updatedCategories);
+                                              setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                            } catch (error) {
+                                              console.error('Ошибка сохранения нового значения:', error);
+                                              alert('Ошибка сохранения нового значения');
+                                            }
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
+                                        title="Сохранить новое значение в категорию"
+                                      >
+                                        Сохранить
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Автоклавируемость</label>
+                          {(() => {
+                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
+                            const specRange = category?.technicalSpecsRanges?.['autoclavable'];
+                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
+                            // Маппинг значений для автоклавируемости
+                            const valueMap: Record<string, boolean | undefined> = {
+                              'Нет': false,
+                              'Частичная': true, // Можно использовать отдельное значение, но для простоты используем true
+                              'Полная': true,
+                              'Да': true,
+                              'false': false,
+                              'true': true
+                            };
+                            const currentValue = item.autoclavable === undefined ? '' : (item.autoclavable ? 'true' : 'false');
+                            const currentDisplayValue = item.autoclavable === undefined ? '' : (item.autoclavable ? 'Полная' : 'Нет');
+                            const showCustomInput = availableValues.length > 0 && !availableValues.includes(currentDisplayValue) && currentValue !== '';
+                            
+                            if (availableValues.length > 0) {
+                              return (
+                                <div className="space-y-1">
+                                  <select
+                                    value={availableValues.includes(currentDisplayValue) ? currentDisplayValue : (showCustomInput ? '__custom__' : '')}
+                                    onChange={(e) => {
+                                      if (e.target.value === '__custom__') {
+                                      } else if (e.target.value === '') {
+                                        handleUpdateItem(index, 'autoclavable', undefined);
+                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      } else {
+                                        const boolValue = valueMap[e.target.value];
+                                        handleUpdateItem(index, 'autoclavable', boolValue);
+                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                      }
+                                    }}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  >
+                                    <option value="">Не указано</option>
+                                    {availableValues.map((val) => (
+                                      <option key={val} value={val}>{val}</option>
+                                    ))}
+                                    <option value="__custom__">+ Добавить новое значение</option>
+                                  </select>
+                                  {showCustomInput && (
+                                    <div className="flex items-center space-x-1">
+                                      <select
+                                        value={currentValue}
+                                        onChange={(e) => {
+                                          handleUpdateItem(index, 'autoclavable', e.target.value === '' ? undefined : e.target.value === 'true');
+                                          setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                        }}
+                                        className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      >
+                                        <option value="">Не указано</option>
+                                        <option value="true">Да</option>
+                                        <option value="false">Нет</option>
+                                      </select>
+                                      {category && (
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            const newValue = currentValue === 'true' ? 'Полная' : (currentValue === 'false' ? 'Нет' : '');
+                                            if (newValue && !availableValues.includes(newValue)) {
+                                              try {
+                                                const updatedRanges = {
+                                                  ...(category.technicalSpecsRanges || {}),
+                                                  autoclavable: {
+                                                    enabled: true,
+                                                    values: [...availableValues, newValue]
+                                                  }
+                                                };
+                                                await equipmentSectionsService.updateSection(category.id, {
+                                                  technicalSpecsRanges: updatedRanges
+                                                });
+                                                const updatedCategories = categories.map(c => 
+                                                  c.id === category.id 
+                                                    ? { ...c, technicalSpecsRanges: updatedRanges }
+                                                    : c
+                                                );
+                                              setCategories(updatedCategories);
+                                              const inputKeyAutoclavable = `autoclavable_${index}`;
+                                              setShowCustomInputs(prev => ({ ...prev, [inputKeyAutoclavable]: false }));
+                                            } catch (error) {
+                                              console.error('Ошибка сохранения нового значения:', error);
+                                              alert('Ошибка сохранения нового значения');
+                                            }
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
+                                        title="Сохранить новое значение в категорию"
+                                      >
+                                        Сохранить
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          } else {
+                              // Если нет доступных значений, показываем стандартный select
+                              return (
+                                <select
+                                  value={item.autoclavable === undefined ? '' : item.autoclavable ? 'true' : 'false'}
+                                  onChange={(e) => {
+                                    handleUpdateItem(index, 'autoclavable', e.target.value === '' ? undefined : e.target.value === 'true');
+                                    setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                >
+                                  <option value="">Не указано</option>
+                                  <option value="true">Да</option>
+                                  <option value="false">Нет</option>
+                                </select>
+                              );
+                            }
+                          })()}
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={item.inRegistrySI || false}
+                              onChange={(e) => handleUpdateItem(index, 'inRegistrySI', e.target.checked)}
+                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                            <span className="text-xs text-gray-700">Наличие в реестре СИ</span>
+                          </label>
+                        </div>
+                      </>
+                    )}
+
                     {/* Наименование */}
                     <div className="md:col-span-2 relative">
-                      <label className="block text-xs text-gray-500 mb-1">Наименование *</label>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Наименование {item.categoryId ? '(необязательно, если выбрана категория)' : '*'}
+                      </label>
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
@@ -425,44 +1203,72 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                           onChange={(e) => {
                             handleUpdateItem(index, 'name', e.target.value);
                             setProductSearches(prev => ({ ...prev, [index]: e.target.value }));
-                            if (e.target.value.trim().length > 0) {
+                            // Показываем список при вводе, если выбрана категория
+                            if (item.categoryId) {
                               setShowProductDropdowns(prev => ({ ...prev, [index]: true }));
                             }
                           }}
                           onFocus={() => {
-                            if (productSearches[index] && productSearches[index].trim().length > 0) {
+                            // Показываем список при фокусе, если выбрана категория
+                            if (item.categoryId) {
                               setShowProductDropdowns(prev => ({ ...prev, [index]: true }));
+                              // Если товары еще не загружены, но категория выбрана, они загрузятся автоматически
                             }
                           }}
-                          placeholder="Поиск по справочнику товаров или введите наименование"
-                          className="w-full pl-8 pr-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder={item.categoryId ? "Поиск товаров категории или введите наименование" : "Сначала выберите категорию"}
+                          disabled={!item.categoryId}
+                          className={`w-full pl-8 pr-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${!item.categoryId ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                         />
-                        {showProductDropdowns[index] && productSearches[index] && productSearches[index].trim().length > 0 && (
+                        {showProductDropdowns[index] && item.categoryId && (
                           <div 
                             ref={el => productDropdownRefs.current[index] = el}
                             className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto"
                           >
                             {productSearchLoading[index] ? (
-                              <div className="px-4 py-2 text-gray-500 text-sm">Поиск...</div>
-                            ) : productSearchResults[index]?.length > 0 ? (
-                              productSearchResults[index].map(product => (
-                                <div
-                                  key={product.id}
-                                  onClick={() => handleProductSelect(index, product)}
-                                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                                >
-                                  <div className="font-medium text-sm">{product.name}</div>
-                                  {product.manufacturer && (
-                                    <div className="text-xs text-gray-500">Производитель: {product.manufacturer}</div>
-                                  )}
-                                  {product.sectionName && (
-                                    <div className="text-xs text-gray-500">Раздел: {product.sectionName}</div>
-                                  )}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="px-4 py-2 text-gray-500 text-sm">Товары не найдены</div>
-                            )}
+                              <div className="px-4 py-2 text-gray-500 text-sm">Загрузка товаров...</div>
+                            ) : (() => {
+                              // Фильтруем товары по поисковому запросу (по наименованию)
+                              const searchTerm = productSearches[index]?.toLowerCase().trim() || '';
+                              const allProducts = productSearchResults[index] || [];
+                              const filteredProducts = allProducts.filter(product => {
+                                if (searchTerm) {
+                                  return product.name.toLowerCase().includes(searchTerm);
+                                }
+                                return true;
+                              });
+                              
+                              if (filteredProducts.length > 0) {
+                                return filteredProducts.map(product => (
+                                  <div
+                                    key={product.id}
+                                    onClick={() => handleProductSelect(index, product)}
+                                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                  >
+                                    <div className="font-medium text-sm">{product.name}</div>
+                                    {product.manufacturer && (
+                                      <div className="text-xs text-gray-500">Производитель: {product.manufacturer}</div>
+                                    )}
+                                    {product.sectionName && (
+                                      <div className="text-xs text-gray-500">Категория: {product.sectionName}</div>
+                                    )}
+                                  </div>
+                                ));
+                              } else if (allProducts.length === 0) {
+                                return (
+                                  <div className="px-4 py-2 text-gray-500 text-sm">
+                                    В данной категории пока нет товаров
+                                  </div>
+                                );
+                              } else {
+                                return (
+                                  <div className="px-4 py-2 text-gray-500 text-sm">
+                                    {searchTerm 
+                                      ? `Товары не найдены по запросу "${productSearches[index]}"` 
+                                      : 'Товары не найдены по заданным техническим характеристикам. Попробуйте изменить фильтры.'}
+                                  </div>
+                                );
+                              }
+                            })()}
                           </div>
                         )}
                       </div>
