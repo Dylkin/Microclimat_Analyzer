@@ -45,6 +45,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
     manufacturers: [],
     website: '',
     supplierIds: [],
+    manufacturerSuppliers: [],
     channelsCount: undefined,
     dosingVolume: '',
     volumeStep: '',
@@ -67,13 +68,29 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
     { key: 'autoclavable', label: 'Автоклавируемость', defaultValues: ['Нет', 'Частичная', 'Полная'] },
     { key: 'volumeStep', label: 'Шаг установки объема дозы', defaultValues: [] },
     { key: 'dosingAccuracy', label: 'Точность дозирования', defaultValues: [] },
-    { key: 'reproducibility', label: 'Воспроизводимость', defaultValues: [] }
+    { key: 'reproducibility', label: 'Воспроизводимость', defaultValues: [] },
+    // Характеристики для лабораторных центрифуг
+    { key: 'maxRotationSpeed', label: 'Макс скорость вращения (об/мин) до', defaultValues: ['4000', '5000', '6000', '7000', '15000'] },
+    { key: 'centrifugalAcceleration', label: 'Центробежное ускорение (RCF)', defaultValues: ['2325', '2420', '2600', '2680', '4390', '5120', '15100', '21380'] },
+    { key: 'rotorType', label: 'Тип ротора', defaultValues: ['угловой', 'горизонтальный/качающийся', 'блочный', 'зональный', 'вертикальный'] },
+    { key: 'speedStep', label: 'Шаг изменения скорости (об/мин)', defaultValues: ['1–10', '10–100', '500-1000'] },
+    { key: 'seatingPlaces', label: 'Количество посадочных мест', defaultValues: [] },
+    { key: 'accelerationTime', label: 'Время разгона (с)', defaultValues: [] },
+    { key: 'maxCapacity', label: 'Максимальная емкость (общее количество пробирок × объем, мл)', defaultValues: [] },
+    { key: 'compatibleTubeTypes', label: 'Типы совместимых пробирок', defaultValues: [
+      'Eppendorf 0.2 мл', 'Eppendorf 0.5 мл', 'Eppendorf 1.5 мл', 'Eppendorf 2 мл',
+      'Falcon 15 мл', 'Falcon 50 мл', 'цилиндрические', 'гематологические', 'ПЦР', 'другие'
+    ]}
   ];
 
   // Данные для выбора поставщиков
   const [suppliers, setSuppliers] = useState<Contractor[]>([]);
   const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  
+  // Состояние для аккордеона технических характеристик
+  const [techSpecsAccordionOpen, setTechSpecsAccordionOpen] = useState(false);
+  const [newSpecName, setNewSpecName] = useState('');
   
   const [cardForm, setCardForm] = useState<CreateEquipmentCardData>({
     sectionId: '',
@@ -179,6 +196,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
       manufacturers: [], 
       website: '', 
       supplierIds: [],
+      manufacturerSuppliers: [],
       channelsCount: undefined,
       dosingVolume: '',
       volumeStep: '',
@@ -193,12 +211,34 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
   };
 
   const handleEditSection = (section: EquipmentSection) => {
+    // Если есть новая структура manufacturerSuppliers, используем её
+    // Иначе конвертируем старую структуру (manufacturers + supplierIds) в новую
+    let manufacturerSuppliers = section.manufacturerSuppliers || [];
+    
+    if (manufacturerSuppliers.length === 0 && section.manufacturers && section.manufacturers.length > 0) {
+      // Конвертируем старую структуру в новую
+      if (section.supplierIds && section.supplierIds.length > 0) {
+        // Если есть общие поставщики, распределяем их по всем производителям
+        manufacturerSuppliers = section.manufacturers.map(manufacturer => ({
+          manufacturer,
+          supplierIds: [...(section.supplierIds || [])]
+        }));
+      } else {
+        // Если поставщиков нет, создаем записи без поставщиков
+        manufacturerSuppliers = section.manufacturers.map(manufacturer => ({
+          manufacturer,
+          supplierIds: []
+        }));
+      }
+    }
+    
     setSectionForm({
       name: section.name,
       description: section.description || '',
       manufacturers: section.manufacturers || [],
       website: section.website || '',
       supplierIds: section.supplierIds || [],
+      manufacturerSuppliers: manufacturerSuppliers,
       channelsCount: section.channelsCount,
       dosingVolume: section.dosingVolume || '',
       volumeStep: section.volumeStep || '',
@@ -235,6 +275,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
         manufacturers: [], 
         website: '', 
         supplierIds: [],
+        manufacturerSuppliers: [],
         channelsCount: undefined,
         dosingVolume: '',
         volumeStep: '',
@@ -246,6 +287,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
       });
       setSupplierSearchTerm('');
       setShowSupplierDropdown(false);
+      setTechSpecsAccordionOpen(false);
+      setNewSpecName('');
       alert(`Категория ${editingSection ? 'обновлена' : 'создана'} успешно`);
     } catch (err) {
       alert(`Ошибка: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`);
@@ -475,32 +518,20 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
 
             {/* Технические характеристики */}
             <div className="border-t pt-4 mt-4">
-              <div className="flex items-center justify-between mb-4">
+              <button
+                type="button"
+                onClick={() => setTechSpecsAccordionOpen(!techSpecsAccordionOpen)}
+                className="flex items-center justify-between w-full mb-4"
+              >
                 <h3 className="text-lg font-semibold text-gray-900">Технические характеристики</h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Добавляем новую характеристику
-                    const specKey = `custom_${Date.now()}`;
-                    const newRanges = {
-                      ...(sectionForm.technicalSpecsRanges || {}),
-                      [specKey]: {
-                        enabled: true,
-                        values: ['']
-                      }
-                    };
-                    setSectionForm({
-                      ...sectionForm,
-                      technicalSpecsRanges: newRanges
-                    });
-                  }}
-                  className="flex items-center space-x-1 text-sm text-indigo-600 hover:text-indigo-800"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Добавить характеристику</span>
-                </button>
-              </div>
+                {techSpecsAccordionOpen ? (
+                  <ChevronDown className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
               
+              {techSpecsAccordionOpen && (
               <div className="space-y-4">
                 {/* Отображение доступных характеристик */}
                 {availableSpecs.map((spec) => {
@@ -602,46 +633,170 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
                   );
                 })}
                 
-                {/* Кнопка для добавления доступных характеристик */}
+                {/* Поле для добавления новой характеристики */}
                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Добавить характеристику:
                   </label>
-                  <select
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        const specKey = e.target.value;
-                        const spec = availableSpecs.find(s => s.key === specKey);
-                        if (spec && !sectionForm.technicalSpecsRanges?.[specKey]?.enabled) {
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={newSpecName}
+                      onChange={(e) => setNewSpecName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newSpecName.trim()) {
+                          e.preventDefault();
+                          // Создаем ключ для новой характеристики
+                          const specKey = `custom_${Date.now()}_${newSpecName.trim().toLowerCase().replace(/\s+/g, '_')}`;
                           const newRanges = {
                             ...(sectionForm.technicalSpecsRanges || {}),
                             [specKey]: {
                               enabled: true,
-                              values: spec.defaultValues.length > 0 ? [...spec.defaultValues] : ['']
+                              values: [''],
+                              label: newSpecName.trim() // Сохраняем название
                             }
                           };
                           setSectionForm({
                             ...sectionForm,
                             technicalSpecsRanges: newRanges
                           });
+                          setNewSpecName('');
                         }
-                        e.target.value = '';
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    defaultValue=""
-                  >
-                    <option value="">Выберите характеристику...</option>
-                    {availableSpecs
-                      .filter(spec => !sectionForm.technicalSpecsRanges?.[spec.key]?.enabled)
-                      .map((spec) => (
-                        <option key={spec.key} value={spec.key}>
-                          {spec.label}
-                        </option>
-                      ))}
-                  </select>
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="Введите название новой характеристики и нажмите Enter"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newSpecName.trim()) {
+                          const specKey = `custom_${Date.now()}_${newSpecName.trim().toLowerCase().replace(/\s+/g, '_')}`;
+                          const newRanges = {
+                            ...(sectionForm.technicalSpecsRanges || {}),
+                            [specKey]: {
+                              enabled: true,
+                              values: [''],
+                              label: newSpecName.trim() // Сохраняем название
+                            }
+                          };
+                          setSectionForm({
+                            ...sectionForm,
+                            technicalSpecsRanges: newRanges
+                          });
+                          setNewSpecName('');
+                        }
+                      }}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
+                
+                {/* Отображение пользовательских характеристик (не из availableSpecs) */}
+                {Object.entries(sectionForm.technicalSpecsRanges || {}).map(([specKey, specRange]) => {
+                  // Пропускаем характеристики из availableSpecs (они уже отображаются выше)
+                  if (availableSpecs.some(spec => spec.key === specKey)) {
+                    return null;
+                  }
+                  
+                  // Для пользовательских характеристик используем сохраненное название или ключ
+                  const specLabel = specRange.label || (specKey.startsWith('custom_') 
+                    ? specKey.replace(/^custom_\d+_/, '').replace(/_/g, ' ')
+                    : specKey);
+                  
+                  return (
+                    <div key={specKey} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {specLabel}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newRanges = { ...(sectionForm.technicalSpecsRanges || {}) };
+                            delete newRanges[specKey];
+                            setSectionForm({
+                              ...sectionForm,
+                              technicalSpecsRanges: newRanges
+                            });
+                          }}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      {/* Управление диапазоном значений */}
+                      <div className="space-y-2">
+                        {specRange.values.map((value, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={value}
+                              onChange={(e) => {
+                                const newRanges = { ...(sectionForm.technicalSpecsRanges || {}) };
+                                const newValues = [...specRange.values];
+                                newValues[index] = e.target.value;
+                                newRanges[specKey] = {
+                                  ...specRange,
+                                  values: newValues
+                                };
+                                setSectionForm({
+                                  ...sectionForm,
+                                  technicalSpecsRanges: newRanges
+                                });
+                              }}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="Введите значение"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newRanges = { ...(sectionForm.technicalSpecsRanges || {}) };
+                                const newValues = specRange.values.filter((_, i) => i !== index);
+                                if (newValues.length === 0) {
+                                  newValues.push('');
+                                }
+                                newRanges[specKey] = {
+                                  ...specRange,
+                                  values: newValues
+                                };
+                                setSectionForm({
+                                  ...sectionForm,
+                                  technicalSpecsRanges: newRanges
+                                });
+                              }}
+                              className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newRanges = { ...(sectionForm.technicalSpecsRanges || {}) };
+                            newRanges[specKey] = {
+                              ...specRange,
+                              values: [...specRange.values, '']
+                            };
+                            setSectionForm({
+                              ...sectionForm,
+                              technicalSpecsRanges: newRanges
+                            });
+                          }}
+                          className="flex items-center space-x-1 text-sm text-indigo-600 hover:text-indigo-800"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Добавить значение</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+              )}
               
               {/* Наличие в реестре СИ */}
               <div className="mt-4">
@@ -659,41 +814,144 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Производитель
+                Производители и поставщики
               </label>
-              <div className="space-y-2">
-                {sectionForm.manufacturers?.map((manufacturer, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      value={manufacturer}
-                      onChange={(e) => {
-                        const newManufacturers = [...(sectionForm.manufacturers || [])];
-                        newManufacturers[index] = e.target.value;
-                        setSectionForm({ ...sectionForm, manufacturers: newManufacturers });
-                      }}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      placeholder="Введите производителя"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newManufacturers = [...(sectionForm.manufacturers || [])];
-                        newManufacturers.splice(index, 1);
-                        setSectionForm({ ...sectionForm, manufacturers: newManufacturers });
-                      }}
-                      className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+              <div className="space-y-4">
+                {(sectionForm.manufacturerSuppliers || []).map((item, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Производитель {index + 1}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newItems = [...(sectionForm.manufacturerSuppliers || [])];
+                          newItems.splice(index, 1);
+                          setSectionForm({ ...sectionForm, manufacturerSuppliers: newItems });
+                        }}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    
+                    <div className="mb-3">
+                      <input
+                        type="text"
+                        value={item.manufacturer}
+                        onChange={(e) => {
+                          const newItems = [...(sectionForm.manufacturerSuppliers || [])];
+                          newItems[index] = { ...item, manufacturer: e.target.value };
+                          setSectionForm({ ...sectionForm, manufacturerSuppliers: newItems });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Введите производителя"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-2">Поставщики для этого производителя:</label>
+                      <div className="space-y-2">
+                        {item.supplierIds.map((supplierId) => {
+                          const supplier = suppliers.find(s => s.id === supplierId);
+                          if (!supplier) return null;
+                          return (
+                            <div key={supplierId} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-gray-200">
+                              <span className="text-sm text-gray-900">{supplier.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newItems = [...(sectionForm.manufacturerSuppliers || [])];
+                                  newItems[index] = {
+                                    ...item,
+                                    supplierIds: item.supplierIds.filter(id => id !== supplierId)
+                                  };
+                                  setSectionForm({ ...sectionForm, manufacturerSuppliers: newItems });
+                                }}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                        
+                        {/* Поле поиска поставщиков для этого производителя */}
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            type="text"
+                            value={supplierSearchTerm}
+                            onChange={(e) => {
+                              setSupplierSearchTerm(e.target.value);
+                              setShowSupplierDropdown(true);
+                            }}
+                            onFocus={() => setShowSupplierDropdown(true)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="Поиск поставщика..."
+                          />
+
+                          {/* Выпадающий список поставщиков */}
+                          {showSupplierDropdown && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setShowSupplierDropdown(false)}
+                              />
+                              <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+                                {suppliers
+                                  .filter(supplier => {
+                                    const searchLower = supplierSearchTerm.toLowerCase();
+                                    return supplier.name.toLowerCase().includes(searchLower) &&
+                                           !item.supplierIds.includes(supplier.id);
+                                  })
+                                  .map((supplier) => (
+                                    <button
+                                      key={supplier.id}
+                                      type="button"
+                                      onClick={() => {
+                                        const newItems = [...(sectionForm.manufacturerSuppliers || [])];
+                                        newItems[index] = {
+                                          ...item,
+                                          supplierIds: [...item.supplierIds, supplier.id]
+                                        };
+                                        setSectionForm({ ...sectionForm, manufacturerSuppliers: newItems });
+                                        setSupplierSearchTerm('');
+                                        setShowSupplierDropdown(false);
+                                      }}
+                                      className="w-full text-left px-4 py-2 hover:bg-indigo-50 transition-colors"
+                                    >
+                                      <div className="font-medium text-gray-900">{supplier.name}</div>
+                                      {supplier.address && (
+                                        <div className="text-xs text-gray-500">{supplier.address}</div>
+                                      )}
+                                    </button>
+                                  ))}
+                                {suppliers.filter(supplier => {
+                                  const searchLower = supplierSearchTerm.toLowerCase();
+                                  return supplier.name.toLowerCase().includes(searchLower) &&
+                                         !item.supplierIds.includes(supplier.id);
+                                }).length === 0 && (
+                                  <div className="px-4 py-2 text-sm text-gray-500">
+                                    Поставщики не найдены
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ))}
+                
                 <button
                   type="button"
                   onClick={() => {
                     setSectionForm({
                       ...sectionForm,
-                      manufacturers: [...(sectionForm.manufacturers || []), '']
+                      manufacturerSuppliers: [...(sectionForm.manufacturerSuppliers || []), { manufacturer: '', supplierIds: [] }]
                     });
                   }}
                   className="flex items-center space-x-2 text-sm text-indigo-600 hover:text-indigo-800"
@@ -717,98 +975,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
                 placeholder="https://example.com"
               />
             </div>
-
-            <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <Building2 className="w-4 h-4 inline mr-1" />
-                Поставщик
-              </label>
-              <div className="space-y-2">
-                {/* Выбранные поставщики */}
-                {sectionForm.supplierIds?.map((supplierId) => {
-                  const supplier = suppliers.find(s => s.id === supplierId);
-                  if (!supplier) return null;
-                  return (
-                    <div key={supplierId} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
-                      <span className="text-sm text-gray-900">{supplier.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newSupplierIds = (sectionForm.supplierIds || []).filter(id => id !== supplierId);
-                          setSectionForm({ ...sectionForm, supplierIds: newSupplierIds });
-                        }}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  );
-                })}
-
-                {/* Поле поиска и выпадающий список */}
-                <div className="relative">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={supplierSearchTerm}
-                      onChange={(e) => {
-                        setSupplierSearchTerm(e.target.value);
-                        setShowSupplierDropdown(true);
-                      }}
-                      onFocus={() => setShowSupplierDropdown(true)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      placeholder="Поиск поставщика..."
-                    />
-                  </div>
-
-                  {/* Выпадающий список поставщиков */}
-                  {showSupplierDropdown && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setShowSupplierDropdown(false)}
-                      />
-                      <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
-                        {suppliers
-                          .filter(supplier => {
-                            const searchLower = supplierSearchTerm.toLowerCase();
-                            return supplier.name.toLowerCase().includes(searchLower) &&
-                                   !sectionForm.supplierIds?.includes(supplier.id);
-                          })
-                          .map((supplier) => (
-                            <button
-                              key={supplier.id}
-                              type="button"
-                              onClick={() => {
-                                const newSupplierIds = [...(sectionForm.supplierIds || []), supplier.id];
-                                setSectionForm({ ...sectionForm, supplierIds: newSupplierIds });
-                                setSupplierSearchTerm('');
-                                setShowSupplierDropdown(false);
-                              }}
-                              className="w-full text-left px-4 py-2 hover:bg-indigo-50 transition-colors"
-                            >
-                              <div className="font-medium text-gray-900">{supplier.name}</div>
-                              {supplier.address && (
-                                <div className="text-xs text-gray-500">{supplier.address}</div>
-                              )}
-                            </button>
-                          ))}
-                        {suppliers.filter(supplier => {
-                          const searchLower = supplierSearchTerm.toLowerCase();
-                          return supplier.name.toLowerCase().includes(searchLower) &&
-                                 !sectionForm.supplierIds?.includes(supplier.id);
-                        }).length === 0 && (
-                          <div className="px-4 py-2 text-sm text-gray-500">
-                            {supplierSearchTerm ? 'Поставщики не найдены' : 'Все поставщики уже добавлены'}
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="flex justify-end space-x-3 mt-6">
@@ -822,13 +988,15 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
                   manufacturers: [], 
                   website: '', 
                   supplierIds: [],
+                  manufacturerSuppliers: [],
                   channelsCount: undefined,
                   dosingVolume: '',
                   volumeStep: '',
                   dosingAccuracy: '',
                   reproducibility: '',
                   autoclavable: undefined,
-                  inRegistrySI: false
+                  inRegistrySI: false,
+                  technicalSpecsRanges: {}
                 });
                 setSupplierSearchTerm('');
                 setShowSupplierDropdown(false);

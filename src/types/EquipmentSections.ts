@@ -1,19 +1,26 @@
 export interface TechnicalSpecRange {
   enabled: boolean;
   values: string[];
+  label?: string; // Название для пользовательских характеристик
 }
 
 export interface TechnicalSpecsRanges {
   [key: string]: TechnicalSpecRange;
 }
 
+export interface ManufacturerSupplier {
+  manufacturer: string;
+  supplierIds: string[];
+}
+
 export interface EquipmentSection {
   id: string;
   name: string;
   description?: string;
-  manufacturers?: string[];
+  manufacturers?: string[]; // Для обратной совместимости
   website?: string;
-  supplierIds?: string[];
+  supplierIds?: string[]; // Для обратной совместимости
+  manufacturerSuppliers?: ManufacturerSupplier[]; // Новая структура: производитель -> поставщики
   channelsCount?: number;
   dosingVolume?: string;
   volumeStep?: string;
@@ -49,9 +56,10 @@ export interface EquipmentCard {
 export interface CreateEquipmentSectionData {
   name: string;
   description?: string;
-  manufacturers?: string[];
+  manufacturers?: string[]; // Для обратной совместимости
   website?: string;
-  supplierIds?: string[];
+  supplierIds?: string[]; // Для обратной совместимости
+  manufacturerSuppliers?: ManufacturerSupplier[]; // Новая структура: производитель -> поставщики
   channelsCount?: number;
   dosingVolume?: string;
   volumeStep?: string;
@@ -65,9 +73,10 @@ export interface CreateEquipmentSectionData {
 export interface UpdateEquipmentSectionData {
   name?: string;
   description?: string;
-  manufacturers?: string[];
+  manufacturers?: string[]; // Для обратной совместимости
   website?: string;
-  supplierIds?: string[];
+  supplierIds?: string[]; // Для обратной совместимости
+  manufacturerSuppliers?: ManufacturerSupplier[]; // Новая структура: производитель -> поставщики
   channelsCount?: number;
   dosingVolume?: string;
   volumeStep?: string;

@@ -1,110 +1,58 @@
 #!/bin/bash
-# ================================
-# Скрипт для исправления конфигурации Nginx
-# Добавляет передачу заголовка x-user-id
-# ================================
+# Скрипт для исправления конфигурации nginx
 
-set -e
+NGINX_CONF="/etc/nginx/sites-available/microclimat-analyzer"
+NGINX_BACKUP="/etc/nginx/sites-available/microclimat-analyzer.backup.$(date +%Y%m%d_%H%M%S)"
 
-# Пробуем найти конфигурационный файл
-NGINX_CONF="/etc/nginx/sites-available/microclimat"
-if [ ! -f "$NGINX_CONF" ]; then
-    NGINX_CONF="/etc/nginx/sites-available/microclimat-analyzer"
-fi
-if [ ! -f "$NGINX_CONF" ]; then
-    echo "Конфигурационный файл не найден. Проверьте /etc/nginx/sites-available/"
-    exit 1
-fi
+echo "Создание резервной копии конфигурации..."
+cp "$NGINX_CONF" "$NGINX_BACKUP"
 
-# Проверка прав
-if [ "$EUID" -ne 0 ]; then
-    echo "Скрипт должен быть запущен с правами root или через sudo"
-    exit 1
-fi
+echo "Обновление конфигурации nginx..."
 
-echo "Исправление конфигурации Nginx..."
-echo ""
+# Используем Python для надежной замены
+python3 << 'PYTHON_SCRIPT'
+import re
 
-# Создаем резервную копию
-cp "$NGINX_CONF" "${NGINX_CONF}.backup.$(date +%Y%m%d_%H%M%S)"
-echo "Резервная копия создана"
+nginx_conf = "/etc/nginx/sites-available/microclimat-analyzer"
 
-# Проверяем, есть ли уже нужные строки
-if grep -q "proxy_set_header.*X-User-Id\|proxy_set_header.*x-user-id" "$NGINX_CONF"; then
-    echo "Заголовок уже присутствует в конфигурации"
-    echo ""
-    echo "Текущая конфигурация location /api:"
-    grep -A 15 "location /api" "$NGINX_CONF" | head -20
-    exit 0
-fi
+try:
+    with open(nginx_conf, 'r') as f:
+        content = f.read()
+    
+    # Заменяем location /uploads { на location /uploads/ {
+    content = re.sub(r'location /uploads \{', 'location /uploads/ {', content)
+    
+    # Заменяем alias /opt/Microclimat_Analyzer/uploads; на alias /opt/Microclimat_Analyzer/uploads/;
+    content = re.sub(r'alias /opt/Microclimat_Analyzer/uploads;', 'alias /opt/Microclimat_Analyzer/uploads/;', content)
+    
+    # Добавляем disable_symlinks off; и try_files $uri =404; перед закрывающей скобкой location /uploads/
+    # Ищем секцию location /uploads/ и добавляем нужные директивы
+    pattern = r'(location /uploads/ \{[^\}]*add_header Cache-Control "public";)(\s+\})'
+    replacement = r'\1\n        disable_symlinks off;\n        try_files $uri =404;\2'
+    content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+    
+    with open(nginx_conf, 'w') as f:
+        f.write(content)
+    
+    print("✅ Конфигурация обновлена")
+except Exception as e:
+    print(f"❌ Ошибка: {e}")
+    exit(1)
+PYTHON_SCRIPT
 
-# Создаем временный файл
-TEMP_FILE=$(mktemp)
-
-# Обрабатываем файл
-IN_API_BLOCK=0
-HEADER_ADDED=0
-
-while IFS= read -r line || [ -n "$line" ]; do
-    # Проверяем начало блока location /api
-    if [[ "$line" =~ location\ /api ]]; then
-        IN_API_BLOCK=1
-        echo "$line" >> "$TEMP_FILE"
-    # Проверяем конец блока location /api
-    elif [[ "$line" =~ ^[[:space:]]*\} ]] && [ $IN_API_BLOCK -eq 1 ]; then
-        # Если мы в блоке /api и еще не добавили заголовок, добавляем его перед закрывающей скобкой
-        if [ $HEADER_ADDED -eq 0 ]; then
-            echo "    # Передача заголовка x-user-id для аутентификации" >> "$TEMP_FILE"
-            echo "    proxy_pass_request_headers on;" >> "$TEMP_FILE"
-            echo "    proxy_set_header X-User-Id \$http_x_user_id;" >> "$TEMP_FILE"
-            echo "    proxy_set_header x-user-id \$http_x_user_id;" >> "$TEMP_FILE"
-            HEADER_ADDED=1
-        fi
-        IN_API_BLOCK=0
-        echo "$line" >> "$TEMP_FILE"
-    # Если мы в блоке /api и встречаем proxy_set_header X-Forwarded-Proto, добавляем после него
-    elif [ $IN_API_BLOCK -eq 1 ] && [[ "$line" =~ proxy_set_header.*X-Forwarded-Proto ]]; then
-        echo "$line" >> "$TEMP_FILE"
-        if [ $HEADER_ADDED -eq 0 ]; then
-            echo "    # Передача заголовка x-user-id для аутентификации" >> "$TEMP_FILE"
-            echo "    proxy_pass_request_headers on;" >> "$TEMP_FILE"
-            echo "    proxy_set_header X-User-Id \$http_x_user_id;" >> "$TEMP_FILE"
-            echo "    proxy_set_header x-user-id \$http_x_user_id;" >> "$TEMP_FILE"
-            HEADER_ADDED=1
-        fi
-    else
-        echo "$line" >> "$TEMP_FILE"
-    fi
-done < "$NGINX_CONF"
-
-# Заменяем оригинальный файл
-mv "$TEMP_FILE" "$NGINX_CONF"
-chmod 644 "$NGINX_CONF"
-
-if [ $HEADER_ADDED -eq 1 ]; then
-    echo "✅ Заголовок x-user-id добавлен в конфигурацию"
-    echo ""
-    echo "Обновленная конфигурация location /api:"
-    grep -A 20 "location /api" "$NGINX_CONF" | head -25
-    echo ""
-    echo "Проверка конфигурации..."
+if [ $? -eq 0 ]; then
+    echo "Проверка конфигурации nginx..."
     if nginx -t; then
-        echo "✅ Конфигурация корректна"
-        echo ""
-        echo "Перезагрузка Nginx..."
+        echo "Конфигурация корректна. Перезагрузка nginx..."
         systemctl reload nginx
-        echo "✅ Nginx перезагружен"
+        echo "✅ Nginx перезагружен успешно!"
     else
-        echo "❌ Ошибка в конфигурации! Восстанавливаем резервную копию..."
-        cp "${NGINX_CONF}.backup."* "$NGINX_CONF" 2>/dev/null || true
+        echo "❌ Ошибка в конфигурации. Восстановление из резервной копии..."
+        cp "$NGINX_BACKUP" "$NGINX_CONF"
+        echo "Конфигурация восстановлена из резервной копии"
         exit 1
     fi
 else
-    echo "⚠️  Не удалось автоматически добавить заголовок"
-    echo "Требуется ручное редактирование файла: $NGINX_CONF"
+    echo "❌ Ошибка при обновлении конфигурации"
     exit 1
 fi
-
-echo ""
-echo "✅ Исправление завершено!"
-

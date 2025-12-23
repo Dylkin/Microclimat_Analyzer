@@ -28,6 +28,7 @@ interface ProjectItem {
   reproducibility?: string;
   autoclavable?: boolean;
   inRegistrySI?: boolean;
+  customTechnicalSpecs?: Record<string, string>; // Для хранения пользовательских технических характеристик
 }
 
 export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
@@ -157,7 +158,8 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
       dosingAccuracy: '',
       reproducibility: '',
       autoclavable: undefined,
-      inRegistrySI: false
+      inRegistrySI: false,
+      customTechnicalSpecs: {}
     }]);
   };
 
@@ -607,490 +609,56 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                     </div>
 
                     {/* Технические характеристики - показываем только если выбрана категория */}
-                    {item.categoryId && (
-                      <>
-                        <div className="md:col-span-2 border-t pt-3 mt-2">
-                          <h4 className="text-xs font-semibold text-gray-700 mb-2">Технические характеристики</h4>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Количество каналов</label>
-                          {(() => {
-                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
-                            const specRange = category?.technicalSpecsRanges?.['channelsCount'];
-                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
-                            const currentValue = item.channelsCount?.toString() || '';
-                            const inputKey = `channelsCount_${index}`;
+                    {item.categoryId && (() => {
+                      const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
+                      if (!category || !category.technicalSpecsRanges) return null;
+                      
+                      // Получаем все технические характеристики из категории
+                      const allSpecs = Object.entries(category.technicalSpecsRanges)
+                        .filter(([_, specRange]) => specRange.enabled)
+                        .map(([specKey, specRange]) => ({
+                          key: specKey,
+                          label: specRange.label || specKey,
+                          values: specRange.values || [],
+                          specRange
+                        }));
+                      
+                      return (
+                        <>
+                          <div className="md:col-span-2 border-t pt-3 mt-2">
+                            <h4 className="text-xs font-semibold text-gray-700 mb-2">Технические характеристики</h4>
+                          </div>
+                          
+                          {/* Отображаем все технические характеристики из категории */}
+                          {allSpecs.map((spec) => {
+                            const availableValues = spec.values.filter(v => v.trim());
+                            const currentValue = item.customTechnicalSpecs?.[spec.key] || '';
+                            const inputKey = `${spec.key}_${index}`;
                             const showCustomInput = showCustomInputs[inputKey] || (!availableValues.includes(currentValue) && currentValue !== '');
                             
                             return (
-                              <div className="space-y-1">
-                                <select
-                                  value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
-                                  onChange={(e) => {
-                                    if (e.target.value === '__custom__') {
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
-                                    } else if (e.target.value === '') {
-                                      handleUpdateItem(index, 'channelsCount', undefined);
-                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                    } else {
-                                      handleUpdateItem(index, 'channelsCount', parseInt(e.target.value));
-                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                    }
-                                  }}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                >
-                                  <option value="">Не указано</option>
-                                  {availableValues.map((val) => (
-                                    <option key={val} value={val}>{val}</option>
-                                  ))}
-                                  <option value="__custom__">+ Добавить новое значение</option>
-                                </select>
-                                {showCustomInput && (
-                                  <div className="flex items-center space-x-1">
-                                    <input
-                                      type="number"
-                                      value={currentValue}
-                                      onChange={(e) => {
-                                        handleUpdateItem(index, 'channelsCount', e.target.value ? parseInt(e.target.value) : undefined);
-                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      }}
-                                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                      min="1"
-                                      placeholder="Введите количество каналов"
-                                    />
-                                    {category && (
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          if (currentValue && !availableValues.includes(currentValue)) {
-                                            try {
-                                              const updatedRanges = {
-                                                ...(category.technicalSpecsRanges || {}),
-                                                channelsCount: {
-                                                  enabled: true,
-                                                  values: [...availableValues, currentValue]
-                                                }
-                                              };
-                                              await equipmentSectionsService.updateSection(category.id, {
-                                                technicalSpecsRanges: updatedRanges
-                                              });
-                                              // Обновляем локальный список категорий
-                                              const updatedCategories = categories.map(c => 
-                                                c.id === category.id 
-                                                  ? { ...c, technicalSpecsRanges: updatedRanges }
-                                                  : c
-                                              );
-                                              setCategories(updatedCategories);
-                                            } catch (error) {
-                                              console.error('Ошибка сохранения нового значения:', error);
-                                              alert('Ошибка сохранения нового значения');
-                                            }
-                                          }
-                                        }}
-                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
-                                        title="Сохранить новое значение в категорию"
-                                      >
-                                        Сохранить
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Объем дозирования</label>
-                          {(() => {
-                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
-                            const specRange = category?.technicalSpecsRanges?.['dosingVolume'];
-                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
-                            const currentValue = item.dosingVolume || '';
-                            const inputKey = `dosingVolume_${index}`;
-                            const showCustomInput = showCustomInputs[inputKey] || (!availableValues.includes(currentValue) && currentValue !== '');
-                            
-                            return (
-                              <div className="space-y-1">
-                                <select
-                                  value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
-                                  onChange={(e) => {
-                                    if (e.target.value === '__custom__') {
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
-                                    } else if (e.target.value === '') {
-                                      handleUpdateItem(index, 'dosingVolume', '');
-                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                    } else {
-                                      handleUpdateItem(index, 'dosingVolume', e.target.value);
-                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                    }
-                                  }}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                >
-                                  <option value="">Не указано</option>
-                                  {availableValues.map((val) => (
-                                    <option key={val} value={val}>{val}</option>
-                                  ))}
-                                  <option value="__custom__">+ Добавить новое значение</option>
-                                </select>
-                                {showCustomInput && (
-                                  <div className="flex items-center space-x-1">
-                                    <input
-                                      type="text"
-                                      value={currentValue}
-                                      onChange={(e) => {
-                                        handleUpdateItem(index, 'dosingVolume', e.target.value);
-                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      }}
-                                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                      placeholder="например, 0,1-2,5 мкл"
-                                    />
-                                    {category && (
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          if (currentValue && !availableValues.includes(currentValue)) {
-                                            try {
-                                              const updatedRanges = {
-                                                ...(category.technicalSpecsRanges || {}),
-                                                dosingVolume: {
-                                                  enabled: true,
-                                                  values: [...availableValues, currentValue]
-                                                }
-                                              };
-                                              await equipmentSectionsService.updateSection(category.id, {
-                                                technicalSpecsRanges: updatedRanges
-                                              });
-                                              const updatedCategories = categories.map(c => 
-                                                c.id === category.id 
-                                                  ? { ...c, technicalSpecsRanges: updatedRanges }
-                                                  : c
-                                              );
-                                              setCategories(updatedCategories);
-                                              setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                            } catch (error) {
-                                              console.error('Ошибка сохранения нового значения:', error);
-                                              alert('Ошибка сохранения нового значения');
-                                            }
-                                          }
-                                        }}
-                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
-                                        title="Сохранить новое значение в категорию"
-                                      >
-                                        Сохранить
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Шаг установки объема дозы</label>
-                          {(() => {
-                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
-                            const specRange = category?.technicalSpecsRanges?.['volumeStep'];
-                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
-                            const currentValue = item.volumeStep || '';
-                            const inputKey = `volumeStep_${index}`;
-                            const showCustomInput = showCustomInputs[inputKey] || (!availableValues.includes(currentValue) && currentValue !== '');
-                            
-                            return (
-                              <div className="space-y-1">
-                                <select
-                                  value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
-                                  onChange={(e) => {
-                                    if (e.target.value === '__custom__') {
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
-                                    } else if (e.target.value === '') {
-                                      handleUpdateItem(index, 'volumeStep', '');
-                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                    } else {
-                                      handleUpdateItem(index, 'volumeStep', e.target.value);
-                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                    }
-                                  }}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                >
-                                  <option value="">Не указано</option>
-                                  {availableValues.map((val) => (
-                                    <option key={val} value={val}>{val}</option>
-                                  ))}
-                                  <option value="__custom__">+ Добавить новое значение</option>
-                                </select>
-                                {showCustomInput && (
-                                  <div className="flex items-center space-x-1">
-                                    <input
-                                      type="text"
-                                      value={currentValue}
-                                      onChange={(e) => {
-                                        handleUpdateItem(index, 'volumeStep', e.target.value);
-                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      }}
-                                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                      placeholder="Введите шаг установки"
-                                    />
-                                    {category && (
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          if (currentValue && !availableValues.includes(currentValue)) {
-                                            try {
-                                              const updatedRanges = {
-                                                ...(category.technicalSpecsRanges || {}),
-                                                volumeStep: {
-                                                  enabled: true,
-                                                  values: [...availableValues, currentValue]
-                                                }
-                                              };
-                                              await equipmentSectionsService.updateSection(category.id, {
-                                                technicalSpecsRanges: updatedRanges
-                                              });
-                                              const updatedCategories = categories.map(c => 
-                                                c.id === category.id 
-                                                  ? { ...c, technicalSpecsRanges: updatedRanges }
-                                                  : c
-                                              );
-                                              setCategories(updatedCategories);
-                                            } catch (error) {
-                                              console.error('Ошибка сохранения нового значения:', error);
-                                              alert('Ошибка сохранения нового значения');
-                                            }
-                                          }
-                                        }}
-                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
-                                        title="Сохранить новое значение в категорию"
-                                      >
-                                        Сохранить
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Точность дозирования</label>
-                          {(() => {
-                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
-                            const specRange = category?.technicalSpecsRanges?.['dosingAccuracy'];
-                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
-                            const currentValue = item.dosingAccuracy || '';
-                            const inputKey = `dosingAccuracy_${index}`;
-                            const showCustomInput = showCustomInputs[inputKey] || (!availableValues.includes(currentValue) && currentValue !== '');
-                            
-                            return (
-                              <div className="space-y-1">
-                                <select
-                                  value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
-                                  onChange={(e) => {
-                                    if (e.target.value === '__custom__') {
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
-                                    } else if (e.target.value === '') {
-                                      handleUpdateItem(index, 'dosingAccuracy', '');
-                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                    } else {
-                                      handleUpdateItem(index, 'dosingAccuracy', e.target.value);
-                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                    }
-                                  }}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                >
-                                  <option value="">Не указано</option>
-                                  {availableValues.map((val) => (
-                                    <option key={val} value={val}>{val}</option>
-                                  ))}
-                                  <option value="__custom__">+ Добавить новое значение</option>
-                                </select>
-                                {showCustomInput && (
-                                  <div className="flex items-center space-x-1">
-                                    <input
-                                      type="text"
-                                      value={currentValue}
-                                      onChange={(e) => {
-                                        handleUpdateItem(index, 'dosingAccuracy', e.target.value);
-                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      }}
-                                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                      placeholder="Введите точность дозирования"
-                                    />
-                                    {category && (
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          if (currentValue && !availableValues.includes(currentValue)) {
-                                            try {
-                                              const updatedRanges = {
-                                                ...(category.technicalSpecsRanges || {}),
-                                                dosingAccuracy: {
-                                                  enabled: true,
-                                                  values: [...availableValues, currentValue]
-                                                }
-                                              };
-                                              await equipmentSectionsService.updateSection(category.id, {
-                                                technicalSpecsRanges: updatedRanges
-                                              });
-                                              const updatedCategories = categories.map(c => 
-                                                c.id === category.id 
-                                                  ? { ...c, technicalSpecsRanges: updatedRanges }
-                                                  : c
-                                              );
-                                              setCategories(updatedCategories);
-                                              setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                            } catch (error) {
-                                              console.error('Ошибка сохранения нового значения:', error);
-                                              alert('Ошибка сохранения нового значения');
-                                            }
-                                          }
-                                        }}
-                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
-                                        title="Сохранить новое значение в категорию"
-                                      >
-                                        Сохранить
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Воспроизводимость</label>
-                          {(() => {
-                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
-                            const specRange = category?.technicalSpecsRanges?.['reproducibility'];
-                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
-                            const currentValue = item.reproducibility || '';
-                            const inputKey = `reproducibility_${index}`;
-                            const showCustomInput = showCustomInputs[inputKey] || (!availableValues.includes(currentValue) && currentValue !== '');
-                            
-                            return (
-                              <div className="space-y-1">
-                                <select
-                                  value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
-                                  onChange={(e) => {
-                                    if (e.target.value === '__custom__') {
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
-                                    } else if (e.target.value === '') {
-                                      handleUpdateItem(index, 'reproducibility', '');
-                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                    } else {
-                                      handleUpdateItem(index, 'reproducibility', e.target.value);
-                                      setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                    }
-                                  }}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                >
-                                  <option value="">Не указано</option>
-                                  {availableValues.map((val) => (
-                                    <option key={val} value={val}>{val}</option>
-                                  ))}
-                                  <option value="__custom__">+ Добавить новое значение</option>
-                                </select>
-                                {showCustomInput && (
-                                  <div className="flex items-center space-x-1">
-                                    <input
-                                      type="text"
-                                      value={currentValue}
-                                      onChange={(e) => {
-                                        handleUpdateItem(index, 'reproducibility', e.target.value);
-                                        setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                      }}
-                                      className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                      placeholder="Введите воспроизводимость"
-                                    />
-                                    {category && (
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          if (currentValue && !availableValues.includes(currentValue)) {
-                                            try {
-                                              const updatedRanges = {
-                                                ...(category.technicalSpecsRanges || {}),
-                                                reproducibility: {
-                                                  enabled: true,
-                                                  values: [...availableValues, currentValue]
-                                                }
-                                              };
-                                              await equipmentSectionsService.updateSection(category.id, {
-                                                technicalSpecsRanges: updatedRanges
-                                              });
-                                              const updatedCategories = categories.map(c => 
-                                                c.id === category.id 
-                                                  ? { ...c, technicalSpecsRanges: updatedRanges }
-                                                  : c
-                                              );
-                                              setCategories(updatedCategories);
-                                              setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
-                                            } catch (error) {
-                                              console.error('Ошибка сохранения нового значения:', error);
-                                              alert('Ошибка сохранения нового значения');
-                                            }
-                                          }
-                                        }}
-                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
-                                        title="Сохранить новое значение в категорию"
-                                      >
-                                        Сохранить
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Автоклавируемость</label>
-                          {(() => {
-                            const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
-                            const specRange = category?.technicalSpecsRanges?.['autoclavable'];
-                            const availableValues = specRange?.enabled && specRange.values ? specRange.values.filter(v => v.trim()) : [];
-                            // Маппинг значений для автоклавируемости
-                            const valueMap: Record<string, boolean | undefined> = {
-                              'Нет': false,
-                              'Частичная': true, // Можно использовать отдельное значение, но для простоты используем true
-                              'Полная': true,
-                              'Да': true,
-                              'false': false,
-                              'true': true
-                            };
-                            const currentValue = item.autoclavable === undefined ? '' : (item.autoclavable ? 'true' : 'false');
-                            const currentDisplayValue = item.autoclavable === undefined ? '' : (item.autoclavable ? 'Полная' : 'Нет');
-                            const showCustomInput = availableValues.length > 0 && !availableValues.includes(currentDisplayValue) && currentValue !== '';
-                            
-                            if (availableValues.length > 0) {
-                              return (
+                              <div key={spec.key}>
+                                <label className="block text-xs text-gray-500 mb-1">{spec.label}</label>
                                 <div className="space-y-1">
                                   <select
-                                    value={availableValues.includes(currentDisplayValue) ? currentDisplayValue : (showCustomInput ? '__custom__' : '')}
+                                    value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
                                     onChange={(e) => {
                                       if (e.target.value === '__custom__') {
+                                        setShowCustomInputs(prev => ({ ...prev, [inputKey]: true }));
                                       } else if (e.target.value === '') {
-                                        handleUpdateItem(index, 'autoclavable', undefined);
+                                        handleUpdateItem(index, 'customTechnicalSpecs', {
+                                          ...(item.customTechnicalSpecs || {}),
+                                          [spec.key]: ''
+                                        });
                                         setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                        setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
                                       } else {
-                                        const boolValue = valueMap[e.target.value];
-                                        handleUpdateItem(index, 'autoclavable', boolValue);
+                                        handleUpdateItem(index, 'customTechnicalSpecs', {
+                                          ...(item.customTechnicalSpecs || {}),
+                                          [spec.key]: e.target.value
+                                        });
                                         setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
+                                        setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
                                       }
                                     }}
                                     className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -1103,30 +671,31 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                                   </select>
                                   {showCustomInput && (
                                     <div className="flex items-center space-x-1">
-                                      <select
+                                      <input
+                                        type="text"
                                         value={currentValue}
                                         onChange={(e) => {
-                                          handleUpdateItem(index, 'autoclavable', e.target.value === '' ? undefined : e.target.value === 'true');
+                                          handleUpdateItem(index, 'customTechnicalSpecs', {
+                                            ...(item.customTechnicalSpecs || {}),
+                                            [spec.key]: e.target.value
+                                          });
                                           setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
                                         }}
                                         className="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                      >
-                                        <option value="">Не указано</option>
-                                        <option value="true">Да</option>
-                                        <option value="false">Нет</option>
-                                      </select>
+                                        placeholder={`Введите значение для ${spec.label.toLowerCase()}`}
+                                      />
                                       {category && (
                                         <button
                                           type="button"
                                           onClick={async () => {
-                                            const newValue = currentValue === 'true' ? 'Полная' : (currentValue === 'false' ? 'Нет' : '');
-                                            if (newValue && !availableValues.includes(newValue)) {
+                                            if (currentValue && !availableValues.includes(currentValue)) {
                                               try {
                                                 const updatedRanges = {
                                                   ...(category.technicalSpecsRanges || {}),
-                                                  autoclavable: {
+                                                  [spec.key]: {
                                                     enabled: true,
-                                                    values: [...availableValues, newValue]
+                                                    values: [...availableValues, currentValue],
+                                                    label: spec.label
                                                   }
                                                 };
                                                 await equipmentSectionsService.updateSection(category.id, {
@@ -1137,58 +706,44 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                                                     ? { ...c, technicalSpecsRanges: updatedRanges }
                                                     : c
                                                 );
-                                              setCategories(updatedCategories);
-                                              const inputKeyAutoclavable = `autoclavable_${index}`;
-                                              setShowCustomInputs(prev => ({ ...prev, [inputKeyAutoclavable]: false }));
-                                            } catch (error) {
-                                              console.error('Ошибка сохранения нового значения:', error);
-                                              alert('Ошибка сохранения нового значения');
+                                                setCategories(updatedCategories);
+                                                setShowCustomInputs(prev => ({ ...prev, [inputKey]: false }));
+                                              } catch (error) {
+                                                console.error('Ошибка сохранения нового значения:', error);
+                                                alert('Ошибка сохранения нового значения');
+                                              }
                                             }
-                                          }
-                                        }}
-                                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
-                                        title="Сохранить новое значение в категорию"
-                                      >
-                                        Сохранить
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
+                                          }}
+                                          className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs"
+                                          title="Сохранить новое значение в категорию"
+                                        >
+                                          Сохранить
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             );
-                          } else {
-                              // Если нет доступных значений, показываем стандартный select
-                              return (
-                                <select
-                                  value={item.autoclavable === undefined ? '' : item.autoclavable ? 'true' : 'false'}
-                                  onChange={(e) => {
-                                    handleUpdateItem(index, 'autoclavable', e.target.value === '' ? undefined : e.target.value === 'true');
-                                    setUserModifiedSpecs(prev => ({ ...prev, [index]: true }));
-                                  }}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                >
-                                  <option value="">Не указано</option>
-                                  <option value="true">Да</option>
-                                  <option value="false">Нет</option>
-                                </select>
-                              );
-                            }
-                          })()}
-                        </div>
+                          })}
+                          
+                          {/* Чекбокс "Наличие в реестре СИ" */}
+                          <div className="md:col-span-2">
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={item.inRegistrySI || false}
+                                onChange={(e) => handleUpdateItem(index, 'inRegistrySI', e.target.checked)}
+                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                              />
+                              <span className="text-xs text-gray-700">Наличие в реестре СИ</span>
+                            </label>
+                          </div>
+                        </>
+                      );
+                    })()}
 
-                        <div className="md:col-span-2">
-                          <label className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              checked={item.inRegistrySI || false}
-                              onChange={(e) => handleUpdateItem(index, 'inRegistrySI', e.target.checked)}
-                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                            />
-                            <span className="text-xs text-gray-700">Наличие в реестре СИ</span>
-                          </label>
-                        </div>
-                      </>
-                    )}
+                    {/* Наименование */}
 
                     {/* Наименование */}
                     <div className="md:col-span-2 relative">

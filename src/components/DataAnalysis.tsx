@@ -477,17 +477,6 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
           qualificationObjectId={selectedQualificationObject.id}
           projectId={fullProject?.id || project.id}
         />
-        
-        {/* Отладочная информация */}
-        <div className="mt-4 p-4 bg-gray-100 rounded-lg text-sm">
-          <h4 className="font-semibold mb-2">Отладочная информация:</h4>
-          <p><strong>qualificationObjectId:</strong> {selectedQualificationObject.id}</p>
-          <p><strong>projectId:</strong> {fullProject?.id || project.id}</p>
-          <p><strong>fullProject:</strong> {fullProject ? 'Загружен' : 'Не загружен'}</p>
-          <p><strong>contractor:</strong> {contractor ? 'Загружен' : 'Не загружен'}</p>
-          <p><strong>loggerCount:</strong> {loggerCount}</p>
-          <p><strong>measurementZones:</strong> {selectedQualificationObject.measurementZones?.length || 0}</p>
-        </div>
       </div>
     );
   }

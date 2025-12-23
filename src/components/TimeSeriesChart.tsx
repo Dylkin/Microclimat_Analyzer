@@ -39,6 +39,7 @@ interface TimeSeriesChartProps {
   color?: string;
   yAxisLabel?: string;
   showLegend?: boolean;
+  yOffset?: number; // Смещение данных по оси Y
 }
 
 export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
@@ -54,22 +55,36 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   onMarkerAdd,
   color = '#3b82f6',
   yAxisLabel,
-  showLegend = true
+  showLegend = true,
+  yOffset = 0
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tooltip, setTooltip] = useState<TooltipData>({ x: 0, y: 0, timestamp: 0, visible: false });
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
+  // Состояние для отслеживания скрытых логгеров
+  const [hiddenLoggers, setHiddenLoggers] = useState<Set<string>>(new Set());
 
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
 
-  // Фильтруем данные по типу
-  const filteredData = data.filter(d => {
-    const value = dataType === 'temperature' ? d.temperature : d.humidity;
-    return value !== undefined;
-  });
+  // Фильтруем данные по типу и видимости логгеров, применяем смещение по Y
+  const filteredData = data
+    .filter(d => {
+      const value = dataType === 'temperature' ? d.temperature : d.humidity;
+      const isVisible = !hiddenLoggers.has(d.fileId);
+      return value !== undefined && isVisible;
+    })
+    .map(d => {
+      // Применяем смещение по оси Y к значениям
+      if (dataType === 'temperature' && d.temperature !== undefined) {
+        return { ...d, temperature: d.temperature + yOffset };
+      } else if (dataType === 'humidity' && d.humidity !== undefined) {
+        return { ...d, humidity: d.humidity + yOffset };
+      }
+      return d;
+    });
 
   // Группируем данные по файлам для легенды и отображения
   const dataByFile = React.useMemo(() => {
@@ -344,14 +359,42 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               if (isExternal) {
                 displayName = displayName ? `${displayName} Внешний` : 'Внешний';
               }
+              const isHidden = hiddenLoggers.has(fileId);
+              const toggleLogger = () => {
+                setHiddenLoggers(prev => {
+                  const newSet = new Set(prev);
+                  if (newSet.has(fileId)) {
+                    newSet.delete(fileId);
+                  } else {
+                    newSet.add(fileId);
+                  }
+                  return newSet;
+                });
+              };
+              
               return (
-                <span key={fileId} className="inline-flex items-center space-x-1 mr-3">
+                <span 
+                  key={fileId} 
+                  className="inline-flex items-center space-x-1 mr-3 cursor-pointer hover:opacity-70 transition-opacity"
+                  onClick={toggleLogger}
+                  title={isHidden ? `Показать ${displayName}` : `Скрыть ${displayName}`}
+                >
                   <div 
                     className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: displayColor }}
+                    style={{ 
+                      backgroundColor: displayColor,
+                      opacity: isHidden ? 0.3 : 1
+                    }}
                     title={`Цвет для ${displayName}`}
                   ></div>
-                  <span>{displayName}</span>
+                  <span 
+                    style={{ 
+                      opacity: isHidden ? 0.5 : 1,
+                      textDecoration: isHidden ? 'line-through' : 'none'
+                    }}
+                  >
+                    {displayName}
+                  </span>
                 </span>
               );
             })}
@@ -590,7 +633,9 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               <rect x={0} y={0} width={innerWidth} height={innerHeight} />
             </clipPath>
           </defs>
-          {Array.from(dataByFile.entries()).map(([fileId, fileData]) => {
+          {Array.from(dataByFile.entries())
+            .filter(([fileId]) => !hiddenLoggers.has(fileId))
+            .map(([fileId, fileData]) => {
             // Проверяем, является ли это внешним датчиком
             const fileDataPoint = data.find(d => d.fileId === fileId);
             const isExternal = fileDataPoint?.zoneNumber === 0 || 

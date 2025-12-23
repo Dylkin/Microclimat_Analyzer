@@ -12,14 +12,22 @@ echo "Обновление конфигурации nginx для правиль�
 # Создаем временный файл с обновленной конфигурацией
 sudo tee /tmp/nginx-uploads-fix.conf > /dev/null <<'EOF'
     # Проксирование загрузок
-    location /uploads {
-        alias /opt/Microclimat_Analyzer/uploads;
+    location /uploads/ {
+        alias /opt/Microclimat_Analyzer/uploads/;
         expires 1d;
         add_header Cache-Control "public";
         # Правильная обработка URL-encoded символов (пробелы, специальные символы)
         disable_symlinks off;
         # Разрешаем доступ к файлам
         try_files $uri =404;
+        # Правильная обработка MIME типов для изображений
+        types {
+            image/png png;
+            image/jpeg jpg jpeg;
+            image/gif gif;
+            image/svg+xml svg;
+        }
+        default_type application/octet-stream;
     }
 EOF
 

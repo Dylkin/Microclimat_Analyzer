@@ -8,7 +8,7 @@ router.get('/', async (req, res) => {
   try {
     const searchTerm = req.query.search as string;
     
-    // Проверяем наличие колонки technical_specs_ranges перед добавлением в SELECT
+    // Проверяем наличие колонок перед добавлением в SELECT
     const technicalSpecsRangesCheck = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
@@ -17,6 +17,15 @@ router.get('/', async (req, res) => {
       AND column_name = 'technical_specs_ranges'
     `);
     const hasTechnicalSpecsRanges = technicalSpecsRangesCheck.rows.length > 0;
+    
+    const manufacturerSuppliersCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'equipment_sections'
+      AND column_name = 'manufacturer_suppliers'
+    `);
+    const hasManufacturerSuppliers = manufacturerSuppliersCheck.rows.length > 0;
     
     let selectColumns = `
       es.id,
@@ -39,6 +48,15 @@ router.get('/', async (req, res) => {
     if (hasTechnicalSpecsRanges) {
       selectColumns = selectColumns.replace('es.in_registry_si,', 'es.in_registry_si, es.technical_specs_ranges,');
     }
+    if (hasManufacturerSuppliers) {
+      // Добавляем manufacturer_suppliers после supplier_ids
+      if (selectColumns.includes('es.supplier_ids,')) {
+        selectColumns = selectColumns.replace('es.supplier_ids,', 'es.supplier_ids, es.manufacturer_suppliers,');
+      } else {
+        // Если supplier_ids нет в списке, добавляем после manufacturers
+        selectColumns = selectColumns.replace('es.manufacturers,', 'es.manufacturers, es.manufacturer_suppliers,');
+      }
+    }
     
     let query = `
       SELECT ${selectColumns}
@@ -55,10 +73,13 @@ router.get('/', async (req, res) => {
       paramCount++;
     }
     
-    // Используем уже проверенную переменную hasTechnicalSpecsRanges
+    // Используем уже проверенные переменные
     let groupByColumns = 'es.id, es.name, es.description, es.manufacturers, es.website, es.supplier_ids, es.channels_count, es.dosing_volume, es.volume_step, es.dosing_accuracy, es.reproducibility, es.autoclavable, es.in_registry_si, es.created_at, es.updated_at';
     if (hasTechnicalSpecsRanges) {
       groupByColumns += ', es.technical_specs_ranges';
+    }
+    if (hasManufacturerSuppliers) {
+      groupByColumns += ', es.manufacturer_suppliers';
     }
     
     query += ` GROUP BY ${groupByColumns}`;
@@ -84,6 +105,31 @@ router.get('/', async (req, res) => {
         }
       }
       
+      // Безопасно обрабатываем manufacturer_suppliers
+      let manufacturerSuppliers: any[] = [];
+      if (hasManufacturerSuppliers) {
+        try {
+          if (row.manufacturer_suppliers) {
+            // Если это уже массив, используем как есть
+            if (Array.isArray(row.manufacturer_suppliers)) {
+              manufacturerSuppliers = row.manufacturer_suppliers;
+            } else if (typeof row.manufacturer_suppliers === 'string') {
+              // Если это строка, пытаемся распарсить JSON
+              if (row.manufacturer_suppliers.trim()) {
+                manufacturerSuppliers = JSON.parse(row.manufacturer_suppliers);
+              }
+            } else if (typeof row.manufacturer_suppliers === 'object' && row.manufacturer_suppliers !== null) {
+              // Если это объект, пытаемся преобразовать в массив
+              manufacturerSuppliers = Array.isArray(row.manufacturer_suppliers) ? row.manufacturer_suppliers : [];
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing manufacturer_suppliers:', e);
+          console.error('manufacturer_suppliers value:', row.manufacturer_suppliers);
+          manufacturerSuppliers = [];
+        }
+      }
+      
       return {
         id: row.id,
         name: row.name,
@@ -91,6 +137,7 @@ router.get('/', async (req, res) => {
         manufacturers: row.manufacturers && Array.isArray(row.manufacturers) ? row.manufacturers : [],
         website: row.website,
         supplierIds: row.supplier_ids && Array.isArray(row.supplier_ids) ? row.supplier_ids : [],
+        manufacturerSuppliers: manufacturerSuppliers,
         channelsCount: row.channels_count,
         dosingVolume: row.dosing_volume,
         volumeStep: row.volume_step,
@@ -211,7 +258,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/equipment-sections - Создать раздел
 router.post('/', async (req, res) => {
   try {
-    const { name, description, manufacturers, website, supplierIds, channelsCount, dosingVolume, volumeStep, dosingAccuracy, reproducibility, autoclavable, inRegistrySI, technicalSpecsRanges } = req.body;
+    const { name, description, manufacturers, website, supplierIds, manufacturerSuppliers, channelsCount, dosingVolume, volumeStep, dosingAccuracy, reproducibility, autoclavable, inRegistrySI, technicalSpecsRanges } = req.body;
     
     if (!name || name.trim() === '') {
       return res.status(400).json({ error: 'Наименование раздела обязательно' });
@@ -221,11 +268,25 @@ router.post('/', async (req, res) => {
     const manufacturersArray = Array.isArray(manufacturers) ? manufacturers.filter(m => m && m.trim()) : [];
     const supplierIdsArray = Array.isArray(supplierIds) ? supplierIds.filter(id => id) : [];
     
-    const result = await pool.query(`
-      INSERT INTO equipment_sections (name, description, manufacturers, website, supplier_ids, channels_count, dosing_volume, volume_step, dosing_accuracy, reproducibility, autoclavable, in_registry_si, technical_specs_ranges)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      RETURNING id, name, description, manufacturers, website, supplier_ids, channels_count, dosing_volume, volume_step, dosing_accuracy, reproducibility, autoclavable, in_registry_si, technical_specs_ranges, created_at, updated_at
-    `, [
+    // Проверяем наличие колонки manufacturer_suppliers
+    const manufacturerSuppliersCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'equipment_sections'
+      AND column_name = 'manufacturer_suppliers'
+    `);
+    const hasManufacturerSuppliers = manufacturerSuppliersCheck.rows.length > 0;
+    
+    // Обрабатываем manufacturerSuppliers
+    const manufacturerSuppliersArray = Array.isArray(manufacturerSuppliers) 
+      ? manufacturerSuppliers.filter(item => item && item.manufacturer && item.manufacturer.trim())
+      : [];
+    
+    let insertColumns = 'name, description, manufacturers, website, supplier_ids, channels_count, dosing_volume, volume_step, dosing_accuracy, reproducibility, autoclavable, in_registry_si, technical_specs_ranges';
+    let insertValues = '$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13';
+    let returnColumns = 'id, name, description, manufacturers, website, supplier_ids, channels_count, dosing_volume, volume_step, dosing_accuracy, reproducibility, autoclavable, in_registry_si, technical_specs_ranges, created_at, updated_at';
+    let params: any[] = [
       name.trim(), 
       description?.trim() || null,
       manufacturersArray.length > 0 ? manufacturersArray : null,
@@ -239,9 +300,38 @@ router.post('/', async (req, res) => {
       autoclavable !== undefined ? autoclavable : null,
       inRegistrySI || false,
       technicalSpecsRanges ? JSON.stringify(technicalSpecsRanges) : '{}'
-    ]);
+    ];
+    
+    if (hasManufacturerSuppliers) {
+      insertColumns += ', manufacturer_suppliers';
+      insertValues += ', $14';
+      returnColumns += ', manufacturer_suppliers';
+      params.push(manufacturerSuppliersArray.length > 0 ? JSON.stringify(manufacturerSuppliersArray) : '[]');
+    }
+    
+    const result = await pool.query(`
+      INSERT INTO equipment_sections (${insertColumns})
+      VALUES (${insertValues})
+      RETURNING ${returnColumns}
+    `, params);
     
     const row = result.rows[0];
+    
+    // Обрабатываем manufacturer_suppliers при возврате
+    let parsedManufacturerSuppliers: any[] = [];
+    if (hasManufacturerSuppliers && row.manufacturer_suppliers) {
+      try {
+        if (Array.isArray(row.manufacturer_suppliers)) {
+          parsedManufacturerSuppliers = row.manufacturer_suppliers;
+        } else if (typeof row.manufacturer_suppliers === 'string') {
+          parsedManufacturerSuppliers = JSON.parse(row.manufacturer_suppliers);
+        }
+      } catch (e) {
+        console.error('Error parsing manufacturer_suppliers:', e);
+        parsedManufacturerSuppliers = [];
+      }
+    }
+    
     res.status(201).json({
       id: row.id,
       name: row.name,
@@ -249,6 +339,7 @@ router.post('/', async (req, res) => {
       manufacturers: row.manufacturers && Array.isArray(row.manufacturers) ? row.manufacturers : [],
       website: row.website,
       supplierIds: row.supplier_ids && Array.isArray(row.supplier_ids) ? row.supplier_ids : [],
+      manufacturerSuppliers: parsedManufacturerSuppliers,
       channelsCount: row.channels_count,
       dosingVolume: row.dosing_volume,
       volumeStep: row.volume_step,
@@ -274,7 +365,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, manufacturers, website, supplierIds, channelsCount, dosingVolume, volumeStep, dosingAccuracy, reproducibility, autoclavable, inRegistrySI, technicalSpecsRanges } = req.body;
+    const { name, description, manufacturers, website, supplierIds, manufacturerSuppliers, channelsCount, dosingVolume, volumeStep, dosingAccuracy, reproducibility, autoclavable, inRegistrySI, technicalSpecsRanges } = req.body;
     
     if (name !== undefined && (!name || name.trim() === '')) {
       return res.status(400).json({ error: 'Наименование раздела обязательно' });
@@ -283,6 +374,23 @@ router.put('/:id', async (req, res) => {
     // Обрабатываем manufacturers и supplierIds как массивы
     const manufacturersArray = Array.isArray(manufacturers) ? manufacturers.filter(m => m && m.trim()) : (manufacturers === null ? null : undefined);
     const supplierIdsArray = Array.isArray(supplierIds) ? supplierIds.filter(id => id) : (supplierIds === null ? null : undefined);
+    
+    // Проверяем наличие колонки manufacturer_suppliers
+    const manufacturerSuppliersCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'equipment_sections'
+      AND column_name = 'manufacturer_suppliers'
+    `);
+    const hasManufacturerSuppliers = manufacturerSuppliersCheck.rows.length > 0;
+    
+    // Обрабатываем manufacturerSuppliers
+    const manufacturerSuppliersArray = manufacturerSuppliers !== undefined
+      ? (Array.isArray(manufacturerSuppliers) 
+          ? manufacturerSuppliers.filter(item => item && item.manufacturer && item.manufacturer.trim())
+          : (manufacturerSuppliers === null ? null : []))
+      : undefined;
     
     const updates: string[] = [];
     const values: any[] = [];
@@ -311,6 +419,11 @@ router.put('/:id', async (req, res) => {
     if (supplierIdsArray !== undefined) {
       updates.push(`supplier_ids = $${paramCount}`);
       values.push(supplierIdsArray && supplierIdsArray.length > 0 ? supplierIdsArray : null);
+      paramCount++;
+    }
+    if (hasManufacturerSuppliers && manufacturerSuppliersArray !== undefined) {
+      updates.push(`manufacturer_suppliers = $${paramCount}`);
+      values.push(manufacturerSuppliersArray && manufacturerSuppliersArray.length > 0 ? JSON.stringify(manufacturerSuppliersArray) : '[]');
       paramCount++;
     }
     if (channelsCount !== undefined) {
@@ -361,11 +474,16 @@ router.put('/:id', async (req, res) => {
     updates.push(`updated_at = NOW()`);
     values.push(id);
     
+    let returnColumns = 'id, name, description, manufacturers, website, supplier_ids, channels_count, dosing_volume, volume_step, dosing_accuracy, reproducibility, autoclavable, in_registry_si, technical_specs_ranges, created_at, updated_at';
+    if (hasManufacturerSuppliers) {
+      returnColumns += ', manufacturer_suppliers';
+    }
+    
     const result = await pool.query(`
       UPDATE equipment_sections
       SET ${updates.join(', ')}
       WHERE id = $${paramCount}
-      RETURNING id, name, description, manufacturers, website, supplier_ids, channels_count, dosing_volume, volume_step, dosing_accuracy, reproducibility, autoclavable, in_registry_si, technical_specs_ranges, created_at, updated_at
+      RETURNING ${returnColumns}
     `, values);
     
     if (result.rows.length === 0) {
@@ -373,6 +491,21 @@ router.put('/:id', async (req, res) => {
     }
     
     const row = result.rows[0];
+    
+    // Обрабатываем manufacturer_suppliers при возврате
+    let updatedManufacturerSuppliers: any[] = [];
+    if (hasManufacturerSuppliers && row.manufacturer_suppliers) {
+      try {
+        if (Array.isArray(row.manufacturer_suppliers)) {
+          updatedManufacturerSuppliers = row.manufacturer_suppliers;
+        } else if (typeof row.manufacturer_suppliers === 'string') {
+          updatedManufacturerSuppliers = JSON.parse(row.manufacturer_suppliers);
+        }
+      } catch (e) {
+        console.error('Error parsing manufacturer_suppliers:', e);
+        updatedManufacturerSuppliers = [];
+      }
+    }
     
     // Получаем количество карточек
     const countResult = await pool.query(`
@@ -386,6 +519,7 @@ router.put('/:id', async (req, res) => {
       manufacturers: row.manufacturers && Array.isArray(row.manufacturers) ? row.manufacturers : [],
       website: row.website,
       supplierIds: row.supplier_ids && Array.isArray(row.supplier_ids) ? row.supplier_ids : [],
+      manufacturerSuppliers: updatedManufacturerSuppliers,
       channelsCount: row.channels_count,
       dosingVolume: row.dosing_volume,
       volumeStep: row.volume_step,

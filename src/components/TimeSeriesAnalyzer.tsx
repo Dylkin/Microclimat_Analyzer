@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
-import { Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle } from 'lucide-react';
+import { Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle, ChevronDown, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
@@ -56,6 +56,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [conclusions, setConclusions] = useState('');
   const [showAnalysisResults, setShowAnalysisResults] = useState(false);
   const [analysisResultsRefreshKey, setAnalysisResultsRefreshKey] = useState(0); // Ключ для принудительного обновления результатов анализа
+  const [yOffset, setYOffset] = useState(0); // Смещение данных по оси Y
+  const [debugInfoOpen, setDebugInfoOpen] = useState(false); // Состояние аккордеона отладочной информации
   const [reportStatus, setReportStatus] = useState<{
     isGenerating: boolean;
     hasReport: boolean;
@@ -111,6 +113,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
   // Состояние для Map оборудования (имя -> serial_number)
   const [equipmentMap, setEquipmentMap] = useState<Map<string, string>>(new Map());
+  
+  // Состояние для отладочной информации
+  const [debugInfo, setDebugInfo] = useState<{
+    fullProject: string;
+    contractor: string;
+    loggerCount: number;
+    measurementZones: number;
+  }>({
+    fullProject: 'Не загружен',
+    contractor: 'Не загружен',
+    loggerCount: 0,
+    measurementZones: 0
+  });
 
   // Состояние для шаблона из справочника
   const [templateFromDirectory, setTemplateFromDirectory] = useState<{
@@ -205,6 +220,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         const obj = await qualificationObjectService.getQualificationObjectById(qualificationObjectId);
         console.log('Загружен объект квалификации с зонами:', obj);
         setQualificationObject(obj);
+        
+        // Обновляем отладочную информацию
+        setDebugInfo(prev => ({
+          ...prev,
+          measurementZones: obj?.measurementZones?.length || 0
+        }));
       } catch (error) {
         console.error('Ошибка загрузки объекта квалификации:', error);
       }
@@ -212,6 +233,50 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
     loadQualificationObject();
   }, [qualificationObjectId]);
+  
+  // Загрузка информации о проекте и подрядчике для отладки
+  useEffect(() => {
+    const loadProjectInfo = async () => {
+      if (!projectId) {
+        setDebugInfo(prev => ({
+          ...prev,
+          fullProject: 'Не указан',
+          contractor: 'Не указан'
+        }));
+        return;
+      }
+
+      try {
+        const { projectService } = await import('../utils/projectService');
+        const fullProject = await projectService.getProjectById(projectId);
+        setDebugInfo(prev => ({
+          ...prev,
+          fullProject: 'Загружен',
+          contractor: fullProject.contractorName || 'Не указан'
+        }));
+      } catch (error) {
+        console.error('Ошибка загрузки проекта:', error);
+        setDebugInfo(prev => ({
+          ...prev,
+          fullProject: 'Ошибка загрузки',
+          contractor: 'Ошибка загрузки'
+        }));
+      }
+    };
+
+    loadProjectInfo();
+  }, [projectId]);
+  
+  // Подсчет количества логгеров из данных
+  useEffect(() => {
+    if (data && data.points) {
+      const uniqueLoggers = new Set(data.points.map(p => p.fileId));
+      setDebugInfo(prev => ({
+        ...prev,
+        loggerCount: uniqueLoggers.size
+      }));
+    }
+  }, [data]);
 
   // Загрузка оборудования при монтировании компонента
   useEffect(() => {
@@ -3287,6 +3352,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           onZoomChange={setZoomState}
           onMarkerAdd={handleAddMarker}
           yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
+          yOffset={yOffset}
         />
       </div>
 
@@ -4393,6 +4459,81 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 <p className="text-sm">Создайте отчет, чтобы он появился здесь</p>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Отладочная информация */}
+      <div className="bg-white rounded-lg shadow">
+        <button
+          onClick={() => setDebugInfoOpen(!debugInfoOpen)}
+          className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+        >
+          <h3 className="text-lg font-semibold text-gray-900">Отладочная информация</h3>
+          {debugInfoOpen ? (
+            <ChevronUp className="w-5 h-5 text-gray-500" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-500" />
+          )}
+        </button>
+        
+        {debugInfoOpen && (
+          <div className="p-6 border-t border-gray-200 space-y-4">
+            {/* Отладочная информация */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">qualificationObjectId:</span>
+                <span className="ml-2 font-mono text-xs text-gray-900 break-all">{qualificationObjectId || 'Не указан'}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">projectId:</span>
+                <span className="ml-2 font-mono text-xs text-gray-900 break-all">{projectId || 'Не указан'}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">fullProject:</span>
+                <span className="ml-2 text-gray-900">{debugInfo.fullProject}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">contractor:</span>
+                <span className="ml-2 text-gray-900">{debugInfo.contractor}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">loggerCount:</span>
+                <span className="ml-2 text-gray-900">{debugInfo.loggerCount}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">measurementZones:</span>
+                <span className="ml-2 text-gray-900">{debugInfo.measurementZones}</span>
+              </div>
+            </div>
+            
+            {/* Смещение по оси Y */}
+            <div className="flex items-center justify-center space-x-2 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setYOffset(prev => prev + 1)}
+                className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                title="Увеличить смещение на +1"
+              >
+                <ArrowUp className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-medium text-gray-900 min-w-[3rem] text-center">
+                {yOffset > 0 ? `+${yOffset}` : yOffset}
+              </span>
+              <button
+                onClick={() => setYOffset(prev => prev - 1)}
+                className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                title="Уменьшить смещение на -1"
+              >
+                <ArrowDown className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setYOffset(0)}
+                className="ml-4 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                title="Сбросить смещение"
+              >
+                Сбросить
+              </button>
+            </div>
           </div>
         )}
       </div>

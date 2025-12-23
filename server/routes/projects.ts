@@ -158,9 +158,10 @@ router.get('/', (req, res, next) => {
         }
         itemsQuery += ' WHERE pi.project_id = $1 ORDER BY pi.created_at';
         
-        const itemsResult = await pool.query(itemsQuery, [row.id]);
-        
-        items = itemsResult.rows.map(item => ({
+        try {
+          const itemsResult = await pool.query(itemsQuery, [row.id]);
+          
+          items = itemsResult.rows.map(item => ({
           id: item.id,
           projectId: row.id,
           name: item.name,
@@ -181,7 +182,19 @@ router.get('/', (req, res, next) => {
           inRegistrySI: hasNewColumns ? item.in_registry_si : undefined,
           createdAt: new Date(item.created_at),
           updatedAt: new Date(item.updated_at)
-        }));
+          }));
+        } catch (itemsError: any) {
+          console.error(`Error fetching items for project ${row.id}:`, itemsError);
+          console.error('Items query:', itemsQuery);
+          console.error('Items error details:', {
+            message: itemsError.message,
+            code: itemsError.code,
+            detail: itemsError.detail,
+            hint: itemsError.hint
+          });
+          // Продолжаем без товаров, чтобы не прерывать загрузку проектов
+          items = [];
+        }
       }
       
       return {

@@ -350,7 +350,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   };
 
   // Получение действия для статуса проекта
-  const getProjectAction = (status: ProjectStatus) => {
+  const getProjectAction = (status: ProjectStatus, projectType?: ProjectType) => {
+    // Для проектов типа 'qualification' не показываем действие для статуса 'documents_submission'
+    if (status === 'documents_submission' && projectType === 'qualification') {
+      return null;
+    }
+    
     switch (status) {
       case 'documents_submission':
         return {
@@ -756,13 +761,20 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                           aria-label="Статус проекта"
                         >
                           {Object.entries(ProjectStatusLabels)
-                            .filter(([value]) =>
-                              project.type === 'sale'
-                                ? value === 'documents_submission' ||
+                            .filter(([value]) => {
+                              // Для проектов типа 'sale' показываем только определенные статусы
+                              if (project.type === 'sale') {
+                                return value === 'documents_submission' ||
                                   value === 'contract_negotiation' ||
-                                  value === 'not_suitable'
-                                : true
-                            )
+                                  value === 'not_suitable';
+                              }
+                              // Для проектов типа 'qualification' исключаем статус 'documents_submission'
+                              if (project.type === 'qualification') {
+                                return value !== 'documents_submission';
+                              }
+                              // Для остальных типов показываем все статусы
+                              return true;
+                            })
                             .map(([value, label]) => (
                               <option key={value} value={value}>
                                 {label}
@@ -801,12 +813,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                         </div>
                       ) : (
                         <div className="flex justify-end space-x-2">
-                          {getProjectAction(project.status) && (
+                          {getProjectAction(project.status, project.type) && (
                             <button
                               onClick={() => handleProjectAction(project)}
                               disabled={operationLoading}
                               className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                              title={getProjectAction(project.status)?.label}
+                              title={getProjectAction(project.status, project.type)?.label}
                             >
                               <Play className="w-3 h-3 mr-1" />
                               Выполнить
