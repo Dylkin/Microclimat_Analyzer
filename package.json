@@ -46,6 +46,7 @@
     "clean-dash-values": "tsx server/scripts/clean-dash-values.ts",
     "apply-section-fields-migration": "tsx server/scripts/apply-section-fields-migration.ts",
     "migrate-products-dev-to-prod": "tsx server/scripts/migrate-products-dev-to-prod.ts",
+    "sync-all-products-dev-to-prod": "tsx server/scripts/sync-all-products-dev-to-prod.ts",
     "check-verification-files": "tsx server/scripts/check-verification-files.ts",
     "fix-verification-file-names": "tsx server/scripts/fix-verification-file-names.ts",
     "add-centrifuge-category": "tsx server/scripts/add-centrifuge-category.ts",
