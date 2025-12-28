@@ -1,16 +1,22 @@
 import { EquipmentSection, EquipmentCard, CreateEquipmentSectionData, UpdateEquipmentSectionData, CreateEquipmentCardData, UpdateEquipmentCardData } from '../types/EquipmentSections';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Базовый URL берём из переменных окружения VITE_API_URL или VITE_API_BASE_URL.
+// По умолчанию используем '/api', чтобы в продакшене работать через Nginx reverse proxy,
+// а не ходить на localhost:3001 из браузера пользователя.
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  '/api';
 
 class EquipmentSectionsService {
   // Разделы оборудования
   async getSections(search?: string): Promise<EquipmentSection[]> {
-    const url = new URL(`${API_BASE_URL}/api/equipment-sections`);
+    let url = `${API_BASE_URL}/equipment-sections`;
     if (search) {
-      url.searchParams.append('search', search);
+      url += `?search=${encodeURIComponent(search)}`;
     }
     
-    const response = await fetch(url.toString());
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error('Ошибка получения разделов оборудования');
     }
@@ -24,7 +30,7 @@ class EquipmentSectionsService {
   }
 
   async getSection(id: string): Promise<EquipmentSection> {
-    const response = await fetch(`${API_BASE_URL}/api/equipment-sections/${id}`);
+    const response = await fetch(`${API_BASE_URL}/equipment-sections/${id}`);
     if (!response.ok) {
       throw new Error('Ошибка получения раздела оборудования');
     }
@@ -38,7 +44,7 @@ class EquipmentSectionsService {
   }
 
   async createSection(data: CreateEquipmentSectionData): Promise<EquipmentSection> {
-    const response = await fetch(`${API_BASE_URL}/api/equipment-sections`, {
+    const response = await fetch(`${API_BASE_URL}/equipment-sections`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -60,7 +66,7 @@ class EquipmentSectionsService {
   }
 
   async updateSection(id: string, data: UpdateEquipmentSectionData): Promise<EquipmentSection> {
-    const response = await fetch(`${API_BASE_URL}/api/equipment-sections/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/equipment-sections/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -82,7 +88,7 @@ class EquipmentSectionsService {
   }
 
   async deleteSection(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/equipment-sections/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/equipment-sections/${id}`, {
       method: 'DELETE'
     });
     
@@ -94,15 +100,19 @@ class EquipmentSectionsService {
 
   // Карточки оборудования
   async getCards(search?: string, sectionId?: string): Promise<EquipmentCard[]> {
-    const url = new URL(`${API_BASE_URL}/api/equipment-cards`);
+    let url = `${API_BASE_URL}/equipment-cards`;
+    const params: string[] = [];
     if (search) {
-      url.searchParams.append('search', search);
+      params.push(`search=${encodeURIComponent(search)}`);
     }
     if (sectionId) {
-      url.searchParams.append('sectionId', sectionId);
+      params.push(`sectionId=${encodeURIComponent(sectionId)}`);
+    }
+    if (params.length > 0) {
+      url += `?${params.join('&')}`;
     }
     
-    const response = await fetch(url.toString());
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error('Ошибка получения карточек оборудования');
     }
@@ -116,7 +126,7 @@ class EquipmentSectionsService {
   }
 
   async getCard(id: string): Promise<EquipmentCard> {
-    const response = await fetch(`${API_BASE_URL}/api/equipment-cards/${id}`);
+    const response = await fetch(`${API_BASE_URL}/equipment-cards/${id}`);
     if (!response.ok) {
       throw new Error('Ошибка получения карточки оборудования');
     }
@@ -130,7 +140,7 @@ class EquipmentSectionsService {
   }
 
   async createCard(data: CreateEquipmentCardData): Promise<EquipmentCard> {
-    const response = await fetch(`${API_BASE_URL}/api/equipment-cards`, {
+    const response = await fetch(`${API_BASE_URL}/equipment-cards`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -152,7 +162,7 @@ class EquipmentSectionsService {
   }
 
   async updateCard(id: string, data: UpdateEquipmentCardData): Promise<EquipmentCard> {
-    const response = await fetch(`${API_BASE_URL}/api/equipment-cards/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/equipment-cards/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -174,7 +184,7 @@ class EquipmentSectionsService {
   }
 
   async deleteCard(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/equipment-cards/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/equipment-cards/${id}`, {
       method: 'DELETE'
     });
     
