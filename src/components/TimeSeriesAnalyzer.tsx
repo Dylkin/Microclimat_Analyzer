@@ -4510,19 +4510,19 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             {/* Смещение по оси Y */}
             <div className="flex items-center justify-center space-x-2 pt-4 border-t border-gray-200">
               <button
-                onClick={() => setYOffset(prev => prev + 1)}
+                onClick={() => setYOffset(prev => prev + 0.1)}
                 className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                title="Увеличить смещение на +1"
+                title="Увеличить смещение на +0.1"
               >
                 <ArrowUp className="w-4 h-4" />
               </button>
               <span className="text-sm font-medium text-gray-900 min-w-[3rem] text-center">
-                {yOffset > 0 ? `+${yOffset}` : yOffset}
+                {yOffset > 0 ? `+${yOffset.toFixed(1)}` : yOffset.toFixed(1)}
               </span>
               <button
-                onClick={() => setYOffset(prev => prev - 1)}
+                onClick={() => setYOffset(prev => prev - 0.1)}
                 className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                title="Уменьшить смещение на -1"
+                title="Уменьшить смещение на -0.1"
               >
                 <ArrowDown className="w-4 h-4" />
               </button>

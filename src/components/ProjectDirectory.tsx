@@ -66,10 +66,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       // Загружаем проекты
       try {
         const projectsData = await projectService.getAllProjects();
-        // Сортируем проекты по дате создания (от более поздних к более ранним, новые сверху)
-        const sortedProjects = projectsData.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        // Сортируем проекты по дате создания (от более ранних к более поздним)
+        const sortedProjects = [...projectsData].sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateA - dateB;
+        });
         setProjects(sortedProjects);
         setFilteredProjects(sortedProjects);
       } catch (projectError) {
@@ -125,27 +127,27 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
 
   // Поиск по проектам
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredProjects(projects);
-      return;
+    let filtered = projects;
+    
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = projects.filter(project => {
+        return (
+          project.name.toLowerCase().includes(searchLower) ||
+          (project.description && project.description.toLowerCase().includes(searchLower)) ||
+          (project.contractorName && project.contractorName.toLowerCase().includes(searchLower)) ||
+          (project.contractNumber && project.contractNumber.toLowerCase().includes(searchLower)) ||
+          ProjectStatusLabels[project.status].toLowerCase().includes(searchLower)
+        );
+      });
     }
 
-    const filtered = projects.filter(project => {
-      const searchLower = searchTerm.toLowerCase();
-      
-      return (
-        project.name.toLowerCase().includes(searchLower) ||
-        (project.description && project.description.toLowerCase().includes(searchLower)) ||
-        (project.contractorName && project.contractorName.toLowerCase().includes(searchLower)) ||
-        (project.contractNumber && project.contractNumber.toLowerCase().includes(searchLower)) ||
-        ProjectStatusLabels[project.status].toLowerCase().includes(searchLower)
-      );
+    // Сортируем по дате создания (от более ранних к более поздним)
+    const sortedFiltered = [...filtered].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateA - dateB;
     });
-
-    // Сохраняем сортировку по дате создания (от более поздних к более ранним, новые сверху)
-    const sortedFiltered = filtered.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
 
     setFilteredProjects(sortedFiltered);
   }, [searchTerm, projects]);

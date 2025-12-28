@@ -68,7 +68,7 @@ router.get('/', (req, res, next) => {
       SELECT ${selectFields}
       FROM projects p
       LEFT JOIN contractors c ON p.contractor_id = c.id
-      ORDER BY p.created_at DESC
+      ORDER BY p.created_at ASC
     `);
     
     // Проверяем наличие таблицы project_qualification_objects
