@@ -95,9 +95,8 @@ class ApiClient {
     const userId = this.getUserId();
     if (userId) {
       headers['x-user-id'] = userId;
-      // Также добавляем в других форматах для совместимости
-      headers['X-User-Id'] = userId;
-      headers['x-userid'] = userId;
+      // Не дублируем тот же заголовок разным регистром: браузер/Node могут склеивать
+      // значения через запятую ("id, id"), что ломает проверку UUID на backend.
       console.log('ApiClient.request: userId добавлен в заголовки', {
         userId,
         endpoint: url,

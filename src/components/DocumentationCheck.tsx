@@ -9,12 +9,14 @@ interface DocumentationCheckProps {
   qualificationObjectId: string;
   projectId: string;
   onSave?: (check: DocumentationCheck) => void;
+  readOnly?: boolean;
 }
 
 export const DocumentationCheckComponent: React.FC<DocumentationCheckProps> = ({
   qualificationObjectId,
   projectId,
-  onSave
+  onSave,
+  readOnly = false
 }) => {
   const { user } = useAuth();
   const [items, setItems] = useState<DocumentationItem[]>([]);
@@ -76,6 +78,7 @@ export const DocumentationCheckComponent: React.FC<DocumentationCheckProps> = ({
   };
 
   const handleStatusChange = async (itemId: string, status: DocumentationStatus) => {
+    if (readOnly) return;
     if (!user) {
       setError('Пользователь не авторизован');
       return;
@@ -141,6 +144,7 @@ export const DocumentationCheckComponent: React.FC<DocumentationCheckProps> = ({
   };
 
   const handleSave = async () => {
+    if (readOnly) return;
     if (!user) {
       setError('Пользователь не авторизован');
       return;
@@ -213,7 +217,7 @@ export const DocumentationCheckComponent: React.FC<DocumentationCheckProps> = ({
   const hasNotAvailableItems = items.some(item => item.status === 'not_available');
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
+    <div className={`bg-white border border-gray-200 rounded-lg p-6 ${readOnly ? 'opacity-90' : ''}`}>
       {/* Header */}
       <div className="flex items-center space-x-3 mb-6">
         <FileText className="w-6 h-6 text-blue-600" />
@@ -271,6 +275,7 @@ export const DocumentationCheckComponent: React.FC<DocumentationCheckProps> = ({
                         value={status}
                         checked={item.status === status}
                         onChange={() => handleStatusChange(item.id, status)}
+                        disabled={readOnly || saving || loading}
                         className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
                       />
                       <span className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(status)}`}>
@@ -373,23 +378,27 @@ export const DocumentationCheckComponent: React.FC<DocumentationCheckProps> = ({
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-        >
-          {saving ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Сохранение...
-            </>
-          ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              Сохранить проверку
-            </>
-          )}
-        </button>
+        {readOnly ? (
+          <div className="text-sm text-gray-500">Режим просмотра</div>
+        ) : (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+          >
+            {saving ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Сохранение...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Сохранить проверку
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

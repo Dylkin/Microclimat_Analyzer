@@ -39,7 +39,16 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       rawHeaders: req.rawHeaders
     });
     
-    if (!userId) {
+    const normalizedUserId = (() => {
+      if (!userId) return '';
+      if (Array.isArray(userId)) return (userId[0] || '').toString().trim();
+      const s = userId.toString();
+      // Если заголовок продублирован разным регистром (x-user-id и X-User-Id),
+      // Node/Express может склеить значения через запятую.
+      return (s.split(',')[0] || '').trim();
+    })();
+
+    if (!normalizedUserId) {
       // Логируем все заголовки для отладки
       const allHeaders: Record<string, any> = {};
       Object.keys(req.headers).forEach(key => {
@@ -79,18 +88,18 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     // Проверяем существование пользователя в БД
     const userResult = await pool.query(
       'SELECT id, full_name, email, role FROM users WHERE id = $1',
-      [userId]
+      [normalizedUserId]
     );
     
     if (userResult.rows.length === 0) {
       console.error('Ошибка авторизации: пользователь не найден в БД', {
-        userId,
+        userId: normalizedUserId,
         method: req.method,
         path: req.path
       });
       return res.status(401).json({ 
         error: 'Не авторизован',
-        details: `Пользователь с ID ${userId} не найден в базе данных. Пожалуйста, войдите в систему заново.`
+        details: `Пользователь с ID ${normalizedUserId} не найден в базе данных. Пожалуйста, войдите в систему заново.`
       });
     }
     

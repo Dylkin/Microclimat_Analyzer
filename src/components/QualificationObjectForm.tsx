@@ -21,6 +21,7 @@ interface QualificationObjectFormProps {
   onPageChange?: (page: string, data?: any) => void;
   mode?: 'view' | 'edit' | 'create'; // Добавляем режим работы
   hideWorkSchedule?: boolean; // Скрыть блок "План график проведения квалификационных работ" и все его подблоки
+  showCloseButtonInView?: boolean; // Показывать кнопку "Закрыть" в режиме просмотра
 }
 
 const getTypeIcon = (type: QualificationObjectType) => {
@@ -28,6 +29,7 @@ const getTypeIcon = (type: QualificationObjectType) => {
     case 'помещение':
       return <Building className="w-5 h-5" />;
     case 'автомобиль':
+    case 'ОМ':
       return <Car className="w-5 h-5" />;
     case 'холодильная_камера':
       return <Refrigerator className="w-5 h-5" />;
@@ -50,7 +52,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   project,
   onPageChange,
   mode = 'create',
-  hideWorkSchedule = false
+  hideWorkSchedule = false,
+  showCloseButtonInView = true
 }) => {
   // Все хуки должны быть вызваны до любых условных возвратов
   console.log('QualificationObjectForm получил projectId:', projectId);
@@ -188,6 +191,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   const renderTypeSpecificFields = () => {
     switch (formData.type) {
       case 'автомобиль':
+      case 'ОМ':
         return (
           <div className="space-y-4">
             {/* VIN номер */}
@@ -691,14 +695,16 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
 
         {/* Кнопки управления */}
         <div className="mt-6 flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <X className="w-4 h-4 mr-2" />
-            {mode === 'view' ? 'Закрыть' : 'Отмена'}
-          </button>
+          {(mode !== 'view' || showCloseButtonInView) && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              <X className="w-4 h-4 mr-2" />
+              {mode === 'view' ? 'Закрыть' : 'Отмена'}
+            </button>
+          )}
           {mode !== 'view' && (
             <button
               type="button"

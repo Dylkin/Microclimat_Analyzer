@@ -38,9 +38,16 @@ echo [INFO] Подключение к серверу и запуск update-prod
 echo.
 
 REM Подключаемся к серверу и запускаем скрипт обновления
-set SSH_PASSWORD=159357Stas
+set SSH_PASSWORD=
 set SSH_USER=stas
 set SSH_HOST_ONLY=192.168.98.42
+
+REM Если пароль не передан — запросим у пользователя
+if "%3"=="" (
+    set /p SSH_PASSWORD=Enter SSH/sudo password:
+) else (
+    set SSH_PASSWORD=%3
+)
 
 REM Используем plink с автоматическим принятием ключа хоста
 REM Для plink нужно указать fingerprint ключа хоста
@@ -52,9 +59,6 @@ if %ERRORLEVEL% EQU 0 (
 ) else (
     REM Используем обычный SSH (потребует ввода пароля вручную)
     echo [INFO] plink не найден, используем обычный SSH
-    echo [INFO] Пароль для SSH: %SSH_PASSWORD%
-    echo [INFO] Пароль для sudo: %SSH_PASSWORD%
-    echo.
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL %SSH_HOST% "cd %PROJECT_DIR% && echo '%SSH_PASSWORD%' | sudo -S bash update-prod.sh"
 )
 

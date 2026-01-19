@@ -114,6 +114,7 @@ const CreatingReport: React.FC<CreatingReportProps> = ({ project, onBack, onPage
         projectQualificationObjects={project.qualificationObjects}
         qualificationProtocols={qualificationProtocols}
         onPageChange={onPageChange}
+        contextPage="creating_report"
       />
     </div>
   );

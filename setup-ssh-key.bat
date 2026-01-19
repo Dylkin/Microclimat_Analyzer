@@ -7,7 +7,7 @@ REM ================================
 setlocal enabledelayedexpansion
 
 set SSH_HOST=stas@192.168.98.42
-set SSH_PASSWORD=159357Stas
+set SSH_PASSWORD=
 
 echo.
 echo ========================================
@@ -17,9 +17,12 @@ echo.
 echo [INFO] Это создаст SSH ключ для автоматической аутентификации
 echo [INFO] Сервер: %SSH_HOST%
 echo.
-echo [INFO] При запросе пароля SSH введите: %SSH_PASSWORD%
-echo [INFO] При запросе пароля для sudo на сервере введите: %SSH_PASSWORD%
+echo [INFO] При запросе пароля SSH/sudo введите свой пароль
 echo.
+
+if "%SSH_PASSWORD%"=="" (
+    set /p SSH_PASSWORD=Enter SSH/sudo password (will be used in prompts only):
+)
 
 REM Проверяем наличие SSH ключа
 if exist "%USERPROFILE%\.ssh\id_rsa" (

@@ -4,6 +4,7 @@
 export const objectTypeMapping: { [key: string]: string } = {
   'помещение': 'room',
   'автомобиль': 'vehicle',
+  'ОМ': 'om',
   'холодильник': 'refrigerator',
   'морозильник': 'freezer',
   'холодильная_камера': 'cold_chamber'
@@ -13,6 +14,7 @@ export const objectTypeMapping: { [key: string]: string } = {
 export const reverseObjectTypeMapping: { [key: string]: string } = {
   'room': 'помещение',
   'vehicle': 'автомобиль',
+  'om': 'ОМ',
   'refrigerator': 'холодильник',
   'freezer': 'морозильник',
   'cold_chamber': 'холодильная_камера'
@@ -51,6 +53,7 @@ export function getObjectTypeDisplayName(objectType: string): string {
   const displayNames: { [key: string]: string } = {
     'помещение': 'Помещение',
     'автомобиль': 'Автомобиль',
+    'ОМ': 'ОМ',
     'холодильник': 'Холодильник',
     'морозильник': 'Морозильник',
     'холодильная_камера': 'Холодильная камера'

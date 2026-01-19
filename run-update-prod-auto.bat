@@ -9,12 +9,16 @@ setlocal enabledelayedexpansion
 REM Параметры подключения
 set SSH_HOST=stas@192.168.98.42
 set PROJECT_DIR=/home/stas/Microclimat_Analyzer
-set SSH_PASSWORD=159357Stas
+set SSH_PASSWORD=
 
 REM Можно передать параметры
 if not "%1"=="" set SSH_HOST=%1
 if not "%2"=="" set PROJECT_DIR=%2
 if not "%3"=="" set SSH_PASSWORD=%3
+
+if "%SSH_PASSWORD%"=="" (
+    set /p SSH_PASSWORD=Enter SSH/sudo password:
+)
 
 echo.
 echo ========================================
@@ -82,7 +86,7 @@ if %EXIT_CODE% NEQ 0 (
     ) else (
         REM Используем обычный SSH (потребует ввода пароля вручную)
         echo [WARNING] Автоматическая передача пароля не доступна
-        echo [INFO] Введите пароль при запросе: %SSH_PASSWORD%
+        echo [INFO] Введите пароль при запросе
         echo.
         ssh %SSH_HOST% "cd %PROJECT_DIR% && echo '%SSH_PASSWORD%' | sudo -S sh ./update-prod.sh"
         set EXIT_CODE=%ERRORLEVEL%

@@ -45,6 +45,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
       case 'помещение':
         return <Building className="w-4 h-4 text-blue-600" />;
       case 'автомобиль':
+      case 'ОМ':
         return <Car className="w-4 h-4 text-green-600" />;
       case 'холодильная_камера':
         return <Refrigerator className="w-4 h-4 text-cyan-600" />;
@@ -69,6 +70,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
           </div>
         );
       case 'автомобиль':
+      case 'ОМ':
         return (
           <div className="text-sm text-gray-600">
             {obj.vin && <div>🔢 VIN: {obj.vin}</div>}
@@ -139,6 +141,9 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                    №
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Тип
                   </th>
@@ -157,9 +162,12 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {objects.map((obj) => (
+                {objects.map((obj, index) => (
                   <React.Fragment key={obj.id}>
                     <tr className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {index + 1}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-2">
                           {getTypeIcon(obj.type)}
@@ -247,7 +255,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                     {/* Форма редактирования под объектом */}
                     {editingQualificationObject && editingQualificationObject.id === obj.id && (
                       <tr>
-                        <td colSpan={5} className="px-6 py-6 bg-gray-50">
+                        <td colSpan={6} className="px-6 py-6 bg-gray-50">
                           <div className="max-w-3xl mx-auto">
                             <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
                               <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
@@ -285,7 +293,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                     {/* Форма просмотра под объектом */}
                     {viewingQualificationObject && viewingQualificationObject.id === obj.id && (
                       <tr>
-                        <td colSpan={5} className="px-6 py-6 bg-gray-50">
+                        <td colSpan={6} className="px-6 py-6 bg-gray-50">
                           <div className="max-w-3xl mx-auto">
                             <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
                               <div className="flex items-center justify-between mb-4">

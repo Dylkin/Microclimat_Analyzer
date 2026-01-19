@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, Building2, CheckCircle, Clock, AlertCircle, Play, FileText, AlertTriangle, Calendar, Printer, Eye } from 'lucide-react';
+import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, Building2, CheckCircle, Clock, AlertCircle, Play, FileText, AlertTriangle, Calendar, Printer, Eye, ArrowUp, ArrowDown } from 'lucide-react';
 import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, ProjectType, ProjectTypeLabels } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
@@ -27,6 +27,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [createdAtSortDirection, setCreatedAtSortDirection] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [operationLoading, setOperationLoading] = useState(false);
@@ -57,6 +58,21 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     qualificationObjectIds: []
   });
 
+  const getCreatedAtMs = (p: Project): number => {
+    const v: any = (p as any).createdAt;
+    if (!v) return 0;
+    if (v instanceof Date) return v.getTime();
+    const t = new Date(v).getTime();
+    return Number.isFinite(t) ? t : 0;
+  };
+
+  const sortProjectsByCreatedAt = (items: Project[], direction: 'asc' | 'desc') => {
+    const sorted = [...items].sort((a, b) => getCreatedAtMs(a) - getCreatedAtMs(b));
+    return direction === 'asc' ? sorted : sorted.reverse();
+  };
+
+  const qualificationContractors = contractors.filter((c) => (c.role || []).includes('buyer'));
+
   // Загрузка данных
   const loadData = async () => {
     setLoading(true);
@@ -66,14 +82,11 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       // Загружаем проекты
       try {
         const projectsData = await projectService.getAllProjects();
-        // Сортируем проекты по дате создания (от более ранних к более поздним)
-        const sortedProjects = [...projectsData].sort((a, b) => {
-          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return dateA - dateB;
-        });
-        setProjects(sortedProjects);
-        setFilteredProjects(sortedProjects);
+        // При открытии страницы по умолчанию: сначала более поздние → затем более ранние
+        const sortedOnLoad = sortProjectsByCreatedAt(projectsData, 'desc');
+        setCreatedAtSortDirection('desc');
+        setProjects(sortedOnLoad);
+        setFilteredProjects(sortedOnLoad);
       } catch (projectError) {
         console.error('Ошибка загрузки проектов:', projectError);
         throw new Error(`Ошибка загрузки проектов: ${projectError instanceof Error ? projectError.message : 'Неизвестная ошибка'}`);
@@ -142,15 +155,8 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       });
     }
 
-    // Сортируем по дате создания (от более ранних к более поздним)
-    const sortedFiltered = [...filtered].sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateA - dateB;
-    });
-
-    setFilteredProjects(sortedFiltered);
-  }, [searchTerm, projects]);
+    setFilteredProjects(sortProjectsByCreatedAt(filtered, createdAtSortDirection));
+  }, [searchTerm, projects, createdAtSortDirection]);
 
   // Получение объектов квалификации для выбранного контрагента
   const getQualificationObjectsForContractor = (contractorId: string) => {
@@ -195,6 +201,11 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     if (!selectedContractor) {
       console.error('Контрагент не найден в списке:', trimmedContractorId);
       alert('Ошибка: выбранный контрагент не найден. Обновите страницу и попробуйте снова.');
+      return;
+    }
+
+    if (newProject.type === 'qualification' && !(selectedContractor.role || []).includes('buyer')) {
+      alert('Для проекта квалификации можно выбрать только контрагента с ролью "Покупатель".');
       return;
     }
     
@@ -557,7 +568,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 aria-label="Выберите контрагента"
               >
                 <option value="">Выберите контрагента</option>
-                {contractors.map(contractor => (
+                {qualificationContractors.map(contractor => (
                   <option key={contractor.id} value={contractor.id}>
                     {contractor.name}
                   </option>
@@ -670,10 +681,26 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <div className="flex items-center space-x-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCreatedAtSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+                      }
+                      className="flex items-center space-x-1 hover:text-gray-700"
+                      title={
+                        createdAtSortDirection === 'asc'
+                          ? 'Сортировка: сначала ранние (нажмите для смены)'
+                          : 'Сортировка: сначала поздние (нажмите для смены)'
+                      }
+                    >
                       <Calendar className="w-4 h-4" />
                       <span>Дата создания</span>
-                    </div>
+                      {createdAtSortDirection === 'asc' ? (
+                        <ArrowUp className="w-4 h-4" />
+                      ) : (
+                        <ArrowDown className="w-4 h-4" />
+                      )}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Проект

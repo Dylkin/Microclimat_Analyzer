@@ -16,7 +16,7 @@ pm2 delete all
 
 ### Через SSH из PowerShell (полная остановка)
 ```powershell
-ssh -o StrictHostKeyChecking=no stas@192.168.98.42 "cd /home/stas/Microclimat_Analyzer; pm2 delete all; echo '159357Stas' | sudo -S pm2 -u root delete all 2>/dev/null; echo '159357Stas' | sudo -S killall -9 node tsx 2>/dev/null; echo '159357Stas' | sudo -S fuser -k 3001/tcp 2>/dev/null; echo '159357Stas' | sudo -S systemctl stop nginx"
+ssh -o StrictHostKeyChecking=no stas@192.168.98.42 "cd /home/stas/Microclimat_Analyzer; pm2 delete all; echo '<SUDO_PASSWORD>' | sudo -S pm2 -u root delete all 2>/dev/null; echo '<SUDO_PASSWORD>' | sudo -S killall -9 node tsx 2>/dev/null; echo '<SUDO_PASSWORD>' | sudo -S fuser -k 3001/tcp 2>/dev/null; echo '<SUDO_PASSWORD>' | sudo -S systemctl stop nginx"
 ```
 
 ### Пошаговая остановка
@@ -57,7 +57,7 @@ ps aux | grep -E 'node|tsx' | grep -v grep
 ## Остановка через PowerShell (одной командой - полная остановка)
 
 ```powershell
-ssh -o StrictHostKeyChecking=no stas@192.168.98.42 "cd /home/stas/Microclimat_Analyzer && pm2 delete all && echo '159357Stas' | sudo -S pm2 -u root delete all 2>/dev/null && echo '159357Stas' | sudo -S pm2 -u root kill 2>/dev/null && echo '159357Stas' | sudo -S killall -9 node tsx 2>/dev/null && echo '159357Stas' | sudo -S fuser -k 3001/tcp 2>/dev/null && echo '159357Stas' | sudo -S systemctl stop nginx && sleep 2 && echo '=== Проверка ===' && pm2 status && echo '159357Stas' | sudo -S netstat -tulpn 2>/dev/null | grep -E ':80|:443|:3001' || echo 'Все порты свободны'"
+ssh -o StrictHostKeyChecking=no stas@192.168.98.42 "cd /home/stas/Microclimat_Analyzer && pm2 delete all && echo '<SUDO_PASSWORD>' | sudo -S pm2 -u root delete all 2>/dev/null && echo '<SUDO_PASSWORD>' | sudo -S pm2 -u root kill 2>/dev/null && echo '<SUDO_PASSWORD>' | sudo -S killall -9 node tsx 2>/dev/null && echo '<SUDO_PASSWORD>' | sudo -S fuser -k 3001/tcp 2>/dev/null && echo '<SUDO_PASSWORD>' | sudo -S systemctl stop nginx && sleep 2 && echo '=== Проверка ===' && pm2 status && echo '<SUDO_PASSWORD>' | sudo -S netstat -tulpn 2>/dev/null | grep -E ':80|:443|:3001' || echo 'Все порты свободны'"
 ```
 
 > **Примечание:** Эта команда останавливает и PM2, и Nginx, поэтому фронтенд полностью станет недоступен.

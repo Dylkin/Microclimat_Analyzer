@@ -162,6 +162,8 @@ class QualificationObjectService {
     const typeMap: Record<string, string> = {
       'room': 'помещение',
       'vehicle': 'автомобиль',
+      'om': 'ОМ',
+      'OM': 'ОМ',
       'cold_chamber': 'холодильная_камера',
       'refrigerator': 'холодильник',
       'freezer': 'морозильник'
@@ -229,6 +231,7 @@ class QualificationObjectService {
       const typeMap: Record<string, string> = {
         'помещение': 'room',
         'автомобиль': 'vehicle',
+        'ОМ': 'om',
         'холодильная_камера': 'cold_chamber',
         'холодильник': 'refrigerator',
         'морозильник': 'freezer'

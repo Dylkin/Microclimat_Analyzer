@@ -9,7 +9,18 @@ import { QualificationObjectForm } from './QualificationObjectForm';
 import { QualificationObjectsTable } from './QualificationObjectsTable';
 import { Chip } from './ui/Chip';
 
-const ContractorDirectory: React.FC = () => {
+export type ContractorDirectoryFocusRequest = { contractorId: string; mode: 'edit' | 'view' };
+
+export interface ContractorDirectoryProps {
+  // Запрос от App: открыть контрагента и показать список объектов квалификации
+  focusQualificationObjects?: ContractorDirectoryFocusRequest | null;
+  onFocusQualificationObjectsHandled?: () => void;
+}
+
+const ContractorDirectory: React.FC<ContractorDirectoryProps> = ({
+  focusQualificationObjects = null,
+  onFocusQualificationObjectsHandled
+}) => {
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [filteredContractors, setFilteredContractors] = useState<Contractor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -204,9 +215,30 @@ const ContractorDirectory: React.FC = () => {
       }))
     });
     setEditingContractorData(contractor);
+    setShowAddQualificationForm(false);
+    setEditingQualificationObject(null);
+    setViewingQualificationObject(null);
     // Загружаем объекты квалификации для редактируемого контрагента
     loadQualificationObjects(contractor.id);
   };
+
+  // Если пришел запрос "вернуться к списку объектов квалификации" — открываем нужного контрагента
+  useEffect(() => {
+    if (!focusQualificationObjects?.contractorId) return;
+
+    const contractor = contractors.find((c) => c.id === focusQualificationObjects.contractorId);
+    if (!contractor) return;
+
+    if (focusQualificationObjects.mode === 'view') {
+      setViewingContractor(contractor);
+      setEditingContractorData(null);
+      loadQualificationObjects(contractor.id);
+    } else {
+      handleEditContractor(contractor);
+    }
+
+    onFocusQualificationObjectsHandled?.();
+  }, [focusQualificationObjects?.contractorId, focusQualificationObjects?.mode, contractors]);
 
   const handleSaveEdit = async () => {
     if (!editContractor.name.trim()) {
@@ -335,6 +367,9 @@ const ContractorDirectory: React.FC = () => {
   // Просмотр контрагента
   const handleViewContractor = (contractor: Contractor) => {
     setViewingContractor(contractor);
+    setShowAddQualificationForm(false);
+    setEditingQualificationObject(null);
+    setViewingQualificationObject(null);
     // Загружаем объекты квалификации для просматриваемого контрагента
     loadQualificationObjects(contractor.id);
   };
@@ -878,7 +913,11 @@ const ContractorDirectory: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900">Объекты квалификации</h3>
               <div className="flex space-x-3">
                 <button
-                  onClick={() => setShowAddQualificationForm(true)}
+                  onClick={() => {
+                    setShowAddQualificationForm(true);
+                    setEditingQualificationObject(null);
+                    setViewingQualificationObject(null);
+                  }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
                 >
                   <Plus className="w-4 h-4" />
@@ -893,6 +932,7 @@ const ContractorDirectory: React.FC = () => {
                     setQualificationSearchTerm('');
                     setShowAddQualificationForm(false);
                     setEditingQualificationObject(null);
+                    setViewingQualificationObject(null);
                   }}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
                 >
@@ -902,16 +942,25 @@ const ContractorDirectory: React.FC = () => {
               </div>
             </div>
 
-            {/* Add Qualification Object Form */}
-            {showAddQualificationForm && (
+            {/* Qualification Object Form (create / edit / view) */}
+            {(showAddQualificationForm || editingQualificationObject || viewingQualificationObject) && (
               <div className="mb-6">
                 <QualificationObjectForm
                   contractorId={editingContractorData.id}
                   contractorAddress={editingContractorData.address}
-                  onSubmit={handleSaveQualificationObject}
+                  initialData={editingQualificationObject || viewingQualificationObject || undefined}
+                  mode={viewingQualificationObject ? 'view' : editingQualificationObject ? 'edit' : 'create'}
+                  hideTypeSelection={!!editingQualificationObject || !!viewingQualificationObject}
+                  onSubmit={async (objectData) => {
+                    if (viewingQualificationObject) {
+                      throw new Error('Редактирование недоступно в режиме просмотра');
+                    }
+                    return await handleSaveQualificationObject(objectData);
+                  }}
                   onCancel={() => {
                     setShowAddQualificationForm(false);
                     setEditingQualificationObject(null);
+                    setViewingQualificationObject(null);
                   }}
                   onPageChange={(page, data) => {
                     console.log('ContractorDirectory: Переход на страницу', page, data);
@@ -925,10 +974,20 @@ const ContractorDirectory: React.FC = () => {
             {/* Qualification Objects Table */}
             <QualificationObjectsTable
               objects={filteredQualificationObjects}
-              onAdd={() => setShowAddQualificationForm(true)}
+              onAdd={() => {
+                setShowAddQualificationForm(true);
+                setEditingQualificationObject(null);
+                setViewingQualificationObject(null);
+              }}
+              onView={(obj) => {
+                setViewingQualificationObject(obj);
+                setEditingQualificationObject(null);
+                setShowAddQualificationForm(false);
+              }}
               onEdit={(obj) => {
-                console.log('Setting editing qualification object:', obj);
                 setEditingQualificationObject(obj);
+                setViewingQualificationObject(null);
+                setShowAddQualificationForm(false);
               }}
               onDelete={handleDeleteQualificationObject}
               onShowOnMap={(obj) => {
@@ -936,12 +995,6 @@ const ContractorDirectory: React.FC = () => {
               }}
               loading={loading}
               hideAddButton={true}
-              editingQualificationObject={editingQualificationObject}
-              onSaveQualificationObject={async (objectData) => {
-                console.log('Saving qualification object:', objectData);
-                return await handleSaveQualificationObject(objectData);
-              }}
-              onCancelQualificationObjectEdit={() => setEditingQualificationObject(null)}
               contractorId={editingContractorData.id}
               contractorAddress={editingContractorData.address}
             />
@@ -1045,6 +1098,27 @@ const ContractorDirectory: React.FC = () => {
           {!(viewingContractor.role && viewingContractor.role.includes('supplier') && !viewingContractor.role.includes('buyer')) && (
             <div className="border-t border-gray-200 pt-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Объекты квалификации</h3>
+
+              {/* Qualification Object View Form */}
+              {viewingQualificationObject && (
+                <div className="mb-6">
+                  <QualificationObjectForm
+                    contractorId={viewingContractor.id}
+                    contractorAddress={viewingContractor.address}
+                    initialData={viewingQualificationObject}
+                    mode="view"
+                    hideTypeSelection={true}
+                    onSubmit={async () => {
+                      throw new Error('Редактирование недоступно в режиме просмотра');
+                    }}
+                    onCancel={() => setViewingQualificationObject(null)}
+                    onPageChange={(page, data) => {
+                      console.log('ContractorDirectory: Переход на страницу', page, data);
+                      alert('Функция анализа данных доступна только в разделе "Управление проектами".\n\nДля анализа данных:\n1. Перейдите в "Управление проектами"\n2. Выберите проект\n3. Откройте объект квалификации\n4. Нажмите "Анализ данных"');
+                    }}
+                  />
+                </div>
+              )}
               
               <QualificationObjectsTable
                 objects={filteredQualificationObjects}
@@ -1059,10 +1133,6 @@ const ContractorDirectory: React.FC = () => {
                 viewMode={true}
                 onView={(obj) => {
                   setViewingQualificationObject(obj);
-                }}
-                viewingQualificationObject={viewingQualificationObject}
-                onCancelQualificationObjectView={() => {
-                  setViewingQualificationObject(null);
                 }}
                 contractorId={viewingContractor?.id}
                 contractorAddress={viewingContractor?.address}

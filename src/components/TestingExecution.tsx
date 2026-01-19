@@ -116,6 +116,7 @@ const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onBack, on
         projectQualificationObjects={project.qualificationObjects}
         qualificationProtocols={qualificationProtocols}
         onPageChange={onPageChange}
+        contextPage="testing_execution"
         showExecuteButton={true}
       />
     </div>

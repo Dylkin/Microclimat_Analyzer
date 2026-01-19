@@ -1,6 +1,7 @@
 export type QualificationObjectType = 
   | 'помещение'
   | 'автомобиль' 
+  | 'ОМ'
   | 'холодильная_камера'
   | 'холодильник'
   | 'морозильник';
@@ -8,6 +9,7 @@ export type QualificationObjectType =
 export const QualificationObjectTypeLabels: Record<QualificationObjectType, string> = {
   'помещение': 'Помещение',
   'автомобиль': 'Автомобиль',
+  'ОМ': 'ОМ',
   'холодильная_камера': 'Холодильная камера',
   'холодильник': 'Холодильник',
   'морозильник': 'Морозильник'

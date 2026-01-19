@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Building, Car, Refrigerator, Snowflake, CheckSquare, Square, FileText, ExternalLink, MoreVertical, Eye, Edit2, Play, BarChart3 } from 'lucide-react';
+import { Building, Car, Refrigerator, Snowflake, CheckSquare, Square, FileText, ExternalLink, MoreVertical, Eye, Play, BarChart3 } from 'lucide-react';
 import { QualificationObject, QualificationObjectTypeLabels } from '../../types/QualificationObject';
 import { qualificationObjectService } from '../../utils/qualificationObjectService';
 import { QualificationProtocolWithDocument } from '../../utils/qualificationProtocolService';
 import { QualificationObjectForm } from '../QualificationObjectForm';
 import { objectTypeMapping } from '../../utils/objectTypeMapping';
+import { projectService } from '../../utils/projectService';
 // import { QualificationObjectsTable } from '../QualificationObjectsTable';
 
 interface QualificationObjectsCRUDProps {
@@ -25,6 +26,7 @@ interface QualificationObjectsCRUDProps {
   onPageChange?: (page: string, data?: any) => void;
   onQualificationObjectStateChange?: (isOpen: boolean) => void;
   showExecuteButton?: boolean; // Показывать кнопку "Выполнить" для страницы "Проведение испытаний"
+  contextPage?: string; // Для диагностики/контекстного поведения
 }
 
 export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> = ({ 
@@ -37,7 +39,8 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   isCheckboxesBlocked = false,
   onPageChange,
   onQualificationObjectStateChange,
-  showExecuteButton = false
+  showExecuteButton = false,
+  contextPage
 }) => {
   const [objects, setObjects] = useState<QualificationObject[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,12 +52,12 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   // const [showForm, setShowForm] = useState(false);
   const [selectedObjects, setSelectedObjects] = useState<Set<string>>(new Set());
 
-  // Отладочная информация для isCheckboxesBlocked (только при изменении ключевых значений)
-  useEffect(() => {
-    console.log('🔒 QualificationObjectsCRUD received isCheckboxesBlocked:', isCheckboxesBlocked);
-    console.log('🔒 QualificationObjectsCRUD - projectId:', projectId);
-    console.log('🔒 QualificationObjectsCRUD - objects count:', objects.length);
-  }, [isCheckboxesBlocked, projectId, objects.length]);
+  const canShowDataAnalysisIcon = Boolean(onPageChange && project);
+  const showDataAnalysisIcon = canShowDataAnalysisIcon && contextPage !== 'contract_negotiation';
+  const projectSelectedCount = projectQualificationObjects.length;
+  const filterToProjectSelection =
+    contextPage === 'testing_execution' || contextPage === 'creating_report';
+  const showSelectionColumn = !filterToProjectSelection;
 
   // Отслеживание изменений состояния объекта квалификации
   useEffect(() => {
@@ -74,11 +77,6 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
       // Объекты квалификации имеют type в русском формате (помещение, автомобиль, etc.)
       // Сравниваем оба варианта для совместимости
       return protocol.objectType === englishType || protocol.objectType === objectType;
-    });
-    
-    console.log('QualificationObjectsCRUD: Протоколы для типа', objectType, '(англ:', englishType, '):', {
-      allProtocols: qualificationProtocols.map(p => ({ id: p.id, objectType: p.objectType })),
-      filtered: filtered.map(p => ({ id: p.id, objectType: p.objectType, hasDocument: !!p.document }))
     });
     
     return filtered;
@@ -110,12 +108,46 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
     return projectQualificationObjects.map(pqo => pqo.qualificationObjectId).sort().join(',');
   }, [projectQualificationObjects]);
 
+  const projectQualificationObjectIdSet = useMemo(() => {
+    return new Set(projectQualificationObjects.map((pqo) => pqo.qualificationObjectId));
+  }, [projectQualificationObjectIds, projectQualificationObjects]);
+
+  const displayedObjects = useMemo(() => {
+    if (!filterToProjectSelection) return objects;
+    return objects.filter((o) => projectQualificationObjectIdSet.has(o.id));
+  }, [filterToProjectSelection, objects, projectQualificationObjectIdSet]);
+
   useEffect(() => {
     if (projectQualificationObjects.length > 0) {
       const selectedIds = new Set(projectQualificationObjects.map(pqo => pqo.qualificationObjectId));
       setSelectedObjects(selectedIds);
     }
   }, [projectQualificationObjectIds, projectQualificationObjects]);
+
+  const selectedObjectIdsKey = useMemo(() => {
+    return Array.from(selectedObjects).sort().join(',');
+  }, [selectedObjects]);
+
+  useEffect(() => {
+    // Сохраняем выбранные объекты в проект только на странице "Согласование договора"
+    if (contextPage !== 'contract_negotiation') return;
+    if (!projectId) return;
+    if (isCheckboxesBlocked) return;
+
+    const selectedIdsSorted = selectedObjectIdsKey;
+    // Если выбранные ID совпадают с тем, что уже пришло из проекта — ничего не делаем
+    if (selectedIdsSorted === projectQualificationObjectIds) return;
+
+    (async () => {
+      try {
+        await projectService.updateProject(projectId, {
+          qualificationObjectIds: Array.from(selectedObjects),
+        });
+      } catch {
+        // ignore
+      }
+    })();
+  }, [contextPage, projectId, isCheckboxesBlocked, selectedObjectIdsKey, projectQualificationObjectIds]);
 
   // Создание нового объекта
   // const handleCreate = async (object: QualificationObject) => {
@@ -184,10 +216,10 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
       return;
     }
     
-    if (selectedObjects.size === objects.length) {
+    if (selectedObjects.size === displayedObjects.length) {
       setSelectedObjects(new Set());
     } else {
-      setSelectedObjects(new Set(objects.map(obj => obj.id)));
+      setSelectedObjects(new Set(displayedObjects.map(obj => obj.id)));
     }
   };
 
@@ -246,6 +278,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
             project={project}
             onPageChange={onPageChange}
             mode={viewingObject ? 'view' : (objectMode || 'edit')}
+            showCloseButtonInView={false}
             hideWorkSchedule={!showExecuteButton}
           />
         </div>
@@ -295,30 +328,32 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="text-gray-600 mt-2">Загрузка объектов...</p>
         </div>
-      ) : objects.length > 0 ? (
+      ) : displayedObjects.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <button
-                    onClick={handleSelectAll}
-                    disabled={isCheckboxesBlocked}
-                    className={`flex items-center space-x-2 ${
-                      isCheckboxesBlocked 
-                        ? 'cursor-not-allowed opacity-50' 
-                        : 'hover:text-gray-700'
-                    }`}
-                    title={isCheckboxesBlocked ? 'Выбор объектов заблокирован после согласования договора' : ''}
-                  >
-                    {selectedObjects.size === objects.length ? (
-                      <CheckSquare className={`w-4 h-4 ${isCheckboxesBlocked ? 'text-gray-400' : 'text-indigo-600'}`} />
-                    ) : (
-                      <Square className="w-4 h-4 text-gray-400" />
-                    )}
-                    <span>Выбрать все</span>
-                  </button>
-                </th>
+                {showSelectionColumn && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <button
+                      onClick={handleSelectAll}
+                      disabled={isCheckboxesBlocked}
+                      className={`flex items-center space-x-2 ${
+                        isCheckboxesBlocked 
+                          ? 'cursor-not-allowed opacity-50' 
+                          : 'hover:text-gray-700'
+                      }`}
+                      title={isCheckboxesBlocked ? 'Выбор объектов заблокирован после согласования договора' : ''}
+                    >
+                      {selectedObjects.size === displayedObjects.length ? (
+                        <CheckSquare className={`w-4 h-4 ${isCheckboxesBlocked ? 'text-gray-400' : 'text-indigo-600'}`} />
+                      ) : (
+                        <Square className="w-4 h-4 text-gray-400" />
+                      )}
+                      <span>Выбрать все</span>
+                    </button>
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Тип
                 </th>
@@ -337,34 +372,36 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {objects.map((obj) => (
+              {displayedObjects.map((obj) => (
                 <tr key={obj.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {isCheckboxesBlocked ? (
-                      <div className="flex items-center space-x-2">
-                        {selectedObjects.has(obj.id) ? (
-                          <CheckSquare className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <Square className="w-4 h-4 text-gray-400" />
-                        )}
-                        <span className="text-sm text-gray-500">
-                          {selectedObjects.has(obj.id) ? 'Выбран' : 'Не выбран'}
-                        </span>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleObjectSelect(obj.id)}
-                        className="flex items-center space-x-2 hover:text-gray-700"
-                        title="Выбрать объект"
-                      >
-                        {selectedObjects.has(obj.id) ? (
-                          <CheckSquare className="w-4 h-4 text-indigo-600" />
-                        ) : (
-                          <Square className="w-4 h-4 text-gray-400" />
-                        )}
-                      </button>
-                    )}
-                  </td>
+                  {showSelectionColumn && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {isCheckboxesBlocked ? (
+                        <div className="flex items-center space-x-2">
+                          {selectedObjects.has(obj.id) ? (
+                            <CheckSquare className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-gray-400" />
+                          )}
+                          <span className="text-sm text-gray-500">
+                            {selectedObjects.has(obj.id) ? 'Выбран' : 'Не выбран'}
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleObjectSelect(obj.id)}
+                          className="flex items-center space-x-2 hover:text-gray-700"
+                          title="Выбрать объект"
+                        >
+                          {selectedObjects.has(obj.id) ? (
+                            <CheckSquare className="w-4 h-4 text-indigo-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+                      )}
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
                       {getTypeIcon(obj.type)}
@@ -389,10 +426,10 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                           {obj.address && <div>Адрес: {obj.address}</div>}
                         </div>
                       )}
-                      {obj.type === 'автомобиль' && (
+                      {(obj.type === 'автомобиль' || obj.type === 'ОМ') && (
                         <div>
                           <div>VIN: {obj.vin || 'Не указан'}</div>
-                          <div>Производитель: {obj.manufacturer || 'Не указан'}</div>
+                          <div>Регистрационный номер: {obj.registrationNumber || 'Не указан'}</div>
                         </div>
                       )}
                       {(obj.type === 'холодильник' || obj.type === 'морозильник' || obj.type === 'холодильная_камера') && (
@@ -485,11 +522,11 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                           onClick={async () => {
                             try {
                               setLoadingObject(true);
-                              // Загружаем полные данные объекта из API перед открытием в режиме просмотра
+                              // Загружаем полные данные объекта из API перед открытием в режиме редактирования (Выполнить)
                               const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id);
-                              setViewingObject(fullObject);
-                              setEditingObject(null); // Очищаем редактирование, если было открыто
-                              setObjectMode('view'); // Режим просмотра
+                              setEditingObject(fullObject);
+                              setViewingObject(null);
+                              setObjectMode('edit');
                             } catch (error) {
                               console.error('Ошибка загрузки объекта квалификации:', error);
                               alert(`Ошибка загрузки объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -512,37 +549,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                           )}
                         </button>
                       )}
-                      <button
-                        onClick={async () => {
-                          try {
-                            setLoadingObject(true);
-                            // Загружаем полные данные объекта из API перед открытием редактирования
-                            const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id);
-                            setEditingObject(fullObject);
-                            setViewingObject(null); // Очищаем просмотр, если было открыто
-                            setObjectMode('edit');
-                          } catch (error) {
-                            console.error('Ошибка загрузки объекта квалификации:', error);
-                            alert(`Ошибка загрузки объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-                          } finally {
-                            setLoadingObject(false);
-                          }
-                        }}
-                        disabled={loadingObject}
-                        className={`${
-                          loadingObject
-                            ? 'opacity-50 cursor-wait'
-                            : 'text-indigo-600 hover:text-indigo-900'
-                        }`}
-                        title={loadingObject ? 'Загрузка...' : 'Редактировать объект квалификации'}
-                      >
-                        {loadingObject ? (
-                          <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Edit2 className="w-4 h-4" />
-                        )}
-                      </button>
-                      {onPageChange && project && (
+                      {showDataAnalysisIcon && (
                         <button
                           onClick={() => {
                             if (onPageChange && project) {

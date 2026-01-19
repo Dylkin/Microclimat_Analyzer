@@ -3,13 +3,18 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { MailSettingsPage } from './components/MailSettingsPage';
+import type { ContractorDirectoryProps, ContractorDirectoryFocusRequest } from './components/ContractorDirectory';
 import './index.css';
 
 // Lazy load components for code splitting
 const MicroclimatAnalyzer = lazy(() => import('./components/MicroclimatAnalyzer'));
 const Help = lazy(() => import('./components/Help'));
 const UserDirectory = lazy(() => import('./components/admin-panels').then(m => ({ default: m.UserDirectory })));
-const ContractorDirectory = lazy(() => import('./components/admin-panels').then(m => ({ default: m.ContractorDirectory })));
+const ContractorDirectory = lazy(() =>
+  import('./components/admin-panels').then((m) => ({
+    default: m.ContractorDirectory as React.ComponentType<ContractorDirectoryProps>
+  }))
+);
 const ProjectDirectory = lazy(() => import('./components/ProjectDirectory'));
 const EquipmentDirectory = lazy(() => import('./components/equipment-management').then(m => ({ default: m.EquipmentDirectory })));
 const ProductsPage = lazy(() => import('./components/ProductsPage'));
@@ -24,6 +29,7 @@ const ResetPassword = lazy(() => import('./components/ResetPassword'));
 const TenderSearch = lazy(() => import('./components/TenderSearch'));
 const QualificationObjectTypes = lazy(() => import('./components/QualificationObjectTypes'));
 const ReleasePage = lazy(() => import('./components/ReleasePage').then(m => ({ default: m.ReleasePage })));
+const QualificationObjectWindow = lazy(() => import('./components/QualificationObjectWindow').then(m => ({ default: m.QualificationObjectWindow })));
 
 // Loading component
 const LoadingSpinner: React.FC = () => (
@@ -38,13 +44,39 @@ const AppContent: React.FC = () => {
   const [showVisualization, setShowVisualization] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [pageData, setPageData] = useState<any>(null);
+  const [contractorFocusRequest, setContractorFocusRequest] =
+    useState<ContractorDirectoryFocusRequest | null>(null);
 
   // Проверяем, находимся ли мы на странице сброса пароля
   useEffect(() => {
     const path = window.location.pathname;
     if (path === '/reset-password') {
       setCurrentPage('reset-password');
+      return;
     }
+    // Окно просмотра/редактирования объекта квалификации
+    if (path === '/qualification-object') {
+      setCurrentPage('qualification-object-window');
+    }
+  }, []);
+
+  // Обработка сообщений из окна объекта квалификации (возврат к списку)
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || typeof event.data !== 'object') return;
+
+      if (event.data.type === 'focusQualificationObjectsList') {
+        const contractorId = event.data.contractorId as string | undefined;
+        const mode = (event.data.mode as 'edit' | 'view' | undefined) || 'edit';
+        if (!contractorId) return;
+        setCurrentPage('contractors');
+        setContractorFocusRequest({ contractorId, mode });
+      }
+    };
+
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
   }, []);
 
   React.useEffect(() => {
@@ -56,6 +88,15 @@ const AppContent: React.FC = () => {
     return (
       <Suspense fallback={<LoadingSpinner />}>
         <ResetPassword />
+      </Suspense>
+    );
+  }
+
+  // Страница-окно для просмотра/редактирования объекта квалификации
+  if (currentPage === 'qualification-object-window') {
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <QualificationObjectWindow />
       </Suspense>
     );
   }
@@ -82,6 +123,20 @@ const AppContent: React.FC = () => {
       const projectToSet = projectData.project || projectData;
       setSelectedProject(projectToSet);
       setPageData(projectData); // Сохраняем полные данные для доступа к analysisData
+
+      const shouldRefreshProject =
+        !!projectToSet?.id &&
+        ['contract_negotiation', 'testing_execution', 'creating_report', 'documents_submission'].includes(page);
+
+      if (shouldRefreshProject) {
+        const projectId = projectToSet.id;
+        import('./utils/projectService')
+          .then(({ projectService }) => projectService.getProjectById(projectId))
+          .then((fresh) => {
+            setSelectedProject(fresh);
+          })
+          .catch(() => {});
+      }
     } else {
       setSelectedProject(null);
       setPageData(null);
@@ -171,7 +226,14 @@ const AppContent: React.FC = () => {
       case 'audit_logs':
         return hasAccess('admin') ? wrapWithSuspense(<AuditLogs onBack={() => handlePageChange('projects')} />) : <div>Доступ запрещен</div>;
       case 'contractors':
-        return hasAccess('analyzer') ? wrapWithSuspense(<ContractorDirectory />) : <div>Доступ запрещен</div>;
+        return hasAccess('analyzer')
+          ? wrapWithSuspense(
+              <ContractorDirectory
+                focusQualificationObjects={contractorFocusRequest}
+                onFocusQualificationObjectsHandled={() => setContractorFocusRequest(null)}
+              />
+            )
+          : <div>Доступ запрещен</div>;
       case 'projects':
         return hasAccess('analyzer') ? wrapWithSuspense(<ProjectDirectory onPageChange={handlePageChange} />) : <div>Доступ запрещен</div>;
       case 'equipment':

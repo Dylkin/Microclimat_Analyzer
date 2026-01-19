@@ -9,12 +9,17 @@ setlocal enabledelayedexpansion
 REM Параметры подключения
 set SSH_HOST=stas@192.168.98.42
 set PROJECT_DIR=/home/stas/Microclimat_Analyzer
-set SSH_PASSWORD=159357Stas
+set SSH_PASSWORD=
 
 REM Можно передать параметры
 if not "%1"=="" set SSH_HOST=%1
 if not "%2"=="" set PROJECT_DIR=%2
 if not "%3"=="" set SSH_PASSWORD=%3
+
+REM Если пароль не передан — запросим у пользователя
+if "%SSH_PASSWORD%"=="" (
+    set /p SSH_PASSWORD=Enter SSH/sudo password:
+)
 
 echo.
 echo ========================================

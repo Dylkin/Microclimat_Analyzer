@@ -449,6 +449,7 @@ const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBa
         project={currentProject}
         projectQualificationObjects={currentProject.qualificationObjects}
         qualificationProtocols={qualificationProtocols}
+        contextPage="contract_negotiation"
         isCheckboxesBlocked={(() => {
           const contractDoc = documents.find(doc => doc.documentType === 'contract');
           if (!contractDoc) {

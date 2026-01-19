@@ -3,12 +3,22 @@
 
 $SSH_HOST = "stas@192.168.98.42"
 $PROJECT_DIR = "/home/stas/Microclimat_Analyzer"
-$SSH_PASSWORD = "159357Stas"
+$SSH_PASSWORD = ""
 
 # Parameters can be passed
 if ($args.Count -gt 0) { $SSH_HOST = $args[0] }
 if ($args.Count -gt 1) { $PROJECT_DIR = $args[1] }
 if ($args.Count -gt 2) { $SSH_PASSWORD = $args[2] }
+
+if ([string]::IsNullOrWhiteSpace($SSH_PASSWORD)) {
+    $secure = Read-Host "Enter SSH/sudo password" -AsSecureString
+    $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+    try {
+        $SSH_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+    }
+}
 
 Write-Host ""
 Write-Host "========================================"
@@ -51,8 +61,6 @@ if ($plinkPath) {
     } else {
         # Use regular SSH (will require manual password input)
         Write-Host "[WARNING] Automatic password transmission not available"
-        Write-Host "[INFO] SSH password: $SSH_PASSWORD"
-        Write-Host "[INFO] sudo password: $SSH_PASSWORD"
         Write-Host ""
         Write-Host "[INFO] You can install plink (PuTTY) for automatic password transmission:"
         Write-Host "       Download from: https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html"

@@ -506,8 +506,12 @@ router.post('/', requireAuth, async (req, res) => {
       ? 'INSERT INTO projects (name, description, type, contractor_id, contract_number, contract_date, tender_link, tender_date, status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, name, description, type, contractor_id, contract_number, contract_date, tender_link, tender_date, status, created_by, created_at, updated_at'
       : 'INSERT INTO projects (name, description, type, contractor_id, contract_number, contract_date, status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, name, description, type, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at';
     
-    // Начальный статус по умолчанию — "Подача документов"
-    const initialStatus = status || 'documents_submission';
+    // Начальный статус по умолчанию:
+    // - Квалификация: "Согласование договора"
+    // - Продажа: "Подача документов"
+    const normalizedType = type || 'qualification';
+    const initialStatus =
+      status || (normalizedType === 'qualification' ? 'contract_negotiation' : 'documents_submission');
     
     const insertValues = hasTenderFields
       ? [name, description || null, type || 'qualification', contractorId, contractNumber || null, contractDate || null, tenderLink || null, tenderDate || null, initialStatus, createdBy || null]
@@ -802,14 +806,24 @@ router.post('/', requireAuth, async (req, res) => {
 
 // PUT /api/projects/:id - Обновить проект
 router.put('/:id', requireAuth, async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
-    const { name, description, type, contractorId, contractNumber, contractDate, status } = req.body;
-    
+    const {
+      name,
+      description,
+      type,
+      contractorId,
+      contractNumber,
+      contractDate,
+      status,
+      qualificationObjectIds,
+    } = req.body;
+
     const updates: string[] = [];
     const values: any[] = [];
     let paramCount = 1;
-    
+
     if (name !== undefined) {
       updates.push(`name = $${paramCount++}`);
       values.push(name);
@@ -838,41 +852,158 @@ router.put('/:id', requireAuth, async (req, res) => {
       updates.push(`status = $${paramCount++}`);
       values.push(status);
     }
-    
-    if (updates.length === 0) {
+
+    const hasQualificationObjectIds = Array.isArray(qualificationObjectIds);
+    if (updates.length === 0 && !hasQualificationObjectIds) {
       return res.status(400).json({ error: 'Нет данных для обновления' });
     }
-    
-    updates.push(`updated_at = NOW()`);
-    values.push(id);
-    
-    const result = await pool.query(
-      `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramCount}
-       RETURNING id, name, description, type, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at`,
-      values
+
+    await client.query('BEGIN');
+
+    // Обновляем поля проекта, если они переданы
+    if (updates.length > 0) {
+      updates.push(`updated_at = NOW()`);
+      values.push(id);
+
+      const result = await client.query(
+        `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramCount}
+         RETURNING id, name, description, type, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at`,
+        values,
+      );
+
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Проект не найден' });
+      }
+    } else {
+      // Только обновление связей - проверяем, что проект существует
+      const exists = await client.query(`SELECT 1 FROM projects WHERE id = $1`, [id]);
+      if (exists.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Проект не найден' });
+      }
+    }
+
+    // Обновляем связи project_qualification_objects, если пришли qualificationObjectIds (включая пустой массив)
+    if (hasQualificationObjectIds) {
+      const tableCheck = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_schema = 'public'
+          AND table_name = 'project_qualification_objects'
+        ) as exists
+      `);
+
+      if (tableCheck.rows[0].exists) {
+        await client.query(`DELETE FROM project_qualification_objects WHERE project_id = $1`, [id]);
+
+        for (const objectId of qualificationObjectIds) {
+          await client.query(
+            `INSERT INTO project_qualification_objects (project_id, qualification_object_id)
+             VALUES ($1, $2)
+             ON CONFLICT (project_id, qualification_object_id) DO NOTHING`,
+            [id, objectId],
+          );
+        }
+      } else {
+        // Фолбэк на старую схему (qualification_objects.project_id)
+        await client.query(`UPDATE qualification_objects SET project_id = NULL WHERE project_id = $1`, [id]);
+        for (const objectId of qualificationObjectIds) {
+          await client.query(`UPDATE qualification_objects SET project_id = $1 WHERE id = $2`, [id, objectId]);
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+
+    // Возвращаем актуальный проект с выбранными объектами (как GET /projects/:id)
+    const tenderFieldsCheck = await pool.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'projects'
+      AND column_name IN ('tender_link', 'tender_date')
+    `);
+    const hasTenderFields = tenderFieldsCheck.rows.length > 0;
+
+    const selectFields = hasTenderFields
+      ? 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.tender_link, p.tender_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name'
+      : 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name';
+
+    const projectResult = await pool.query(
+      `
+      SELECT ${selectFields}
+      FROM projects p
+      LEFT JOIN contractors c ON p.contractor_id = c.id
+      WHERE p.id = $1
+      `,
+      [id],
     );
-    
-    if (result.rows.length === 0) {
+
+    if (projectResult.rows.length === 0) {
       return res.status(404).json({ error: 'Проект не найден' });
     }
-    
-    const project = result.rows[0];
+
+    const projectRow = projectResult.rows[0];
+
+    const relTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'project_qualification_objects'
+      ) as exists
+    `);
+
+    let objectsResult;
+    if (relTableCheck.rows[0].exists) {
+      objectsResult = await pool.query(
+        `
+        SELECT pqo.id, pqo.qualification_object_id, qo.name, qo.object_type
+        FROM project_qualification_objects pqo
+        JOIN qualification_objects qo ON pqo.qualification_object_id = qo.id
+        WHERE pqo.project_id = $1
+        `,
+        [id],
+      );
+    } else {
+      objectsResult = await pool.query(
+        `
+        SELECT id, name, object_type
+        FROM qualification_objects
+        WHERE project_id = $1
+        `,
+        [id],
+      );
+    }
+
     res.json({
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      type: project.type || 'qualification',
-      contractorId: project.contractor_id,
-      contractNumber: project.contract_number,
-      contractDate: project.contract_date ? new Date(project.contract_date) : undefined,
-      status: project.status,
-      createdBy: project.created_by,
-      createdAt: new Date(project.created_at),
-      updatedAt: new Date(project.updated_at)
+      id: projectRow.id,
+      name: projectRow.name,
+      description: projectRow.description,
+      type: projectRow.type || 'qualification',
+      contractorId: projectRow.contractor_id,
+      contractorName: projectRow.contractor_name,
+      contractNumber: projectRow.contract_number,
+      contractDate: projectRow.contract_date ? new Date(projectRow.contract_date) : undefined,
+      tenderLink: projectRow.tender_link || undefined,
+      tenderDate: projectRow.tender_date ? new Date(projectRow.tender_date) : undefined,
+      status: projectRow.status,
+      createdBy: projectRow.created_by,
+      createdAt: new Date(projectRow.created_at),
+      updatedAt: new Date(projectRow.updated_at),
+      qualificationObjects: objectsResult.rows.map((row: any) => ({
+        id: relTableCheck.rows[0].exists ? row.id : row.id,
+        qualificationObjectId: relTableCheck.rows[0].exists ? row.qualification_object_id : row.id,
+        name: row.name,
+        objectType: row.object_type,
+      })),
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error updating project:', error);
     res.status(500).json({ error: 'Ошибка обновления проекта' });
+  } finally {
+    client.release();
   }
 });
 

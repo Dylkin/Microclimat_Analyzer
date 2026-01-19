@@ -797,6 +797,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
   // Обработка загрузки документов
   const handleDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (mode === 'view') return;
     const files = Array.from(event.target.files || []);
     const validFiles = files.filter(file => {
       const isPdf = file.type === 'application/pdf';
@@ -814,6 +815,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
   // Удаление документа
   const removeDocument = (index: number) => {
+    if (mode === 'view') return;
     setTestDocuments(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -2339,6 +2341,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
           <DocumentationCheckComponent
             qualificationObjectId={qualificationObjectId}
             projectId={projectId}
+            readOnly={mode === 'view'}
             onSave={(check) => {
               console.log('Проверка документации сохранена:', check);
               setSuccess('Проверка документации сохранена');
@@ -2370,8 +2373,9 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                 multiple
                 accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp"
                 onChange={handleDocumentUpload}
+                disabled={mode === 'view'}
                 title="Выберите файлы для загрузки"
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 ${mode === 'view' ? 'cursor-not-allowed opacity-60' : ''}`}
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
@@ -2398,6 +2402,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                     <button
                       type="button"
                       onClick={() => removeDocument(index)}
+                      disabled={mode === 'view'}
                       className="text-red-600 hover:text-red-800 transition-colors"
                       title="Удалить файл"
                     >
