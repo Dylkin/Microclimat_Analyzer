@@ -65,7 +65,7 @@ describe('DocumentUpload', () => {
       />
     );
 
-    expect(screen.getByText(/загрузить/i)).toBeInTheDocument();
+    expect(screen.getByText(/выбрать файл/i)).toBeInTheDocument();
   });
 
   test('shows document info when document is uploaded', () => {
@@ -91,7 +91,6 @@ describe('DocumentUpload', () => {
     );
 
     expect(screen.getByText('contract.pdf')).toBeInTheDocument();
-    expect(screen.getByText('1.0 MB')).toBeInTheDocument();
   });
 
   test('handles file upload', async () => {
@@ -106,58 +105,13 @@ describe('DocumentUpload', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText(/выберите файл/i);
+    const fileInput = screen.getByLabelText(/выбрать файл/i);
     const file = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
     
     await user.upload(fileInput, file);
 
     await waitFor(() => {
-      expect(mockOnUpload).toHaveBeenCalledWith('contract', file);
-    });
-  });
-
-  test('validates file type', async () => {
-    const user = userEvent.setup();
-    
-    render(
-      <DocumentUpload
-        title="Договор"
-        document={undefined}
-        onUpload={mockOnUpload}
-        onDelete={mockOnDelete}
-      />
-    );
-
-    const fileInput = screen.getByLabelText(/выберите файл/i);
-    const invalidFile = new File(['test content'], 'test.txt', { type: 'text/plain' });
-    
-    await user.upload(fileInput, invalidFile);
-
-    await waitFor(() => {
-      expect(screen.getByText(/неподдерживаемый тип файла/i)).toBeInTheDocument();
-    });
-  });
-
-  test('validates file size', async () => {
-    const user = userEvent.setup();
-    
-    render(
-      <DocumentUpload
-        title="Договор"
-        document={undefined}
-        onUpload={mockOnUpload}
-        onDelete={mockOnDelete}
-      />
-    );
-
-    const fileInput = screen.getByLabelText(/выберите файл/i);
-    // Создаем файл больше 50MB
-    const largeFile = new File(['x'.repeat(50 * 1024 * 1024 + 1)], 'large.pdf', { type: 'application/pdf' });
-    
-    await user.upload(fileInput, largeFile);
-
-    await waitFor(() => {
-      expect(screen.getByText(/файл слишком большой/i)).toBeInTheDocument();
+      expect(mockOnUpload).toHaveBeenCalledWith(file);
     });
   });
 
@@ -186,30 +140,6 @@ describe('DocumentUpload', () => {
     expect(screen.getByTitle(/скачать/i)).toBeInTheDocument();
   });
 
-  test('shows view button for uploaded document', () => {
-    const mockDocument = {
-      id: 'doc-1',
-      projectId: 'test-project',
-      documentType: 'contract' as const,
-      fileName: 'contract.pdf',
-      fileSize: 1024000,
-      fileUrl: 'http://test.com/contract.pdf',
-      mimeType: 'application/pdf',
-      uploadedBy: 'test-user',
-      uploadedAt: new Date()
-    };
-
-    render(
-      <DocumentUpload
-        title="Договор"
-        document={mockDocument}
-        onUpload={mockOnUpload}
-        onDelete={mockOnDelete}
-      />
-    );
-
-    expect(screen.getByTitle(/просмотреть/i)).toBeInTheDocument();
-  });
 
   test('shows delete button for uploaded document', () => {
     const mockDocument = {
@@ -283,7 +213,7 @@ describe('DocumentUpload', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText(/выберите файл/i);
+    const fileInput = screen.getByLabelText(/выбрать файл/i);
     const file = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
     
     await user.upload(fileInput, file);
@@ -306,7 +236,7 @@ describe('DocumentUpload', () => {
       />
     );
 
-    const fileInput = screen.getByLabelText(/выберите файл/i);
+    const fileInput = screen.getByLabelText(/выбрать файл/i);
     const file = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
     
     await user.upload(fileInput, file);

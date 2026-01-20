@@ -1,45 +1,16 @@
 import { qualificationWorkScheduleService, QualificationWorkStage } from '../qualificationWorkScheduleService';
+import { apiClient } from '../apiClient';
+import { qualificationObjectService } from '../qualificationObjectService';
 
-// Mock для Supabase
-const mockSupabase = {
-  from: jest.fn(() => ({
-    select: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        order: jest.fn(() => Promise.resolve({ 
-          data: [], 
-          error: null 
-        }))
-      }))
-    })),
-    insert: jest.fn(() => ({
-      select: jest.fn(() => Promise.resolve({ 
-        data: [], 
-        error: null 
-      }))
-    })),
-    update: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        select: jest.fn(() => ({
-          single: jest.fn(() => Promise.resolve({ 
-            data: { id: 'test-id' }, 
-            error: null 
-          }))
-        }))
-      }))
-    })),
-    delete: jest.fn(() => ({
-      eq: jest.fn(() => Promise.resolve({ 
-        data: null, 
-        error: null 
-      }))
-    }))
-  }))
-};
-
-// Mock для createClient
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => mockSupabase)
+jest.mock('../apiClient');
+jest.mock('../qualificationObjectService', () => ({
+  qualificationObjectService: {
+    getQualificationObjectById: jest.fn(),
+    updateMeasurementZones: jest.fn()
+  }
 }));
+
+const mockApiClient = apiClient as jest.Mocked<typeof apiClient>;
 
 describe('QualificationWorkScheduleService', () => {
   beforeEach(() => {
@@ -47,48 +18,40 @@ describe('QualificationWorkScheduleService', () => {
   });
 
   describe('isAvailable', () => {
-    test('returns true when supabase is available', () => {
+    test('returns true when apiClient is available', () => {
       expect(qualificationWorkScheduleService.isAvailable()).toBe(true);
     });
   });
 
   describe('getWorkSchedule', () => {
-    test('returns empty array when no stages exist', async () => {
-      const result = await qualificationWorkScheduleService.getWorkSchedule('test-object-id');
-      
-      expect(result).toEqual([]);
-      expect(mockSupabase.from).toHaveBeenCalledWith('qualification_work_schedule');
-    });
+    test('returns mapped stages', async () => {
+      mockApiClient.get = jest.fn().mockResolvedValue([
+        {
+          id: 'stage-1',
+          qualification_object_id: 'test-object-id',
+          project_id: 'test-project-id',
+          stage_name: 'Test Stage',
+          stage_description: 'Test Description',
+          is_completed: false,
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z'
+        }
+      ]);
 
-    test('filters by projectId when provided', async () => {
       const result = await qualificationWorkScheduleService.getWorkSchedule('test-object-id', 'test-project-id');
       
-      expect(result).toEqual([]);
-      expect(mockSupabase.from).toHaveBeenCalledWith('qualification_work_schedule');
+      expect(result).toHaveLength(1);
+      expect(result[0].stageName).toBe('Test Stage');
+      expect(mockApiClient.get).toHaveBeenCalledWith(
+        '/qualification-work-schedule?qualification_object_id=test-object-id&project_id=test-project-id'
+      );
     });
 
-    test('handles service not configured', async () => {
-      // @ts-ignore
-      qualificationWorkScheduleService.supabase = null;
+    test('handles api error', async () => {
+      mockApiClient.get = jest.fn().mockRejectedValue(new Error('Network error'));
 
       await expect(qualificationWorkScheduleService.getWorkSchedule('test-object-id'))
-        .rejects.toThrow('Supabase не настроен');
-    });
-
-    test('handles database error', async () => {
-      mockSupabase.from.mockReturnValueOnce({
-        select: jest.fn(() => ({
-          eq: jest.fn(() => ({
-            order: jest.fn(() => Promise.resolve({ 
-              data: null, 
-              error: new Error('Database error') 
-            }))
-          }))
-        }))
-      });
-
-      await expect(qualificationWorkScheduleService.getWorkSchedule('test-object-id'))
-        .rejects.toThrow('Ошибка загрузки расписания: Database error');
+        .rejects.toThrow('Ошибка загрузки расписания: Network error');
     });
   });
 
@@ -104,48 +67,42 @@ describe('QualificationWorkScheduleService', () => {
         }
       ];
 
+      mockApiClient.post = jest.fn().mockResolvedValue([
+        {
+          id: 'stage-1',
+          qualification_object_id: 'test-object-id',
+          stage_name: 'Test Stage',
+          stage_description: 'Test Description',
+          is_completed: false,
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z'
+        }
+      ]);
+
       const result = await qualificationWorkScheduleService.saveWorkSchedule('test-object-id', stages);
       
-      expect(result).toEqual([]);
-      expect(mockSupabase.from).toHaveBeenCalledWith('qualification_work_schedule');
+      expect(result).toHaveLength(1);
+      expect(result[0].stageName).toBe('Test Stage');
+      expect(mockApiClient.post).toHaveBeenCalledWith('/qualification-work-schedule', expect.any(Object));
     });
 
-    test('handles service not configured', async () => {
-      // @ts-ignore
-      qualificationWorkScheduleService.supabase = null;
+    test('handles api error', async () => {
+      mockApiClient.post = jest.fn().mockRejectedValue(new Error('Network error'));
 
       await expect(qualificationWorkScheduleService.saveWorkSchedule('test-object-id', []))
-        .rejects.toThrow('Supabase не настроен');
+        .rejects.toThrow('Ошибка сохранения расписания: Network error');
     });
   });
 
   describe('deleteWorkSchedule', () => {
     test('deletes work schedule successfully', async () => {
+      jest.spyOn(qualificationWorkScheduleService, 'getWorkSchedule').mockResolvedValue([]);
+      jest.spyOn(qualificationWorkScheduleService, 'saveWorkSchedule').mockResolvedValue([]);
+
       await qualificationWorkScheduleService.deleteWorkSchedule('test-object-id');
       
-      expect(mockSupabase.from).toHaveBeenCalledWith('qualification_work_schedule');
-    });
-
-    test('handles service not configured', async () => {
-      // @ts-ignore
-      qualificationWorkScheduleService.supabase = null;
-
-      await expect(qualificationWorkScheduleService.deleteWorkSchedule('test-object-id'))
-        .rejects.toThrow('Supabase не настроен');
-    });
-
-    test('handles database error', async () => {
-      mockSupabase.from.mockReturnValueOnce({
-        delete: jest.fn(() => ({
-          eq: jest.fn(() => Promise.resolve({ 
-            data: null, 
-            error: new Error('Delete error') 
-          }))
-        }))
-      });
-
-      await expect(qualificationWorkScheduleService.deleteWorkSchedule('test-object-id'))
-        .rejects.toThrow('Ошибка удаления расписания: Delete error');
+      expect(qualificationWorkScheduleService.getWorkSchedule).toHaveBeenCalledWith('test-object-id');
+      expect(qualificationWorkScheduleService.saveWorkSchedule).toHaveBeenCalledWith('test-object-id', []);
     });
   });
 
@@ -159,36 +116,29 @@ describe('QualificationWorkScheduleService', () => {
         isCompleted: false
       };
 
+      jest.spyOn(qualificationWorkScheduleService, 'getWorkSchedule').mockResolvedValue([]);
+      jest.spyOn(qualificationWorkScheduleService, 'saveWorkSchedule').mockResolvedValue([
+        {
+          id: '',
+          qualificationObjectId: 'test-object-id',
+          projectId: undefined,
+          stageName: 'Test Stage',
+          stageDescription: 'Test Description',
+          startDate: '2023-01-01',
+          endDate: '2023-01-02',
+          isCompleted: false,
+          completedAt: undefined,
+          completedBy: undefined,
+          cancelledAt: undefined,
+          cancelledBy: undefined,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ]);
+
       const result = await qualificationWorkScheduleService.createWorkStage('test-object-id', stageData);
       
-      expect(result).toEqual({
-        id: 'test-id',
-        qualificationObjectId: 'test-object-id',
-        projectId: undefined,
-        stageName: 'Test Stage',
-        stageDescription: 'Test Description',
-        startDate: '2023-01-01',
-        endDate: '2023-01-02',
-        isCompleted: false,
-        completedAt: undefined,
-        completedBy: undefined,
-        cancelledAt: undefined,
-        cancelledBy: undefined,
-        createdAt: expect.any(Date),
-        updatedAt: expect.any(Date)
-      });
-    });
-
-    test('handles service not configured', async () => {
-      // @ts-ignore
-      qualificationWorkScheduleService.supabase = null;
-
-      await expect(qualificationWorkScheduleService.createWorkStage('test-object-id', {
-        stageName: 'Test',
-        stageDescription: 'Test',
-        isCompleted: false
-      }))
-        .rejects.toThrow('Supabase не настроен');
+      expect(result.stageName).toBe('Test Stage');
     });
   });
 
@@ -200,83 +150,75 @@ describe('QualificationWorkScheduleService', () => {
         isCompleted: true
       };
 
-      const result = await qualificationWorkScheduleService.updateWorkStage('test-object-id', 'test-stage-id', stageData);
+      jest.spyOn(qualificationWorkScheduleService, 'getWorkSchedule').mockResolvedValue([
+        {
+          id: 'stage-1',
+          qualificationObjectId: 'test-object-id',
+          projectId: undefined,
+          stageName: 'Updated Stage',
+          stageDescription: 'Old Description',
+          startDate: undefined,
+          endDate: undefined,
+          isCompleted: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ] as QualificationWorkStage[]);
+      jest.spyOn(qualificationWorkScheduleService, 'saveWorkSchedule').mockResolvedValue([
+        {
+          id: 'stage-1',
+          qualificationObjectId: 'test-object-id',
+          projectId: undefined,
+          stageName: 'Updated Stage',
+          stageDescription: 'Updated Description',
+          startDate: undefined,
+          endDate: undefined,
+          isCompleted: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ] as QualificationWorkStage[]);
+
+      const result = await qualificationWorkScheduleService.updateWorkStage('test-object-id', 'stage-1', stageData);
       
-      expect(result).toEqual({
-        id: 'test-id',
-        qualificationObjectId: 'test-object-id',
-        projectId: undefined,
-        stageName: 'Updated Stage',
-        stageDescription: 'Updated Description',
-        startDate: undefined,
-        endDate: undefined,
-        isCompleted: true,
-        completedAt: undefined,
-        completedBy: undefined,
-        cancelledAt: undefined,
-        cancelledBy: undefined,
-        createdAt: expect.any(Date),
-        updatedAt: expect.any(Date)
-      });
-    });
-
-    test('handles service not configured', async () => {
-      // @ts-ignore
-      qualificationWorkScheduleService.supabase = null;
-
-      await expect(qualificationWorkScheduleService.updateWorkStage('test-object-id', 'test-stage-id', {
-        stageName: 'Test',
-        stageDescription: 'Test',
-        isCompleted: false
-      }))
-        .rejects.toThrow('Supabase не настроен');
+      expect(result.stageDescription).toBe('Updated Description');
+      expect(result.isCompleted).toBe(true);
     });
   });
 
   describe('createAllStages', () => {
     test('creates all stages when none exist', async () => {
+      jest.spyOn(qualificationWorkScheduleService, 'getWorkSchedule').mockResolvedValue([]);
+      jest.spyOn(qualificationWorkScheduleService, 'saveWorkSchedule').mockResolvedValue([
+        {
+          id: 'stage-1',
+          qualificationObjectId: 'test-object-id',
+          projectId: 'test-project-id',
+          stageName: 'Расстановка логгеров',
+          stageDescription: 'Установка и настройка логгеров для мониторинга температуры',
+          startDate: undefined,
+          endDate: undefined,
+          isCompleted: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ] as QualificationWorkStage[]);
+      jest.spyOn(qualificationWorkScheduleService as any, 'createExternalSensorZone').mockResolvedValue(undefined);
+
       const result = await qualificationWorkScheduleService.createAllStages('test-object-id', 'test-project-id');
       
-      expect(result).toEqual([]);
-      expect(mockSupabase.from).toHaveBeenCalledWith('qualification_work_schedule');
+      expect(result.length).toBeGreaterThan(0);
+      expect(qualificationWorkScheduleService.saveWorkSchedule).toHaveBeenCalled();
     });
 
     test('creates all stages without projectId', async () => {
+      jest.spyOn(qualificationWorkScheduleService, 'getWorkSchedule').mockResolvedValue([]);
+      jest.spyOn(qualificationWorkScheduleService, 'saveWorkSchedule').mockResolvedValue([] as QualificationWorkStage[]);
+      jest.spyOn(qualificationWorkScheduleService as any, 'createExternalSensorZone').mockResolvedValue(undefined);
+
       const result = await qualificationWorkScheduleService.createAllStages('test-object-id');
       
       expect(result).toEqual([]);
-      expect(mockSupabase.from).toHaveBeenCalledWith('qualification_work_schedule');
-    });
-
-    test('handles service not configured', async () => {
-      // @ts-ignore
-      qualificationWorkScheduleService.supabase = null;
-
-      await expect(qualificationWorkScheduleService.createAllStages('test-object-id'))
-        .rejects.toThrow('Supabase не настроен');
-    });
-
-    test('handles database error during creation', async () => {
-      mockSupabase.from.mockReturnValueOnce({
-        select: jest.fn(() => ({
-          eq: jest.fn(() => ({
-            order: jest.fn(() => Promise.resolve({ 
-              data: [], 
-              error: null 
-            }))
-          }))
-        }))
-      }).mockReturnValueOnce({
-        insert: jest.fn(() => ({
-          select: jest.fn(() => Promise.resolve({ 
-            data: null, 
-            error: new Error('Insert error') 
-          }))
-        }))
-      });
-
-      await expect(qualificationWorkScheduleService.createAllStages('test-object-id'))
-        .rejects.toThrow('Ошибка создания этапов: Insert error');
     });
   });
 });

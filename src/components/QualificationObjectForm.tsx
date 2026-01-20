@@ -70,7 +70,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     bodyVolume: initialData?.bodyVolume || undefined,
     inventoryNumber: initialData?.inventoryNumber || '',
     chamberVolume: initialData?.chamberVolume || undefined,
-    serialNumber: initialData?.serialNumber || ''
+    serialNumber: initialData?.serialNumber || '',
+    zones: initialData?.zones || []
   });
 
   const [planFile, setPlanFile] = useState<File | null>(null);
@@ -83,6 +84,37 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   const handleInputChange = (field: keyof CreateQualificationObjectData, value: any) => {
     if (mode === 'view') return; // Не изменяем данные в режиме просмотра
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleZoneChange = (zoneId: string, field: 'name' | 'volume', value: string | number | undefined) => {
+    if (mode === 'view') return;
+    setFormData(prev => ({
+      ...prev,
+      zones: (prev.zones || []).map(zone =>
+        zone.id === zoneId ? { ...zone, [field]: value } : zone
+      )
+    }));
+  };
+
+  const handleAddZone = () => {
+    if (mode === 'view') return;
+    const newZone = {
+      id: `zone-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: '',
+      volume: undefined as number | undefined
+    };
+    setFormData(prev => ({
+      ...prev,
+      zones: [...(prev.zones || []), newZone]
+    }));
+  };
+
+  const handleRemoveZone = (zoneId: string) => {
+    if (mode === 'view') return;
+    setFormData(prev => ({
+      ...prev,
+      zones: (prev.zones || []).filter(zone => zone.id !== zoneId)
+    }));
   };
 
   const handleFileChange = (type: 'plan' | 'testData', file: File | null) => {
@@ -201,6 +233,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="text"
+                name="vin"
                 value={formData.vin || ''}
                 onChange={(e) => handleInputChange('vin', e.target.value)}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -216,6 +249,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="text"
+                name="registrationNumber"
                 value={formData.registrationNumber || ''}
                 onChange={(e) => handleInputChange('registrationNumber', e.target.value)}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -231,6 +265,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="number"
+                name="bodyVolume"
                 step="0.01"
                 value={formData.bodyVolume || ''}
                 onChange={(e) => handleInputChange('bodyVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
@@ -252,6 +287,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="number"
+                name="area"
                 step="0.01"
                 value={formData.area || ''}
                 onChange={(e) => handleInputChange('area', e.target.value ? parseFloat(e.target.value) : undefined)}
@@ -273,6 +309,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="text"
+                name="manufacturer"
                 value={formData.manufacturer || ''}
                 onChange={(e) => handleInputChange('manufacturer', e.target.value)}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -288,6 +325,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="text"
+                name="inventoryNumber"
                 value={formData.inventoryNumber || ''}
                 onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -303,6 +341,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="number"
+                name="chamberVolume"
                 step="0.01"
                 value={formData.chamberVolume || ''}
                 onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
@@ -325,6 +364,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="text"
+                name="manufacturer"
                 value={formData.manufacturer || ''}
                 onChange={(e) => handleInputChange('manufacturer', e.target.value)}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -340,6 +380,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="text"
+                name="serialNumber"
                 value={formData.serialNumber || ''}
                 onChange={(e) => handleInputChange('serialNumber', e.target.value)}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -355,6 +396,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="text"
+                name="inventoryNumber"
                 value={formData.inventoryNumber || ''}
                 onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -379,6 +421,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         </label>
         <input
           type="number"
+          name="areaAll"
           step="0.01"
           value={formData.area || ''}
           onChange={(e) => handleInputChange('area', e.target.value ? parseFloat(e.target.value) : undefined)}
@@ -394,6 +437,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         </label>
         <input
           type="text"
+          name="vinAll"
           value={formData.vin || ''}
           onChange={(e) => handleInputChange('vin', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -408,6 +452,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         </label>
         <input
           type="text"
+          name="registrationNumberAll"
           value={formData.registrationNumber || ''}
           onChange={(e) => handleInputChange('registrationNumber', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -422,6 +467,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         </label>
         <input
           type="number"
+          name="bodyVolumeAll"
           step="0.01"
           value={formData.bodyVolume || ''}
           onChange={(e) => handleInputChange('bodyVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
@@ -437,6 +483,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         </label>
         <input
           type="text"
+          name="inventoryNumberAll"
           value={formData.inventoryNumber || ''}
           onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -451,6 +498,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         </label>
         <input
           type="number"
+          name="chamberVolumeAll"
           step="0.01"
           value={formData.chamberVolume || ''}
           onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
@@ -466,6 +514,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         </label>
         <input
           type="text"
+          name="serialNumberAll"
           value={formData.serialNumber || ''}
           onChange={(e) => handleInputChange('serialNumber', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -550,6 +599,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             <label className="cursor-pointer block">
               <input
                 type="file"
+                name={`file-${type}-replace`}
                 accept={accept}
                 onChange={(e) => onChange(e.target.files?.[0] || null)}
                 className="hidden"
@@ -569,6 +619,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           <label className="cursor-pointer block">
             <input
               type="file"
+              name={`file-${type}-upload`}
               accept={accept}
               onChange={(e) => onChange(e.target.files?.[0] || null)}
               className="hidden"
@@ -635,6 +686,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="text"
+              name="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -651,6 +703,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                 </label>
                 <input
                   type="text"
+                  name="climateSystem"
                   value={formData.climateSystem}
                   onChange={(e) => handleInputChange('climateSystem', e.target.value)}
                   className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -669,6 +722,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               </label>
               <input
                 type="text"
+                name="address"
                 value={formData.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -680,6 +734,85 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
 
           {/* Специфичные для типа поля */}
           {renderTypeSpecificFields()}
+
+          {/* Зоны объекта */}
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-gray-900">Зоны объекта</h4>
+              {mode !== 'view' && (
+                <button
+                  type="button"
+                  onClick={handleAddZone}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                >
+                  Добавить зону
+                </button>
+              )}
+            </div>
+
+            {(formData.zones || []).length === 0 ? (
+              <div className="text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-300 rounded-md p-3">
+                Зоны объекта не добавлены
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(formData.zones || []).map((zone) => (
+                  <div key={zone.id} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Наименование зоны
+                      </label>
+                      <input
+                        type="text"
+                        name={`zone-name-${zone.id}`}
+                        value={zone.name || ''}
+                        onChange={(e) => handleZoneChange(zone.id, 'name', e.target.value)}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                          mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''
+                        }`}
+                        readOnly={mode === 'view'}
+                        placeholder="Введите наименование зоны"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Объем (м³)
+                      </label>
+                      <input
+                        type="number"
+                        name={`zone-volume-${zone.id}`}
+                        step="0.01"
+                        value={zone.volume ?? ''}
+                        onChange={(e) =>
+                          handleZoneChange(
+                            zone.id,
+                            'volume',
+                            e.target.value ? parseFloat(e.target.value) : undefined
+                          )
+                        }
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                          mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''
+                        }`}
+                        readOnly={mode === 'view'}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    {mode !== 'view' && (
+                      <div className="md:col-span-3">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveZone(zone.id)}
+                          className="text-sm text-red-600 hover:text-red-800"
+                        >
+                          Удалить зону
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Файлы */}
           <div className="grid grid-cols-1 gap-6">

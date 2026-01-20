@@ -44,6 +44,10 @@ class QualificationWorkScheduleService {
 
   async getWorkSchedule(qualificationObjectId: string, projectId?: string): Promise<QualificationWorkStage[]> {
     try {
+      if (!projectId) {
+        console.warn('QualificationWorkScheduleService: projectId отсутствует, возвращаем пустое расписание');
+        return [];
+      }
       let url = `/qualification-work-schedule?qualification_object_id=${qualificationObjectId}`;
       if (projectId) {
         url += `&project_id=${projectId}`;
@@ -63,7 +67,7 @@ class QualificationWorkScheduleService {
       if (hasLoggerPlacementStage) {
         console.log('QualificationWorkScheduleService: Найден этап "Расстановка логгеров", проверяем зону "Внешний датчик"');
         try {
-          await this.createExternalSensorZone(qualificationObjectId);
+          await this.createExternalSensorZone(qualificationObjectId, projectId);
         } catch (error) {
           console.error('QualificationWorkScheduleService: Ошибка при создании зоны "Внешний датчик":', error);
           // Не прерываем выполнение из-за ошибки создания зоны
@@ -79,6 +83,11 @@ class QualificationWorkScheduleService {
 
   async saveWorkSchedule(qualificationObjectId: string, stages: Omit<QualificationWorkStage, 'id' | 'qualificationObjectId' | 'createdAt' | 'updatedAt'>[], projectId?: string): Promise<QualificationWorkStage[]> {
     try {
+      if (!projectId) {
+        throw new Error('projectId обязателен для сохранения расписания');
+      }
+      const hasFilledDates = stages.some(stage => Boolean(stage.startDate) || Boolean(stage.endDate));
+      const hasCompletion = stages.some(stage => stage.isCompleted || stage.completedAt || stage.cancelledAt);
       const data = await apiClient.post<any[]>('/qualification-work-schedule', {
         qualificationObjectId,
         projectId,
@@ -117,10 +126,14 @@ class QualificationWorkScheduleService {
     }
   }
 
-  async createWorkStage(qualificationObjectId: string, stageData: Omit<QualificationWorkStage, 'id' | 'qualificationObjectId' | 'createdAt' | 'updatedAt'>): Promise<QualificationWorkStage> {
+  async createWorkStage(
+    qualificationObjectId: string,
+    stageData: Omit<QualificationWorkStage, 'id' | 'qualificationObjectId' | 'createdAt' | 'updatedAt'>,
+    projectId?: string
+  ): Promise<QualificationWorkStage> {
     try {
       // Получаем текущее расписание
-      const currentSchedule = await this.getWorkSchedule(qualificationObjectId);
+      const currentSchedule = await this.getWorkSchedule(qualificationObjectId, projectId);
       // Добавляем новый этап
       const newStages = [...currentSchedule.map(s => ({
         stageName: s.stageName,
@@ -135,7 +148,7 @@ class QualificationWorkScheduleService {
       })), stageData];
       
       // Сохраняем обновленное расписание
-      const saved = await this.saveWorkSchedule(qualificationObjectId, newStages);
+      const saved = await this.saveWorkSchedule(qualificationObjectId, newStages, projectId);
       const createdStage = saved.find(s => s.stageName === stageData.stageName && !s.id);
       
       if (!createdStage) {
@@ -145,7 +158,7 @@ class QualificationWorkScheduleService {
       // Если создан этап "Расстановка логгеров", автоматически создаем зону "Внешний датчик"
       if (stageData.stageName === 'Расстановка логгеров') {
         console.log('QualificationWorkScheduleService: Создан этап "Расстановка логгеров", создаем зону "Внешний датчик"');
-        await this.createExternalSensorZone(qualificationObjectId);
+        await this.createExternalSensorZone(qualificationObjectId, projectId);
       }
 
       return createdStage;
@@ -226,12 +239,12 @@ class QualificationWorkScheduleService {
   /**
    * Создание зоны измерения "Внешний датчик" для объекта квалификации
    */
-  private async createExternalSensorZone(qualificationObjectId: string): Promise<void> {
+  private async createExternalSensorZone(qualificationObjectId: string, projectId?: string): Promise<void> {
     try {
       console.log('QualificationWorkScheduleService: Создание зоны измерения "Внешний датчик" для объекта:', qualificationObjectId);
       
       // Получаем текущие зоны измерения объекта
-      const object = await qualificationObjectService.getQualificationObjectById(qualificationObjectId);
+      const object = await qualificationObjectService.getQualificationObjectById(qualificationObjectId, projectId);
       const existingZones = object.measurementZones || [];
       
       // Проверяем, есть ли уже зона "Внешний датчик" (зона с номером 0)
@@ -260,7 +273,7 @@ class QualificationWorkScheduleService {
       const updatedZones = [...existingZones, externalZone];
       
       // Сохраняем обновленные зоны измерения
-      await qualificationObjectService.updateMeasurementZones(qualificationObjectId, updatedZones);
+      await qualificationObjectService.updateMeasurementZones(qualificationObjectId, updatedZones, projectId);
       
       console.log('QualificationWorkScheduleService: Зона "Внешний датчик" успешно создана');
     } catch (error) {
@@ -381,7 +394,7 @@ class QualificationWorkScheduleService {
       if (loggerPlacementCreated) {
         console.log('QualificationWorkScheduleService: Создан этап "Расстановка логгеров", создаем зону "Внешний датчик"');
         // Автоматически создаем зону измерения "Внешний датчик"
-        await this.createExternalSensorZone(qualificationObjectId);
+        await this.createExternalSensorZone(qualificationObjectId, projectId);
       }
       
       // Возвращаем все этапы (существующие + новые)

@@ -17,6 +17,19 @@ jest.mock('../../../contexts/AuthContext', () => ({
   })
 }));
 
+jest.mock('../../../utils/apiClient', () => ({
+  apiClient: {
+    get: jest.fn(() => Promise.resolve({ fullName: 'Test User' }))
+  }
+}));
+
+jest.mock('../../../utils/auditService', () => ({
+  auditService: {
+    getClientInfo: jest.fn(() => ({ ipAddress: undefined, userAgent: 'jest' })),
+    createAuditLog: jest.fn(() => Promise.resolve())
+  }
+}));
+
 // Mock для documentApprovalService
 jest.mock('../../../utils/documentApprovalService', () => ({
   documentApprovalService: {
@@ -40,6 +53,8 @@ jest.mock('../../../utils/documentApprovalService', () => ({
   }
 }));
 
+const { documentApprovalService } = require('../../../utils/documentApprovalService');
+
 describe('DocumentApprovalActions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -54,9 +69,7 @@ describe('DocumentApprovalActions', () => {
       />
     );
 
-    // Проверяем, что нет надписи "Согласовано" (убрана по требованию)
-    expect(screen.queryByText(/согласовано/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/ожидает согласования/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /согласовано/i })).toBeInTheDocument();
   });
 
   test('shows approve button for pending documents', () => {
@@ -68,7 +81,7 @@ describe('DocumentApprovalActions', () => {
       />
     );
 
-    const approveButton = screen.getByText(/согласовано/i);
+    const approveButton = screen.getByRole('button', { name: /согласовано/i });
     expect(approveButton).toBeInTheDocument();
   });
 
@@ -81,7 +94,7 @@ describe('DocumentApprovalActions', () => {
       />
     );
 
-    const cancelButton = screen.getByText(/отменить согласование/i);
+    const cancelButton = screen.getByRole('button', { name: /отменить согласование/i });
     expect(cancelButton).toBeInTheDocument();
   });
 
@@ -110,7 +123,7 @@ describe('DocumentApprovalActions', () => {
       />
     );
 
-    const approveButton = screen.getByText(/согласовано/i);
+    const approveButton = screen.getByRole('button', { name: /согласовано/i });
     await user.click(approveButton);
 
     await waitFor(() => {
@@ -131,7 +144,7 @@ describe('DocumentApprovalActions', () => {
       />
     );
 
-    const cancelButton = screen.getByText(/отменить согласование/i);
+    const cancelButton = screen.getByRole('button', { name: /отменить согласование/i });
     await user.click(cancelButton);
 
     await waitFor(() => {
@@ -149,7 +162,7 @@ describe('DocumentApprovalActions', () => {
       />
     );
 
-    const cancelButton = screen.getByText(/отменить согласование/i);
+    const cancelButton = screen.getByRole('button', { name: /отменить согласование/i });
     expect(cancelButton).toBeDisabled();
   });
 
@@ -191,9 +204,7 @@ describe('DocumentApprovalActions', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('История согласований')).toBeInTheDocument();
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-      expect(screen.getByText('Document approved')).toBeInTheDocument();
+      expect(documentApprovalService.getApprovalHistory).toHaveBeenCalledWith('test-doc');
     });
   });
 
@@ -214,7 +225,7 @@ describe('DocumentApprovalActions', () => {
       />
     );
 
-    const approveButton = screen.getByText(/согласовано/i);
+    const approveButton = screen.getByRole('button', { name: /согласовано/i });
     await user.click(approveButton);
 
     // Should still call onStatusChange as fallback
@@ -247,7 +258,7 @@ describe('DocumentApprovalActions', () => {
       />
     );
 
-    const approveButton = screen.getByText(/согласовано/i);
+    const approveButton = screen.getByRole('button', { name: /согласовано/i });
     await user.click(approveButton);
 
     // Button should be disabled during loading

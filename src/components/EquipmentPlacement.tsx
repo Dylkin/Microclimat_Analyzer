@@ -10,13 +10,15 @@ interface EquipmentPlacementProps {
   initialZones?: MeasurementZone[];
   onZonesChange?: (zones: MeasurementZone[]) => void;
   readOnly?: boolean;
+  projectId?: string;
 }
 
 export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
   qualificationObjectId,
   initialZones = [],
   onZonesChange,
-  readOnly = false
+  readOnly = false,
+  projectId
 }) => {
   // Инициализируем с зоной 0 (Внешняя температура), если зон нет
   const initializeZones = (zones: MeasurementZone[]): MeasurementZone[] => {
@@ -275,7 +277,7 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
     setSaveSuccess(null);
 
     try {
-      await qualificationObjectService.updateMeasurementZones(qualificationObjectId, measurementZones);
+      await qualificationObjectService.updateMeasurementZones(qualificationObjectId, measurementZones, projectId);
       setSaveSuccess('Зоны измерения успешно сохранены');
       
       // Автоматически скрываем сообщение об успехе через 3 секунды
@@ -388,6 +390,7 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
                         <label className="block text-xs text-gray-500 mb-1">Высота (м)</label>
                         <input
                           type="number"
+                          name={`measurement-level-${zone.id}-${level.id}`}
                           step="0.1"
                           min="0"
                           max="10"
@@ -411,6 +414,7 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
                         <div className="relative">
                           <input
                             type="text"
+                            name={`equipment-search-${zone.id}-${level.id}`}
                             value={equipmentSearchTerms[level.id] || level.equipmentName || ''}
                             onChange={(e) => {
                               if (!readOnly) {

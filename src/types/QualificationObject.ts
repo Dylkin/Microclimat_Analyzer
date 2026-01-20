@@ -40,6 +40,7 @@ export interface QualificationObject {
   createdAt?: Date;
   updatedAt?: Date;
   measurementZones?: MeasurementZone[];
+  zones?: QualificationZone[];
 }
 
 export interface MeasurementZone {
@@ -54,6 +55,14 @@ export interface MeasurementLevel {
   equipmentId?: string;
   equipmentName?: string;
 }
+
+export interface QualificationZone {
+  id: string;
+  name: string;
+  volume?: number;
+}
+
+export type QualificationZoneInput = Omit<QualificationZone, 'id'> & { id?: string };
 
 export interface CreateQualificationObjectData {
   contractorId: string;
@@ -74,4 +83,5 @@ export interface CreateQualificationObjectData {
   serialNumber?: string;
   testDataFile?: File;
   measurementZones?: Omit<MeasurementZone, 'id'>[];
+  zones?: QualificationZoneInput[];
 }

@@ -39,10 +39,11 @@ class QualificationObjectService {
     }
   }
 
-  async getQualificationObjectById(id: string): Promise<QualificationObject> {
+  async getQualificationObjectById(id: string, projectId?: string): Promise<QualificationObject> {
     try {
       console.log('Загрузка объекта квалификации по ID:', id);
-      const data = await apiClient.get<any>(`/qualification-objects/${id}`);
+      const query = projectId ? `?project_id=${projectId}` : '';
+      const data = await apiClient.get<any>(`/qualification-objects/${id}${query}`);
       return this.mapFromApi(data);
     } catch (error: any) {
       console.error('Ошибка загрузки объекта квалификации:', error);
@@ -74,7 +75,7 @@ class QualificationObjectService {
   }
 
   // Обновление зон измерения для объекта квалификации
-  async updateMeasurementZones(objectId: string, measurementZones: any[]): Promise<QualificationObject> {
+  async updateMeasurementZones(objectId: string, measurementZones: any[], projectId?: string): Promise<QualificationObject> {
     try {
       console.log('Сохранение зон измерения:', {
         objectId,
@@ -83,7 +84,8 @@ class QualificationObjectService {
       });
 
       const data = await apiClient.patch<any>(`/qualification-objects/${objectId}`, {
-        measurementZones: measurementZones
+        measurementZones: measurementZones,
+        projectId
       });
 
       console.log('Зоны измерения успешно сохранены:', data);
@@ -189,6 +191,34 @@ class QualificationObjectService {
       measurementZones = [];
     }
 
+    // Обработка zones из JSONB
+    let zones = [];
+    try {
+      const zonesData = data.zones;
+      if (zonesData) {
+        const normalizeZone = (zone: any) => ({
+          ...zone,
+          id: zone.id || `zone-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: zone.name || '',
+          volume: zone.volume !== undefined && zone.volume !== null
+            ? parseFloat(zone.volume)
+            : undefined
+        });
+
+        if (Array.isArray(zonesData)) {
+          zones = zonesData.map(normalizeZone);
+        } else if (typeof zonesData === 'string') {
+          const parsedZones = JSON.parse(zonesData);
+          zones = Array.isArray(parsedZones)
+            ? parsedZones.map(normalizeZone)
+            : [];
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка обработки zones:', error);
+      zones = [];
+    }
+
     // Маппим тип объекта из английского в русский
     const objectType = data.objectType || data.type || 'room';
     const mappedType = this.mapObjectTypeFromDatabase(objectType);
@@ -217,7 +247,8 @@ class QualificationObjectService {
       testDataFileName: data.testDataFileName || data.test_data_file_name || '',
       createdAt: data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date()),
       updatedAt: data.updatedAt ? new Date(data.updatedAt) : (data.updated_at ? new Date(data.updated_at) : new Date()),
-      measurementZones: measurementZones
+      measurementZones: measurementZones,
+      zones: zones
     };
   }
 
@@ -299,6 +330,14 @@ class QualificationObjectService {
         }));
         dbData.measurementZones = zonesWithIds; // Передаем объект, не строку
       }
+
+      if ('zones' in data && data.zones !== undefined) {
+        const zonesWithIds = (data.zones || []).map((zone: any) => ({
+          ...zone,
+          id: zone.id || `zone-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }));
+        dbData.zones = zonesWithIds;
+      }
       
       if ('temperatureLimits' in data && data.temperatureLimits !== undefined) {
         dbData.temperatureLimits = data.temperatureLimits;
@@ -315,11 +354,12 @@ class QualificationObjectService {
       return dbData;
     }
 
-  async uploadLoggerRemovalFile(objectId: string, zoneNumber: number, level: number, file: File): Promise<string> {
+  async uploadLoggerRemovalFile(objectId: string, zoneNumber: number, level: number, file: File, projectId?: string): Promise<string> {
     try {
       // Сохраняем оригинальное имя файла для .vi2 файлов
       const originalFileName = file.name;
-      const fileName = `logger-removal/${objectId}/zone-${zoneNumber}-level-${level}/${originalFileName}`;
+      const prefix = projectId ? `logger-removal/${objectId}/${projectId}` : `logger-removal/${objectId}`;
+      const fileName = `${prefix}/zone-${zoneNumber}-level-${level}/${originalFileName}`;
 
       // Загружаем файл через API
       const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
@@ -336,12 +376,13 @@ class QualificationObjectService {
   }
 
   // Удаление файла снятия логгеров из Storage
-  async deleteLoggerRemovalFile(objectId: string, zoneNumber: number, level: number): Promise<void> {
+  async deleteLoggerRemovalFile(objectId: string, zoneNumber: number, level: number, projectId?: string): Promise<void> {
     try {
       // Преобразуем дробные значения уровня в строку с точкой для совместимости
       const levelStr = level.toString();
       // Получаем список файлов в папке для данной зоны и уровня
-      const folderPath = `logger-removal/${objectId}/zone-${zoneNumber}-level-${levelStr}`;
+      const prefix = projectId ? `logger-removal/${objectId}/${projectId}` : `logger-removal/${objectId}`;
+      const folderPath = `${prefix}/zone-${zoneNumber}-level-${levelStr}`;
       
       console.log('Удаление файлов из Storage:', { objectId, zoneNumber, level, levelStr, folderPath });
       
@@ -385,9 +426,9 @@ class QualificationObjectService {
   }
 
   // Получение списка файлов снятия логгеров из Storage
-  async getLoggerRemovalFiles(objectId: string): Promise<{ [key: string]: { name: string; url: string; size: number; lastModified: string } }> {
+  async getLoggerRemovalFiles(objectId: string, projectId?: string): Promise<{ [key: string]: { name: string; url: string; size: number; lastModified: string } }> {
     try {
-      const prefix = `logger-removal/${objectId}`;
+      const prefix = projectId ? `logger-removal/${objectId}/${projectId}` : `logger-removal/${objectId}`;
       const listResult = await apiClient.post<{ data: StorageFileObject[] }>('/storage/list', {
         bucket: 'qualification-objects',
         prefix: prefix

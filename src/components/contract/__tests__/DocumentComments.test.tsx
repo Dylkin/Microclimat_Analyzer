@@ -71,7 +71,7 @@ describe('DocumentComments', () => {
     const textarea = screen.getByPlaceholderText(/добавить комментарий/i);
     expect(textarea).toBeInTheDocument();
     
-    const sendButton = screen.getByText(/отправить/i);
+    const sendButton = screen.getByRole('button', { name: /отправить/i });
     expect(sendButton).toBeInTheDocument();
   });
 
@@ -86,7 +86,7 @@ describe('DocumentComments', () => {
     );
 
     const textarea = screen.getByPlaceholderText(/добавить комментарий/i);
-    const sendButton = screen.getByText(/отправить/i);
+    const sendButton = screen.getByRole('button', { name: /отправить/i });
 
     await user.type(textarea, 'Test comment');
     await user.click(sendButton);
@@ -104,7 +104,7 @@ describe('DocumentComments', () => {
       />
     );
 
-    const sendButton = screen.getByText(/отправить/i);
+    const sendButton = screen.getByRole('button', { name: /отправить/i });
     expect(sendButton).toBeDisabled();
   });
 
@@ -119,7 +119,7 @@ describe('DocumentComments', () => {
     );
 
     const textarea = screen.getByPlaceholderText(/добавить комментарий/i);
-    const sendButton = screen.getByText(/отправить/i);
+    const sendButton = screen.getByRole('button', { name: /отправить/i });
 
     await user.type(textarea, 'Test comment');
     
@@ -137,7 +137,7 @@ describe('DocumentComments', () => {
     );
 
     const textarea = screen.getByPlaceholderText(/добавить комментарий/i);
-    const sendButton = screen.getByText(/отправить/i);
+    const sendButton = screen.getByRole('button', { name: /отправить/i });
 
     await user.type(textarea, 'Test comment');
     await user.click(sendButton);
@@ -158,7 +158,7 @@ describe('DocumentComments', () => {
     );
 
     const textarea = screen.getByPlaceholderText(/добавить комментарий/i);
-    const sendButton = screen.getByText(/отправить/i);
+    const sendButton = screen.getByRole('button', { name: /отправить/i });
 
     await user.type(textarea, 'Test comment');
     await user.click(sendButton);
@@ -180,7 +180,7 @@ describe('DocumentComments', () => {
     );
 
     const textarea = screen.getByPlaceholderText(/добавить комментарий/i);
-    const sendButton = screen.getByText(/отправить/i);
+    const sendButton = screen.getByRole('button', { name: /отправить/i });
 
     await user.type(textarea, 'Test comment');
     await user.click(sendButton);
@@ -203,7 +203,7 @@ describe('DocumentComments', () => {
     );
 
     const textarea = screen.getByPlaceholderText(/добавить комментарий/i);
-    const sendButton = screen.getByText(/отправить/i);
+    const sendButton = screen.getByRole('button', { name: /отправить/i });
 
     await user.type(textarea, 'Test comment');
     await user.click(sendButton);
@@ -233,7 +233,7 @@ describe('DocumentComments', () => {
     );
 
     const textarea = screen.getByPlaceholderText(/добавить комментарий/i);
-    const sendButton = screen.getByText(/отправить/i);
+    const sendButton = screen.getByRole('button', { name: /отправить/i });
 
     await user.type(textarea, 'Test comment');
     await user.click(sendButton);

@@ -7,24 +7,52 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const { qualification_object_id, project_id } = req.query;
-    
-    let query = 'SELECT * FROM qualification_work_schedule WHERE 1=1';
-    const params: any[] = [];
-    let paramIndex = 1;
-
-    if (qualification_object_id) {
-      query += ` AND qualification_object_id = $${paramIndex++}`;
-      params.push(qualification_object_id);
+    if (!qualification_object_id) {
+      return res.status(400).json({ error: 'qualification_object_id обязателен' });
     }
 
-    if (project_id) {
-      query += ` AND project_id = $${paramIndex++}`;
-      params.push(project_id);
+    if (!project_id) {
+      return res.json([]);
     }
 
-    query += ' ORDER BY created_at ASC';
+    const projectMeta = await pool.query(
+      'SELECT created_at FROM projects WHERE id = $1',
+      [project_id]
+    );
+    const scheduleMeta = await pool.query(
+      'SELECT MIN(created_at) as min_created_at, COUNT(*) as count FROM qualification_work_schedule WHERE qualification_object_id = $1 AND project_id = $2',
+      [qualification_object_id, project_id]
+    );
 
-    const result = await pool.query(query, params);
+    const projectQuery = `
+      SELECT * FROM qualification_work_schedule
+      WHERE qualification_object_id = $1 AND project_id = $2
+      ORDER BY created_at ASC
+    `;
+
+    let result = await pool.query(projectQuery, [qualification_object_id, project_id]);
+
+
+
+    if (result.rows.length === 0) {
+      const legacyQuery = `
+        SELECT * FROM qualification_work_schedule
+        WHERE qualification_object_id = $1 AND project_id IS NULL
+      `;
+      const legacyResult = await pool.query(legacyQuery, [qualification_object_id]);
+
+      if (legacyResult.rows.length > 0) {
+        await pool.query(
+          `UPDATE qualification_work_schedule
+           SET project_id = $1
+           WHERE qualification_object_id = $2 AND project_id IS NULL`,
+          [project_id, qualification_object_id]
+        );
+      }
+
+      const refreshed = await pool.query(projectQuery, [qualification_object_id, project_id]);
+      result = refreshed;
+    }
     
     const schedules = result.rows.map((row: any) => ({
       id: row.id,
@@ -55,14 +83,18 @@ router.post('/', async (req, res) => {
   try {
     const { qualificationObjectId, projectId, stages } = req.body;
 
+
     if (!qualificationObjectId || !stages || !Array.isArray(stages)) {
       return res.status(400).json({ error: 'qualificationObjectId и stages обязательны' });
+    }
+    if (!projectId) {
+      return res.status(400).json({ error: 'projectId обязателен для сохранения расписания' });
     }
 
     // Удаляем существующие записи
     await pool.query(
-      'DELETE FROM qualification_work_schedule WHERE qualification_object_id = $1 AND ($2::uuid IS NULL OR project_id = $2)',
-      [qualificationObjectId, projectId || null]
+      'DELETE FROM qualification_work_schedule WHERE qualification_object_id = $1 AND project_id = $2',
+      [qualificationObjectId, projectId]
     );
 
     // Вставляем новые записи
@@ -104,7 +136,7 @@ router.post('/', async (req, res) => {
         RETURNING *
       `, [
         qualificationObjectId,
-        projectId || null,
+        projectId,
         stage.stageName || stage.stage_name,
         stage.stageDescription || stage.stage_description || null,
         processedStartDate,

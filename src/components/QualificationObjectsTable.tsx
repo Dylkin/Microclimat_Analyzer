@@ -59,6 +59,11 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
   };
 
   const renderObjectDetails = (obj: QualificationObject) => {
+    const zonesSummary =
+      obj.zones && obj.zones.length > 0 ? (
+        <div>📌 Зоны: {obj.zones.length}</div>
+      ) : null;
+
     switch (obj.type) {
       case 'помещение':
         return (
@@ -67,6 +72,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             {obj.area && <div>📐 {obj.area} м²</div>}
             {obj.manufacturer && <div>🏭 {obj.manufacturer}</div>}
             {obj.climateSystem && <div>❄️ {obj.climateSystem}</div>}
+            {zonesSummary}
           </div>
         );
       case 'автомобиль':
@@ -77,6 +83,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             {obj.registrationNumber && <div>🚗 {obj.registrationNumber}</div>}
             {obj.bodyVolume && <div>📦 {obj.bodyVolume} м³</div>}
             {obj.climateSystem && <div>❄️ {obj.climateSystem}</div>}
+            {zonesSummary}
           </div>
         );
       case 'холодильная_камера':
@@ -86,6 +93,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             {obj.chamberVolume && <div>📦 {obj.chamberVolume} м³</div>}
             {obj.manufacturer && <div>🏭 {obj.manufacturer}</div>}
             {obj.climateSystem && <div>❄️ {obj.climateSystem}</div>}
+            {zonesSummary}
           </div>
         );
       case 'холодильник':
@@ -98,6 +106,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             {obj.measurementZones && obj.measurementZones.length > 0 && (
               <div>📍 Зон измерения: {obj.measurementZones.length}</div>
             )}
+            {zonesSummary}
             {/* Климатическая установка не отображается для холодильника и морозильника */}
           </div>
         );
@@ -107,6 +116,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             {obj.measurementZones && obj.measurementZones.length > 0 && (
               <div>📍 Зон измерения: {obj.measurementZones.length}</div>
             )}
+            {zonesSummary}
           </div>
         );
     }

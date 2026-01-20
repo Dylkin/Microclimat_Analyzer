@@ -89,9 +89,19 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [parsingProgress, setParsingProgress] = useState<{ [key: string]: number }>({});
   const [stageCompletionLoading, setStageCompletionLoading] = useState<{ [key: string]: boolean }>({});
+  const [stageDataInitialized, setStageDataInitialized] = useState(false);
+
+  useEffect(() => {
+    if (!stageDataInitialized) return;
+  }, [stages, qualificationObjectId, projectId, stageDataInitialized]);
 
   // Загрузка расписания из базы данных
   const loadSchedule = async () => {
+    if (!projectId) {
+      setError('Проект не выбран. Расписание будет пустым до выбора проекта.');
+      initializeStages();
+      return;
+    }
     if (!qualificationWorkScheduleService.isAvailable()) {
       console.warn('Сервис расписания недоступен, используем локальные данные');
       initializeStages();
@@ -210,6 +220,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         console.log('QualificationWorkSchedule: Этапы с завершением:', convertedStages.filter(s => s.isCompleted || s.cancelledAt));
         
         setStages(convertedStages);
+        setStageDataInitialized(true);
       } else {
         // Если данных нет, создаем все этапы в базе данных с привязкой к проекту
         console.log('QualificationWorkSchedule: Этапы не найдены, создаем все этапы в БД для проекта:', projectId);
@@ -277,6 +288,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         }));
         
         setStages(convertedStages);
+        setStageDataInitialized(true);
       }
     } catch (error) {
       console.error('Ошибка загрузки расписания:', error);
@@ -305,6 +317,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       stageNames: initializedStages.map(s => s.name)
     });
     setStages(initializedStages);
+    setStageDataInitialized(true);
   };
 
   // Загрузка уже сохраненных файлов снятия логгеров
@@ -315,7 +328,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       console.log('Загрузка файлов снятия логгеров для объекта:', qualificationObjectId);
       
       // Получаем файлы из Supabase Storage
-      const storageFilesData = await qualificationObjectService.getLoggerRemovalFiles(qualificationObjectId);
+      const storageFilesData = await qualificationObjectService.getLoggerRemovalFiles(qualificationObjectId, projectId);
       console.log('Загруженные файлы из Storage:', storageFilesData);
       console.log('Количество файлов из Storage:', Object.keys(storageFilesData).length);
       console.log('Ключи файлов из Storage:', Object.keys(storageFilesData));
@@ -473,7 +486,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
     try {
       console.log('Загрузка зон измерения для объекта:', qualificationObjectId);
-      const qualificationObject = await qualificationObjectService.getQualificationObjectById(qualificationObjectId);
+      const qualificationObject = await qualificationObjectService.getQualificationObjectById(qualificationObjectId, projectId);
       console.log('Загруженный объект квалификации:', qualificationObject);
       
       if (qualificationObject && qualificationObject.measurementZones) {
@@ -508,7 +521,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
             const updatedZones = [externalZone, ...renumberedZones];
             
             // Сохраняем обновленные зоны
-            await qualificationObjectService.updateMeasurementZones(qualificationObjectId, updatedZones);
+            await qualificationObjectService.updateMeasurementZones(qualificationObjectId, updatedZones, projectId);
             
             console.log('QualificationWorkSchedule: Зона "Внешний датчик" успешно создана');
             setMeasurementZones(updatedZones);
@@ -755,7 +768,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
           // Создаем новый этап в БД
           const createdStage = await qualificationWorkScheduleService.createWorkStage(
             qualificationObjectId,
-            stageToSave
+            stageToSave,
+            projectId
           );
           
           // Обновляем локальное состояние с реальным ID из БД
@@ -975,7 +989,12 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
       // Удаляем файл из Storage
       try {
-        await qualificationObjectService.deleteLoggerRemovalFile(qualificationObjectId, zoneNumber, measurementLevel);
+        await qualificationObjectService.deleteLoggerRemovalFile(
+          qualificationObjectId,
+          zoneNumber,
+          measurementLevel,
+          currentProjectId
+        );
         console.log('Файл удален из Storage');
       } catch (storageError) {
         console.warn('Ошибка удаления файла из Storage (может быть уже удален):', storageError);
@@ -1247,7 +1266,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         qualificationObjectId,
         zoneNumber,
         measurementLevel,
-        file
+        file,
+        currentProjectId
       );
       
       console.log('QualificationWorkSchedule: Файл загружен в Storage:', storageUrl);
@@ -1470,6 +1490,17 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
     setSuccess(null);
 
     try {
+      let currentProjectId = projectId;
+      if (!currentProjectId) {
+        const urlParams = new URLSearchParams(window.location.search);
+        currentProjectId = urlParams.get('projectId') || undefined;
+      }
+
+      if (!currentProjectId) {
+        setError('ProjectId не найден для сохранения файлов логгеров');
+        return;
+      }
+
       const uploadPromises = Object.entries(loggerRemovalFiles)
         .filter(([_, file]) => file !== null)
         .map(async ([fileKey, file]) => {
@@ -1487,7 +1518,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
             qualificationObjectId,
             zoneNumber,
             level,
-            file
+            file,
+            currentProjectId
           );
           
           console.log(`Файл снятия логгеров загружен для зоны ${zoneNumber}, уровень ${level}:`, url);
@@ -1517,6 +1549,9 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
     setSuccess(null);
 
     try {
+      if (!projectId) {
+        throw new Error('Невозможно сохранить расписание без выбранного проекта');
+      }
       // Валидация дат
       for (const stage of stages) {
         if (stage.startDate && stage.endDate) {
@@ -1811,6 +1846,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                     </label>
                     <input
                       type="date"
+                      name={`stage-date-${stage.id}`}
                       value={stage.startDate}
                       onChange={(e) => handleSingleDateChange(stage.id, e.target.value)}
                       disabled={stage.isCompleted || mode === 'view'}
@@ -1831,6 +1867,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                           initialZones={measurementZones}
                           onZonesChange={handleZonesChange}
                           readOnly={mode === 'view'}
+                          projectId={projectId}
                         />
                       </div>
                     )}
@@ -2055,6 +2092,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                                                   <label className="cursor-pointer">
                                                     <input
                                                       type="file"
+                                                    name={`logger-removal-file-${fileKey}`}
                                                       accept=".vi2,.csv,.xls,.xlsx,.pdf"
                                                       onChange={(e) => handleLoggerRemovalFileUpload(fileKey, e)}
                                                       className="hidden"
@@ -2207,6 +2245,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                       </label>
                       <input
                         type="date"
+                        name={`stage-start-${stage.id}`}
                         value={stage.startDate}
                         onChange={(e) => handleDateChange(stage.id, 'startDate', e.target.value)}
                         disabled={stage.isCompleted || mode === 'view'}
@@ -2226,6 +2265,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                       </label>
                       <input
                         type="date"
+                        name={`stage-end-${stage.id}`}
                         value={stage.endDate}
                         onChange={(e) => handleDateChange(stage.id, 'endDate', e.target.value)}
                         disabled={stage.isCompleted || mode === 'view'}
@@ -2370,6 +2410,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
             <div className="flex items-center space-x-4">
               <input
                 type="file"
+                name="test-documents"
                 multiple
                 accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp"
                 onChange={handleDocumentUpload}

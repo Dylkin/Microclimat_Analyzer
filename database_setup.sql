@@ -124,6 +124,19 @@ CREATE TABLE IF NOT EXISTS public.qualification_objects (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Таблица зон объектов квалификации
+CREATE TABLE IF NOT EXISTS public.qualification_object_zones (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  qualification_object_id UUID NOT NULL REFERENCES public.qualification_objects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  volume NUMERIC(10,2),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_qo_zones_object_id
+ON public.qualification_object_zones(qualification_object_id);
+
 -- Таблица оборудования
 CREATE TABLE IF NOT EXISTS public.equipment (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -430,6 +443,9 @@ CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON public.projects
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TRIGGER update_qualification_objects_updated_at BEFORE UPDATE ON public.qualification_objects
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_qualification_object_zones_updated_at BEFORE UPDATE ON public.qualification_object_zones
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TRIGGER update_equipment_updated_at BEFORE UPDATE ON public.equipment

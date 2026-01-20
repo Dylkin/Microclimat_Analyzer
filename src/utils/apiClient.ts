@@ -3,8 +3,8 @@
 // По умолчанию используем '/api', чтобы в продакшене работать через Nginx reverse proxy,
 // а не ходить на localhost:3001 из браузера пользователя.
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
+  (typeof process !== 'undefined' && process.env?.VITE_API_URL) ||
+  (typeof process !== 'undefined' && process.env?.VITE_API_BASE_URL) ||
   '/api';
 
 // Типы для ответов API

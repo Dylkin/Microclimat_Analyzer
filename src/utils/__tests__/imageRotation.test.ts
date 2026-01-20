@@ -8,6 +8,8 @@ describe('Поворот изображений на 90° против часо�
   let mockContext: CanvasRenderingContext2D;
 
   beforeEach(() => {
+    const originalCreateElement = document.createElement.bind(document);
+
     // Mock для Image
     mockImage = {
       width: 100,
@@ -22,7 +24,8 @@ describe('Поворот изображений на 90° против часо�
     mockCanvas = {
       width: 0,
       height: 0,
-      getContext: jest.fn()
+      getContext: jest.fn(),
+      toBlob: jest.fn()
     } as any;
 
     // Mock для Context
@@ -42,11 +45,11 @@ describe('Поворот изображений на 90° против часо�
       if (tagName === 'canvas') {
         return mockCanvas as any;
       }
-      return document.createElement(tagName);
+      return originalCreateElement(tagName);
     });
 
     // Mock для canvas.toBlob
-    HTMLCanvasElement.prototype.toBlob = jest.fn((callback) => {
+    mockCanvas.toBlob = jest.fn((callback: (blob: Blob | null) => void) => {
       callback?.(new Blob(['test'], { type: 'image/png' }));
     });
 

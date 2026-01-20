@@ -33,6 +33,22 @@ global.IntersectionObserver = jest.fn().mockImplementation(() => ({
 global.URL.createObjectURL = jest.fn(() => 'mock-url');
 global.URL.revokeObjectURL = jest.fn();
 
+// Mock для fetch (используется apiClient в тестах)
+if (!global.fetch) {
+  global.fetch = jest.fn(() =>
+    Promise.resolve({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: () => 'application/json'
+      },
+      text: async () => JSON.stringify({}),
+      json: async () => ({})
+    } as Response)
+  );
+}
+
 // Mock для console methods to reduce noise in tests
 const originalError = console.error;
 const originalWarn = console.warn;
