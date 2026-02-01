@@ -8,6 +8,7 @@ export interface TemplateReportData {
   analysisResults: any[];
   conclusions?: string;
   researchObject?: string;
+  storageZoneName?: string;
   conditioningSystem?: string;
   testType?: string; // Код типа испытания (empty_volume, loaded_volume и т.д.) - используется для логики
   testTypeLabel?: string; // Читаемое название типа испытания - используется для плейсхолдера {NameTest}
@@ -743,7 +744,8 @@ export class DocxTemplateProcessor {
     let previousConclusions = '';
     if (previousData.conclusions && previousData.conclusions.trim()) {
       // Все выводы формируются с размером шрифта 12 (Times New Roman 12pt)
-      const formattedPreviousConclusions = this.convertHtmlBoldToDocx(previousData.conclusions, true);
+      const preparedPreviousConclusions = this.formatConclusionsText(previousData.conclusions, previousData.testType);
+      const formattedPreviousConclusions = this.convertHtmlBoldToDocx(preparedPreviousConclusions, true);
       previousConclusions = `
         <w:p>
           <w:pPr>
@@ -762,7 +764,7 @@ export class DocxTemplateProcessor {
           <w:pPr>
             <w:spacing w:before="0" w:after="240"/>
           </w:pPr>
-          ${formattedPreviousConclusions}
+          <w:br/><w:br/>${formattedPreviousConclusions}
         </w:p>`;
     }
 
@@ -1209,15 +1211,17 @@ export class DocxTemplateProcessor {
     if (data.conclusions) {
       // Преобразуем HTML-теги <b> в DOCX-формат перед экранированием
       // Все выводы формируются с размером шрифта 12 (Times New Roman 12pt)
-      const formattedConclusions = this.convertHtmlBoldToDocx(data.conclusions, true);
-      result = result.replace(/{Result}/g, formattedConclusions);
+      const preparedConclusions = this.formatConclusionsText(data.conclusions, data.testType);
+      const formattedConclusions = this.convertHtmlBoldToDocx(preparedConclusions, true);
+      result = result.replace(/{Result}/g, `<w:br/><w:br/>${formattedConclusions}`);
     } else {
       result = result.replace(/{Result}/g, '');
     }
 
     // Обработка плейсхолдера {Object} для наименования объекта квалификации
     if (data.researchObject) {
-      result = result.replace(/{Object}/g, this.escapeXml(data.researchObject));
+      const storageZoneSuffix = data.storageZoneName ? ` ${data.storageZoneName}` : '';
+      result = result.replace(/{Object}/g, this.escapeXml(`${data.researchObject}${storageZoneSuffix}`));
     } else {
       result = result.replace(/{Object}/g, '');
     }
@@ -1465,6 +1469,20 @@ export class DocxTemplateProcessor {
       }
     }
     
+    return result;
+  }
+
+  private formatConclusionsText(text: string, testType?: string): string {
+    if (!text) return '';
+    let result = text;
+    if (testType === 'temperature_recovery') {
+      const phrase = 'За время проведения испытания температура за контролируемые пределы';
+      const hasLineBreak = new RegExp(`\\n\\s*(?:<b>)?${phrase}`).test(result);
+      if (!hasLineBreak) {
+        const phraseRegex = new RegExp(`(?:<b>)?${phrase}`);
+        result = result.replace(phraseRegex, (match) => `\n${match}`);
+      }
+    }
     return result;
   }
 
@@ -1911,14 +1929,19 @@ export class DocxTemplateProcessor {
       return this.createTemperatureRecoveryTableXml(results, points, markers, limits, acceptanceCriterion, escapeXml, (points, doorMarkers, minLimit, maxLimit) => calculateRecoveryTimeAfterDoorOpening(points, doorMarkers, minLimit, maxLimit, acceptanceCriterion), zoomState);
     } else {
       // Стандартная таблица для empty_volume и loaded_volume
-      return this.createStandardTableXml(results, dataType, escapeXml);
+      return this.createStandardTableXml(results, dataType, escapeXml, limits);
     }
   }
 
   /**
    * Создание стандартной таблицы для empty_volume и loaded_volume
    */
-  private createStandardTableXml(results: any[], dataType: 'temperature' | 'humidity', escapeXml: (text: string) => string): string {
+  private createStandardTableXml(
+    results: any[],
+    dataType: 'temperature' | 'humidity',
+    escapeXml: (text: string) => string,
+    limits: any = {}
+  ): string {
     // Сортируем результаты: внешние датчики в конце, затем по номеру зоны и уровню
     const sortedResults = [...results].sort((a, b) => {
       const isExternalA = a.isExternal || a.zoneNumber?.toString() === '0' || a.zoneNumber === 'Внешний';
@@ -1954,132 +1977,83 @@ export class DocxTemplateProcessor {
     const globalMinTemp = minTempValues.length > 0 ? Math.min(...minTempValues) : null;
     const globalMaxTemp = maxTempValues.length > 0 ? Math.max(...maxTempValues) : null;
 
-    // Заголовок таблицы
-    const headerRow = `
+    const limitMin = limits?.temperature?.min;
+    const limitMax = limits?.temperature?.max;
+    const hasLimits = typeof limitMin === 'number' && typeof limitMax === 'number';
+    const limitCenter = hasLimits ? (limitMin + limitMax) / 2 : null;
+    const limitCenterLabel = hasLimits && limitCenter !== null
+      ? limitCenter.toFixed(1).replace('.', ',')
+      : 'X';
+
+    const headerCell = (text: string, extraPr: string = '') => `
+        <w:tc>
+          <w:tcPr>
+            <w:tcBorders>
+              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            </w:tcBorders>
+            <w:shd w:val="clear" w:color="auto" w:fill="4472C4"/>
+            ${extraPr}
+          </w:tcPr>
+          <w:p>
+            <w:pPr><w:jc w:val="center"/></w:pPr>
+            <w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>${escapeXml(text)}</w:t></w:r>
+          </w:p>
+        </w:tc>`;
+
+    const headerRowTop = `
       <w:tr>
-        <w:tc>
-          <w:tcPr>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-            <w:shd w:val="clear" w:color="auto" w:fill="4472C4"/>
-          </w:tcPr>
-          <w:p>
-            <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>№ зоны</w:t></w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-            <w:shd w:val="clear" w:color="auto" w:fill="4472C4"/>
-          </w:tcPr>
-          <w:p>
-            <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Уровень (м.)</w:t></w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-            <w:shd w:val="clear" w:color="auto" w:fill="4472C4"/>
-          </w:tcPr>
-          <w:p>
-            <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Наименование логгера</w:t></w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-            <w:shd w:val="clear" w:color="auto" w:fill="4472C4"/>
-          </w:tcPr>
-          <w:p>
-            <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Серийный № логгера</w:t></w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-            <w:shd w:val="clear" w:color="auto" w:fill="4472C4"/>
-          </w:tcPr>
-          <w:p>
-            <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Мин. t°C</w:t></w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-            <w:shd w:val="clear" w:color="auto" w:fill="4472C4"/>
-          </w:tcPr>
-          <w:p>
-            <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Макс. t°C</w:t></w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-            <w:shd w:val="clear" w:color="auto" w:fill="4472C4"/>
-          </w:tcPr>
-          <w:p>
-            <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Среднее t°C</w:t></w:r>
-          </w:p>
-        </w:tc>
-        <w:tc>
-          <w:tcPr>
-            <w:tcBorders>
-              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-            </w:tcBorders>
-            <w:shd w:val="clear" w:color="auto" w:fill="4472C4"/>
-          </w:tcPr>
-          <w:p>
-            <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Соответствие критериям</w:t></w:r>
-          </w:p>
-        </w:tc>
+        ${headerCell('№ зоны', '<w:vMerge w:val="restart"/>')}
+        ${headerCell('Уровень (м.)', '<w:vMerge w:val="restart"/>')}
+        ${headerCell('Наименование логгера', '<w:vMerge w:val="restart"/>')}
+        ${headerCell('Серийный № логгера', '<w:vMerge w:val="restart"/>')}
+        ${headerCell('Мин. t°C', '<w:vMerge w:val="restart"/>')}
+        ${headerCell('Макс. t°C', '<w:vMerge w:val="restart"/>')}
+        ${headerCell('Среднее t°C', '<w:vMerge w:val="restart"/>')}
+        ${headerCell(`Отклонение от среднего значения (${limitCenterLabel}°C) установленного диапазона (по модулю)`, '<w:gridSpan w:val="2"/>')}
+        ${headerCell('Соответствие критериям', '<w:vMerge w:val="restart"/>')}
+      </w:tr>`;
+
+    const headerRowBottom = `
+      <w:tr>
+        ${headerCell('', '<w:vMerge/>')}
+        ${headerCell('', '<w:vMerge/>')}
+        ${headerCell('', '<w:vMerge/>')}
+        ${headerCell('', '<w:vMerge/>')}
+        ${headerCell('', '<w:vMerge/>')}
+        ${headerCell('', '<w:vMerge/>')}
+        ${headerCell('', '<w:vMerge/>')}
+        ${headerCell('Мин.')}
+        ${headerCell('Макс.')}
+        ${headerCell('', '<w:vMerge/>')}
       </w:tr>`;
 
     // Строки данных
+    const deviationMinValues = sortedResults
+      .filter(result => !result.isExternal)
+      .map(result => {
+        if (!hasLimits || limitCenter === null) {
+          return null;
+        }
+        const parsed = parseFloat(result.minTemp);
+        return isNaN(parsed) ? null : Math.abs(parsed - limitCenter);
+      })
+      .filter((val): val is number => val !== null);
+    const deviationMaxValues = sortedResults
+      .filter(result => !result.isExternal)
+      .map(result => {
+        if (!hasLimits || limitCenter === null) {
+          return null;
+        }
+        const parsed = parseFloat(result.maxTemp);
+        return isNaN(parsed) ? null : Math.abs(parsed - limitCenter);
+      })
+      .filter((val): val is number => val !== null);
+    const maxDeviationMin = deviationMinValues.length > 0 ? Math.max(...deviationMinValues) : null;
+    const maxDeviationMax = deviationMaxValues.length > 0 ? Math.max(...deviationMaxValues) : null;
+
     const dataRows = sortedResults.map(result => {
       // Определяем цвет фона для соответствия лимитам
       const complianceColor = result.meetsLimits === 'Да' ? 'C6EFCE' : 
@@ -2108,6 +2082,43 @@ export class DocxTemplateProcessor {
       const avgTempFormatted = isNaN(avgNumber)
         ? (avgRaw !== undefined && avgRaw !== null ? avgRaw.toString() : '-')
         : avgNumber.toFixed(1).replace('.', ',');
+      
+      const deviationMinValue = (() => {
+        if (result.isExternal || !hasLimits || limitCenter === null) {
+          return null;
+        }
+        const parsed = parseFloat(result.minTemp);
+        if (isNaN(parsed)) {
+          return null;
+        }
+        return Math.abs(parsed - limitCenter);
+      })();
+
+      const deviationMaxValue = (() => {
+        if (result.isExternal || !hasLimits || limitCenter === null) {
+          return null;
+        }
+        const parsed = parseFloat(result.maxTemp);
+        if (isNaN(parsed)) {
+          return null;
+        }
+        return Math.abs(parsed - limitCenter);
+      })();
+
+      const deviationMinFormatted = deviationMinValue === null
+        ? '-'
+        : deviationMinValue.toFixed(1).replace('.', ',');
+
+      const deviationMaxFormatted = deviationMaxValue === null
+        ? '-'
+        : deviationMaxValue.toFixed(1).replace('.', ',');
+
+      const deviationMinColor = deviationMinValue !== null && maxDeviationMin !== null && deviationMinValue === maxDeviationMin
+        ? 'D9D9D9'
+        : 'FFFFFF';
+      const deviationMaxColor = deviationMaxValue !== null && maxDeviationMax !== null && deviationMaxValue === maxDeviationMax
+        ? 'D9D9D9'
+        : 'FFFFFF';
 
       return `
         <w:tr>
@@ -2219,6 +2230,36 @@ export class DocxTemplateProcessor {
                 <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
                 <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
               </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="${deviationMinColor}"/>
+            </w:tcPr>
+            <w:p>
+              <w:pPr><w:jc w:val="center"/></w:pPr>
+              <w:r><w:t>${escapeXml(deviationMinFormatted)}</w:t></w:r>
+            </w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
+              <w:shd w:val="clear" w:color="auto" w:fill="${deviationMaxColor}"/>
+            </w:tcPr>
+            <w:p>
+              <w:pPr><w:jc w:val="center"/></w:pPr>
+              <w:r><w:t>${escapeXml(deviationMaxFormatted)}</w:t></w:r>
+            </w:p>
+          </w:tc>
+          <w:tc>
+            <w:tcPr>
+              <w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              </w:tcBorders>
               <w:shd w:val="clear" w:color="auto" w:fill="${complianceColor}"/>
             </w:tcPr>
             <w:p>
@@ -2253,8 +2294,11 @@ export class DocxTemplateProcessor {
           <w:gridCol w:w="2000"/>
           <w:gridCol w:w="2000"/>
           <w:gridCol w:w="2000"/>
+          <w:gridCol w:w="2000"/>
+          <w:gridCol w:w="2000"/>
         </w:tblGrid>
-        ${headerRow}
+        ${headerRowTop}
+        ${headerRowBottom}
         ${dataRows}
       </w:tbl>`;
     
@@ -2296,11 +2340,11 @@ export class DocxTemplateProcessor {
 
     const headerRow = `
       <w:tr>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Номер логгера</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Серийный № логгера</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Питание отключено. Время, в течение которого температура находится в требуемом диапазоне, (час: мин)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Номер логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Серийный № логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Питание отключено. Время, в течение которого температура находится в требуемом диапазоне, (час: мин)</w:t></w:r></w:p></w:tc>
       </w:tr>`;
 
     // Показываем все датчики, но для внешних не рассчитываем время
@@ -2367,11 +2411,11 @@ export class DocxTemplateProcessor {
 
     const headerRow = `
       <w:tr>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Номер логгера</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Серийный № логгера</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Питание включено. Время восстановления до требуемого диапазона температур, (час: мин)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Номер логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Серийный № логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Питание включено. Время восстановления до требуемого диапазона температур, (час: мин)</w:t></w:r></w:p></w:tc>
       </w:tr>`;
 
     // Показываем все датчики, но для внешних не рассчитываем время
@@ -2442,12 +2486,12 @@ export class DocxTemplateProcessor {
 
     const headerRow = `
       <w:tr>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Номер логгера</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Серийный № логгера</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Время восстановления до заданного диапазона температур, (час: мин)</w:t></w:r></w:p></w:tc>
-        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/></w:rPr><w:t>Соответствует критерию</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>№ зоны</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Уровень (м.)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Номер логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Серийный № логгера</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Время восстановления до заданного диапазона температур, (час: мин)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="4472C4"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>Соответствует критерию</w:t></w:r></w:p></w:tc>
       </w:tr>`;
 
     const dataRows = results.map(result => {
@@ -2658,7 +2702,8 @@ export class DocxTemplateProcessor {
     let conclusions = '';
     if (data.conclusions && data.conclusions.trim()) {
       // Все выводы формируются с размером шрифта 12 (Times New Roman 12pt)
-      const formattedConclusions = this.convertHtmlBoldToDocx(data.conclusions, true);
+      const preparedConclusions = this.formatConclusionsText(data.conclusions, data.testType);
+      const formattedConclusions = this.convertHtmlBoldToDocx(preparedConclusions, true);
       conclusions = `
         <w:p>
           <w:pPr>
@@ -2677,7 +2722,7 @@ export class DocxTemplateProcessor {
           <w:pPr>
             <w:spacing w:before="0" w:after="240"/>
           </w:pPr>
-          ${formattedConclusions}
+          <w:br/><w:br/>${formattedConclusions}
         </w:p>`;
     }
 

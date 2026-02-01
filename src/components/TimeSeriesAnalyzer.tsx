@@ -1725,6 +1725,17 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       const convertedTestType = getTestTypeLabel(contractFields.testType);
       console.log('Converted test type:', convertedTestType);
+
+      const selectedStorageZone = (storageZones || []).find(zone => zone.id === selectedStorageZoneId);
+      const selectedStorageZoneName = selectedStorageZone
+        ? (selectedStorageZone.name && selectedStorageZone.name.trim().length > 0 ? selectedStorageZone.name : 'Без наименования')
+        : '';
+      const selectedStorageZoneVolumeLabel = selectedStorageZone && selectedStorageZone.volume !== undefined && selectedStorageZone.volume !== null
+        ? ` (${selectedStorageZone.volume}м³)`
+        : '';
+      const selectedStorageZoneLabel = selectedStorageZoneName
+        ? `${selectedStorageZoneName}${selectedStorageZoneVolumeLabel}`
+        : '';
       
       const templateData: TemplateReportData = {
         title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
@@ -1733,6 +1744,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         analysisResults,
         conclusions,
         researchObject: qualificationObject?.name || 'Не указан',
+        storageZoneName: selectedStorageZoneLabel,
         conditioningSystem: qualificationObject?.climateSystem || '',
        testType: contractFields.testType || '', // Передаем исходный testType (empty_volume, loaded_volume и т.д.) для логики
         testTypeLabel: convertedTestType || '', // Передаем преобразованное название для плейсхолдера {NameTest}
@@ -1811,6 +1823,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 dataType,
                 analysisResults,
                 contractFields,
+                storageZoneName: selectedStorageZoneLabel,
                 conclusions,
                 markers,
                 limits
@@ -1833,6 +1846,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 dataType,
                 analysisResults,
                 contractFields,
+                storageZoneName: selectedStorageZoneLabel,
                 conclusions,
                 markers,
                 limits
@@ -2907,14 +2921,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       
       if (!hasExceededLimits) {
         // Температура не выходила за пределы
-        conclusionText = `${markersInfo}<b>За время проведения испытания температура за контролируемые пределы</b> не выходила, <b>что соответствует</b> установленному критерию приемлемости (<b>${acceptanceCriterion}</b> мин.).\n<b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
+        conclusionText = `${markersInfo}За время проведения испытания температура за контролируемые пределы не выходила, <b>что соответствует</b> установленному критерию приемлемости (<b>${acceptanceCriterion}</b> мин).\n<b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
       } else {
         // Температура выходила за пределы
         const maxTimeText = maxTimeLogger.recoveryTime;
         
         const maxTimeMeetsCriterion = maxTimeLogger.meetsCriterion === 'Да' ? 'соответствует' : 'не соответствует';
         
-        conclusionText = `${markersInfo}<b>За время проведения испытания температура за контролируемые пределы</b> выходила, <b>максимальное время выхода зафиксировано логгером</b> ${maxTimeLogger.loggerName} <b>и составило</b> ${maxTimeText}, <b>что</b> ${maxTimeMeetsCriterion} <b>установленному критерию приемлемости</b> (<b>${acceptanceCriterion}</b> мин.).\n<b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
+        conclusionText = `${markersInfo}За время проведения испытания температура за контролируемые пределы выходила, <b>максимальное время выхода зафиксировано логгером</b> ${maxTimeLogger.loggerName} <b>и составило</b> ${maxTimeText}, <b>что</b> ${maxTimeMeetsCriterion} <b>установленному критерию приемлемости</b> (<b>${acceptanceCriterion}</b> мин).\n<b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
       }
 
       setConclusions(conclusionText);
@@ -3869,35 +3883,81 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         
         // Стандартная таблица для empty_volume и loaded_volume
         if (testType === 'empty_volume' || testType === 'loaded_volume') {
+          const limitMin = limits.temperature?.min;
+          const limitMax = limits.temperature?.max;
+          const hasLimits = typeof limitMin === 'number' && typeof limitMax === 'number';
+          const limitCenter = hasLimits ? (limitMin + limitMax) / 2 : null;
+          const limitCenterLabel = hasLimits && limitCenter !== null
+            ? (Math.round(limitCenter * 10) / 10).toString().replace('.', ',')
+            : 'X';
+          const getDeviationValue = (value: string, isExternal: boolean) => {
+            if (isExternal || !hasLimits || limitCenter === null) {
+              return null;
+            }
+            const parsed = parseFloat(value);
+            if (isNaN(parsed)) {
+              return null;
+            }
+            return Math.abs(parsed - limitCenter);
+          };
+          const formatDeviation = (value: string, isExternal: boolean) => {
+            const deviation = getDeviationValue(value, isExternal);
+            if (deviation === null) {
+              return '-';
+            }
+            return (Math.round(deviation * 10) / 10).toString().replace('.', ',');
+          };
+          const deviationMinValues = analysisResults
+            .map((result) => getDeviationValue(result.minTemp, result.isExternal))
+            .filter((val): val is number => val !== null);
+          const deviationMaxValues = analysisResults
+            .map((result) => getDeviationValue(result.maxTemp, result.isExternal))
+            .filter((val): val is number => val !== null);
+          const maxDeviationMin = deviationMinValues.length > 0 ? Math.max(...deviationMinValues) : null;
+          const maxDeviationMax = deviationMaxValues.length > 0 ? Math.max(...deviationMaxValues) : null;
           return (
             <>
             <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" rowSpan={2}>
                     № зоны измерения
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" rowSpan={2}>
                     Уровень измерения (м.)
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" rowSpan={2}>
                     Наименование логгера
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" rowSpan={2}>
                     Серийный № логгера
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" rowSpan={2}>
                     Мин. t°C
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" rowSpan={2}>
                     Макс. t°C
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" rowSpan={2}>
                     Среднее t°C
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th
+                    className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    colSpan={2}
+                  >
+                    {`Отклонение от среднего значения (${limitCenterLabel}°C) установленного диапазона (по модулю)`}
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" rowSpan={2}>
                     Соответствие критериям
+                  </th>
+                </tr>
+                <tr>
+                  <th className="px-6 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Мин.
+                  </th>
+                  <th className="px-6 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Макс.
                   </th>
                 </tr>
               </thead>
@@ -3916,7 +3976,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {result.serialNumber}
                     </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center ${
                       !result.isExternal && !isNaN(parseFloat(result.minTemp)) && 
                       globalMinTemp !== null && parseFloat(result.minTemp) === globalMinTemp
                         ? 'bg-blue-200' 
@@ -3924,7 +3984,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     }`}>
                       {result.minTemp}
                     </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center ${
                       !result.isExternal && !isNaN(parseFloat(result.maxTemp)) && 
                       globalMaxTemp !== null && parseFloat(result.maxTemp) === globalMaxTemp
                         ? 'bg-red-200' 
@@ -3932,10 +3992,26 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                     }`}>
                       {result.maxTemp}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                       {result.avgTemp === '-' || !result.avgTemp ? '-' : parseFloat(result.avgTemp).toFixed(1).replace('.', ',')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center ${
+                      maxDeviationMin !== null &&
+                      getDeviationValue(result.minTemp, result.isExternal) === maxDeviationMin
+                        ? 'bg-gray-300'
+                        : ''
+                    }`}>
+                      {formatDeviation(result.minTemp, result.isExternal)}
+                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center ${
+                      maxDeviationMax !== null &&
+                      getDeviationValue(result.maxTemp, result.isExternal) === maxDeviationMax
+                        ? 'bg-gray-300'
+                        : ''
+                    }`}>
+                      {formatDeviation(result.maxTemp, result.isExternal)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         result.meetsLimits === 'Да' 
                           ? 'bg-green-100 text-green-800' 
