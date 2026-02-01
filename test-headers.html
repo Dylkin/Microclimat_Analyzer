@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест заголовков</title>
+</head>
+<body>
+    <h1>Тест передачи заголовка x-user-id</h1>
+    <button onclick="testHeaders()">Проверить заголовки</button>
+    <pre id="result"></pre>
+
+    <script>
+        async function testHeaders() {
+            const resultEl = document.getElementById('result');
+            
+            // Получаем currentUser из localStorage
+            const currentUserStr = localStorage.getItem('currentUser');
+            const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+            
+            resultEl.textContent = 'Проверка...\n';
+            resultEl.textContent += 'currentUser: ' + JSON.stringify(currentUser, null, 2) + '\n\n';
+            
+            if (!currentUser || !currentUser.id) {
+                resultEl.textContent += 'ОШИБКА: currentUser не найден или не содержит id';
+                return;
+            }
+            
+            // Создаем заголовки
+            const headers = {
+                'Content-Type': 'application/json',
+                'x-user-id': currentUser.id,
+                'X-User-Id': currentUser.id,
+                'x-userid': currentUser.id
+            };
+            
+            resultEl.textContent += 'Отправляемые заголовки:\n';
+            resultEl.textContent += JSON.stringify(headers, null, 2) + '\n\n';
+            
+            try {
+                // Отправляем запрос
+                const response = await fetch('/api/projects/test-headers', {
+                    method: 'GET',
+                    headers: headers
+                });
+                
+                const data = await response.json();
+                
+                resultEl.textContent += 'Ответ от сервера:\n';
+                resultEl.textContent += JSON.stringify(data, null, 2) + '\n\n';
+                
+                // Проверяем, есть ли x-user-id в ответе
+                if (data.xHeaders && data.xHeaders['x-user-id']) {
+                    resultEl.textContent += '✅ Заголовок x-user-id ДОШЕЛ до backend: ' + data.xHeaders['x-user-id'];
+                } else {
+                    resultEl.textContent += '❌ Заголовок x-user-id НЕ дошел до backend';
+                    resultEl.textContent += '\n\nВсе заголовки, начинающиеся с x-:\n';
+                    resultEl.textContent += JSON.stringify(data.xHeaders, null, 2);
+                }
+            } catch (error) {
+                resultEl.textContent += 'ОШИБКА: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
+
