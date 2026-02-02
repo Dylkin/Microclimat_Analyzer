@@ -533,6 +533,16 @@ router.post('/', requireAuth, async (req, res) => {
           AND table_name = 'project_qualification_objects'
         )
       `);
+
+      const dataTableCheck = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'project_qualification_object_data'
+        )
+      `);
+
+      const hasProjectObjectDataTable = dataTableCheck.rows[0].exists;
       
       if (tableCheck.rows[0].exists) {
         // Вставляем связи в таблицу project_qualification_objects
@@ -543,6 +553,14 @@ router.post('/', requireAuth, async (req, res) => {
               VALUES ($1, $2)
               ON CONFLICT (project_id, qualification_object_id) DO NOTHING
             `, [projectId, objectId]);
+
+            if (hasProjectObjectDataTable) {
+              await client.query(`
+                INSERT INTO project_qualification_object_data (project_id, qualification_object_id)
+                VALUES ($1, $2)
+                ON CONFLICT (project_id, qualification_object_id) DO NOTHING
+              `, [projectId, objectId]);
+            }
           } catch (linkError: any) {
             console.error(`Ошибка добавления связи с объектом ${objectId}:`, linkError);
             // Продолжаем с другими объектами
@@ -894,6 +912,16 @@ router.put('/:id', requireAuth, async (req, res) => {
         ) as exists
       `);
 
+      const dataTableCheck = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_schema = 'public'
+          AND table_name = 'project_qualification_object_data'
+        ) as exists
+      `);
+
+      const hasProjectObjectDataTable = dataTableCheck.rows[0].exists;
+
       if (tableCheck.rows[0].exists) {
         await client.query(`DELETE FROM project_qualification_objects WHERE project_id = $1`, [id]);
 
@@ -904,6 +932,31 @@ router.put('/:id', requireAuth, async (req, res) => {
              ON CONFLICT (project_id, qualification_object_id) DO NOTHING`,
             [id, objectId],
           );
+
+          if (hasProjectObjectDataTable) {
+            await client.query(
+              `INSERT INTO project_qualification_object_data (project_id, qualification_object_id)
+               VALUES ($1, $2)
+               ON CONFLICT (project_id, qualification_object_id) DO NOTHING`,
+              [id, objectId],
+            );
+          }
+        }
+
+        if (hasProjectObjectDataTable) {
+          if (qualificationObjectIds.length === 0) {
+            await client.query(
+              `DELETE FROM project_qualification_object_data WHERE project_id = $1`,
+              [id],
+            );
+          } else {
+            const placeholders = qualificationObjectIds.map((_, idx) => `$${idx + 2}`).join(', ');
+            await client.query(
+              `DELETE FROM project_qualification_object_data
+               WHERE project_id = $1 AND qualification_object_id NOT IN (${placeholders})`,
+              [id, ...qualificationObjectIds],
+            );
+          }
         }
       } else {
         // Фолбэк на старую схему (qualification_objects.project_id)

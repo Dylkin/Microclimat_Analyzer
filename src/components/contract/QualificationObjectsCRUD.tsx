@@ -88,7 +88,11 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
     setError(null);
 
     try {
-      const data = await qualificationObjectService.getQualificationObjectsByContractor(contractorId);
+      const shouldScopeToProject = Boolean(projectId && filterToProjectSelection);
+      const data = await qualificationObjectService.getQualificationObjectsByContractor(
+        contractorId,
+        shouldScopeToProject ? projectId : undefined
+      );
       setObjects(data);
     } catch (error) {
       console.error('Ошибка загрузки объектов:', error);
@@ -160,7 +164,8 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
       // Обновляем объект в базе данных
       const updatedObject = await qualificationObjectService.updateQualificationObject(
         object.id,
-        object
+        object,
+        projectId
       );
       
       // Обновляем локальное состояние
@@ -496,7 +501,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                           try {
                             setLoadingObject(true);
                             // Загружаем полные данные объекта из API перед открытием просмотра
-                            const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id);
+                            const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id, projectId);
                             setViewingObject(fullObject);
                             setEditingObject(null); // Очищаем редактирование, если было открыто
                             setObjectMode('view');
@@ -523,7 +528,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                             try {
                               setLoadingObject(true);
                               // Загружаем полные данные объекта из API перед открытием в режиме редактирования (Выполнить)
-                              const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id);
+                              const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id, projectId);
                               setEditingObject(fullObject);
                               setViewingObject(null);
                               setObjectMode('edit');

@@ -125,6 +125,38 @@ CREATE TABLE IF NOT EXISTS public.qualification_objects (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Таблица данных объекта квалификации в рамках проекта (полная изоляция проектов)
+CREATE TABLE IF NOT EXISTS public.project_qualification_object_data (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  qualification_object_id UUID NOT NULL REFERENCES public.qualification_objects(id) ON DELETE CASCADE,
+  storage_zones JSONB DEFAULT '[]'::jsonb,
+  climate_system TEXT,
+  temperature_limits JSONB DEFAULT '{"min": null, "max": null}',
+  humidity_limits JSONB DEFAULT '{"min": null, "max": null}',
+  measurement_zones JSONB DEFAULT '[]'::jsonb,
+  work_schedule JSONB DEFAULT '[]',
+  plan_file_url TEXT,
+  plan_file_name TEXT,
+  test_data_file_url TEXT,
+  test_data_file_name TEXT,
+  address TEXT,
+  latitude NUMERIC(10,8),
+  longitude NUMERIC(11,8),
+  geocoded_at TIMESTAMP WITH TIME ZONE,
+  area NUMERIC(10,2),
+  vin TEXT,
+  registration_number TEXT,
+  body_volume NUMERIC(10,2),
+  inventory_number TEXT,
+  chamber_volume NUMERIC(10,2),
+  serial_number TEXT,
+  manufacturer TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(project_id, qualification_object_id)
+);
+
 -- Таблица оборудования
 CREATE TABLE IF NOT EXISTS public.equipment (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -345,6 +377,10 @@ CREATE INDEX IF NOT EXISTS idx_projects_created_by ON public.projects(created_by
 CREATE INDEX IF NOT EXISTS idx_qualification_objects_project ON public.qualification_objects(project_id);
 CREATE INDEX IF NOT EXISTS idx_qualification_objects_type ON public.qualification_objects(object_type);
 
+-- Индексы для project_qualification_object_data
+CREATE INDEX IF NOT EXISTS idx_project_qo_data_project ON public.project_qualification_object_data(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_qo_data_object ON public.project_qualification_object_data(qualification_object_id);
+
 -- Индексы для equipment
 CREATE INDEX IF NOT EXISTS idx_equipment_serial ON public.equipment(serial_number);
 CREATE INDEX IF NOT EXISTS idx_equipment_status ON public.equipment(status);
@@ -431,6 +467,9 @@ CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON public.projects
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TRIGGER update_qualification_objects_updated_at BEFORE UPDATE ON public.qualification_objects
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER update_project_qualification_object_data_updated_at BEFORE UPDATE ON public.project_qualification_object_data
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TRIGGER update_equipment_updated_at BEFORE UPDATE ON public.equipment

@@ -10,13 +10,15 @@ interface EquipmentPlacementProps {
   initialZones?: MeasurementZone[];
   onZonesChange?: (zones: MeasurementZone[]) => void;
   readOnly?: boolean;
+  projectId?: string;
 }
 
 export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
   qualificationObjectId,
   initialZones = [],
   onZonesChange,
-  readOnly = false
+  readOnly = false,
+  projectId
 }) => {
   // Инициализируем с зоной 0 (Внешняя температура), если зон нет
   const initializeZones = (zones: MeasurementZone[]): MeasurementZone[] => {
@@ -275,7 +277,7 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
     setSaveSuccess(null);
 
     try {
-      await qualificationObjectService.updateMeasurementZones(qualificationObjectId, measurementZones);
+      await qualificationObjectService.updateMeasurementZones(qualificationObjectId, measurementZones, projectId);
       setSaveSuccess('Зоны измерения успешно сохранены');
       
       // Автоматически скрываем сообщение об успехе через 3 секунды

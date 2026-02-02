@@ -19,9 +19,18 @@ class QualificationObjectService {
     return true; // API всегда доступен
   }
 
-  async getAllQualificationObjects(): Promise<QualificationObject[]> {
+  private buildProjectPath(prefix: string, objectId: string, projectId?: string): string {
+    return projectId ? `${prefix}/${projectId}/${objectId}` : `${prefix}/${objectId}`;
+  }
+
+  async getAllQualificationObjects(projectId?: string): Promise<QualificationObject[]> {
     try {
-      const data = await apiClient.get<any[]>('/qualification-objects');
+      const params = new URLSearchParams();
+      if (projectId) {
+        params.set('project_id', projectId);
+      }
+      const url = params.toString() ? `/qualification-objects?${params.toString()}` : '/qualification-objects';
+      const data = await apiClient.get<any[]>(url);
       return data.map(item => this.mapFromApi(item));
     } catch (error: any) {
       console.error('Ошибка загрузки объектов квалификации:', error);
@@ -29,9 +38,13 @@ class QualificationObjectService {
     }
   }
 
-  async getQualificationObjectsByContractor(contractorId: string): Promise<QualificationObject[]> {
+  async getQualificationObjectsByContractor(contractorId: string, projectId?: string): Promise<QualificationObject[]> {
     try {
-      const data = await apiClient.get<any[]>(`/qualification-objects?contractor_id=${contractorId}`);
+      const params = new URLSearchParams({ contractor_id: contractorId });
+      if (projectId) {
+        params.set('project_id', projectId);
+      }
+      const data = await apiClient.get<any[]>(`/qualification-objects?${params.toString()}`);
       return data.map(item => this.mapFromApi(item));
     } catch (error: any) {
       console.error('Ошибка загрузки объектов квалификации контрагента:', error);
@@ -39,10 +52,15 @@ class QualificationObjectService {
     }
   }
 
-  async getQualificationObjectById(id: string): Promise<QualificationObject> {
+  async getQualificationObjectById(id: string, projectId?: string): Promise<QualificationObject> {
     try {
       console.log('Загрузка объекта квалификации по ID:', id);
-      const data = await apiClient.get<any>(`/qualification-objects/${id}`);
+      const params = new URLSearchParams();
+      if (projectId) {
+        params.set('project_id', projectId);
+      }
+      const url = params.toString() ? `/qualification-objects/${id}?${params.toString()}` : `/qualification-objects/${id}`;
+      const data = await apiClient.get<any>(url);
       return this.mapFromApi(data);
     } catch (error: any) {
       console.error('Ошибка загрузки объекта квалификации:', error);
@@ -51,9 +69,9 @@ class QualificationObjectService {
   }
 
 
-  async createQualificationObject(qualificationObject: CreateQualificationObjectData): Promise<QualificationObject> {
+  async createQualificationObject(qualificationObject: CreateQualificationObjectData, projectId?: string): Promise<QualificationObject> {
     try {
-      const dbData = this.mapToDatabase(qualificationObject);
+      const dbData = this.mapToDatabase({ ...qualificationObject, projectId });
       const data = await apiClient.post<any>('/qualification-objects', dbData);
       return this.mapFromApi(data);
     } catch (error: any) {
@@ -62,9 +80,9 @@ class QualificationObjectService {
     }
   }
 
-  async updateQualificationObject(id: string, updates: Partial<QualificationObject> | CreateQualificationObjectData): Promise<QualificationObject> {
+  async updateQualificationObject(id: string, updates: Partial<QualificationObject> | CreateQualificationObjectData, projectId?: string): Promise<QualificationObject> {
     try {
-      const dbUpdates = this.mapToDatabase(updates);
+      const dbUpdates = this.mapToDatabase({ ...updates, projectId });
       const data = await apiClient.put<any>(`/qualification-objects/${id}`, dbUpdates);
       return this.mapFromApi(data);
     } catch (error: any) {
@@ -74,7 +92,7 @@ class QualificationObjectService {
   }
 
   // Обновление зон измерения для объекта квалификации
-  async updateMeasurementZones(objectId: string, measurementZones: any[]): Promise<QualificationObject> {
+  async updateMeasurementZones(objectId: string, measurementZones: any[], projectId?: string): Promise<QualificationObject> {
     try {
       console.log('Сохранение зон измерения:', {
         objectId,
@@ -83,7 +101,8 @@ class QualificationObjectService {
       });
 
       const data = await apiClient.patch<any>(`/qualification-objects/${objectId}`, {
-        measurementZones: measurementZones
+        measurementZones: measurementZones,
+        projectId
       });
 
       console.log('Зоны измерения успешно сохранены:', data);
@@ -103,11 +122,12 @@ class QualificationObjectService {
     }
   }
 
-  async uploadPlanFile(objectId: string, file: File): Promise<string> {
+  async uploadPlanFile(objectId: string, file: File, projectId?: string): Promise<string> {
     try {
       // Очищаем имя файла от недопустимых символов
       const sanitizedFileName = sanitizeFileName(file.name);
-      const fileName = `plans/${objectId}/${Date.now()}-${sanitizedFileName}`;
+      const basePath = this.buildProjectPath('plans', objectId, projectId);
+      const fileName = `${basePath}/${Date.now()}-${sanitizedFileName}`;
 
       // Загружаем файл через API
       const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
@@ -120,7 +140,8 @@ class QualificationObjectService {
       // Обновляем объект с URL файла
       await apiClient.patch(`/qualification-objects/${objectId}`, {
         planFileUrl: publicUrl,
-        planFileName: file.name
+        planFileName: file.name,
+        projectId
       });
 
       return publicUrl;
@@ -130,11 +151,12 @@ class QualificationObjectService {
     }
   }
 
-  async uploadTestDataFile(objectId: string, file: File): Promise<string> {
+  async uploadTestDataFile(objectId: string, file: File, projectId?: string): Promise<string> {
     try {
       // Очищаем имя файла от недопустимых символов
       const sanitizedFileName = sanitizeFileName(file.name);
-      const fileName = `test-data/${objectId}/${Date.now()}-${sanitizedFileName}`;
+      const basePath = this.buildProjectPath('test-data', objectId, projectId);
+      const fileName = `${basePath}/${Date.now()}-${sanitizedFileName}`;
 
       // Загружаем файл через API
       const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
@@ -147,7 +169,8 @@ class QualificationObjectService {
       // Обновляем объект с URL файла
       await apiClient.patch(`/qualification-objects/${objectId}`, {
         testDataFileUrl: publicUrl,
-        testDataFileName: file.name
+        testDataFileName: file.name,
+        projectId
       });
 
       return publicUrl;
@@ -210,6 +233,7 @@ class QualificationObjectService {
 
     return {
       id: data.id,
+      projectId: data.projectId || data.project_id || undefined,
       contractorId: data.contractorId || data.contractor_id || '',
       type: mappedType as any,
       name: data.name || '',
@@ -332,11 +356,12 @@ class QualificationObjectService {
       return dbData;
     }
 
-  async uploadLoggerRemovalFile(objectId: string, zoneNumber: number, level: number, file: File): Promise<string> {
+  async uploadLoggerRemovalFile(objectId: string, zoneNumber: number, level: number, file: File, projectId?: string): Promise<string> {
     try {
       // Сохраняем оригинальное имя файла для .vi2 файлов
       const originalFileName = file.name;
-      const fileName = `logger-removal/${objectId}/zone-${zoneNumber}-level-${level}/${originalFileName}`;
+      const basePath = this.buildProjectPath('logger-removal', objectId, projectId);
+      const fileName = `${basePath}/zone-${zoneNumber}-level-${level}/${originalFileName}`;
 
       // Загружаем файл через API
       const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
@@ -353,12 +378,13 @@ class QualificationObjectService {
   }
 
   // Удаление файла снятия логгеров из Storage
-  async deleteLoggerRemovalFile(objectId: string, zoneNumber: number, level: number): Promise<void> {
+  async deleteLoggerRemovalFile(objectId: string, zoneNumber: number, level: number, projectId?: string): Promise<void> {
     try {
       // Преобразуем дробные значения уровня в строку с точкой для совместимости
       const levelStr = level.toString();
       // Получаем список файлов в папке для данной зоны и уровня
-      const folderPath = `logger-removal/${objectId}/zone-${zoneNumber}-level-${levelStr}`;
+      const basePath = this.buildProjectPath('logger-removal', objectId, projectId);
+      const folderPath = `${basePath}/zone-${zoneNumber}-level-${levelStr}`;
       
       console.log('Удаление файлов из Storage:', { objectId, zoneNumber, level, levelStr, folderPath });
       
@@ -402,9 +428,9 @@ class QualificationObjectService {
   }
 
   // Получение списка файлов снятия логгеров из Storage
-  async getLoggerRemovalFiles(objectId: string): Promise<{ [key: string]: { name: string; url: string; size: number; lastModified: string } }> {
+  async getLoggerRemovalFiles(objectId: string, projectId?: string): Promise<{ [key: string]: { name: string; url: string; size: number; lastModified: string } }> {
     try {
-      const prefix = `logger-removal/${objectId}`;
+      const prefix = this.buildProjectPath('logger-removal', objectId, projectId);
       const listResult = await apiClient.post<{ data: StorageFileObject[] }>('/storage/list', {
         bucket: 'qualification-objects',
         prefix: prefix

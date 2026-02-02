@@ -254,6 +254,8 @@ const main = async () => {
           if (file === '20260130000000_add_thermocontainer_type.sql') return true;
           // Миграция для списка "Зоны хранения"
           if (file === '20260130000002_add_storage_zones.sql') return true;
+        // Миграция для проектных данных объектов квалификации
+        if (file === '20260201000000_add_project_qualification_object_data.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:

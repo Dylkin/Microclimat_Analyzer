@@ -93,7 +93,11 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
     }
 
     try {
-      const object = await qualificationObjectService.getQualificationObjectById(analysisData.qualificationObjectId);
+      const projectId = fullProject?.id || analysisData?.projectId || analysisData?.project?.id;
+      const object = await qualificationObjectService.getQualificationObjectById(
+        analysisData.qualificationObjectId,
+        projectId
+      );
       setSelectedQualificationObject(object);
     } catch (error) {
       console.error('Ошибка загрузки объекта квалификации:', error);

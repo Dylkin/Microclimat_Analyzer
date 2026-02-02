@@ -17,6 +17,7 @@ export const QualificationObjectTypeLabels: Record<QualificationObjectType, stri
 
 export interface QualificationObject {
   id: string;
+  projectId?: string;
   contractorId: string;
   type: QualificationObjectType;
   name?: string;
@@ -63,6 +64,7 @@ export interface MeasurementLevel {
 }
 
 export interface CreateQualificationObjectData {
+  projectId?: string;
   contractorId: string;
   type: QualificationObjectType;
   name?: string;

@@ -3,49 +3,180 @@ import { pool } from '../config/database.js';
 
 const router = express.Router();
 
+const tableExists = async (tableName: string): Promise<boolean> => {
+  const result = await pool.query(
+    `
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = $1
+    ) as exists
+    `,
+    [tableName]
+  );
+  return result.rows[0]?.exists === true;
+};
+
+const upsertProjectObjectData = async (
+  projectId: string,
+  qualificationObjectId: string,
+  data: Record<string, any>
+) => {
+  const fieldConfig: Record<string, { column: string; json?: boolean }> = {
+    storageZones: { column: 'storage_zones', json: true },
+    climateSystem: { column: 'climate_system' },
+    temperatureLimits: { column: 'temperature_limits', json: true },
+    humidityLimits: { column: 'humidity_limits', json: true },
+    measurementZones: { column: 'measurement_zones', json: true },
+    workSchedule: { column: 'work_schedule', json: true },
+    planFileUrl: { column: 'plan_file_url' },
+    planFileName: { column: 'plan_file_name' },
+    testDataFileUrl: { column: 'test_data_file_url' },
+    testDataFileName: { column: 'test_data_file_name' },
+    address: { column: 'address' },
+    latitude: { column: 'latitude' },
+    longitude: { column: 'longitude' },
+    geocodedAt: { column: 'geocoded_at' },
+    area: { column: 'area' },
+    vin: { column: 'vin' },
+    registrationNumber: { column: 'registration_number' },
+    bodyVolume: { column: 'body_volume' },
+    inventoryNumber: { column: 'inventory_number' },
+    chamberVolume: { column: 'chamber_volume' },
+    serialNumber: { column: 'serial_number' },
+    manufacturer: { column: 'manufacturer' }
+  };
+
+  const columns: string[] = [];
+  const values: any[] = [];
+
+  Object.entries(fieldConfig).forEach(([key, config]) => {
+    if (data[key] === undefined) return;
+    let value = data[key];
+    if (config.json) {
+      value = typeof value === 'object' ? JSON.stringify(value) : value;
+    }
+    if (key === 'geocodedAt' && value instanceof Date) {
+      value = value.toISOString();
+    }
+    columns.push(config.column);
+    values.push(value);
+  });
+
+  if (columns.length === 0) return;
+
+  const insertColumns = ['project_id', 'qualification_object_id', ...columns];
+  const placeholders = insertColumns.map((_, i) => `$${i + 1}`).join(', ');
+  const updateSet = columns.map(col => `${col} = EXCLUDED.${col}`).join(', ');
+
+  await pool.query(
+    `
+    INSERT INTO project_qualification_object_data (${insertColumns.join(', ')})
+    VALUES (${placeholders})
+    ON CONFLICT (project_id, qualification_object_id)
+    DO UPDATE SET ${updateSet}
+    `,
+    [projectId, qualificationObjectId, ...values]
+  );
+};
+
 // GET /api/qualification-objects - Получить все объекты квалификации
 router.get('/', async (req, res) => {
   try {
-    const { contractor_id } = req.query;
-    
-    let query = `
-      SELECT 
-        qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
-        qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
-        qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
-        qo.test_data_file_url, qo.test_data_file_name,
-        qo.address, qo.latitude, qo.longitude, qo.area,
-        qo.vin, qo.registration_number, qo.body_volume,
-        qo.inventory_number, qo.chamber_volume, qo.serial_number, qo.manufacturer,
-        qo.created_at, qo.updated_at,
-        COALESCE(qo.contractor_id, p.contractor_id) as final_contractor_id,
-        c.name as contractor_name
-      FROM qualification_objects qo
-      LEFT JOIN projects p ON qo.project_id = p.id
-      LEFT JOIN contractors c ON COALESCE(qo.contractor_id, p.contractor_id) = c.id
-    `;
-    
+    const { contractor_id, project_id } = req.query;
+    const hasProjectDataTable = await tableExists('project_qualification_object_data');
+    const hasProjectQualificationObjects = await tableExists('project_qualification_objects');
+
+    let query: string;
     const params: any[] = [];
-    if (contractor_id) {
-      query += ' WHERE (qo.contractor_id = $1 OR p.contractor_id = $1)';
-      params.push(contractor_id);
+
+    if (project_id && hasProjectDataTable && hasProjectQualificationObjects) {
+      params.push(project_id);
+      query = `
+        SELECT 
+          qo.id,
+          qo.contractor_id,
+          qo.name,
+          qo.object_type,
+          pqod.storage_zones,
+          pqod.climate_system,
+          pqod.temperature_limits,
+          pqod.humidity_limits,
+          pqod.measurement_zones,
+          pqod.work_schedule,
+          pqod.plan_file_url,
+          pqod.plan_file_name,
+          pqod.test_data_file_url,
+          pqod.test_data_file_name,
+          pqod.address,
+          pqod.latitude,
+          pqod.longitude,
+          pqod.geocoded_at,
+          pqod.area,
+          pqod.vin,
+          pqod.registration_number,
+          pqod.body_volume,
+          pqod.inventory_number,
+          pqod.chamber_volume,
+          pqod.serial_number,
+          pqod.manufacturer,
+          pqod.created_at,
+          pqod.updated_at,
+          c.name as contractor_name
+        FROM project_qualification_objects pqo
+        JOIN qualification_objects qo ON qo.id = pqo.qualification_object_id
+        LEFT JOIN project_qualification_object_data pqod
+          ON pqod.project_id = pqo.project_id
+          AND pqod.qualification_object_id = pqo.qualification_object_id
+        LEFT JOIN contractors c ON qo.contractor_id = c.id
+        WHERE pqo.project_id = $1
+      `;
+
+      if (contractor_id) {
+        params.push(contractor_id);
+        query += ` AND qo.contractor_id = $${params.length}`;
+      }
+
+      query += ' ORDER BY qo.created_at DESC';
+    } else {
+      query = `
+        SELECT 
+          qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
+          qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
+          qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
+          qo.test_data_file_url, qo.test_data_file_name,
+          qo.address, qo.latitude, qo.longitude, qo.area,
+          qo.vin, qo.registration_number, qo.body_volume,
+          qo.inventory_number, qo.chamber_volume, qo.serial_number, qo.manufacturer,
+          qo.created_at, qo.updated_at,
+          COALESCE(qo.contractor_id, p.contractor_id) as final_contractor_id,
+          c.name as contractor_name
+        FROM qualification_objects qo
+        LEFT JOIN projects p ON qo.project_id = p.id
+        LEFT JOIN contractors c ON COALESCE(qo.contractor_id, p.contractor_id) = c.id
+      `;
+
+      if (contractor_id) {
+        query += ' WHERE (qo.contractor_id = $1 OR p.contractor_id = $1)';
+        params.push(contractor_id);
+      }
+
+      query += ' ORDER BY qo.created_at DESC';
     }
-    
-    query += ' ORDER BY qo.created_at DESC';
-    
+
     const result = await pool.query(query, params);
     
     const objects = result.rows.map((row: any) => ({
       id: row.id,
-      projectId: row.project_id,
-      contractorId: row.final_contractor_id || undefined,
+      projectId: project_id || row.project_id || undefined,
+      contractorId: row.final_contractor_id || row.contractor_id || undefined,
       name: row.name,
       storageZones: row.storage_zones || [],
       objectType: row.object_type,
       climateSystem: row.climate_system,
       temperatureLimits: row.temperature_limits || { min: null, max: null },
       humidityLimits: row.humidity_limits || { min: null, max: null },
-      measurementZones: row.measurement_zones || 0,
+      measurementZones: row.measurement_zones || [],
       workSchedule: row.work_schedule || [],
       planFileUrl: row.plan_file_url || undefined,
       planFileName: row.plan_file_name || undefined,
@@ -63,8 +194,8 @@ router.get('/', async (req, res) => {
       serialNumber: row.serial_number || undefined,
       manufacturer: row.manufacturer || undefined,
       contractor: row.contractor_name ? { name: row.contractor_name } : undefined,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at)
+      createdAt: row.created_at ? new Date(row.created_at) : undefined,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : undefined
     }));
     
     res.json(objects);
@@ -78,25 +209,77 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const result = await pool.query(`
-      SELECT 
-        qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
-        qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
-        qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
-        qo.test_data_file_url, qo.test_data_file_name,
-        qo.address, qo.latitude, qo.longitude, qo.area,
-        qo.vin, qo.registration_number, qo.body_volume,
-        qo.inventory_number, qo.chamber_volume, qo.serial_number, qo.manufacturer,
-        qo.created_at, qo.updated_at,
-        COALESCE(qo.contractor_id, p.contractor_id) as final_contractor_id,
-        c.name as contractor_name
-      FROM qualification_objects qo
-      LEFT JOIN projects p ON qo.project_id = p.id
-      LEFT JOIN contractors c ON COALESCE(qo.contractor_id, p.contractor_id) = c.id
-      WHERE qo.id = $1
-    `, [id]);
-    
+    const { project_id } = req.query;
+    const hasProjectDataTable = await tableExists('project_qualification_object_data');
+    const hasProjectQualificationObjects = await tableExists('project_qualification_objects');
+    let result;
+
+    if (project_id && hasProjectDataTable && hasProjectQualificationObjects) {
+      result = await pool.query(
+        `
+        SELECT 
+          qo.id,
+          qo.contractor_id,
+          qo.name,
+          qo.object_type,
+          pqod.storage_zones,
+          pqod.climate_system,
+          pqod.temperature_limits,
+          pqod.humidity_limits,
+          pqod.measurement_zones,
+          pqod.work_schedule,
+          pqod.plan_file_url,
+          pqod.plan_file_name,
+          pqod.test_data_file_url,
+          pqod.test_data_file_name,
+          pqod.address,
+          pqod.latitude,
+          pqod.longitude,
+          pqod.geocoded_at,
+          pqod.area,
+          pqod.vin,
+          pqod.registration_number,
+          pqod.body_volume,
+          pqod.inventory_number,
+          pqod.chamber_volume,
+          pqod.serial_number,
+          pqod.manufacturer,
+          pqod.created_at,
+          pqod.updated_at,
+          c.name as contractor_name
+        FROM project_qualification_objects pqo
+        JOIN qualification_objects qo ON qo.id = pqo.qualification_object_id
+        LEFT JOIN project_qualification_object_data pqod
+          ON pqod.project_id = pqo.project_id
+          AND pqod.qualification_object_id = pqo.qualification_object_id
+        LEFT JOIN contractors c ON qo.contractor_id = c.id
+        WHERE pqo.project_id = $1 AND qo.id = $2
+        `,
+        [project_id, id]
+      );
+    } else {
+      result = await pool.query(
+        `
+        SELECT 
+          qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
+          qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
+          qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
+          qo.test_data_file_url, qo.test_data_file_name,
+          qo.address, qo.latitude, qo.longitude, qo.area,
+          qo.vin, qo.registration_number, qo.body_volume,
+          qo.inventory_number, qo.chamber_volume, qo.serial_number, qo.manufacturer,
+          qo.created_at, qo.updated_at,
+          COALESCE(qo.contractor_id, p.contractor_id) as final_contractor_id,
+          c.name as contractor_name
+        FROM qualification_objects qo
+        LEFT JOIN projects p ON qo.project_id = p.id
+        LEFT JOIN contractors c ON COALESCE(qo.contractor_id, p.contractor_id) = c.id
+        WHERE qo.id = $1
+        `,
+        [id]
+      );
+    }
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Объект квалификации не найден' });
     }
@@ -104,15 +287,15 @@ router.get('/:id', async (req, res) => {
     const row = result.rows[0];
     res.json({
       id: row.id,
-      projectId: row.project_id,
-      contractorId: row.final_contractor_id || undefined,
+      projectId: project_id || row.project_id || undefined,
+      contractorId: row.final_contractor_id || row.contractor_id || undefined,
       name: row.name,
       storageZones: row.storage_zones || [],
       objectType: row.object_type,
       climateSystem: row.climate_system,
       temperatureLimits: row.temperature_limits || { min: null, max: null },
       humidityLimits: row.humidity_limits || { min: null, max: null },
-      measurementZones: row.measurement_zones || 0,
+      measurementZones: row.measurement_zones || [],
       workSchedule: row.work_schedule || [],
       planFileUrl: row.plan_file_url || undefined,
       planFileName: row.plan_file_name || undefined,
@@ -130,8 +313,8 @@ router.get('/:id', async (req, res) => {
       serialNumber: row.serial_number || undefined,
       manufacturer: row.manufacturer || undefined,
       contractor: row.contractor_name ? { name: row.contractor_name } : undefined,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at)
+      createdAt: row.created_at ? new Date(row.created_at) : undefined,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : undefined
     });
   } catch (error) {
     console.error('Error fetching qualification object:', error);
@@ -253,38 +436,113 @@ router.post('/', async (req, res) => {
 
     const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ');
 
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       INSERT INTO qualification_objects (${insertFields.join(', ')})
       VALUES (${placeholders})
       RETURNING id, created_at, updated_at
-    `, insertValues);
+      `,
+      insertValues
+    );
 
     const row = result.rows[0];
     
-    // Получаем полную информацию с contractor
-    const fullResult = await pool.query(`
-      SELECT 
-        qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
-        qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
-        qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
-        qo.test_data_file_url, qo.test_data_file_name,
-        qo.address, qo.latitude, qo.longitude, qo.area,
-        qo.vin, qo.registration_number, qo.body_volume,
-        qo.inventory_number, qo.chamber_volume, qo.serial_number, qo.manufacturer,
-        qo.created_at, qo.updated_at,
-        COALESCE(qo.contractor_id, p.contractor_id) as final_contractor_id,
-        c.name as contractor_name
-      FROM qualification_objects qo
-      LEFT JOIN projects p ON qo.project_id = p.id
-      LEFT JOIN contractors c ON COALESCE(qo.contractor_id, p.contractor_id) = c.id
-      WHERE qo.id = $1
-    `, [row.id]);
+    const hasProjectDataTable = await tableExists('project_qualification_object_data');
+    const hasProjectQualificationObjects = await tableExists('project_qualification_objects');
+
+    if (projectId && hasProjectQualificationObjects && hasProjectDataTable) {
+      await pool.query(
+        `
+        INSERT INTO project_qualification_objects (project_id, qualification_object_id)
+        VALUES ($1, $2)
+        ON CONFLICT (project_id, qualification_object_id) DO NOTHING
+        `,
+        [projectId, row.id]
+      );
+
+      await upsertProjectObjectData(projectId, row.id, {
+        storageZones,
+        climateSystem,
+        temperatureLimits,
+        humidityLimits,
+        measurementZones,
+        workSchedule,
+        ...otherFields
+      });
+    }
+
+    let fullResult;
+    if (projectId && hasProjectQualificationObjects && hasProjectDataTable) {
+      fullResult = await pool.query(
+        `
+        SELECT 
+          qo.id,
+          qo.contractor_id,
+          qo.name,
+          qo.object_type,
+          pqod.storage_zones,
+          pqod.climate_system,
+          pqod.temperature_limits,
+          pqod.humidity_limits,
+          pqod.measurement_zones,
+          pqod.work_schedule,
+          pqod.plan_file_url,
+          pqod.plan_file_name,
+          pqod.test_data_file_url,
+          pqod.test_data_file_name,
+          pqod.address,
+          pqod.latitude,
+          pqod.longitude,
+          pqod.geocoded_at,
+          pqod.area,
+          pqod.vin,
+          pqod.registration_number,
+          pqod.body_volume,
+          pqod.inventory_number,
+          pqod.chamber_volume,
+          pqod.serial_number,
+          pqod.manufacturer,
+          pqod.created_at,
+          pqod.updated_at,
+          c.name as contractor_name
+        FROM project_qualification_objects pqo
+        JOIN qualification_objects qo ON qo.id = pqo.qualification_object_id
+        LEFT JOIN project_qualification_object_data pqod
+          ON pqod.project_id = pqo.project_id
+          AND pqod.qualification_object_id = pqo.qualification_object_id
+        LEFT JOIN contractors c ON qo.contractor_id = c.id
+        WHERE pqo.project_id = $1 AND qo.id = $2
+        `,
+        [projectId, row.id]
+      );
+    } else {
+      fullResult = await pool.query(
+        `
+        SELECT 
+          qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
+          qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
+          qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
+          qo.test_data_file_url, qo.test_data_file_name,
+          qo.address, qo.latitude, qo.longitude, qo.area,
+          qo.vin, qo.registration_number, qo.body_volume,
+          qo.inventory_number, qo.chamber_volume, qo.serial_number, qo.manufacturer,
+          qo.created_at, qo.updated_at,
+          COALESCE(qo.contractor_id, p.contractor_id) as final_contractor_id,
+          c.name as contractor_name
+        FROM qualification_objects qo
+        LEFT JOIN projects p ON qo.project_id = p.id
+        LEFT JOIN contractors c ON COALESCE(qo.contractor_id, p.contractor_id) = c.id
+        WHERE qo.id = $1
+        `,
+        [row.id]
+      );
+    }
 
     const fullRow = fullResult.rows[0];
     res.status(201).json({
       id: fullRow.id,
-      projectId: fullRow.project_id,
-      contractorId: fullRow.final_contractor_id,
+      projectId: projectId || fullRow.project_id,
+      contractorId: fullRow.final_contractor_id || fullRow.contractor_id,
       name: fullRow.name,
       storageZones: fullRow.storage_zones || [],
       objectType: fullRow.object_type,
@@ -309,8 +567,8 @@ router.post('/', async (req, res) => {
       serialNumber: fullRow.serial_number || undefined,
       manufacturer: fullRow.manufacturer || undefined,
       contractor: fullRow.contractor_name ? { name: fullRow.contractor_name } : undefined,
-      createdAt: new Date(fullRow.created_at),
-      updatedAt: new Date(fullRow.updated_at)
+      createdAt: fullRow.created_at ? new Date(fullRow.created_at) : undefined,
+      updatedAt: fullRow.updated_at ? new Date(fullRow.updated_at) : undefined
     });
   } catch (error: any) {
     console.error('Error creating qualification object:', error);
@@ -335,6 +593,10 @@ router.put('/:id', async (req, res) => {
       ...otherFields
     } = req.body;
 
+    const hasProjectDataTable = await tableExists('project_qualification_object_data');
+    const hasProjectQualificationObjects = await tableExists('project_qualification_objects');
+    const isProjectScoped = Boolean(projectId && hasProjectDataTable && hasProjectQualificationObjects);
+
     // Проверяем существование объекта
     const checkResult = await pool.query('SELECT id FROM qualification_objects WHERE id = $1', [id]);
     if (checkResult.rows.length === 0) {
@@ -346,7 +608,7 @@ router.put('/:id', async (req, res) => {
     const params: any[] = [];
     let paramIndex = 1;
 
-    if (projectId !== undefined) {
+    if (projectId !== undefined && !isProjectScoped) {
       updates.push(`project_id = $${paramIndex++}`);
       params.push(projectId);
     }
@@ -358,27 +620,27 @@ router.put('/:id', async (req, res) => {
       updates.push(`object_type = $${paramIndex++}`);
       params.push(objectType);
     }
-    if (climateSystem !== undefined) {
+    if (climateSystem !== undefined && !isProjectScoped) {
       updates.push(`climate_system = $${paramIndex++}`);
       params.push(climateSystem);
     }
-    if (temperatureLimits !== undefined) {
+    if (temperatureLimits !== undefined && !isProjectScoped) {
       updates.push(`temperature_limits = $${paramIndex++}`);
       params.push(JSON.stringify(temperatureLimits));
     }
-    if (humidityLimits !== undefined) {
+    if (humidityLimits !== undefined && !isProjectScoped) {
       updates.push(`humidity_limits = $${paramIndex++}`);
       params.push(JSON.stringify(humidityLimits));
     }
-    if (storageZones !== undefined) {
+    if (storageZones !== undefined && !isProjectScoped) {
       updates.push(`storage_zones = $${paramIndex++}`);
       params.push(typeof storageZones === 'object' ? JSON.stringify(storageZones) : storageZones);
     }
-    if (measurementZones !== undefined) {
+    if (measurementZones !== undefined && !isProjectScoped) {
       updates.push(`measurement_zones = $${paramIndex++}`);
       params.push(typeof measurementZones === 'object' ? JSON.stringify(measurementZones) : measurementZones);
     }
-    if (workSchedule !== undefined) {
+    if (workSchedule !== undefined && !isProjectScoped) {
       updates.push(`work_schedule = $${paramIndex++}`);
       params.push(JSON.stringify(workSchedule));
     }
@@ -403,83 +665,151 @@ router.put('/:id', async (req, res) => {
       updates.push(`contractor_id = $${paramIndex++}`);
       params.push(updateContractorId);
     }
-    if (address !== undefined) {
+    if (address !== undefined && !isProjectScoped) {
       updates.push(`address = $${paramIndex++}`);
       params.push(address || null);
     }
-    if (latitude !== undefined) {
+    if (latitude !== undefined && !isProjectScoped) {
       updates.push(`latitude = $${paramIndex++}`);
       params.push(latitude || null);
     }
-    if (longitude !== undefined) {
+    if (longitude !== undefined && !isProjectScoped) {
       updates.push(`longitude = $${paramIndex++}`);
       params.push(longitude || null);
     }
-    if (area !== undefined) {
+    if (area !== undefined && !isProjectScoped) {
       updates.push(`area = $${paramIndex++}`);
       params.push(area || null);
     }
-    if (vin !== undefined) {
+    if (vin !== undefined && !isProjectScoped) {
       updates.push(`vin = $${paramIndex++}`);
       params.push(vin || null);
     }
-    if (registrationNumber !== undefined) {
+    if (registrationNumber !== undefined && !isProjectScoped) {
       updates.push(`registration_number = $${paramIndex++}`);
       params.push(registrationNumber || null);
     }
-    if (bodyVolume !== undefined) {
+    if (bodyVolume !== undefined && !isProjectScoped) {
       updates.push(`body_volume = $${paramIndex++}`);
       params.push(bodyVolume || null);
     }
-    if (inventoryNumber !== undefined) {
+    if (inventoryNumber !== undefined && !isProjectScoped) {
       updates.push(`inventory_number = $${paramIndex++}`);
       params.push(inventoryNumber || null);
     }
-    if (chamberVolume !== undefined) {
+    if (chamberVolume !== undefined && !isProjectScoped) {
       updates.push(`chamber_volume = $${paramIndex++}`);
       params.push(chamberVolume || null);
     }
-    if (serialNumber !== undefined) {
+    if (serialNumber !== undefined && !isProjectScoped) {
       updates.push(`serial_number = $${paramIndex++}`);
       params.push(serialNumber || null);
     }
-    if (manufacturer !== undefined) {
+    if (manufacturer !== undefined && !isProjectScoped) {
       updates.push(`manufacturer = $${paramIndex++}`);
       params.push(manufacturer || null);
     }
 
-    if (updates.length === 0) {
+    const projectData = {
+      storageZones,
+      climateSystem,
+      temperatureLimits,
+      humidityLimits,
+      measurementZones,
+      workSchedule,
+      ...otherFields
+    };
+    const hasProjectDataUpdates = isProjectScoped
+      ? Object.values(projectData).some(value => value !== undefined)
+      : false;
+
+    if (updates.length === 0 && !hasProjectDataUpdates) {
       return res.status(400).json({ error: 'Нет данных для обновления' });
     }
 
-    params.push(id);
-    const updateQuery = `
-      UPDATE qualification_objects
-      SET ${updates.join(', ')}, updated_at = NOW()
-      WHERE id = $${paramIndex}
-      RETURNING id
-    `;
+    if (updates.length > 0) {
+      params.push(id);
+      const updateQuery = `
+        UPDATE qualification_objects
+        SET ${updates.join(', ')}, updated_at = NOW()
+        WHERE id = $${paramIndex}
+        RETURNING id
+      `;
 
-    await pool.query(updateQuery, params);
+      await pool.query(updateQuery, params);
+    }
+
+    if (isProjectScoped && projectId && hasProjectDataUpdates) {
+      await upsertProjectObjectData(projectId, id, projectData);
+    }
 
     // Получаем обновленный объект
-    const result = await pool.query(`
-      SELECT 
-        qo.id, qo.project_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
-        qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
-        qo.work_schedule, qo.created_at, qo.updated_at,
-        p.contractor_id,
-        c.name as contractor_name
-      FROM qualification_objects qo
-      LEFT JOIN projects p ON qo.project_id = p.id
-      LEFT JOIN contractors c ON p.contractor_id = c.id
-      WHERE qo.id = $1
-    `, [id]);
+    let result;
+    if (isProjectScoped && projectId) {
+      result = await pool.query(
+        `
+        SELECT 
+          qo.id,
+          qo.contractor_id,
+          qo.name,
+          qo.object_type,
+          pqod.storage_zones,
+          pqod.climate_system,
+          pqod.temperature_limits,
+          pqod.humidity_limits,
+          pqod.measurement_zones,
+          pqod.work_schedule,
+          pqod.plan_file_url,
+          pqod.plan_file_name,
+          pqod.test_data_file_url,
+          pqod.test_data_file_name,
+          pqod.address,
+          pqod.latitude,
+          pqod.longitude,
+          pqod.geocoded_at,
+          pqod.area,
+          pqod.vin,
+          pqod.registration_number,
+          pqod.body_volume,
+          pqod.inventory_number,
+          pqod.chamber_volume,
+          pqod.serial_number,
+          pqod.manufacturer,
+          pqod.created_at,
+          pqod.updated_at,
+          c.name as contractor_name
+        FROM project_qualification_objects pqo
+        JOIN qualification_objects qo ON qo.id = pqo.qualification_object_id
+        LEFT JOIN project_qualification_object_data pqod
+          ON pqod.project_id = pqo.project_id
+          AND pqod.qualification_object_id = pqo.qualification_object_id
+        LEFT JOIN contractors c ON qo.contractor_id = c.id
+        WHERE pqo.project_id = $1 AND qo.id = $2
+        `,
+        [projectId, id]
+      );
+    } else {
+      result = await pool.query(
+        `
+        SELECT 
+          qo.id, qo.project_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
+          qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
+          qo.work_schedule, qo.created_at, qo.updated_at,
+          p.contractor_id,
+          c.name as contractor_name
+        FROM qualification_objects qo
+        LEFT JOIN projects p ON qo.project_id = p.id
+        LEFT JOIN contractors c ON p.contractor_id = c.id
+        WHERE qo.id = $1
+        `,
+        [id]
+      );
+    }
 
     const row = result.rows[0];
     res.json({
       id: row.id,
-      projectId: row.project_id,
+      projectId: projectId || row.project_id,
       name: row.name,
       storageZones: row.storage_zones || [],
       objectType: row.object_type,
@@ -490,8 +820,8 @@ router.put('/:id', async (req, res) => {
       workSchedule: row.work_schedule || [],
       contractorId: row.contractor_id || undefined,
       contractor: row.contractor_name ? { name: row.contractor_name } : undefined,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at)
+      createdAt: row.created_at ? new Date(row.created_at) : undefined,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : undefined
     });
   } catch (error: any) {
     console.error('Error updating qualification object:', error);
@@ -504,6 +834,10 @@ router.patch('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    const projectId = updates.projectId || updates.project_id;
+    const hasProjectDataTable = await tableExists('project_qualification_object_data');
+    const hasProjectQualificationObjects = await tableExists('project_qualification_objects');
+    const isProjectScoped = Boolean(projectId && hasProjectDataTable && hasProjectQualificationObjects);
 
     // Проверяем существование объекта
     const checkResult = await pool.query('SELECT id FROM qualification_objects WHERE id = $1', [id]);
@@ -525,10 +859,44 @@ router.patch('/:id', async (req, res) => {
       'inventory_number', 'chamber_volume', 'serial_number', 'manufacturer'
     ];
 
+    const projectFieldMap: Record<string, string> = {
+      storage_zones: 'storageZones',
+      climate_system: 'climateSystem',
+      temperature_limits: 'temperatureLimits',
+      humidity_limits: 'humidityLimits',
+      measurement_zones: 'measurementZones',
+      work_schedule: 'workSchedule',
+      plan_file_url: 'planFileUrl',
+      plan_file_name: 'planFileName',
+      test_data_file_url: 'testDataFileUrl',
+      test_data_file_name: 'testDataFileName',
+      address: 'address',
+      latitude: 'latitude',
+      longitude: 'longitude',
+      geocoded_at: 'geocodedAt',
+      area: 'area',
+      vin: 'vin',
+      registration_number: 'registrationNumber',
+      body_volume: 'bodyVolume',
+      inventory_number: 'inventoryNumber',
+      chamber_volume: 'chamberVolume',
+      serial_number: 'serialNumber',
+      manufacturer: 'manufacturer'
+    };
+
+    const projectData: Record<string, any> = {};
+
     for (const [key, value] of Object.entries(updates)) {
       const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
       console.log(`PATCH: маппинг поля ${key} -> ${dbKey}, значение:`, value);
       if (allowedFields.includes(dbKey)) {
+        if (isProjectScoped && dbKey === 'project_id') {
+          continue;
+        }
+        if (isProjectScoped && projectFieldMap[dbKey]) {
+          projectData[projectFieldMap[dbKey]] = value;
+          continue;
+        }
         updateFields.push(`${dbKey} = $${paramIndex++}`);
         // Для JSONB полей сериализуем объекты
         if (dbKey === 'temperature_limits' || dbKey === 'humidity_limits' || 
@@ -542,29 +910,38 @@ router.patch('/:id', async (req, res) => {
       }
     }
 
-    if (updateFields.length === 0) {
+    if (updateFields.length === 0 && Object.keys(projectData).length === 0) {
       return res.status(400).json({ error: 'Нет валидных данных для обновления' });
     }
 
-    params.push(id);
-    const updateQuery = `
-      UPDATE qualification_objects
-      SET ${updateFields.join(', ')}, updated_at = NOW()
-      WHERE id = $${paramIndex}
-      RETURNING id
-    `;
+    if (updateFields.length > 0) {
+      params.push(id);
+      const updateQuery = `
+        UPDATE qualification_objects
+        SET ${updateFields.join(', ')}, updated_at = NOW()
+        WHERE id = $${paramIndex}
+        RETURNING id
+      `;
 
-    const updateResult = await pool.query(updateQuery, params);
+      await pool.query(updateQuery, params);
+    }
+
+    if (isProjectScoped && projectId && Object.keys(projectData).length > 0) {
+      await upsertProjectObjectData(projectId, id, projectData);
+    }
     
     // Если обновляются файлы планов, регистрируем их в project_files
     if (updates.planFileUrl || updates.testDataFileUrl) {
-      const objectResult = await pool.query(
-        'SELECT project_id FROM qualification_objects WHERE id = $1',
-        [id]
-      );
-      const projectId = objectResult.rows[0]?.project_id;
+      let fileProjectId = projectId;
+      if (!fileProjectId) {
+        const objectResult = await pool.query(
+          'SELECT project_id FROM qualification_objects WHERE id = $1',
+          [id]
+        );
+        fileProjectId = objectResult.rows[0]?.project_id;
+      }
       
-      if (projectId) {
+      if (fileProjectId) {
         try {
           if (updates.planFileUrl) {
             await pool.query(`
@@ -575,7 +952,7 @@ router.patch('/:id', async (req, res) => {
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
               ON CONFLICT DO NOTHING
             `, [
-              projectId,
+              fileProjectId,
               'plan',
               'object_plan',
               updates.planFileName || 'plan',
@@ -597,7 +974,7 @@ router.patch('/:id', async (req, res) => {
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
               ON CONFLICT DO NOTHING
             `, [
-              projectId,
+              fileProjectId,
               'test_data',
               'object_test_data',
               updates.testDataFileName || 'test_data',
@@ -619,23 +996,72 @@ router.patch('/:id', async (req, res) => {
     }
 
     // Получаем обновленный объект
-    const result = await pool.query(`
-      SELECT 
-        qo.id, qo.project_id, qo.name, qo.object_type, qo.climate_system,
-        qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
-        qo.work_schedule, qo.created_at, qo.updated_at,
-        p.contractor_id,
-        c.name as contractor_name
-      FROM qualification_objects qo
-      LEFT JOIN projects p ON qo.project_id = p.id
-      LEFT JOIN contractors c ON p.contractor_id = c.id
-      WHERE qo.id = $1
-    `, [id]);
+    let result;
+    if (isProjectScoped && projectId) {
+      result = await pool.query(
+        `
+        SELECT 
+          qo.id,
+          qo.contractor_id,
+          qo.name,
+          qo.object_type,
+          pqod.storage_zones,
+          pqod.climate_system,
+          pqod.temperature_limits,
+          pqod.humidity_limits,
+          pqod.measurement_zones,
+          pqod.work_schedule,
+          pqod.plan_file_url,
+          pqod.plan_file_name,
+          pqod.test_data_file_url,
+          pqod.test_data_file_name,
+          pqod.address,
+          pqod.latitude,
+          pqod.longitude,
+          pqod.geocoded_at,
+          pqod.area,
+          pqod.vin,
+          pqod.registration_number,
+          pqod.body_volume,
+          pqod.inventory_number,
+          pqod.chamber_volume,
+          pqod.serial_number,
+          pqod.manufacturer,
+          pqod.created_at,
+          pqod.updated_at,
+          c.name as contractor_name
+        FROM project_qualification_objects pqo
+        JOIN qualification_objects qo ON qo.id = pqo.qualification_object_id
+        LEFT JOIN project_qualification_object_data pqod
+          ON pqod.project_id = pqo.project_id
+          AND pqod.qualification_object_id = pqo.qualification_object_id
+        LEFT JOIN contractors c ON qo.contractor_id = c.id
+        WHERE pqo.project_id = $1 AND qo.id = $2
+        `,
+        [projectId, id]
+      );
+    } else {
+      result = await pool.query(
+        `
+        SELECT 
+          qo.id, qo.project_id, qo.name, qo.object_type, qo.climate_system,
+          qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
+          qo.work_schedule, qo.created_at, qo.updated_at,
+          p.contractor_id,
+          c.name as contractor_name
+        FROM qualification_objects qo
+        LEFT JOIN projects p ON qo.project_id = p.id
+        LEFT JOIN contractors c ON p.contractor_id = c.id
+        WHERE qo.id = $1
+        `,
+        [id]
+      );
+    }
 
     const row = result.rows[0];
     res.json({
       id: row.id,
-      projectId: row.project_id,
+      projectId: projectId || row.project_id,
       name: row.name,
       objectType: row.object_type,
       climateSystem: row.climate_system,
@@ -645,8 +1071,8 @@ router.patch('/:id', async (req, res) => {
       workSchedule: row.work_schedule || [],
       contractorId: row.contractor_id || undefined,
       contractor: row.contractor_name ? { name: row.contractor_name } : undefined,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at)
+      createdAt: row.created_at ? new Date(row.created_at) : undefined,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : undefined
     });
   } catch (error: any) {
     console.error('Error patching qualification object:', error);

@@ -334,19 +334,19 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
     try {
       console.log('Загрузка файлов снятия логгеров для объекта:', qualificationObjectId);
       
-      // Получаем файлы из Supabase Storage
-      const storageFilesData = await qualificationObjectService.getLoggerRemovalFiles(qualificationObjectId);
-      console.log('Загруженные файлы из Storage:', storageFilesData);
-      console.log('Количество файлов из Storage:', Object.keys(storageFilesData).length);
-      console.log('Ключи файлов из Storage:', Object.keys(storageFilesData));
-      setStorageFiles(storageFilesData);
-      
       // Также получаем данные из БД для отображения статуса парсинга
       let currentProjectId = projectId;
       if (!currentProjectId) {
         const urlParams = new URLSearchParams(window.location.search);
         currentProjectId = urlParams.get('projectId') || undefined;
       }
+
+      // Получаем файлы из Supabase Storage
+      const storageFilesData = await qualificationObjectService.getLoggerRemovalFiles(qualificationObjectId, currentProjectId);
+      console.log('Загруженные файлы из Storage:', storageFilesData);
+      console.log('Количество файлов из Storage:', Object.keys(storageFilesData).length);
+      console.log('Ключи файлов из Storage:', Object.keys(storageFilesData));
+      setStorageFiles(storageFilesData);
       
       if (currentProjectId && loggerDataService.isAvailable()) {
         console.log('Загружаем сводки данных логгеров из БД');
@@ -514,7 +514,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
     try {
       console.log('Загрузка зон измерения для объекта:', qualificationObjectId);
-      const qualificationObject = await qualificationObjectService.getQualificationObjectById(qualificationObjectId);
+      const qualificationObject = await qualificationObjectService.getQualificationObjectById(qualificationObjectId, projectId);
       console.log('Загруженный объект квалификации:', qualificationObject);
       
       if (qualificationObject && qualificationObject.measurementZones) {
@@ -549,7 +549,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
             const updatedZones = [externalZone, ...renumberedZones];
             
             // Сохраняем обновленные зоны
-            await qualificationObjectService.updateMeasurementZones(qualificationObjectId, updatedZones);
+            await qualificationObjectService.updateMeasurementZones(qualificationObjectId, updatedZones, projectId);
             
             console.log('QualificationWorkSchedule: Зона "Внешний датчик" успешно создана');
             setMeasurementZones(updatedZones);
@@ -1098,7 +1098,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
       // Удаляем файл из Storage
       try {
-        await qualificationObjectService.deleteLoggerRemovalFile(qualificationObjectId, zoneNumber, measurementLevel);
+        await qualificationObjectService.deleteLoggerRemovalFile(qualificationObjectId, zoneNumber, measurementLevel, projectId);
         console.log('Файл удален из Storage');
       } catch (storageError) {
         console.warn('Ошибка удаления файла из Storage (может быть уже удален):', storageError);
@@ -1429,7 +1429,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         qualificationObjectId,
         zoneNumber,
         measurementLevel,
-        file
+        file,
+        projectId
       );
       
       console.log('QualificationWorkSchedule: Файл загружен в Storage:', storageUrl);
@@ -1669,7 +1670,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
             qualificationObjectId,
             zoneNumber,
             level,
-            file
+            file,
+            projectId
           );
           
           console.log(`Файл снятия логгеров загружен для зоны ${zoneNumber}, уровень ${level}:`, url);
@@ -2013,6 +2015,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                           initialZones={measurementZones}
                           onZonesChange={handleZonesChange}
                           readOnly={mode === 'view'}
+                          projectId={projectId}
                         />
                       </div>
                     )}

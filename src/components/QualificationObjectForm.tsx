@@ -183,7 +183,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       const finalFormData = {
         ...formData,
         id: initialData?.id, // Добавляем ID для обновления существующего объекта
-        // projectId добавляется отдельно через параметры функции, не через initialData
+        projectId
       };
       
       // Вызываем onSubmit для сохранения объекта и получаем сохраненный объект с ID
@@ -195,7 +195,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       // После сохранения объекта загружаем файлы, если они есть
       if (planFile && objectId) {
         try {
-          const planUrl = await qualificationObjectService.uploadPlanFile(objectId, planFile);
+          const planUrl = await qualificationObjectService.uploadPlanFile(objectId, planFile, projectId);
           setUploadedPlanUrl(planUrl);
           console.log('Файл плана успешно загружен');
         } catch (error) {
@@ -207,7 +207,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
       
       if (testDataFile && objectId) {
         try {
-          await qualificationObjectService.uploadTestDataFile(objectId, testDataFile);
+          await qualificationObjectService.uploadTestDataFile(objectId, testDataFile, projectId);
           console.log('Файл данных испытаний успешно загружен');
         } catch (error) {
           console.error('Ошибка загрузки файла данных испытаний:', error);

@@ -249,7 +249,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
 
       try {
-        const obj = await qualificationObjectService.getQualificationObjectById(qualificationObjectId);
+        const obj = await qualificationObjectService.getQualificationObjectById(qualificationObjectId, projectId);
         console.log('Загружен объект квалификации с зонами:', obj);
         setQualificationObject(obj);
         
@@ -348,7 +348,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
       try {
         // 1. Загружаем объект квалификации
-        const qualificationObject = await qualificationObjectService.getQualificationObjectById(qualificationObjectId);
+        const qualificationObject = await qualificationObjectService.getQualificationObjectById(qualificationObjectId, projectId);
         console.log('Загружен объект квалификации:', qualificationObject);
 
         // 2. Получаем тип объекта квалификации из справочника
