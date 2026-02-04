@@ -117,10 +117,14 @@ class QualificationWorkScheduleService {
     }
   }
 
-  async createWorkStage(qualificationObjectId: string, stageData: Omit<QualificationWorkStage, 'id' | 'qualificationObjectId' | 'createdAt' | 'updatedAt'>): Promise<QualificationWorkStage> {
+  async createWorkStage(
+    qualificationObjectId: string,
+    stageData: Omit<QualificationWorkStage, 'id' | 'qualificationObjectId' | 'createdAt' | 'updatedAt'>,
+    projectId?: string
+  ): Promise<QualificationWorkStage> {
     try {
       // Получаем текущее расписание
-      const currentSchedule = await this.getWorkSchedule(qualificationObjectId);
+      const currentSchedule = await this.getWorkSchedule(qualificationObjectId, projectId);
       // Добавляем новый этап
       const newStages = [...currentSchedule.map(s => ({
         stageName: s.stageName,
@@ -135,7 +139,7 @@ class QualificationWorkScheduleService {
       })), stageData];
       
       // Сохраняем обновленное расписание
-      const saved = await this.saveWorkSchedule(qualificationObjectId, newStages);
+      const saved = await this.saveWorkSchedule(qualificationObjectId, newStages, projectId);
       const createdStage = saved.find(s => s.stageName === stageData.stageName && !s.id);
       
       if (!createdStage) {

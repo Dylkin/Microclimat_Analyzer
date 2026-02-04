@@ -796,7 +796,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
           // Создаем новый этап в БД
           const createdStage = await qualificationWorkScheduleService.createWorkStage(
             qualificationObjectId,
-            stageToSave
+            stageToSave,
+            projectId
           );
           
           // Обновляем локальное состояние с реальным ID из БД
