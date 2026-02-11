@@ -105,6 +105,16 @@ const AppContent: React.FC = () => {
     return <Login />;
   }
 
+  const restrictedDirectoryRoles = new Set([
+    'specialist',
+    'director',
+    'manager',
+    'специалист',
+    'руководитель',
+    'менеджер'
+  ]);
+  const canAccessUsersDirectory = hasAccess('users') && !restrictedDirectoryRoles.has((user.role || '').toLowerCase());
+
   const handlePageChange = (page: string, projectData?: any) => {
     console.log('App: handlePageChange вызван:', {
       page,
@@ -222,7 +232,7 @@ const AppContent: React.FC = () => {
       case 'help':
         return hasAccess('help') ? wrapWithSuspense(<Help />) : <div>Доступ запрещен</div>;
       case 'users':
-        return hasAccess('users') ? wrapWithSuspense(<UserDirectory />) : <div>Доступ запрещен</div>;
+        return canAccessUsersDirectory ? wrapWithSuspense(<UserDirectory />) : <div>Доступ запрещен</div>;
       case 'audit_logs':
         return hasAccess('admin') ? wrapWithSuspense(<AuditLogs onBack={() => handlePageChange('projects')} />) : <div>Доступ запрещен</div>;
       case 'contractors':

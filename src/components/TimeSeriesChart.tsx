@@ -41,6 +41,7 @@ interface TimeSeriesChartProps {
   showLegend?: boolean;
   yOffset?: number; // Смещение данных по оси Y
   resetLegendToken?: number;
+  onHiddenLoggersChange?: (hiddenLoggers: Set<string>) => void;
 }
 
 export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
@@ -58,7 +59,8 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   yAxisLabel,
   showLegend = true,
   yOffset = 0,
-  resetLegendToken
+  resetLegendToken,
+  onHiddenLoggersChange
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tooltip, setTooltip] = useState<TooltipData>({ x: 0, y: 0, timestamp: 0, visible: false });
@@ -70,7 +72,11 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
 
   useEffect(() => {
     if (resetLegendToken !== undefined) {
-      setHiddenLoggers(new Set());
+      const newSet = new Set<string>();
+      setHiddenLoggers(newSet);
+      if (onHiddenLoggersChange) {
+        onHiddenLoggersChange(newSet);
+      }
     }
   }, [resetLegendToken]);
 
@@ -106,6 +112,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     });
     return grouped;
   }, [filteredData]);
+
 
   // Получаем уникальные файлы и назначаем им цвета
   // Серый цвет зарезервирован для внешнего датчика (zoneNumber === 0)
@@ -375,6 +382,9 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                     newSet.delete(fileId);
                   } else {
                     newSet.add(fileId);
+                  }
+                  if (onHiddenLoggersChange) {
+                    onHiddenLoggersChange(newSet);
                   }
                   return newSet;
                 });

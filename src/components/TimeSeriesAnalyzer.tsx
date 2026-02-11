@@ -16,6 +16,7 @@ import { qualificationWorkScheduleService } from '../utils/qualificationWorkSche
 import { loggerDataService } from '../utils/loggerDataService';
 import PizZip from 'pizzip';
 import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
 
 interface TimeSeriesAnalyzerProps {
   files: UploadedFile[];
@@ -27,6 +28,15 @@ interface TimeSeriesAnalyzerProps {
 
 export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack, qualificationObjectId, projectId, storageZones }) => {
   const { user } = useAuth();
+  const restrictedDebugRoles = new Set([
+    'specialist',
+    'director',
+    'manager',
+    'специалист',
+    'руководитель',
+    'менеджер'
+  ]);
+  const canViewDebugInfo = !restrictedDebugRoles.has((user?.role || '').toLowerCase());
 
   // Отладочная информация (убрана для продакшена)
   // console.log('TimeSeriesAnalyzer: props:', { files, qualificationObjectId, projectId });
@@ -40,6 +50,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   const [markers, setMarkers] = useState<VerticalMarker[]>([]);
   const [zoomState, setZoomState] = useState<ZoomState | undefined>();
   const [legendResetKey, setLegendResetKey] = useState(0);
+  const [hiddenLoggers, setHiddenLoggers] = useState<Set<string>>(new Set());
+
+  const handleHiddenLoggersChange = useCallback((newHiddenLoggers: Set<string>) => {
+    setHiddenLoggers(newHiddenLoggers);
+  }, []);
   
   // Contract fields
   const [contractFields, setContractFields] = useState({
@@ -117,31 +132,97 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     measurementZones: qualificationObject?.measurementZones
   });
 
-  useEffect(() => {
-    if (!data?.points) {
-      return;
-    }
-    const fileIdCounts = new Map<string, number>();
-    data.points.forEach(point => {
-      fileIdCounts.set(point.fileId, (fileIdCounts.get(point.fileId) || 0) + 1);
+  const formatExportTimestamp = (timestamp: number) => {
+    const formatted = new Date(timestamp).toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
     });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6cc9bf76-f0b1-4f01-9c91-807d2948c190',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TimeSeriesAnalyzer.tsx:38',message:'render unique fileIds',data:{pointsCount:data.points.length,uniqueFileIds:fileIdCounts.size},timestamp:Date.now(),sessionId:'debug-session',runId:'repro',hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion agent log
-  }, [data]);
+    return formatted.replace(',', '');
+  };
 
-  useEffect(() => {
-    if (!data?.points) {
+  const formatExportValue = (value: number | null | undefined) => {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return '';
+    }
+    return value.toFixed(2).replace('.', ',');
+  };
+
+  const buildDisplayedPoints = useCallback(() => {
+    if (!data?.points?.length) {
+      return [];
+    }
+    let points = data.points.filter(point => {
+      const value = dataType === 'temperature' ? point.temperature : point.humidity;
+      return value !== undefined;
+    });
+
+    if (zoomState) {
+      points = points.filter(point => point.timestamp >= zoomState.startTime && point.timestamp <= zoomState.endTime);
+    }
+
+    return points.map(point => {
+      const value = dataType === 'temperature' ? point.temperature : point.humidity;
+      const adjustedValue =
+        value !== undefined
+          ? dataType === 'temperature'
+            ? value + yOffset
+            : value + yOffset
+          : undefined;
+
+      return {
+        timestamp: point.timestamp,
+        loggerName: point.loggerName || '',
+        fileId: point.fileId,
+        value: formatExportValue(adjustedValue ?? null)
+      };
+    });
+  }, [data, dataType, yOffset, zoomState]);
+
+  const buildFileSafeName = (value: string) => {
+    const cleaned = value
+      .replace(/[\\/:*?"<>|]+/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleaned.length > 0 ? cleaned : 'logger';
+  };
+
+  const handleInvestigate = useCallback(() => {
+    const points = buildDisplayedPoints();
+    if (points.length === 0) {
+      alert('Нет данных для выгрузки.');
       return;
     }
-    const fileIdCounts = new Map<string, number>();
-    data.points.forEach(point => {
-      fileIdCounts.set(point.fileId, (fileIdCounts.get(point.fileId) || 0) + 1);
+
+    const valueLabel = dataType === 'temperature' ? 'Температура[°C]' : 'Влажность[%]';
+    const grouped = new Map<string, { name: string; rows: Array<{ 'Дата/время': string; [key: string]: string }> }>();
+
+    points.forEach(point => {
+      const loggerLabel = point.loggerName || point.fileId;
+      const key = loggerLabel || point.fileId;
+      if (!grouped.has(key)) {
+        grouped.set(key, { name: loggerLabel || point.fileId, rows: [] });
+      }
+      grouped.get(key)!.rows.push({
+        'Дата/время': formatExportTimestamp(point.timestamp),
+        [valueLabel]: point.value
+      });
     });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6cc9bf76-f0b1-4f01-9c91-807d2948c190',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TimeSeriesAnalyzer.tsx:38',message:'render unique fileIds',data:{pointsCount:data.points.length,uniqueFileIds:fileIdCounts.size},timestamp:Date.now(),sessionId:'debug-session',runId:'verify',hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion agent log
-  }, [data]);
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    grouped.forEach(({ name, rows }) => {
+      const sheet = XLSX.utils.json_to_sheet(rows, {
+        header: ['Дата/время', valueLabel]
+      });
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, 'GraphData');
+      const safeName = buildFileSafeName(name);
+      const fileName = `graph-data-${safeName}-${dataType}-${timestamp}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    });
+  }, [buildDisplayedPoints, dataType]);
 
   // Состояние для Map оборудования (имя -> serial_number)
   const [equipmentMap, setEquipmentMap] = useState<Map<string, string>>(new Map());
@@ -835,7 +916,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           maxHumidity: humidityStats.max,
           avgHumidity: humidityStats.avg,
           meetsLimits,
-          isExternal: zoneNumber === 0
+          isExternal: zoneNumber === 0,
+          fileId: points[0]?.fileId || 'unknown' // Добавляем fileId для фильтрации
         };
       }).sort((a, b) => {
         const parseLevel = (level: any) => {
@@ -898,7 +980,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           maxHumidity: '-',
           avgHumidity: '-',
           meetsLimits: '-',
-          isExternal: file.zoneNumber === 0
+          isExternal: file.zoneNumber === 0,
+          fileId: file.name // Добавляем fileId для фильтрации
         };
       }
 
@@ -1018,7 +1101,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         maxHumidity: humidityStats.max,
         avgHumidity: humidityStats.avg,
         meetsLimits,
-        isExternal: file.zoneNumber === 0
+        isExternal: file.zoneNumber === 0,
+        fileId: file.name // Добавляем fileId для фильтрации
       };
     }).sort((a, b) => {
       const parseLevel = (level: any) => {
@@ -1050,9 +1134,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     });
   }, [data, files, limits, zoomState, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel, getSerialNumberByEquipmentName, equipmentMap, contractFields.testType, markers, analysisResultsRefreshKey]); // Добавляем analysisResultsRefreshKey для принудительного обновления при нажатии "Заполнить"
 
+
+  // Фильтруем analysisResults по скрытым логгерам
+  const visibleAnalysisResults = useMemo(() => {
+    const filtered = analysisResults.filter(result => {
+      const fileId = (result as any).fileId;
+      const isHidden = hiddenLoggers.has(fileId);
+      return !isHidden;
+    });
+    return filtered;
+  }, [analysisResults, hiddenLoggers]);
+
   // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
   const { globalMinTemp, globalMaxTemp } = useMemo(() => {
-    const nonExternalResults = analysisResults.filter(result => !result.isExternal);
+    const nonExternalResults = visibleAnalysisResults.filter(result => !result.isExternal);
     const minTempValues = nonExternalResults
       .map(result => parseFloat(result.minTemp))
       .filter(val => !isNaN(val));
@@ -1084,7 +1179,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       globalMinTemp,
       globalMaxTemp
     };
-  }, [analysisResults]);
+  }, [visibleAnalysisResults]);
 
   // Функция для вычисления времени в формате "час:мин"
   const formatTimeDuration = (milliseconds: number): string => {
@@ -1741,7 +1836,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
         date: dateStr, // Только дата без времени
         dataType,
-        analysisResults,
+        analysisResults: visibleAnalysisResults,
         conclusions,
         researchObject: qualificationObject?.name || 'Не указан',
         storageZoneName: selectedStorageZoneLabel,
@@ -1821,7 +1916,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               reportFilename: trialReportFilename,
               reportData: {
                 dataType,
-                analysisResults,
+                analysisResults: visibleAnalysisResults,
                 contractFields,
                 storageZoneName: selectedStorageZoneLabel,
                 conclusions,
@@ -1844,7 +1939,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
               reportFilename: trialReportFilename,
               reportData: {
                 dataType,
-                analysisResults,
+                analysisResults: visibleAnalysisResults,
                 contractFields,
                 storageZoneName: selectedStorageZoneLabel,
                 conclusions,
@@ -2824,7 +2919,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       ).sort((a, b) => a.timestamp - b.timestamp);
       
       // Исключаем внешние датчики
-      const nonExternalResults = analysisResults.filter(result => {
+      const nonExternalResults = visibleAnalysisResults.filter(result => {
         const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
         return !isExternal;
       });
@@ -2949,7 +3044,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
 
       // Исключаем внешние датчики
-      const nonExternalResults = analysisResults.filter(result => {
+      const nonExternalResults = visibleAnalysisResults.filter(result => {
         const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
         return !isExternal;
       });
@@ -3066,7 +3161,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       }
 
       // Исключаем внешние датчики
-      const nonExternalResults = analysisResults.filter(result => {
+      const nonExternalResults = visibleAnalysisResults.filter(result => {
         const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
         return !isExternal;
       });
@@ -3401,6 +3496,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           yAxisLabel={dataType === 'temperature' ? 'Температура (°C)' : 'Влажность (%)'}
           yOffset={yOffset}
           resetLegendToken={legendResetKey}
+          onHiddenLoggersChange={handleHiddenLoggersChange}
         />
       </div>
 
@@ -3907,10 +4003,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             }
             return (Math.round(deviation * 10) / 10).toString().replace('.', ',');
           };
-          const deviationMinValues = analysisResults
+          const deviationMinValues = visibleAnalysisResults
             .map((result) => getDeviationValue(result.minTemp, result.isExternal))
             .filter((val): val is number => val !== null);
-          const deviationMaxValues = analysisResults
+          const deviationMaxValues = visibleAnalysisResults
             .map((result) => getDeviationValue(result.maxTemp, result.isExternal))
             .filter((val): val is number => val !== null);
           const maxDeviationMin = deviationMinValues.length > 0 ? Math.max(...deviationMinValues) : null;
@@ -3962,7 +4058,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {analysisResults.map((result, index) => (
+                {visibleAnalysisResults.map((result, index) => (
                   <tr key={index} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешняя температура' : result.zoneNumber}
@@ -4086,7 +4182,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {analysisResults.map((result, index) => {
+                {visibleAnalysisResults.map((result, index) => {
                   const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
                   const testMarker = getTestMarker();
                   const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(result.zoneNumber.toString()) || 0);
@@ -4167,7 +4263,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {analysisResults.map((result, index) => {
+                {visibleAnalysisResults.map((result, index) => {
                   const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
                   const testMarker = getTestMarker();
                   const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
@@ -4252,7 +4348,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {analysisResults.map((result, index) => {
+                {visibleAnalysisResults.map((result, index) => {
                   const isExternal = result.isExternal || result.zoneNumber === 'Внешний' || result.zoneNumber === '0';
                   const zoneNumber = result.zoneNumberRaw !== undefined ? result.zoneNumberRaw : (result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 0 : parseInt(String(result.zoneNumber)) || 0);
                   const resultLevel = typeof result.measurementLevel === 'string' ? result.measurementLevel : String(result.measurementLevel || 'unknown');
@@ -4595,7 +4691,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       </div>
 
       {/* Отладочная информация */}
-      <div className="bg-white rounded-lg shadow">
+      {canViewDebugInfo && <div className="bg-white rounded-lg shadow">
         <button
           onClick={() => setDebugInfoOpen(!debugInfoOpen)}
           className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
@@ -4610,6 +4706,15 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         
         {debugInfoOpen && (
           <div className="p-6 border-t border-gray-200 space-y-4">
+            <div className="flex items-center justify-end">
+              <button
+                onClick={handleInvestigate}
+                className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+                title="Сформировать XLSX по данным графика"
+              >
+                Исследовать
+              </button>
+            </div>
             {/* Отладочная информация */}
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
@@ -4667,7 +4772,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             </div>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 };
