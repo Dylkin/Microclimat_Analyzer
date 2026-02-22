@@ -29,6 +29,8 @@ interface ProjectItem {
   autoclavable?: boolean;
   inRegistrySI?: boolean;
   customTechnicalSpecs?: Record<string, string>; // Для хранения пользовательских технических характеристик
+  /** Товар добавлен пользователем через «+ Добавить товар» — блок «Технические характеристики» не показывается */
+  userAddedProduct?: boolean;
 }
 
 export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
@@ -51,6 +53,10 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
   const [productSearchLoading, setProductSearchLoading] = useState<Record<number, boolean>>({});
   const [categories, setCategories] = useState<EquipmentSection[]>([]);
   const [allCategoryProducts, setAllCategoryProducts] = useState<Record<number, EquipmentCard[]>>({});
+  const [categorySearches, setCategorySearches] = useState<Record<number, string>>({});
+  const [showCategoryDropdowns, setShowCategoryDropdowns] = useState<Record<number, boolean>>({});
+  const [categoryAdding, setCategoryAdding] = useState<Record<number, boolean>>({});
+  const [productAdding, setProductAdding] = useState<Record<number, boolean>>({});
   // Отслеживаем, были ли изменены технические характеристики пользователем (для определения, применять ли фильтрацию)
   const [userModifiedSpecs, setUserModifiedSpecs] = useState<Record<number, boolean>>({});
   // Отслеживаем, когда пользователь выбрал "Добавить новое значение" для каждого поля
@@ -59,6 +65,7 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
   const contractorDropdownRef = useRef<HTMLDivElement>(null);
   const supplierDropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const productDropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const categoryDropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   // Закрытие выпадающих списков при клике вне области
   useEffect(() => {
@@ -78,6 +85,13 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
         const ref = productDropdownRefs.current[parseInt(index)];
         if (ref && !ref.contains(event.target as Node)) {
           setShowProductDropdowns(prev => ({ ...prev, [parseInt(index)]: false }));
+        }
+      });
+
+      Object.keys(categoryDropdownRefs.current).forEach(index => {
+        const ref = categoryDropdownRefs.current[parseInt(index)];
+        if (ref && !ref.contains(event.target as Node)) {
+          setShowCategoryDropdowns(prev => ({ ...prev, [parseInt(index)]: false }));
         }
       });
     };
@@ -129,6 +143,81 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
     }
   };
 
+  // Фильтрация категорий по поисковому запросу
+  const getFilteredCategories = (itemIndex: number) => {
+    const search = categorySearches[itemIndex] ?? '';
+    return categories.filter(c =>
+      c.name.toLowerCase().includes(search.toLowerCase())
+    );
+  };
+
+  // Обработка выбора категории
+  const handleCategorySelect = (itemIndex: number, category: EquipmentSection) => {
+    handleUpdateItem(itemIndex, 'categoryId', category.id);
+    setCategorySearches(prev => ({ ...prev, [itemIndex]: category.name }));
+    setShowCategoryDropdowns(prev => ({ ...prev, [itemIndex]: false }));
+    const categoryForSpecs = categories.find((c: EquipmentSection) => c.id === category.id);
+    if (categoryForSpecs) {
+      handleUpdateItem(itemIndex, 'channelsCount', categoryForSpecs.channelsCount);
+      handleUpdateItem(itemIndex, 'dosingVolume', categoryForSpecs.dosingVolume || '');
+      handleUpdateItem(itemIndex, 'volumeStep', categoryForSpecs.volumeStep || '');
+      handleUpdateItem(itemIndex, 'dosingAccuracy', categoryForSpecs.dosingAccuracy || '');
+      handleUpdateItem(itemIndex, 'reproducibility', categoryForSpecs.reproducibility || '');
+      handleUpdateItem(itemIndex, 'autoclavable', categoryForSpecs.autoclavable);
+      handleUpdateItem(itemIndex, 'inRegistrySI', categoryForSpecs.inRegistrySI || false);
+    }
+    setUserModifiedSpecs(prev => ({ ...prev, [itemIndex]: false }));
+    handleUpdateItem(itemIndex, 'name', '');
+    setProductSearches(prev => ({ ...prev, [itemIndex]: '' }));
+    setShowProductDropdowns(prev => ({ ...prev, [itemIndex]: false }));
+  };
+
+  // Добавление новой категории товара
+  const handleAddNewCategory = async (itemIndex: number) => {
+    const search = (categorySearches[itemIndex] ?? '').trim();
+    if (!search) return;
+
+    setCategoryAdding(prev => ({ ...prev, [itemIndex]: true }));
+    try {
+      const newSection = await equipmentSectionsService.createSection({ name: search });
+      setCategories(prev => [...prev, newSection]);
+      handleCategorySelect(itemIndex, newSection);
+    } catch (error) {
+      console.error('Ошибка добавления категории:', error);
+      alert('Ошибка добавления категории товара');
+    } finally {
+      setCategoryAdding(prev => ({ ...prev, [itemIndex]: false }));
+    }
+  };
+
+  // Добавление нового товара в выбранную категорию
+  const handleAddNewProduct = async (itemIndex: number) => {
+    const item = items[itemIndex];
+    const search = (productSearches[itemIndex] ?? '').trim();
+    if (!item.categoryId || !search) return;
+
+    setProductAdding(prev => ({ ...prev, [itemIndex]: true }));
+    try {
+      const newCard = await equipmentSectionsService.createCard({
+        sectionId: item.categoryId,
+        name: search,
+        manufacturer: undefined,
+        specifications: {}
+      });
+      setProductSearchResults(prev => ({
+        ...prev,
+        [itemIndex]: [...(prev[itemIndex] || []), newCard]
+      }));
+      handleProductSelect(itemIndex, newCard);
+      handleUpdateItem(itemIndex, 'userAddedProduct', true);
+    } catch (error) {
+      console.error('Ошибка добавления товара:', error);
+      alert('Ошибка добавления товара');
+    } finally {
+      setProductAdding(prev => ({ ...prev, [itemIndex]: false }));
+    }
+  };
+
   // Загрузка категорий
   useEffect(() => {
     const loadCategories = async () => {
@@ -166,24 +255,25 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
   // Удаление товара
   const handleRemoveItem = (index: number) => {
     setItems(prev => prev.filter((_, i) => i !== index));
-    const newSupplierSearches = { ...supplierSearches };
-    const newSupplierDropdowns = { ...showSupplierDropdowns };
-    const newProductSearches = { ...productSearches };
-    const newProductDropdowns = { ...showProductDropdowns };
-    const newProductResults = { ...productSearchResults };
-    const newProductLoading = { ...productSearchLoading };
-    delete newSupplierSearches[index];
-    delete newSupplierDropdowns[index];
-    delete newProductSearches[index];
-    delete newProductDropdowns[index];
-    delete newProductResults[index];
-    delete newProductLoading[index];
-    setSupplierSearches(newSupplierSearches);
-    setShowSupplierDropdowns(newSupplierDropdowns);
-    setProductSearches(newProductSearches);
-    setShowProductDropdowns(newProductDropdowns);
-    setProductSearchResults(newProductResults);
-    setProductSearchLoading(newProductLoading);
+    const rekey = <T extends Record<number, unknown>>(obj: T): T => {
+      const next: Record<number, unknown> = {};
+      Object.keys(obj).forEach(k => {
+        const i = parseInt(k, 10);
+        if (i < index) next[i] = obj[i];
+        if (i > index) next[i - 1] = obj[i];
+      });
+      return next as T;
+    };
+    setSupplierSearches(prev => rekey(prev));
+    setShowSupplierDropdowns(prev => rekey(prev));
+    setProductSearches(prev => rekey(prev));
+    setShowProductDropdowns(prev => rekey(prev));
+    setProductSearchResults(prev => rekey(prev));
+    setProductSearchLoading(prev => rekey(prev));
+    setCategorySearches(prev => rekey(prev));
+    setShowCategoryDropdowns(prev => rekey(prev));
+    setCategoryAdding(prev => rekey(prev));
+    setProductAdding(prev => rekey(prev));
   };
 
   // Обновление товара
@@ -309,9 +399,10 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
   }, [items.map(item => `${item.categoryId}-${item.channelsCount}-${item.dosingVolume}-${item.volumeStep}-${item.dosingAccuracy}-${item.reproducibility}-${item.autoclavable}`).join('|'), userModifiedSpecs]);
 
 
-  // Обработка выбора товара из справочника
+  // Обработка выбора товара из справочника (не пользовательское добавление — показываем блок тех. характеристик)
   const handleProductSelect = (itemIndex: number, product: EquipmentCard) => {
     handleUpdateItem(itemIndex, 'name', product.name);
+    handleUpdateItem(itemIndex, 'userAddedProduct', false);
     setProductSearches(prev => ({ ...prev, [itemIndex]: product.name }));
     setShowProductDropdowns(prev => ({ ...prev, [itemIndex]: false }));
   };
@@ -517,6 +608,8 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
             type="date"
             value={tenderDate}
             onChange={(e) => setTenderDate(e.target.value)}
+            title="Дата тендера"
+            aria-label="Дата тендера"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
@@ -531,6 +624,8 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
               type="button"
               onClick={handleAddItem}
               className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1"
+              title="Добавить товар"
+              aria-label="Добавить товар"
             >
               <Plus className="w-3 h-3" />
               <span>Добавить товар</span>
@@ -552,64 +647,82 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                       type="button"
                       onClick={() => handleRemoveItem(index)}
                       className="text-red-600 hover:text-red-800"
+                      title="Удалить товар"
+                      aria-label="Удалить товар"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Категория */}
-                    <div className="md:col-span-2">
-                      <label className="block text-xs text-gray-500 mb-1">Категория</label>
-                      <select
-                        value={item.categoryId || ''}
-                        onChange={(e) => {
-                          const categoryId = e.target.value || undefined;
-                          handleUpdateItem(index, 'categoryId', categoryId);
-                          // Если выбрана категория, загружаем её технические характеристики
-                          if (categoryId) {
-                            const category = categories.find((c: EquipmentSection) => c.id === categoryId);
-                            if (category) {
-                              handleUpdateItem(index, 'channelsCount', category.channelsCount);
-                              handleUpdateItem(index, 'dosingVolume', category.dosingVolume || '');
-                              handleUpdateItem(index, 'volumeStep', category.volumeStep || '');
-                              handleUpdateItem(index, 'dosingAccuracy', category.dosingAccuracy || '');
-                              handleUpdateItem(index, 'reproducibility', category.reproducibility || '');
-                              handleUpdateItem(index, 'autoclavable', category.autoclavable);
-                              handleUpdateItem(index, 'inRegistrySI', category.inRegistrySI || false);
-                            }
-                            // Сбрасываем флаг изменений технических характеристик при выборе новой категории
-                            setUserModifiedSpecs(prev => ({ ...prev, [index]: false }));
-                            // Показываем список товаров при выборе категории (товары загрузятся автоматически)
-                            // Список будет показан после загрузки товаров в useEffect
-                          } else {
-                            // Очищаем технические характеристики при снятии выбора категории
-                            handleUpdateItem(index, 'channelsCount', undefined);
-                            handleUpdateItem(index, 'dosingVolume', '');
-                            handleUpdateItem(index, 'volumeStep', '');
-                            handleUpdateItem(index, 'dosingAccuracy', '');
-                            handleUpdateItem(index, 'reproducibility', '');
-                            handleUpdateItem(index, 'autoclavable', undefined);
-                            handleUpdateItem(index, 'inRegistrySI', false);
-                            handleUpdateItem(index, 'name', '');
-                            setProductSearches(prev => ({ ...prev, [index]: '' }));
-                            setShowProductDropdowns(prev => ({ ...prev, [index]: false }));
-                            setProductSearchResults(prev => ({ ...prev, [index]: [] }));
-                          }
-                        }}
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    {/* Категория товара */}
+                    <div className="md:col-span-2 relative">
+                      <label className="block text-xs text-gray-500 mb-1">Категория товара</label>
+                      <div
+                        ref={el => { categoryDropdownRefs.current[index] = el; }}
+                        className="relative"
                       >
-                        <option value="">Выберите категорию</option>
-                        {categories.map((category: EquipmentSection) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
+                        <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          title="Категория товара"
+                          aria-label="Поиск категории товара или добавление новой"
+                          value={item.categoryId ? (categories.find(c => c.id === item.categoryId)?.name ?? categorySearches[index] ?? '') : (categorySearches[index] ?? '')}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setCategorySearches(prev => ({ ...prev, [index]: v }));
+                            if (!v.trim()) {
+                              handleUpdateItem(index, 'categoryId', undefined);
+                              handleUpdateItem(index, 'channelsCount', undefined);
+                              handleUpdateItem(index, 'dosingVolume', '');
+                              handleUpdateItem(index, 'volumeStep', '');
+                              handleUpdateItem(index, 'dosingAccuracy', '');
+                              handleUpdateItem(index, 'reproducibility', '');
+                              handleUpdateItem(index, 'autoclavable', undefined);
+                              handleUpdateItem(index, 'inRegistrySI', false);
+                              handleUpdateItem(index, 'name', '');
+                              setProductSearches(prev => ({ ...prev, [index]: '' }));
+                              setShowProductDropdowns(prev => ({ ...prev, [index]: false }));
+                              setProductSearchResults(prev => ({ ...prev, [index]: [] }));
+                            }
+                            setShowCategoryDropdowns(prev => ({ ...prev, [index]: true }));
+                          }}
+                          onFocus={() => setShowCategoryDropdowns(prev => ({ ...prev, [index]: true }))}
+                          placeholder="Поиск категории или добавление новой"
+                          className="w-full pl-8 pr-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                        {showCategoryDropdowns[index] && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+                            {getFilteredCategories(index).length > 0 ? (
+                              getFilteredCategories(index).map(category => (
+                                <div
+                                  key={category.id}
+                                  onClick={() => handleCategorySelect(index, category)}
+                                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  {category.name}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="px-4 py-2 text-gray-500 text-sm">
+                                Категория не найдена
+                              </div>
+                            )}
+                            {(categorySearches[index] ?? '').trim() && !categories.some(c => c.name.toLowerCase() === (categorySearches[index] ?? '').toLowerCase()) && (
+                              <div
+                                onClick={() => handleAddNewCategory(index)}
+                                className="px-4 py-2 hover:bg-green-50 cursor-pointer border-t border-gray-200 text-green-600 font-medium text-sm"
+                              >
+                                {categoryAdding[index] ? 'Создание...' : `+ Добавить категорию «${categorySearches[index]}»`}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Технические характеристики - показываем только если выбрана категория */}
-                    {item.categoryId && (() => {
+                    {/* Технические характеристики — только для товаров из справочника; для добавленных пользователем полей нет, их можно добавить при редактировании карточки */}
+                    {item.categoryId && !item.userAddedProduct && (() => {
                       const category = categories.find((c: EquipmentSection) => c.id === item.categoryId);
                       if (!category || !category.technicalSpecsRanges) return null;
                       
@@ -641,6 +754,8 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                                 <label className="block text-xs text-gray-500 mb-1">{spec.label}</label>
                                 <div className="space-y-1">
                                   <select
+                                    title={spec.label}
+                                    aria-label={spec.label}
                                     value={availableValues.includes(currentValue) ? currentValue : (showCustomInput ? '__custom__' : '')}
                                     onChange={(e) => {
                                       if (e.target.value === '__custom__') {
@@ -810,16 +925,34 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                                 ));
                               } else if (allProducts.length === 0) {
                                 return (
-                                  <div className="px-4 py-2 text-gray-500 text-sm">
-                                    В данной категории пока нет товаров
+                                  <div className="px-4 py-2">
+                                    <div className="text-gray-500 text-sm mb-2">В данной категории пока нет товаров</div>
+                                    {searchTerm && (
+                                      <div
+                                        onClick={() => !productAdding[index] && handleAddNewProduct(index)}
+                                        className="px-2 py-1 hover:bg-green-50 cursor-pointer text-green-600 font-medium text-sm border-t border-gray-100"
+                                      >
+                                        {productAdding[index] ? 'Создание...' : `+ Добавить товар «${productSearches[index]}»`}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               } else {
                                 return (
-                                  <div className="px-4 py-2 text-gray-500 text-sm">
-                                    {searchTerm 
-                                      ? `Товары не найдены по запросу "${productSearches[index]}"` 
-                                      : 'Товары не найдены по заданным техническим характеристикам. Попробуйте изменить фильтры.'}
+                                  <div className="px-4 py-2">
+                                    <div className="text-gray-500 text-sm">
+                                      {searchTerm 
+                                        ? `Товары не найдены по запросу "${productSearches[index]}"` 
+                                        : 'Товары не найдены по заданным техническим характеристикам. Попробуйте изменить фильтры.'}
+                                    </div>
+                                    {searchTerm && (
+                                      <div
+                                        onClick={() => !productAdding[index] && handleAddNewProduct(index)}
+                                        className="mt-2 pt-2 border-t border-gray-200 hover:bg-green-50 cursor-pointer text-green-600 font-medium text-sm"
+                                      >
+                                        {productAdding[index] ? 'Создание...' : `+ Добавить товар «${productSearches[index]}» в категорию`}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               }
@@ -837,6 +970,8 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                         min="1"
                         value={item.quantity}
                         onChange={(e) => handleUpdateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                        title="Количество"
+                        aria-label="Количество (шт.)"
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
@@ -850,6 +985,8 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
                         step="0.01"
                         value={item.declaredPrice}
                         onChange={(e) => handleUpdateItem(index, 'declaredPrice', parseFloat(e.target.value) || 0)}
+                        title="Заявленная стоимость"
+                        aria-label="Заявленная стоимость"
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>

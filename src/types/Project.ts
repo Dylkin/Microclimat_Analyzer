@@ -96,6 +96,8 @@ export interface UpdateProjectData {
   contractDate?: Date;
   status?: ProjectStatus;
   qualificationObjectIds?: string[];
+  /** Обновление товаров проекта (Подача документов — блок «Товары и возможные поставщики») */
+  items?: Array<Partial<Omit<ProjectItem, 'projectId' | 'createdAt' | 'updatedAt'>> & { id: string }>;
 }
 
 export const ProjectStatusLabels: Record<ProjectStatus, string> = {

@@ -46,6 +46,22 @@ type ProjectDto = {
     supplierPrice?: number | null;
     supplier_price?: number | string | null;
     description?: string | null;
+    categoryId?: string | null;
+    category_id?: string | null;
+    categoryName?: string | null;
+    category_name?: string | null;
+    channelsCount?: number | null;
+    channels_count?: number | null;
+    dosingVolume?: string | null;
+    dosing_volume?: string | null;
+    volumeStep?: string | null;
+    volume_step?: string | null;
+    dosingAccuracy?: string | null;
+    dosing_accuracy?: string | null;
+    reproducibility?: string | null;
+    autoclavable?: boolean | null;
+    inRegistrySI?: boolean | null;
+    in_registry_si?: boolean | null;
     createdAt?: string;
     created_at?: string;
     updatedAt?: string;
@@ -123,6 +139,15 @@ const mapItems = (items?: ProjectDto['items']): ProjectItem[] =>
         ? Number(item.supplier_price)
         : undefined,
     description: item.description || undefined,
+    categoryId: (item as any).categoryId ?? (item as any).category_id ?? undefined,
+    categoryName: (item as any).categoryName ?? (item as any).category_name ?? undefined,
+    channelsCount: (item as any).channelsCount ?? (item as any).channels_count ?? undefined,
+    dosingVolume: (item as any).dosingVolume ?? (item as any).dosing_volume ?? undefined,
+    volumeStep: (item as any).volumeStep ?? (item as any).volume_step ?? undefined,
+    dosingAccuracy: (item as any).dosingAccuracy ?? (item as any).dosing_accuracy ?? undefined,
+    reproducibility: (item as any).reproducibility ?? undefined,
+    autoclavable: (item as any).autoclavable ?? undefined,
+    inRegistrySI: (item as any).inRegistrySI ?? (item as any).in_registry_si ?? undefined,
     createdAt:
       toDate(item.createdAt || item.created_at) || new Date(),
     updatedAt:
@@ -219,6 +244,25 @@ class ProjectService {
     }
     if (updates.qualificationObjectIds !== undefined) {
       payload.qualificationObjectIds = updates.qualificationObjectIds;
+    }
+    if (updates.items !== undefined) {
+      payload.items = updates.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        declaredPrice: item.declaredPrice,
+        supplierId: item.supplierId,
+        supplierPrice: item.supplierPrice,
+        description: item.description,
+        categoryId: item.categoryId,
+        channelsCount: item.channelsCount,
+        dosingVolume: item.dosingVolume,
+        volumeStep: item.volumeStep,
+        dosingAccuracy: item.dosingAccuracy,
+        reproducibility: item.reproducibility,
+        autoclavable: item.autoclavable,
+        inRegistrySI: item.inRegistrySI,
+      }));
     }
 
     const data = await apiClient.put<ProjectDto>(`/projects/${id}`, payload);

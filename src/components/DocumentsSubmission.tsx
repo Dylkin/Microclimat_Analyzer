@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, Package, Building2, ClipboardList, User, Phone, Mail, MessageSquare, Send } from 'lucide-react';
+import { ArrowLeft, Package, Building2, ClipboardList, User, Phone, Mail, MessageSquare, Send, Edit2, Save, X } from 'lucide-react';
 import { Project, ProjectItem } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { contractorService } from '../utils/contractorService';
+import { projectService } from '../utils/projectService';
 import { ProjectInfo } from './contract/ProjectInfo';
 import { apiClient } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +34,9 @@ export const DocumentsSubmission: React.FC<DocumentsSubmissionProps> = ({ projec
       }[]
     >
   >({});
+  const [isEditingItems, setIsEditingItems] = useState(false);
+  const [editingItems, setEditingItems] = useState<ProjectItem[]>([]);
+  const [savingItems, setSavingItems] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -327,37 +331,142 @@ export const DocumentsSubmission: React.FC<DocumentsSubmissionProps> = ({ projec
 
       {/* Товары и поставщики */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center mb-4">
-          <Package className="w-6 h-6 text-green-600 mr-2" />
-          <h2 className="text-lg font-semibold text-gray-900">Товары и возможные поставщики</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <Package className="w-6 h-6 text-green-600 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Товары и возможные поставщики</h2>
+          </div>
+          {!isEditingItems ? (
+            (currentProject.items?.length ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingItems(currentProject.items ? currentProject.items.map(i => ({ ...i })) : []);
+                  setIsEditingItems(true);
+                }}
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+              >
+                <Edit2 className="w-4 h-4 mr-1" />
+                Редактировать
+              </button>
+            )
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEditingItems(false)}
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200"
+              >
+                <X className="w-4 h-4 mr-1" />
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setSavingItems(true);
+                  try {
+                    const updated = await projectService.updateProject(currentProject.id, { items: editingItems });
+                    setCurrentProject(updated);
+                    setIsEditingItems(false);
+                    alert('Изменения сохранены.');
+                  } catch (e: any) {
+                    alert(e?.message || 'Ошибка сохранения');
+                  } finally {
+                    setSavingItems(false);
+                  }
+                }}
+                disabled={savingItems}
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4 mr-1" />
+                {savingItems ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          )}
         </div>
 
-        {itemsWithSuppliers.length === 0 ? (
-          <p className="text-gray-500 text-sm">Для данного проекта товары не указаны.</p>
-        ) : (
+        {(() => {
+          const displayItems = isEditingItems ? editingItems : (currentProject.items || []);
+          if (displayItems.length === 0) {
+            return <p className="text-gray-500 text-sm">Для данного проекта товары не указаны.</p>;
+          }
+          return (
           <div className="space-y-4">
-            {itemsWithSuppliers.map(({ item, suppliers }, index) => (
+            {displayItems.map((item, index) => {
+              const suppliers = itemsWithSuppliers.find(x => x.item.id === item.id)?.suppliers ?? [];
+              const category = item.categoryId ? categories.find(c => c.id === item.categoryId) : undefined;
+              const techSpecs = category?.technicalSpecsRanges ? Object.entries(category.technicalSpecsRanges).filter(([, r]) => r.enabled) : [];
+              return (
               <div
                 key={item.id || index}
                 className="border border-gray-200 rounded-lg p-4 bg-gray-50"
               >
-                {/* Одна строка: Наименование, Количество, Заявленная стоимость */}
-                <div className="flex flex-wrap items-baseline gap-4 text-sm font-medium text-gray-900 mb-2">
-                  <span>{item.name}</span>
-                  <span className="text-gray-700">
-                    Количество:{' '}
-                    <span className="font-semibold">{item.quantity}</span>
-                  </span>
-                  <span className="text-gray-700">
-                    Заявленная стоимость:{' '}
-                    <span className="font-semibold">
-                      {item.declaredPrice.toLocaleString('ru-RU', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  </span>
-                </div>
+                {/* Редактируемые поля: Наименование, Количество, Заявленная стоимость, Описание */}
+                {isEditingItems ? (
+                  <div className="space-y-3 mb-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Наименование</label>
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, name: e.target.value } : it))}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Количество</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, quantity: parseInt(e.target.value, 10) || 1 } : it))}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Заявленная стоимость</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={item.declaredPrice}
+                          onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, declaredPrice: parseFloat(e.target.value) || 0 } : it))}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Описание</label>
+                      <textarea
+                        value={item.description || ''}
+                        onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, description: e.target.value } : it))}
+                        rows={2}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-baseline gap-4 text-sm font-medium text-gray-900 mb-2">
+                      <span>{item.name}</span>
+                      <span className="text-gray-700">
+                        Количество: <span className="font-semibold">{item.quantity}</span>
+                      </span>
+                      <span className="text-gray-700">
+                        Заявленная стоимость:{' '}
+                        <span className="font-semibold">
+                          {item.declaredPrice.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </span>
+                    </div>
+                    {item.description && (
+                      <div className="text-xs text-gray-600 mb-3">
+                        <span className="font-semibold">Описание:</span> {item.description}
+                      </div>
+                    )}
+                  </>
+                )}
 
                 {/* Категория товара */}
                 {item.categoryName && (
@@ -366,56 +475,125 @@ export const DocumentsSubmission: React.FC<DocumentsSubmissionProps> = ({ projec
                   </div>
                 )}
 
-                {/* Технические характеристики */}
-                {(item.categoryId || item.channelsCount !== undefined || item.dosingVolume || 
-                  item.volumeStep || item.dosingAccuracy || item.reproducibility !== undefined || 
-                  item.autoclavable !== undefined || item.inRegistrySI) && (
+                {/* Технические характеристики выбранного товара — отображаются по категории, с возможностью заполнения */}
+                {item.categoryId && category && (techSpecs.length > 0 || isEditingItems) && (
                   <div className="mb-3 p-3 bg-white rounded border border-gray-200">
-                    <div className="text-xs font-semibold text-gray-700 mb-2">Технические характеристики:</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600">
-                      {item.channelsCount !== undefined && item.channelsCount !== null && (
+                    <div className="text-xs font-semibold text-gray-700 mb-2">Технические характеристики</div>
+                    {isEditingItems && techSpecs.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {techSpecs.map(([specKey, specRange]) => {
+                          const label = specRange.label || specKey;
+                          const currentVal = (item as Record<string, unknown>)[specKey];
+                          const isBool = specKey === 'autoclavable' || specKey === 'inRegistrySI';
+                          const isNum = specKey === 'channelsCount';
+                          return (
+                            <div key={specKey}>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                              {isBool ? (
+                                <select
+                                  value={currentVal === undefined ? '' : currentVal ? 'true' : 'false'}
+                                  onChange={(e) => {
+                                    const v = e.target.value === '' ? undefined : e.target.value === 'true';
+                                    setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, [specKey]: v } : it));
+                                  }}
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                                >
+                                  <option value="">Не указано</option>
+                                  <option value="true">Да</option>
+                                  <option value="false">Нет</option>
+                                </select>
+                              ) : isNum ? (
+                                <input
+                                  type="number"
+                                  value={currentVal !== undefined && currentVal !== null ? String(currentVal) : ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value === '' ? undefined : parseInt(e.target.value, 10);
+                                    setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, [specKey]: v } : it));
+                                  }}
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={currentVal !== undefined && currentVal !== null ? String(currentVal) : ''}
+                                  onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, [specKey]: e.target.value } : it))}
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                                  placeholder={label}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                        {(category.inRegistrySI !== undefined || category.inRegistrySI === true) && (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Наличие в реестре СИ</label>
+                            <select
+                              value={item.inRegistrySI === undefined ? '' : item.inRegistrySI ? 'true' : 'false'}
+                              onChange={(e) => {
+                                const v = e.target.value === '' ? undefined : e.target.value === 'true';
+                                setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, inRegistrySI: v } : it));
+                              }}
+                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                            >
+                              <option value="">Не указано</option>
+                              <option value="true">Да</option>
+                              <option value="false">Нет</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    ) : isEditingItems && techSpecs.length === 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                          <span className="font-medium">Количество каналов:</span> {item.channelsCount}
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Количество каналов</label>
+                          <input type="number" min={1} value={item.channelsCount ?? ''} onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, channelsCount: e.target.value === '' ? undefined : parseInt(e.target.value, 10) } : it))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500" />
                         </div>
-                      )}
-                      {item.dosingVolume && (
                         <div>
-                          <span className="font-medium">Объем дозирования:</span> {item.dosingVolume}
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Объем дозирования</label>
+                          <input type="text" value={item.dosingVolume ?? ''} onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, dosingVolume: e.target.value } : it))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500" placeholder="например, 0,1-2,5 мкл" />
                         </div>
-                      )}
-                      {item.volumeStep && (
                         <div>
-                          <span className="font-medium">Шаг установки объема дозы:</span> {item.volumeStep}
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Шаг установки объема дозы</label>
+                          <input type="text" value={item.volumeStep ?? ''} onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, volumeStep: e.target.value } : it))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500" />
                         </div>
-                      )}
-                      {item.dosingAccuracy && (
                         <div>
-                          <span className="font-medium">Точность дозирования:</span> {item.dosingAccuracy}
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Точность дозирования</label>
+                          <input type="text" value={item.dosingAccuracy ?? ''} onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, dosingAccuracy: e.target.value } : it))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500" />
                         </div>
-                      )}
-                      {item.reproducibility && (
                         <div>
-                          <span className="font-medium">Воспроизводимость:</span> {item.reproducibility}
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Воспроизводимость</label>
+                          <input type="text" value={item.reproducibility ?? ''} onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, reproducibility: e.target.value } : it))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500" />
                         </div>
-                      )}
-                      {item.autoclavable !== undefined && (
                         <div>
-                          <span className="font-medium">Автоклавируемость:</span> {item.autoclavable ? 'Да' : 'Нет'}
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Автоклавируемость</label>
+                          <select value={item.autoclavable === undefined ? '' : item.autoclavable ? 'true' : 'false'} onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, autoclavable: e.target.value === '' ? undefined : e.target.value === 'true' } : it))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500">
+                            <option value="">Не указано</option>
+                            <option value="true">Да</option>
+                            <option value="false">Нет</option>
+                          </select>
                         </div>
-                      )}
-                      {item.inRegistrySI && (
                         <div>
-                          <span className="font-medium">Наличие в реестре СИ:</span> Да
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Наличие в реестре СИ</label>
+                          <select value={item.inRegistrySI === undefined ? '' : item.inRegistrySI ? 'true' : 'false'} onChange={(e) => setEditingItems(prev => prev.map(it => it.id === item.id ? { ...it, inRegistrySI: e.target.value === '' ? undefined : e.target.value === 'true' } : it))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500">
+                            <option value="">Не указано</option>
+                            <option value="true">Да</option>
+                            <option value="false">Нет</option>
+                          </select>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Описание товара */}
-                {item.description && (
-                  <div className="text-xs text-gray-600 mb-3">
-                    <span className="font-semibold">Описание:</span> {item.description}
+                      </div>
+                    ) : !isEditingItems && (item.channelsCount !== undefined || item.dosingVolume || item.volumeStep || item.dosingAccuracy || item.reproducibility !== undefined || item.autoclavable !== undefined || item.inRegistrySI) ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600">
+                        {item.channelsCount !== undefined && item.channelsCount !== null && (
+                          <div><span className="font-medium">Количество каналов:</span> {item.channelsCount}</div>
+                        )}
+                        {item.dosingVolume && <div><span className="font-medium">Объем дозирования:</span> {item.dosingVolume}</div>}
+                        {item.volumeStep && <div><span className="font-medium">Шаг установки объема дозы:</span> {item.volumeStep}</div>}
+                        {item.dosingAccuracy && <div><span className="font-medium">Точность дозирования:</span> {item.dosingAccuracy}</div>}
+                        {item.reproducibility && <div><span className="font-medium">Воспроизводимость:</span> {item.reproducibility}</div>}
+                        {item.autoclavable !== undefined && <div><span className="font-medium">Автоклавируемость:</span> {item.autoclavable ? 'Да' : 'Нет'}</div>}
+                        {item.inRegistrySI && <div><span className="font-medium">Наличие в реестре СИ:</span> Да</div>}
+                      </div>
+                    ) : null}
                   </div>
                 )}
 
@@ -425,11 +603,9 @@ export const DocumentsSubmission: React.FC<DocumentsSubmissionProps> = ({ projec
                   <div className="text-xs font-semibold text-gray-700 mb-2">
                     Поставщики
                   </div>
-                  {itemsWithSuppliers.find(x => x.item === item)?.suppliers.length ? (
+                  {suppliers.length > 0 ? (
                     <div className="space-y-3">
-                      {itemsWithSuppliers
-                        .find(x => x.item === item)!
-                        .suppliers.map((supplier) => (
+                      {suppliers.map((supplier) => (
                           <div
                             key={supplier.id}
                             className="bg-white border border-gray-200 rounded-md px-4 py-3"
@@ -607,9 +783,11 @@ export const DocumentsSubmission: React.FC<DocumentsSubmissionProps> = ({ projec
                   )}
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
-        )}
+        );
+        })()}
       </div>
     </div>
   );

@@ -836,6 +836,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       contractDate,
       status,
       qualificationObjectIds,
+      items: projectItems,
     } = req.body;
 
     const updates: string[] = [];
@@ -967,6 +968,61 @@ router.put('/:id', requireAuth, async (req, res) => {
       }
     }
 
+    // Обновление товаров проекта (блок «Товары и возможные поставщики» на Подаче документов)
+    if (Array.isArray(projectItems) && projectItems.length > 0) {
+      const itemsTableCheck = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_schema = 'public'
+          AND table_name = 'project_items'
+        ) as exists
+      `);
+      if (itemsTableCheck.rows[0].exists) {
+        const colsCheck = await client.query(`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'project_items'
+          AND column_name IN ('category_id', 'channels_count', 'dosing_volume', 'volume_step', 'dosing_accuracy', 'reproducibility', 'autoclavable', 'in_registry_si')
+        `);
+        const hasItemCols = colsCheck.rows.length > 0;
+        for (const item of projectItems) {
+          if (!item.id) continue;
+          if (hasItemCols) {
+            await client.query(
+              `UPDATE project_items SET
+                name = $2, quantity = $3, declared_price = $4, supplier_id = $5, supplier_price = $6, description = $7,
+                category_id = $8, channels_count = $9, dosing_volume = $10, volume_step = $11,
+                dosing_accuracy = $12, reproducibility = $13, autoclavable = $14, in_registry_si = $15,
+                updated_at = NOW()
+              WHERE id = $1 AND project_id = $16`,
+              [
+                item.id,
+                item.name ?? '',
+                item.quantity ?? 0,
+                item.declaredPrice ?? 0,
+                item.supplierId || null,
+                item.supplierPrice ?? null,
+                item.description || null,
+                item.categoryId || null,
+                item.channelsCount ?? null,
+                item.dosingVolume || null,
+                item.volumeStep || null,
+                item.dosingAccuracy || null,
+                item.reproducibility || null,
+                item.autoclavable ?? null,
+                item.inRegistrySI ?? null,
+                id,
+              ],
+            );
+          } else {
+            await client.query(
+              `UPDATE project_items SET name = $2, quantity = $3, declared_price = $4, supplier_id = $5, supplier_price = $6, description = $7, updated_at = NOW() WHERE id = $1 AND project_id = $8`,
+              [item.id, item.name ?? '', item.quantity ?? 0, item.declaredPrice ?? 0, item.supplierId || null, item.supplierPrice ?? null, item.description || null, id],
+            );
+          }
+        }
+      }
+    }
+
     await client.query('COMMIT');
 
     // Возвращаем актуальный проект с выбранными объектами (как GET /projects/:id)
@@ -1029,6 +1085,49 @@ router.put('/:id', requireAuth, async (req, res) => {
       );
     }
 
+    let putProjectItems: any[] = [];
+    const putItemsTableCheck = await pool.query(`
+      SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'project_items') as exists
+    `);
+    if (putItemsTableCheck.rows[0].exists) {
+      const putColsCheck = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'project_items'
+        AND column_name IN ('category_id', 'channels_count', 'dosing_volume', 'volume_step', 'dosing_accuracy', 'reproducibility', 'autoclavable', 'in_registry_si')
+      `);
+      const putHasNewCols = putColsCheck.rows.length > 0;
+      const putHasCategoryId = putColsCheck.rows.some((r: any) => r.column_name === 'category_id');
+      let putSelectCols = 'pi.id, pi.name, pi.quantity, pi.declared_price, pi.supplier_id, pi.supplier_price, pi.description, pi.created_at, pi.updated_at, c.name as supplier_name';
+      if (putHasNewCols) putSelectCols += ', pi.category_id, pi.channels_count, pi.dosing_volume, pi.volume_step, pi.dosing_accuracy, pi.reproducibility, pi.autoclavable, pi.in_registry_si';
+      if (putHasCategoryId) putSelectCols += ', es.name as category_name';
+      let putItemsQuery = `SELECT ${putSelectCols} FROM project_items pi LEFT JOIN contractors c ON pi.supplier_id = c.id`;
+      if (putHasCategoryId) putItemsQuery += ' LEFT JOIN equipment_sections es ON pi.category_id = es.id';
+      putItemsQuery += ' WHERE pi.project_id = $1 ORDER BY pi.created_at';
+      const putItemsResult = await pool.query(putItemsQuery, [id]);
+      putProjectItems = putItemsResult.rows.map((item: any) => ({
+        id: item.id,
+        projectId: id,
+        name: item.name,
+        quantity: item.quantity,
+        declaredPrice: parseFloat(item.declared_price),
+        supplierId: item.supplier_id,
+        supplierName: item.supplier_name,
+        supplierPrice: item.supplier_price ? parseFloat(item.supplier_price) : undefined,
+        description: item.description,
+        categoryId: putHasNewCols ? item.category_id : undefined,
+        categoryName: putHasCategoryId ? item.category_name : undefined,
+        channelsCount: putHasNewCols ? item.channels_count : undefined,
+        dosingVolume: putHasNewCols ? item.dosing_volume : undefined,
+        volumeStep: putHasNewCols ? item.volume_step : undefined,
+        dosingAccuracy: putHasNewCols ? item.dosing_accuracy : undefined,
+        reproducibility: putHasNewCols ? item.reproducibility : undefined,
+        autoclavable: putHasNewCols ? item.autoclavable : undefined,
+        inRegistrySI: putHasNewCols ? item.in_registry_si : undefined,
+        createdAt: new Date(item.created_at),
+        updatedAt: new Date(item.updated_at),
+      }));
+    }
+
     res.json({
       id: projectRow.id,
       name: projectRow.name,
@@ -1050,6 +1149,7 @@ router.put('/:id', requireAuth, async (req, res) => {
         name: row.name,
         objectType: row.object_type,
       })),
+      items: putProjectItems.length > 0 ? putProjectItems : undefined,
     });
   } catch (error) {
     await client.query('ROLLBACK');

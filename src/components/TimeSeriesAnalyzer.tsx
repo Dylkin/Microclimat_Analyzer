@@ -797,10 +797,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           ? points[0].measurementLevel
           : 'unknown';
         
-        // Calculate temperature statistics
+        // Calculate temperature statistics (с учётом смещения по оси Y из Отладочная информация)
         const temperatures = points
           .filter(p => p.temperature !== undefined && p.temperature !== null && !isNaN(p.temperature) && isFinite(p.temperature))
-          .map(p => p.temperature!);
+          .map(p => p.temperature! + yOffset);
         
         // Отладочная информация (убрана для продакшена)
         // console.log(`TimeSeriesAnalyzer: Processing zone ${zoneNumber} level ${measurementLevel}`, {
@@ -811,7 +811,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         
         const humidities = points
           .filter(p => p.humidity !== undefined && p.humidity !== null)
-          .map(p => p.humidity!);
+          .map(p => p.humidity! + yOffset);
 
         let tempStats = { min: '-', max: '-', avg: '-' };
         let humidityStats = { min: '-', max: '-', avg: '-' };
@@ -985,14 +985,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         };
       }
 
-      // Calculate temperature statistics
+      // Calculate temperature statistics (с учётом смещения по оси Y из Отладочная информация)
       const temperatures = filePoints
         .filter(p => p.temperature !== undefined)
-        .map(p => p.temperature!);
+        .map(p => p.temperature! + yOffset);
       
       const humidities = filePoints
         .filter(p => p.humidity !== undefined)
-        .map(p => p.humidity!);
+        .map(p => p.humidity! + yOffset);
 
       let tempStats = { min: '-', max: '-', avg: '-' };
       let humidityStats = { min: '-', max: '-', avg: '-' };
@@ -1132,7 +1132,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       if (aLevel === null && bLevel !== null) return 1;
       return 0;
     });
-  }, [data, files, limits, zoomState, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel, getSerialNumberByEquipmentName, equipmentMap, contractFields.testType, markers, analysisResultsRefreshKey]); // Добавляем analysisResultsRefreshKey для принудительного обновления при нажатии "Заполнить"
+  }, [data, files, limits, zoomState, yOffset, qualificationObjectId, projectId, qualificationObject, getLoggerNameForZoneAndLevel, getSerialNumberByEquipmentName, equipmentMap, contractFields.testType, markers, analysisResultsRefreshKey]); // yOffset — смещение из блока «Отладочная информация»
 
 
   // Фильтруем analysisResults по скрытым логгерам

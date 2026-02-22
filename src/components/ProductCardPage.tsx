@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ArrowLeft, Save, X, AlertTriangle, Loader, Package, RefreshCw
+  ArrowLeft, Save, X, Plus, AlertTriangle, Loader, Package, RefreshCw
 } from 'lucide-react';
 import { EquipmentCard, UpdateEquipmentCardData } from '../types/EquipmentSections';
 import { equipmentSectionsService } from '../utils/equipmentSectionsService';
@@ -30,8 +30,11 @@ const ProductCardPage: React.FC<ProductCardPageProps> = ({ cardId, onBack, initi
     dosingAccuracy: '',
     reproducibility: '',
     autoclavable: undefined,
-    externalUrl: ''
+    externalUrl: '',
+    specifications: {}
   });
+  const [newSpecName, setNewSpecName] = useState('');
+  const [newSpecValue, setNewSpecValue] = useState('');
 
   useEffect(() => {
     if (cardId) {
@@ -71,7 +74,8 @@ const ProductCardPage: React.FC<ProductCardPageProps> = ({ cardId, onBack, initi
         dosingAccuracy: data.dosingAccuracy || '',
         reproducibility: data.reproducibility || '',
         autoclavable: data.autoclavable,
-        externalUrl: data.externalUrl || ''
+        externalUrl: data.externalUrl || '',
+        specifications: data.specifications && Object.keys(data.specifications).length > 0 ? { ...data.specifications } : {}
       });
     } catch (err) {
       console.error('Ошибка загрузки карточки:', err);
@@ -111,7 +115,8 @@ const ProductCardPage: React.FC<ProductCardPageProps> = ({ cardId, onBack, initi
         dosingAccuracy: updatedCard.dosingAccuracy || '',
         reproducibility: updatedCard.reproducibility || '',
         autoclavable: updatedCard.autoclavable,
-        externalUrl: updatedCard.externalUrl || ''
+        externalUrl: updatedCard.externalUrl || '',
+        specifications: updatedCard.specifications && Object.keys(updatedCard.specifications).length > 0 ? { ...updatedCard.specifications } : {}
       });
       setIsEditing(false);
       alert('Карточка успешно обновлена');
@@ -335,113 +340,96 @@ const ProductCardPage: React.FC<ProductCardPageProps> = ({ cardId, onBack, initi
 
           </div>
 
-          {/* Правая колонка - Технические характеристики */}
+          {/* Правая колонка - Технические характеристики (только по названию) */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Технические характеристики</h3>
 
+            {/* Дополнительные характеристики по названию — пользователь добавляет поля при редактировании карточки */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Количество каналов
-              </label>
+              <h4 className="text-sm font-semibold text-gray-900 mb-2">Дополнительные характеристики (по названию)</h4>
+              <p className="text-xs text-gray-500 mb-3">Добавьте поля, указав название и значение.</p>
               {isEditing ? (
-                <input
-                  type="number"
-                  value={formData.channelsCount || ''}
-                  onChange={(e) => setFormData({ ...formData, channelsCount: e.target.value ? parseInt(e.target.value) : undefined })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  min="1"
-                />
+                <>
+                  {(Object.entries(formData.specifications || {}).length > 0) && (
+                    <div className="space-y-2 mb-3">
+                      {Object.entries(formData.specifications || {}).map(([specKey, specVal]) => (
+                        <div key={specKey} className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-700 min-w-[100px]">{specKey}:</span>
+                          <input
+                            type="text"
+                            value={typeof specVal === 'string' ? specVal : JSON.stringify(specVal)}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              specifications: { ...(formData.specifications || {}), [specKey]: e.target.value }
+                            })}
+                            className="flex-1 min-w-[120px] px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = { ...(formData.specifications || {}) };
+                              delete next[specKey];
+                              setFormData({ ...formData, specifications: next });
+                            }}
+                            className="p-1 text-red-600 hover:text-red-800"
+                            title="Удалить поле"
+                            aria-label="Удалить поле"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="text"
+                      value={newSpecName}
+                      onChange={(e) => setNewSpecName(e.target.value)}
+                      placeholder="Название поля"
+                      className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 text-sm w-36"
+                      aria-label="Название поля"
+                    />
+                    <input
+                      type="text"
+                      value={newSpecValue}
+                      onChange={(e) => setNewSpecValue(e.target.value)}
+                      placeholder="Значение"
+                      className="flex-1 min-w-[100px] px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 text-sm"
+                      aria-label="Значение"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const name = newSpecName.trim();
+                        if (!name) return;
+                        setFormData({
+                          ...formData,
+                          specifications: { ...(formData.specifications || {}), [name]: newSpecValue }
+                        });
+                        setNewSpecName('');
+                        setNewSpecValue('');
+                      }}
+                      className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Добавить
+                    </button>
+                  </div>
+                </>
               ) : (
-                <p className="text-sm text-gray-900">{card.channelsCount || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объем дозирования
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.dosingVolume}
-                  onChange={(e) => setFormData({ ...formData, dosingVolume: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="например, 0,1-2,5 мкл"
-                />
-              ) : (
-                <p className="text-sm text-gray-900">{card.dosingVolume || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Шаг установки объема дозы
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.volumeStep}
-                  onChange={(e) => setFormData({ ...formData, volumeStep: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              ) : (
-                <p className="text-sm text-gray-900">{card.volumeStep ? card.volumeStep : '-'}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Точность дозирования
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.dosingAccuracy}
-                  onChange={(e) => setFormData({ ...formData, dosingAccuracy: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              ) : (
-                <p className="text-sm text-gray-900">{card.dosingAccuracy ? card.dosingAccuracy : '-'}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Воспроизводимость
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.reproducibility}
-                  onChange={(e) => setFormData({ ...formData, reproducibility: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              ) : (
-                <p className="text-sm text-gray-900">{card.reproducibility ? card.reproducibility : '-'}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Автоклавируемость
-              </label>
-              {isEditing ? (
-                <select
-                  value={formData.autoclavable === undefined ? '' : formData.autoclavable ? 'true' : 'false'}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    autoclavable: e.target.value === '' ? undefined : e.target.value === 'true' 
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="">Не указано</option>
-                  <option value="true">Да</option>
-                  <option value="false">Нет</option>
-                </select>
-              ) : (
-                <p className="text-sm text-gray-900">
-                  {card.autoclavable === undefined ? '-' : card.autoclavable ? 'Да' : 'Нет'}
-                </p>
+                (card.specifications && Object.keys(card.specifications).length > 0) ? (
+                  <div className="space-y-1">
+                    {Object.entries(card.specifications).map(([key, val]) => (
+                      <div key={key} className="flex gap-2">
+                        <span className="text-sm font-medium text-gray-700 min-w-[100px]">{key}:</span>
+                        <span className="text-sm text-gray-900">{typeof val === 'string' ? val : JSON.stringify(val)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Нет дополнительных характеристик</p>
+                )
               )}
             </div>
           </div>

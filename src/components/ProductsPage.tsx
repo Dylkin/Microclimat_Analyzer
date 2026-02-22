@@ -91,6 +91,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
   // Состояние для аккордеона технических характеристик
   const [techSpecsAccordionOpen, setTechSpecsAccordionOpen] = useState(false);
   const [newSpecName, setNewSpecName] = useState('');
+  const [newCardSpecName, setNewCardSpecName] = useState('');
+  const [newCardSpecValue, setNewCardSpecValue] = useState('');
   
   const [cardForm, setCardForm] = useState<CreateEquipmentCardData>({
     sectionId: '',
@@ -1298,96 +1300,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Количество каналов
-                </label>
-                <input
-                  type="number"
-                  value={cardForm.channelsCount || ''}
-                  onChange={(e) => setCardForm({ ...cardForm, channelsCount: e.target.value ? parseInt(e.target.value) : undefined })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Количество каналов"
-                  min="1"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Объем дозирования
-                </label>
-                <input
-                  type="text"
-                  value={cardForm.dosingVolume}
-                  onChange={(e) => setCardForm({ ...cardForm, dosingVolume: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="например, 0,1-2,5 мкл"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Шаг установки объема дозы
-                </label>
-                <input
-                  type="text"
-                  value={cardForm.volumeStep}
-                  onChange={(e) => setCardForm({ ...cardForm, volumeStep: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Шаг установки объема"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Точность дозирования
-                </label>
-                <input
-                  type="text"
-                  value={cardForm.dosingAccuracy}
-                  onChange={(e) => setCardForm({ ...cardForm, dosingAccuracy: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Точность дозирования"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Воспроизводимость
-                </label>
-                <input
-                  type="text"
-                  value={cardForm.reproducibility}
-                  onChange={(e) => setCardForm({ ...cardForm, reproducibility: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Воспроизводимость"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Автоклавируемость
-                </label>
-                <select
-                  value={cardForm.autoclavable === undefined ? '' : cardForm.autoclavable ? 'true' : 'false'}
-                  onChange={(e) => setCardForm({ 
-                    ...cardForm, 
-                    autoclavable: e.target.value === '' ? undefined : e.target.value === 'true' 
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="">Не указано</option>
-                  <option value="true">Да</option>
-                  <option value="false">Нет</option>
-                </select>
-              </div>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Ссылка на внешний ресурс
@@ -1399,6 +1311,80 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ onPageChange }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="https://..."
               />
+            </div>
+
+            {/* Технические характеристики — поля по названию (пользователь добавляет нужные при создании/редактировании карточки) */}
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Технические характеристики</h3>
+              <p className="text-xs text-gray-500 mb-3">Добавьте поля, указав название и значение. Для добавленных из проекта «Продажа» товаров здесь изначально полей нет.</p>
+              {Object.entries(cardForm.specifications || {}).length > 0 && (
+                <div className="space-y-2 mb-3">
+                  {Object.entries(cardForm.specifications || {}).map(([specKey, specVal]) => (
+                    <div key={specKey} className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-gray-700 min-w-[120px]">{specKey}:</span>
+                      <input
+                        type="text"
+                        value={typeof specVal === 'string' ? specVal : JSON.stringify(specVal)}
+                        onChange={(e) => setCardForm({
+                          ...cardForm,
+                          specifications: { ...(cardForm.specifications || {}), [specKey]: e.target.value }
+                        })}
+                        className="flex-1 min-w-[140px] px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = { ...(cardForm.specifications || {}) };
+                          delete next[specKey];
+                          setCardForm({ ...cardForm, specifications: next });
+                        }}
+                        className="p-1 text-red-600 hover:text-red-800"
+                        title="Удалить поле"
+                        aria-label="Удалить поле"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="text"
+                  value={newCardSpecName}
+                  onChange={(e) => setNewCardSpecName(e.target.value)}
+                  placeholder="Название поля"
+                  title="Название поля"
+                  className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm w-40"
+                  aria-label="Название поля"
+                />
+                <input
+                  type="text"
+                  value={newCardSpecValue}
+                  onChange={(e) => setNewCardSpecValue(e.target.value)}
+                  placeholder="Значение"
+                  title="Значение"
+                  className="flex-1 min-w-[120px] px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  aria-label="Значение"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const name = newCardSpecName.trim();
+                    if (!name) return;
+                    setCardForm({
+                      ...cardForm,
+                      specifications: { ...(cardForm.specifications || {}), [name]: newCardSpecValue }
+                    });
+                    setNewCardSpecName('');
+                    setNewCardSpecValue('');
+                  }}
+                  className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  Добавить поле
+                </button>
+              </div>
             </div>
 
           </div>
