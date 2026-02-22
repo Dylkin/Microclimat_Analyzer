@@ -483,7 +483,7 @@ export const DocumentsSubmission: React.FC<DocumentsSubmissionProps> = ({ projec
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {techSpecs.map(([specKey, specRange]) => {
                           const label = specRange.label || specKey;
-                          const currentVal = (item as Record<string, unknown>)[specKey];
+                          const currentVal = (item as unknown as Record<string, unknown>)[specKey];
                           const isBool = specKey === 'autoclavable' || specKey === 'inRegistrySI';
                           const isNum = specKey === 'channelsCount';
                           return (
