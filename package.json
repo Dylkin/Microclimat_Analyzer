@@ -18,6 +18,7 @@
     "add-columns": "tsx server/scripts/add-missing-columns.ts",
     "create-project-objects-table": "tsx server/scripts/create-project-qualification-objects-table.ts",
     "fix-project-status": "tsx server/scripts/fix-project-status-enum.ts",
+    "fix-users-role-constraint": "tsx server/scripts/fix-users-role-constraint.ts",
     "fix-project-documents": "tsx server/scripts/fix-project-documents-columns.ts",
     "fix-document-type": "tsx server/scripts/fix-document-type-enum.ts",
     "fix-project-documents-file-path": "tsx server/scripts/fix-project-documents-file-path.ts",

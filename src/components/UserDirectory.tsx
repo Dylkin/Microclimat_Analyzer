@@ -6,6 +6,7 @@ import { userService } from '../utils/userService';
 
 const UserDirectory: React.FC = () => {
   const { users, addUser, updateUser, deleteUser, user: currentUser } = useAuth();
+  const canManageUsers = currentUser?.role === 'administrator' || currentUser?.role === 'admin';
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [sendingResetEmail, setSendingResetEmail] = useState<string | null>(null);
@@ -21,6 +22,7 @@ const UserDirectory: React.FC = () => {
   const [editUser, setEditUser] = useState({
     fullName: '',
     email: '',
+    password: '',
     role: 'specialist' as UserRole
   });
 
@@ -73,6 +75,7 @@ const UserDirectory: React.FC = () => {
     setEditUser({
       fullName: user.fullName,
       email: user.email,
+      password: '',
       role: user.role
     });
     setEditingUser(user.id);
@@ -92,7 +95,11 @@ const UserDirectory: React.FC = () => {
 
     setOperationLoading(true);
     try {
-      await updateUser(editingUser!, editUser);
+      const payload: Partial<User> = { fullName: editUser.fullName, email: editUser.email, role: editUser.role };
+      if (editUser.password.trim()) {
+        payload.password = editUser.password;
+      }
+      await updateUser(editingUser!, payload);
       alert('Пользователь успешно обновлен');
     } catch (error) {
       alert(`Ошибка обновления пользователя: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
@@ -170,13 +177,15 @@ const UserDirectory: React.FC = () => {
           <Users className="w-8 h-8 text-indigo-600" />
           <h1 className="text-2xl font-bold text-gray-900">Справочник пользователей</h1>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Добавить пользователя</span>
-        </button>
+        {canManageUsers && (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Добавить пользователя</span>
+          </button>
+        )}
       </div>
 
       {/* Add User Form */}
@@ -296,6 +305,9 @@ const UserDirectory: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Роль
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Пароль
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
                 </th>
@@ -361,6 +373,36 @@ const UserDirectory: React.FC = () => {
                       </span>
                     )}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {editingUser === user.id ? (
+                      <div className="flex space-x-2">
+                        <input
+                          type="password"
+                          value={editUser.password}
+                          onChange={(e) => setEditUser(prev => ({ ...prev, password: e.target.value }))}
+                          className="flex-1 min-w-[140px] px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="Оставьте пустым, чтобы не менять"
+                          title="Новый пароль"
+                          aria-label="Новый пароль"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                            let p = '';
+                            for (let i = 0; i < 8; i++) p += chars.charAt(Math.floor(Math.random() * chars.length));
+                            setEditUser(prev => ({ ...prev, password: p }));
+                          }}
+                          className="bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600 transition-colors shrink-0"
+                          title="Сгенерировать пароль"
+                        >
+                          <Key className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">—</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     {editingUser === user.id ? (
                       <div className="flex justify-end space-x-2">
@@ -396,23 +438,27 @@ const UserDirectory: React.FC = () => {
                             )}
                           </button>
                         )}
-                        <button
-                          onClick={() => handleEditUser(user)}
-                        disabled={operationLoading}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          title="Редактировать"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        {!user.isDefault && user.id !== currentUser?.id && (
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                          disabled={operationLoading}
-                            className="text-red-600 hover:text-red-900"
-                            title="Удалить"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                        {canManageUsers && (
+                          <>
+                            <button
+                              onClick={() => handleEditUser(user)}
+                              disabled={operationLoading}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Редактировать"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            {!user.isDefault && user.id !== currentUser?.id && (
+                              <button
+                                onClick={() => handleDeleteUser(user.id)}
+                                disabled={operationLoading}
+                                className="text-red-600 hover:text-red-900"
+                                title="Удалить"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     )}

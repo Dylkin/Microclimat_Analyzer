@@ -22,6 +22,8 @@ type ProjectDto = {
   contractNumber?: string | null;
   contract_date?: string | null;
   contractDate?: string | null;
+  tender_date?: string | null;
+  tenderDate?: string | null;
   status: ProjectStatus;
   created_by?: string | null;
   createdBy?: string | null;
@@ -157,6 +159,7 @@ const mapProject = (dto: ProjectDto): Project => {
     contractorName: dto.contractorName || undefined,
     contractNumber: dto.contractNumber || dto.contract_number || undefined,
     contractDate: toDate(dto.contractDate || dto.contract_date),
+    tenderDate: toDate(dto.tenderDate || dto.tender_date),
     status: status,
     createdBy: dto.createdBy || dto.created_by || undefined,
     createdAt: toDate(dto.createdAt || dto.created_at) || new Date(),

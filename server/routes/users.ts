@@ -100,7 +100,15 @@ router.post('/login', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { fullName, email, password, role, isDefault } = req.body;
-    
+    // #region agent log
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const logPath = path.join(process.cwd(), 'debug-43c079.log');
+      fs.appendFileSync(logPath, JSON.stringify({ sessionId: '43c079', location: 'server/routes/users.ts:POST /', message: 'req.body', data: { fullName, email, role, hasPassword: !!password }, timestamp: Date.now(), hypothesisId: 'B' }) + '\n');
+    } catch (_) {}
+    // #endregion
+
     if (!fullName || !email || !password) {
       return res.status(400).json({ error: 'Имя, email и пароль обязательны' });
     }
@@ -126,8 +134,19 @@ router.post('/', async (req, res) => {
     });
   } catch (error: any) {
     console.error('Error creating user:', error);
+    // #region agent log
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const logPath = path.join(process.cwd(), 'debug-43c079.log');
+      fs.appendFileSync(logPath, JSON.stringify({ sessionId: '43c079', location: 'server/routes/users.ts:POST / catch', message: 'create user error', data: { code: error.code, message: error.message, detail: error.detail }, timestamp: Date.now(), hypothesisId: 'C' }) + '\n');
+    } catch (_) {}
+    // #endregion
     if (error.code === '23505') {
       return res.status(409).json({ error: 'Пользователь с таким email уже существует' });
+    }
+    if (error.code === '23514') {
+      return res.status(400).json({ error: 'Недопустимая роль пользователя. Выполните миграцию: fix_users_role_constraint.sql' });
     }
     res.status(500).json({ error: 'Ошибка создания пользователя' });
   }

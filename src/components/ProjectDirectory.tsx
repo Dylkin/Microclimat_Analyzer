@@ -22,20 +22,22 @@ interface ProjectDirectoryProps {
 
 const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => {
   const { user } = useAuth();
+  const canEditDeleteProjects = (user?.role || '').toLowerCase() !== 'specialist';
   const [projects, setProjects] = useState<Project[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [qualificationObjects, setQualificationObjects] = useState<QualificationObject[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [createdAtSortDirection, setCreatedAtSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortColumn, setSortColumn] = useState<'createdAt' | 'tenderDate'>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [operationLoading, setOperationLoading] = useState(false);
-  
+
   // UI state
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  
+
   // Form state
   const [newProject, setNewProject] = useState<{
     description: string;
@@ -58,16 +60,32 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     qualificationObjectIds: []
   });
 
-  const getCreatedAtMs = (p: Project): number => {
-    const v: any = (p as any).createdAt;
-    if (!v) return 0;
+  const getDateMs = (v: unknown): number | null => {
+    if (!v) return null;
     if (v instanceof Date) return v.getTime();
-    const t = new Date(v).getTime();
-    return Number.isFinite(t) ? t : 0;
+    if (typeof v === 'string' || typeof v === 'number') {
+      const t = new Date(v).getTime();
+      return Number.isFinite(t) ? t : null;
+    }
+    return null;
   };
 
-  const sortProjectsByCreatedAt = (items: Project[], direction: 'asc' | 'desc') => {
-    const sorted = [...items].sort((a, b) => getCreatedAtMs(a) - getCreatedAtMs(b));
+  const sortProjects = (
+    items: Project[],
+    column: 'createdAt' | 'tenderDate',
+    direction: 'asc' | 'desc'
+  ) => {
+    const sorted = [...items].sort((a, b) => {
+      const aValue = column === 'createdAt' ? getDateMs(a.createdAt) : getDateMs((a as any).tenderDate);
+      const bValue = column === 'createdAt' ? getDateMs(b.createdAt) : getDateMs((b as any).tenderDate);
+
+      // Пустые даты всегда внизу
+      if (aValue === null && bValue === null) return 0;
+      if (aValue === null) return 1;
+      if (bValue === null) return -1;
+
+      return aValue - bValue;
+    });
     return direction === 'asc' ? sorted : sorted.reverse();
   };
 
@@ -83,8 +101,9 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       try {
         const projectsData = await projectService.getAllProjects();
         // При открытии страницы по умолчанию: сначала более поздние → затем более ранние
-        const sortedOnLoad = sortProjectsByCreatedAt(projectsData, 'desc');
-        setCreatedAtSortDirection('desc');
+        const sortedOnLoad = sortProjects(projectsData, 'createdAt', 'desc');
+        setSortColumn('createdAt');
+        setSortDirection('desc');
         setProjects(sortedOnLoad);
         setFilteredProjects(sortedOnLoad);
       } catch (projectError) {
@@ -122,7 +141,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
       const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-      
+
       // Формируем понятное сообщение об ошибке
       if (errorMessage.includes('fetch') || errorMessage.includes('JSON') || errorMessage.includes('network')) {
         setError('Ошибка подключения к серверу. Проверьте, что сервер запущен и доступен.');
@@ -141,7 +160,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   // Поиск по проектам
   useEffect(() => {
     let filtered = projects;
-    
+
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
       filtered = projects.filter(project => {
@@ -155,8 +174,8 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       });
     }
 
-    setFilteredProjects(sortProjectsByCreatedAt(filtered, createdAtSortDirection));
-  }, [searchTerm, projects, createdAtSortDirection]);
+    setFilteredProjects(sortProjects(filtered, sortColumn, sortDirection));
+  }, [searchTerm, projects, sortColumn, sortDirection]);
 
   // Получение объектов квалификации для выбранного контрагента
   const getQualificationObjectsForContractor = (contractorId: string) => {
@@ -170,7 +189,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     console.log('ID контрагента:', newProject.contractorId);
     console.log('Тип ID контрагента:', typeof newProject.contractorId);
     console.log('Все доступные контрагенты:', contractors.map(c => ({ id: c.id, name: c.name })));
-    
+
     // Проверяем, что contractorId является строкой
     if (typeof newProject.contractorId !== 'string') {
       console.error('Contractor ID не является строкой:', newProject.contractorId);
@@ -186,7 +205,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
 
     // Проверяем, что contractorId является валидным UUID
     const trimmedContractorId = newProject.contractorId.trim();
-    
+
     if (!isValidUUID(trimmedContractorId)) {
       console.error('Некорректный UUID контрагента:', trimmedContractorId);
       console.error('Доступные контрагенты с валидными UUID:', contractors);
@@ -197,7 +216,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     // Находим выбранного контрагента в списке
     const selectedContractor = contractors.find(c => c.id === trimmedContractorId);
     console.log('Найденный контрагент:', selectedContractor);
-    
+
     if (!selectedContractor) {
       console.error('Контрагент не найден в списке:', trimmedContractorId);
       alert('Ошибка: выбранный контрагент не найден. Обновите страницу и попробуйте снова.');
@@ -208,16 +227,16 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       alert('Для проекта квалификации можно выбрать только контрагента с ролью "Покупатель".');
       return;
     }
-    
+
     console.log('ID найденного контрагента:', selectedContractor.id);
     console.log('Тип ID найденного контрагента:', typeof selectedContractor.id);
-    
+
     // Проверяем все контрагенты на корректность UUID
     console.log('Все контрагенты:');
     contractors.forEach((contractor, index) => {
       console.log(`${index + 1}. ID: "${contractor.id}" (тип: ${typeof contractor.id}), Название: "${contractor.name}"`);
     });
-    
+
     if (newProject.qualificationObjectIds.length === 0) {
       alert('Выберите хотя бы один объект квалификации');
       return;
@@ -237,20 +256,20 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       // Генерируем название проекта на основе выбранных объектов
       const selectedObjects = getQualificationObjectsForContractor(trimmedContractorId)
         .filter(obj => newProject.qualificationObjectIds.includes(obj.id));
-      
+
       const contractorName = contractors.find(c => c.id === trimmedContractorId)?.name || 'Неизвестный контрагент';
-      const objectNames = selectedObjects.map(obj => 
+      const objectNames = selectedObjects.map(obj =>
         obj.name || obj.vin || obj.serialNumber || 'Без названия'
       ).join(', ');
-      
+
       const projectName = `${contractorName} - ${objectNames}`;
-      
+
       const projectData = {
         ...newProject,
         contractorId: trimmedContractorId,
         name: projectName
       };
-      
+
       // Final validation before database call
       console.log('=== FINAL VALIDATION BEFORE DATABASE CALL ===');
       console.log('Final projectData.contractorId:', projectData.contractorId);
@@ -258,14 +277,14 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       console.log('Is valid UUID:', isValidUUID(projectData.contractorId));
       console.log('Final projectData.qualificationObjectIds:', projectData.qualificationObjectIds);
       console.log('All qualification object IDs are valid UUIDs:', projectData.qualificationObjectIds.every(id => isValidUUID(id)));
-      
+
       // Double-check UUID validity one more time
       if (!isValidUUID(projectData.contractorId)) {
         console.error('CRITICAL: Invalid UUID detected right before database call:', projectData.contractorId);
         alert('Критическая ошибка: некорректный ID контрагента. Обратитесь к администратору.');
         return;
       }
-      
+
       // Validate all qualification object IDs one more time
       const finalInvalidIds = projectData.qualificationObjectIds.filter(id => !isValidUUID(id));
       if (finalInvalidIds.length > 0) {
@@ -273,7 +292,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         alert('Критическая ошибка: некорректные ID объектов квалификации. Обратитесь к администратору.');
         return;
       }
-      
+
       const createdProject = await projectService.addProject(projectData, user?.id);
       setProjects(prev => [...prev, createdProject]);
       setNewProject({
@@ -293,6 +312,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
 
   // Редактирование проекта
   const handleEditProject = (project: Project) => {
+    if (!canEditDeleteProjects) return;
     setEditProject({
       description: project.description || '',
       status: project.status,
@@ -309,7 +329,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         status: editProject.status,
         qualificationObjectIds: editProject.qualificationObjectIds
       });
-      
+
       setProjects(prev => prev.map(p => p.id === editingProject ? updatedProject : p));
       setEditingProject(null);
       alert('Проект успешно обновлен');
@@ -368,7 +388,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     if (status === 'documents_submission' && projectType === 'qualification') {
       return null;
     }
-    
+
     switch (status) {
       case 'documents_submission':
         return {
@@ -557,8 +577,8 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               </label>
               <select
                 value={newProject.contractorId}
-                onChange={(e) => setNewProject(prev => ({ 
-                  ...prev, 
+                onChange={(e) => setNewProject(prev => ({
+                  ...prev,
                   contractorId: e.target.value,
                   qualificationObjectIds: [] // Сбрасываем выбранные объекты
                 }))}
@@ -669,231 +689,275 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
 
       {/* Projects List */}
       {!showAddForm && (
-      <div className="bg-white rounded-lg shadow">
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <p className="text-gray-500">Загрузка проектов...</p>
-          </div>
-        ) : filteredProjects.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCreatedAtSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-                      }
-                      className="flex items-center space-x-1 hover:text-gray-700"
-                      title={
-                        createdAtSortDirection === 'asc'
-                          ? 'Сортировка: сначала ранние (нажмите для смены)'
-                          : 'Сортировка: сначала поздние (нажмите для смены)'
-                      }
-                    >
-                      <Calendar className="w-4 h-4" />
-                      <span>Дата создания</span>
-                      {createdAtSortDirection === 'asc' ? (
-                        <ArrowUp className="w-4 h-4" />
-                      ) : (
-                        <ArrowDown className="w-4 h-4" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Проект
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Тип
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Контрагент
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Статус
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Действия
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredProjects.map((project) => (
-                  <tr key={project.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <div className="text-sm text-gray-900">
-                          {project.createdAt.toLocaleDateString('ru-RU')}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editingProject === project.id ? (
-                        <textarea
-                          value={editProject.description}
-                          onChange={(e) => setEditProject(prev => ({ ...prev, description: e.target.value }))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          rows={2}
-                          placeholder="Описание"
-                        />
-                      ) : (
-                        <div>
-                          <div 
-                            className="text-sm font-medium text-gray-900 cursor-help" 
-                            title={project.name}
-                          >
-                            {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
-                          </div>
-                          {project.description && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {project.description.length > 35 
-                                ? `${project.description.substring(0, 35)}...` 
-                                : project.description}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {ProjectTypeLabels[project.type || 'qualification']}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <Building2 className="w-4 h-4 text-gray-400" />
-                        <span
-                          className="text-sm text-gray-900 cursor-help"
-                          title={project.contractorName || ''}
-                        >
-                          {project.contractorName && project.contractorName.length > 30
-                            ? `${project.contractorName.substring(0, 30)}...`
-                            : project.contractorName || ''}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {editingProject === project.id ? (
-                        <select
-                          value={editProject.status}
-                          onChange={(e) =>
-                            setEditProject((prev) => ({
-                              ...prev,
-                              status: e.target.value as ProjectStatus,
-                            }))
+        <div className="bg-white rounded-lg shadow">
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">Загрузка проектов...</p>
+            </div>
+          ) : filteredProjects.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (sortColumn === 'createdAt') {
+                            setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                          } else {
+                            setSortColumn('createdAt');
+                            setSortDirection('desc');
                           }
-                          className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          title="Статус проекта"
-                          aria-label="Статус проекта"
-                        >
-                          {Object.entries(ProjectStatusLabels)
-                            .filter(([value]) => {
-                              // Для проектов типа 'sale' показываем только определенные статусы
-                              if (project.type === 'sale') {
-                                return value === 'documents_submission' ||
-                                  value === 'contract_negotiation' ||
-                                  value === 'not_suitable';
-                              }
-                              // Для проектов типа 'qualification' исключаем статус 'documents_submission'
-                              if (project.type === 'qualification') {
-                                return value !== 'documents_submission';
-                              }
-                              // Для остальных типов показываем все статусы
-                              return true;
-                            })
-                            .map(([value, label]) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}
-                        </select>
-                      ) : (
+                        }}
+                        className="flex items-center space-x-1 hover:text-gray-700"
+                        title={
+                          sortColumn === 'createdAt' && sortDirection === 'asc'
+                            ? 'Сортировка: сначала ранние (нажмите для смены)'
+                            : 'Сортировка: сначала поздние (нажмите для смены)'
+                        }
+                      >
+                        <Calendar className="w-4 h-4" />
+                        <span>Дата создания</span>
+                        {sortColumn === 'createdAt' && sortDirection === 'asc' ? (
+                          <ArrowUp className="w-4 h-4" />
+                        ) : sortColumn === 'createdAt' ? (
+                          <ArrowDown className="w-4 h-4" />
+                        ) : null}
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (sortColumn === 'tenderDate') {
+                            setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                          } else {
+                            setSortColumn('tenderDate');
+                            setSortDirection('desc');
+                          }
+                        }}
+                        className="flex items-center space-x-1 hover:text-gray-700"
+                        title={
+                          sortColumn === 'tenderDate' && sortDirection === 'asc'
+                            ? 'Сортировка: сначала ранние (нажмите для смены)'
+                            : 'Сортировка: сначала поздние (нажмите для смены)'
+                        }
+                      >
+                        <Calendar className="w-4 h-4" />
+                        <span>Дата тендера</span>
+                        {sortColumn === 'tenderDate' && sortDirection === 'asc' ? (
+                          <ArrowUp className="w-4 h-4" />
+                        ) : sortColumn === 'tenderDate' ? (
+                          <ArrowDown className="w-4 h-4" />
+                        ) : null}
+                      </button>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Проект
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Тип
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Контрагент
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Статус
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Действия
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredProjects.map((project) => (
+                    <tr key={project.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-2">
-                          {getStatusIcon(project.status)}
+                          <Calendar className="w-4 h-4 text-gray-400" />
+                          <div className="text-sm text-gray-900">
+                            {project.createdAt.toLocaleDateString('ru-RU')}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4 text-gray-400" />
+                          <div className="text-sm text-gray-900">
+                            {project.tenderDate ? project.tenderDate.toLocaleDateString('ru-RU') : '—'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {editingProject === project.id ? (
+                          <textarea
+                            value={editProject.description}
+                            onChange={(e) => setEditProject(prev => ({ ...prev, description: e.target.value }))}
+                            className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            rows={2}
+                            placeholder="Описание"
+                          />
+                        ) : (
+                          <div>
+                            <div
+                              className="text-sm font-medium text-gray-900 cursor-help"
+                              title={project.name}
+                            >
+                              {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
+                            </div>
+                            {project.description && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {project.description.length > 35
+                                  ? `${project.description.substring(0, 35)}...`
+                                  : project.description}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {ProjectTypeLabels[project.type || 'qualification']}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <Building2 className="w-4 h-4 text-gray-400" />
                           <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ProjectStatusColors[project.status]}`}
+                            className="text-sm text-gray-900 cursor-help"
+                            title={project.contractorName || ''}
                           >
-                            {ProjectStatusLabels[project.status]}
+                            {project.contractorName && project.contractorName.length > 30
+                              ? `${project.contractorName.substring(0, 30)}...`
+                              : project.contractorName || ''}
                           </span>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {editingProject === project.id ? (
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            onClick={handleSaveEdit}
-                            disabled={operationLoading}
-                            className="text-green-600 hover:text-green-900"
-                            title="Сохранить"
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {editingProject === project.id ? (
+                          <select
+                            value={editProject.status}
+                            onChange={(e) =>
+                              setEditProject((prev) => ({
+                                ...prev,
+                                status: e.target.value as ProjectStatus,
+                              }))
+                            }
+                            className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            title="Статус проекта"
+                            aria-label="Статус проекта"
                           >
-                            <Save className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setEditingProject(null)}
-                            className="text-gray-600 hover:text-gray-900"
-                            title="Отмена"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex justify-end space-x-2">
-                          {getProjectAction(project.status, project.type) && (
-                            <button
-                              onClick={() => handleProjectAction(project)}
-                              disabled={operationLoading}
-                              className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                              title={getProjectAction(project.status, project.type)?.label}
+                            {Object.entries(ProjectStatusLabels)
+                              .filter(([value]) => {
+                                // Для проектов типа 'sale' показываем только определенные статусы
+                                if (project.type === 'sale') {
+                                  return value === 'documents_submission' ||
+                                    value === 'contract_negotiation' ||
+                                    value === 'not_suitable';
+                                }
+                                // Для проектов типа 'qualification' исключаем статус 'documents_submission'
+                                if (project.type === 'qualification') {
+                                  return value !== 'documents_submission';
+                                }
+                                // Для остальных типов показываем все статусы
+                                return true;
+                              })
+                              .map(([value, label]) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ))}
+                          </select>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            {getStatusIcon(project.status)}
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ProjectStatusColors[project.status]}`}
                             >
-                              <Play className="w-3 h-3 mr-1" />
-                              Выполнить
+                              {ProjectStatusLabels[project.status]}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {editingProject === project.id && canEditDeleteProjects ? (
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              onClick={handleSaveEdit}
+                              disabled={operationLoading}
+                              className="text-green-600 hover:text-green-900"
+                              title="Сохранить"
+                            >
+                              <Save className="w-4 h-4" />
                             </button>
-                          )}
-                          <button
-                            onClick={() => handleEditProject(project)}
-                            disabled={operationLoading}
-                            className="text-indigo-600 hover:text-indigo-900"
-                            title="Редактировать"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProject(project.id)}
-                            disabled={operationLoading}
-                            className="text-red-600 hover:text-red-900"
-                            title="Удалить"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <FolderOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            {searchTerm ? (
-              <>
-                <p>По запросу "{searchTerm}" ничего не найдено</p>
-                <p className="text-sm">Попробуйте изменить поисковый запрос</p>
-              </>
-            ) : (
-              <>
-                <p>Проекты не найдены</p>
-                <p className="text-sm">Нажмите кнопку "Квалификация" для создания первого проекта</p>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+                            <button
+                              onClick={() => setEditingProject(null)}
+                              className="text-gray-600 hover:text-gray-900"
+                              title="Отмена"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-end space-x-2">
+                            {getProjectAction(project.status, project.type) && (
+                              <button
+                                onClick={() => handleProjectAction(project)}
+                                disabled={operationLoading}
+                                className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={getProjectAction(project.status, project.type)?.label}
+                              >
+                                <Play className="w-3 h-3 mr-1" />
+                                Выполнить
+                              </button>
+                            )}
+                            {canEditDeleteProjects && (
+                              <>
+                                <button
+                                  onClick={() => handleEditProject(project)}
+                                  disabled={operationLoading}
+                                  className="text-indigo-600 hover:text-indigo-900"
+                                  title="Редактировать"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteProject(project.id)}
+                                  disabled={operationLoading}
+                                  className="text-red-600 hover:text-red-900"
+                                  title="Удалить"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <FolderOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              {searchTerm ? (
+                <>
+                  <p>По запросу "{searchTerm}" ничего не найдено</p>
+                  <p className="text-sm">Попробуйте изменить поисковый запрос</p>
+                </>
+              ) : (
+                <>
+                  <p>Проекты не найдены</p>
+                  <p className="text-sm">Нажмите кнопку "Квалификация" для создания первого проекта</p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Statistics */}

@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   email TEXT UNIQUE NOT NULL,
   full_name TEXT,
   password TEXT, -- Хешированный пароль для аутентификации
-  role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user', 'viewer')),
+  role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'administrator', 'user', 'viewer', 'specialist', 'manager', 'director')),
   position TEXT,
   is_default BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

@@ -33,6 +33,9 @@ class UserService {
   // Добавление нового пользователя
   async addUser(user: Omit<User, 'id'>): Promise<User> {
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7653/ingest/794e80a8-49c5-458d-ba3b-b218b41c9a03',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'43c079'},body:JSON.stringify({sessionId:'43c079',location:'userService.pg.ts:addUser',message:'POST /users body',data:{fullName:user.fullName,email:user.email,role:user.role,hasPassword:!!user.password},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return await apiClient.post<User>('/users', user);
     } catch (error) {
       console.error('Ошибка при добавлении пользователя:', error);

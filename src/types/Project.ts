@@ -19,6 +19,7 @@ export interface Project {
   contractorName?: string;
   contractNumber?: string;
   contractDate?: Date;
+  tenderDate?: Date;
   status: ProjectStatus;
   createdBy?: string;
   createdByName?: string;
