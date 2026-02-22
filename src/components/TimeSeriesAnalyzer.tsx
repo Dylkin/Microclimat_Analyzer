@@ -1302,36 +1302,36 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     } else {
       // Сортируем маркеры по времени
       const sortedMarkers = [...doorMarkers].sort((a, b) => a.timestamp - b.timestamp);
-      
-      // Находим пары маркеров: Закрытие двери -> Восстановление температуры
+      const openingMarkers = sortedMarkers.filter(m => m.type === 'door_opening');
       const closingMarkers = sortedMarkers.filter(m => m.type === 'door_closing');
       const recoveryMarkers = sortedMarkers.filter(m => m.type === 'temperature_recovery');
       
-      if (closingMarkers.length === 0 || recoveryMarkers.length === 0) {
-        // Если нет нужных маркеров, используем все данные
+      // Если только два маркера: Открытие двери и Закрытие двери (без Восстановление температуры) —
+      // используем период от открытия до закрытия двери для проверки выхода за лимиты.
+      // Если в этом периоде температура не выходила за пределы — в колонке указываем «за пределы не выходила».
+      if (openingMarkers.length > 0 && closingMarkers.length > 0 && recoveryMarkers.length === 0) {
+        const tStart = openingMarkers[0].timestamp;
+        const tEnd = closingMarkers[closingMarkers.length - 1].timestamp;
+        filteredPoints = pointsWithTemp.filter(p => p.timestamp >= tStart && p.timestamp <= tEnd);
+      } else if (closingMarkers.length === 0 || recoveryMarkers.length === 0) {
+        // Нет пары закрытие/восстановление — используем все данные (резервный вариант)
         filteredPoints = pointsWithTemp;
       } else {
         // Для каждой пары "Закрытие двери" - "Восстановление температуры" используем данные между ними
         for (const closingMarker of closingMarkers) {
-          // Находим ближайший маркер "Восстановление температуры" после "Закрытие двери"
           const recoveryMarker = recoveryMarkers.find(m => m.timestamp > closingMarker.timestamp);
-          
           if (recoveryMarker) {
-            // Данные между "Закрытие двери" и "Восстановление температуры" (включительно)
-            const rangePoints = pointsWithTemp.filter(p => 
+            const rangePoints = pointsWithTemp.filter(p =>
               p.timestamp >= closingMarker.timestamp && p.timestamp <= recoveryMarker.timestamp
             );
             filteredPoints.push(...rangePoints);
           } else {
-            // Если нет маркера восстановления после закрытия, используем данные от закрытия до конца
             const rangePoints = pointsWithTemp.filter(p => p.timestamp >= closingMarker.timestamp);
             filteredPoints.push(...rangePoints);
           }
         }
-        
-        // Удаляем дубликаты и сортируем
         filteredPoints = filteredPoints
-          .filter((point, index, self) => 
+          .filter((point, index, self) =>
             index === self.findIndex(p => p.timestamp === point.timestamp)
           )
           .sort((a, b) => a.timestamp - b.timestamp);
@@ -3015,15 +3015,13 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       let conclusionText = '';
       
       if (!hasExceededLimits) {
-        // Температура не выходила за пределы
-        conclusionText = `${markersInfo}За время проведения испытания температура за контролируемые пределы не выходила, <b>что соответствует</b> установленному критерию приемлемости (<b>${acceptanceCriterion}</b> мин).\n<b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
+        // Температура не выходила за пределы (выделение только у «Открытие/Закрытие двери» и «Результат испытания заданному критерию приемлемости»)
+        conclusionText = `${markersInfo}За время проведения испытания температура за контролируемые пределы не выходила, что соответствует установленному критерию приемлемости (${acceptanceCriterion} мин).\n<b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
       } else {
-        // Температура выходила за пределы
+        // Температура выходила за пределы (без «зафиксировано логгером» и номера логгера; выделение только у маркеров и «Результат испытания заданному критерию приемлемости»)
         const maxTimeText = maxTimeLogger.recoveryTime;
-        
         const maxTimeMeetsCriterion = maxTimeLogger.meetsCriterion === 'Да' ? 'соответствует' : 'не соответствует';
-        
-        conclusionText = `${markersInfo}За время проведения испытания температура за контролируемые пределы выходила, <b>максимальное время выхода зафиксировано логгером</b> ${maxTimeLogger.loggerName} <b>и составило</b> ${maxTimeText}, <b>что</b> ${maxTimeMeetsCriterion} <b>установленному критерию приемлемости</b> (<b>${acceptanceCriterion}</b> мин).\n<b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
+        conclusionText = `${markersInfo}За время проведения испытания температура за контролируемые пределы выходила, максимальное время выхода составило ${maxTimeText}, что ${maxTimeMeetsCriterion} установленному критерию приемлемости (${acceptanceCriterion} мин).\n<b>Результат испытания заданному критерию приемлемости</b> ${overallMeetsCriterion ? 'соответствует' : 'не соответствует'}.`;
       }
 
       setConclusions(conclusionText);
@@ -3135,11 +3133,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           const maxTimeLogger = validTimes.reduce((max, current) => {
             return current.timeInMilliseconds > max.timeInMilliseconds ? current : max;
           });
-          
-          // Форматируем время для вывода в формате "X минут"
+          // Формат Ч:ММ (без слова «минут»), без выделения значения и сопровождающего текста
           const totalMinutes = Math.floor(maxTimeLogger.timeInMilliseconds / (1000 * 60));
-          const maxTimeText = `${totalMinutes} минут`;
-          conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\n<b>Максимальное время восстановления температуры при включении электропитания составляет:</b> ${maxTimeText}.`;
+          const hours = Math.floor(totalMinutes / 60);
+          const minutes = totalMinutes % 60;
+          const maxTimeText = `${hours}:${String(minutes).padStart(2, '0')}`;
+          conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\nМаксимальное время восстановления температуры при включении электропитания составляет ${maxTimeText}.`;
         }
       }
 
@@ -3243,25 +3242,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           const minTimeLogger = validTimes.reduce((min, current) => {
             return current.timeInMinutes < min.timeInMinutes ? current : min;
           });
-          
-          // Преобразуем минуты в часы и минуты для вывода
+          // Формат Ч:ММ (без слова «минут»), без выделения значения и сопровождающего текста
           const hours = Math.floor(minTimeLogger.timeInMinutes / 60);
           const minutes = minTimeLogger.timeInMinutes % 60;
-          
-          let timeText = '';
-          if (hours > 0 && minutes > 0) {
-            const hoursText = hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов';
-            const minutesText = minutes === 1 ? 'минута' : minutes < 5 ? 'минуты' : 'минут';
-            timeText = `${hours} ${hoursText} ${minutes} ${minutesText}`;
-          } else if (hours > 0) {
-            const hoursText = hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов';
-            timeText = `${hours} ${hoursText}`;
-          } else {
-            const minutesText = minutes === 1 ? 'минута' : minutes < 5 ? 'минуты' : 'минут';
-            timeText = `${minutes} ${minutesText}`;
-          }
-          
-          conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\nМинимальное время поддержания температуры при отключении электропитания составляет <b>${timeText}</b>.`;
+          const timeText = `${hours}:${String(minutes).padStart(2, '0')}`;
+          conclusionText = `<b>Начало испытания: </b>  ${startTimeStr}.\nМинимальное время поддержания температуры при отключении электропитания составляет ${timeText}.`;
         }
       }
 

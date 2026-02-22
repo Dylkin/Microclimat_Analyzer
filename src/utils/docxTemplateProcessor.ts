@@ -1841,36 +1841,33 @@ export class DocxTemplateProcessor {
       } else {
         // Сортируем маркеры по времени
         const sortedMarkers = [...doorMarkers].sort((a: any, b: any) => a.timestamp - b.timestamp);
-        
-        // Находим пары маркеров: Закрытие двери -> Восстановление температуры
+        const openingMarkers = sortedMarkers.filter((m: any) => m.type === 'door_opening');
         const closingMarkers = sortedMarkers.filter((m: any) => m.type === 'door_closing');
         const recoveryMarkers = sortedMarkers.filter((m: any) => m.type === 'temperature_recovery');
         
-        if (closingMarkers.length === 0 || recoveryMarkers.length === 0) {
-          // Если нет нужных маркеров, используем все данные
+        // Если только два маркера: Открытие двери и Закрытие двери — используем период от открытия до закрытия.
+        // Если в этом периоде температура не выходила за пределы — «за пределы не выходила».
+        if (openingMarkers.length > 0 && closingMarkers.length > 0 && recoveryMarkers.length === 0) {
+          const tStart = openingMarkers[0].timestamp;
+          const tEnd = closingMarkers[closingMarkers.length - 1].timestamp;
+          filteredPoints = pointsWithTemp.filter((p: any) => p.timestamp >= tStart && p.timestamp <= tEnd);
+        } else if (closingMarkers.length === 0 || recoveryMarkers.length === 0) {
           filteredPoints = pointsWithTemp;
         } else {
-          // Для каждой пары "Закрытие двери" - "Восстановление температуры" используем данные между ними
           for (const closingMarker of closingMarkers) {
-            // Находим ближайший маркер "Восстановление температуры" после "Закрытие двери"
             const recoveryMarker = recoveryMarkers.find((m: any) => m.timestamp > closingMarker.timestamp);
-            
             if (recoveryMarker) {
-              // Данные между "Закрытие двери" и "Восстановление температуры" (включительно)
-              const rangePoints = pointsWithTemp.filter((p: any) => 
+              const rangePoints = pointsWithTemp.filter((p: any) =>
                 p.timestamp >= closingMarker.timestamp && p.timestamp <= recoveryMarker.timestamp
               );
               filteredPoints.push(...rangePoints);
             } else {
-              // Если нет маркера восстановления после закрытия, используем данные от закрытия до конца
               const rangePoints = pointsWithTemp.filter((p: any) => p.timestamp >= closingMarker.timestamp);
               filteredPoints.push(...rangePoints);
             }
           }
-          
-          // Удаляем дубликаты и сортируем
           filteredPoints = filteredPoints
-            .filter((point: any, index: number, self: any[]) => 
+            .filter((point: any, index: number, self: any[]) =>
               index === self.findIndex((p: any) => p.timestamp === point.timestamp)
             )
             .sort((a: any, b: any) => a.timestamp - b.timestamp);

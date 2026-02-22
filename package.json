@@ -10,6 +10,8 @@
     "server": "tsx watch server/index.ts",
     "server:prod": "NODE_OPTIONS='--no-warnings' tsx --no-cache server/index.ts",
     "migrate": "tsx server/scripts/apply-migrations.ts",
+    "prod:migrate": "npm run migrate",
+    "prod:update": "npm run build && npm run migrate",
     "setup-db": "tsx server/scripts/setup-database.ts",
     "create-default-user": "tsx server/scripts/create-default-user.ts",
     "migrate-default-user-uuid": "tsx server/scripts/migrate-default-user-uuid.ts",
