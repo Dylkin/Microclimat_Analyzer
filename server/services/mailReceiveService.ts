@@ -84,7 +84,7 @@ export async function syncEmailsForContactEmail(
       });
 
       // Берём только последние limit сообщений
-      const lastUids = sequence.slice(-limit);
+      const lastUids = Array.isArray(sequence) ? sequence.slice(-limit) : [];
 
       if (lastUids.length === 0) {
         return [];

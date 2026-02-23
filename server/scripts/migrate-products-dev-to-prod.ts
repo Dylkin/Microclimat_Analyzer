@@ -48,6 +48,9 @@ async function migrateProductsDevToProd() {
     });
   };
 
+  let devPool: Pool | null = null;
+  let prodPool: Pool | null = null;
+
   try {
     console.log('🚀 Скрипт переноса товаров из DEV в PROD\n');
     console.log('⚠️  ВНИМАНИЕ: Этот скрипт перенесет все разделы и карточки товаров из dev базы в prod базу.');
@@ -80,7 +83,7 @@ async function migrateProductsDevToProd() {
     rl.close();
 
     // Создаем пулы подключений
-    const devPool = new Pool({
+    devPool = new Pool({
       host: devHost,
       port: parseInt(devPort),
       database: devDatabase,
@@ -88,7 +91,7 @@ async function migrateProductsDevToProd() {
       password: devPassword,
     });
 
-    const prodPool = new Pool({
+    prodPool = new Pool({
       host: prodHost,
       port: parseInt(prodPort),
       database: prodDatabase,
@@ -322,8 +325,8 @@ async function migrateProductsDevToProd() {
     process.exit(1);
   } finally {
     // Закрываем подключения
-    await devPool.end();
-    await prodPool.end();
+    if (devPool) await devPool.end();
+    if (prodPool) await prodPool.end();
   }
 }
 

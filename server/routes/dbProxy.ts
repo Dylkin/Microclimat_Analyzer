@@ -198,7 +198,9 @@ router.post('/', async (req, res) => {
           throw new Error('Нет данных для вставки');
         }
 
-        const rows = Array.isArray(payload.data) ? payload.data : [payload.data];
+        const rows: Record<string, unknown>[] = Array.isArray(payload.data)
+          ? (payload.data as Record<string, unknown>[])
+          : [payload.data as Record<string, unknown>];
         if (rows.length === 0) {
           throw new Error('Пустой набор данных для вставки');
         }

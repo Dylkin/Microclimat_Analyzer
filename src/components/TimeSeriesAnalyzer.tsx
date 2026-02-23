@@ -1146,7 +1146,7 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
   }, [analysisResults, hiddenLoggers]);
 
   // Вычисляем глобальные минимальные и максимальные значения (исключая внешние датчики)
-  const { globalMinTemp, globalMaxTemp } = useMemo(() => {
+  const { globalMinTemp, globalMaxTemp, globalMinHumidity, globalMaxHumidity } = useMemo(() => {
     const nonExternalResults = visibleAnalysisResults.filter(result => !result.isExternal);
     const minTempValues = nonExternalResults
       .map(result => parseFloat(result.minTemp))
@@ -1154,10 +1154,17 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
     const maxTempValues = nonExternalResults
       .map(result => parseFloat(result.maxTemp))
       .filter(val => !isNaN(val));
+    const minHumidityValues = nonExternalResults
+      .map(result => parseFloat((result as any).minHumidity))
+      .filter(val => !isNaN(val));
+    const maxHumidityValues = nonExternalResults
+      .map(result => parseFloat((result as any).maxHumidity))
+      .filter(val => !isNaN(val));
     
-    // Используем итеративный подход для больших массивов
     let globalMinTemp: number | null = null;
     let globalMaxTemp: number | null = null;
+    let globalMinHumidity: number | null = null;
+    let globalMaxHumidity: number | null = null;
     
     if (minTempValues.length > 0) {
       let min = Infinity;
@@ -1175,9 +1182,27 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       globalMaxTemp = max === -Infinity ? null : max;
     }
     
+    if (minHumidityValues.length > 0) {
+      let min = Infinity;
+      for (const val of minHumidityValues) {
+        if (val < min) min = val;
+      }
+      globalMinHumidity = min === Infinity ? null : min;
+    }
+    
+    if (maxHumidityValues.length > 0) {
+      let max = -Infinity;
+      for (const val of maxHumidityValues) {
+        if (val > max) max = val;
+      }
+      globalMaxHumidity = max === -Infinity ? null : max;
+    }
+    
     return {
       globalMinTemp,
-      globalMaxTemp
+      globalMaxTemp,
+      globalMinHumidity,
+      globalMaxHumidity
     };
   }, [visibleAnalysisResults]);
 
@@ -3325,8 +3350,11 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
 
     // Находим минимальное и максимальное значения (исключая внешние датчики)
     const nonExternalResults = analysisResults.filter(result => !result.isExternal);
-    const validResults = nonExternalResults.filter(result => 
-      result.minTemp !== '-' && result.maxTemp !== '-'
+    const isHumidity = dataType === 'humidity';
+    const validResults = nonExternalResults.filter(result =>
+      isHumidity
+        ? (result as any).minHumidity !== '-' && (result as any).maxHumidity !== '-'
+        : result.minTemp !== '-' && result.maxTemp !== '-'
     );
 
     if (validResults.length === 0) {
@@ -3334,60 +3362,79 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       return;
     }
 
-    // Находим результат с минимальной температурой
+    // Находим результат с минимальным значением (температура или влажность)
     const minTempResult = validResults.reduce((min, current) => {
-      const minTemp = parseFloat(min.minTemp);
-      const currentMinTemp = parseFloat(current.minTemp);
-      return currentMinTemp < minTemp ? current : min;
+      const minVal = parseFloat(isHumidity ? (min as any).minHumidity : min.minTemp);
+      const currentMinVal = parseFloat(isHumidity ? (current as any).minHumidity : current.minTemp);
+      return currentMinVal < minVal ? current : min;
     });
 
-    // Находим результат с максимальной температурой
+    // Находим результат с максимальным значением (температура или влажность)
     const maxTempResult = validResults.reduce((max, current) => {
-      const maxTemp = parseFloat(max.maxTemp);
-      const currentMaxTemp = parseFloat(current.maxTemp);
-      return currentMaxTemp > maxTemp ? current : max;
+      const maxVal = parseFloat(isHumidity ? (max as any).maxHumidity : max.maxTemp);
+      const currentMaxVal = parseFloat(isHumidity ? (current as any).maxHumidity : current.maxTemp);
+      return currentMaxVal > maxVal ? current : max;
     });
 
     // Проверяем соответствие лимитам
     let meetsLimits = true;
-    if (limits.temperature) {
+    if (isHumidity && limits.humidity) {
+      const minVal = parseFloat((minTempResult as any).minHumidity);
+      const maxVal = parseFloat((maxTempResult as any).maxHumidity);
+      if (limits.humidity.min !== undefined && minVal < limits.humidity.min) meetsLimits = false;
+      if (limits.humidity.max !== undefined && maxVal > limits.humidity.max) meetsLimits = false;
+    } else if (!isHumidity && limits.temperature) {
       const minTemp = parseFloat(minTempResult.minTemp);
       const maxTemp = parseFloat(maxTempResult.maxTemp);
-      
-      if (limits.temperature.min !== undefined && minTemp < limits.temperature.min) {
-        meetsLimits = false;
-      }
-      if (limits.temperature.max !== undefined && maxTemp > limits.temperature.max) {
-        meetsLimits = false;
-      }
+      if (limits.temperature.min !== undefined && minTemp < limits.temperature.min) meetsLimits = false;
+      if (limits.temperature.max !== undefined && maxTemp > limits.temperature.max) meetsLimits = false;
     }
 
     // Формируем текст выводов
     // Для empty_volume и loaded_volume применяем форматирование с жирным шрифтом для определенных фраз
     if (contractFields.testType === 'empty_volume' || contractFields.testType === 'loaded_volume') {
-      const startTimeStr = startTime.toLocaleString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      const endTimeStr = endTime.toLocaleString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      const minValueStr = `${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.`;
-      const maxValueStr = `${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.`;
       const resultStr = `${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
-      
-      const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Длительность испытания: </b>${durationText}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
-      
-      setConclusions(conclusionText);
+
+      if (isHumidity) {
+        // Влажность: только даты, значения влажности в зоне/высоте, без длительности
+        const startTimeStr = startTime.toLocaleDateString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+        const endTimeStr = endTime.toLocaleDateString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+        const minValueStr = `${(minTempResult as any).minHumidity}% в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.`;
+        const maxValueStr = `${(maxTempResult as any).maxHumidity}% в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.`;
+        const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
+        setConclusions(conclusionText);
+      } else {
+        const startTimeStr = startTime.toLocaleString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        const endTimeStr = endTime.toLocaleString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        const minValueStr = `${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.`;
+        const maxValueStr = `${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.`;
+        const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Длительность испытания: </b>${durationText}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
+        setConclusions(conclusionText);
+      }
     } else {
       // Для других типов испытаний используем стандартное форматирование
+      const minValStr = isHumidity ? `${(minTempResult as any).minHumidity}%` : `${minTempResult.minTemp}°C`;
+      const maxValStr = isHumidity ? `${(maxTempResult as any).maxHumidity}%` : `${maxTempResult.maxTemp}°C`;
       const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU', {
         day: '2-digit',
         month: '2-digit',
@@ -3403,8 +3450,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         minute: '2-digit'
       })}.
 Длительность испытания: ${durationText}.
-Зафиксированное минимальное значение: ${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
-Зафиксированное максимальное значение: ${maxTempResult.maxTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
+Зафиксированное минимальное значение: ${minValStr} в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
+Зафиксированное максимальное значение: ${maxValStr} в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.
 Результаты испытания ${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
 
       setConclusions(conclusionText);
@@ -3964,6 +4011,9 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         
         // Стандартная таблица для empty_volume и loaded_volume
         if (testType === 'empty_volume' || testType === 'loaded_volume') {
+          const isHumidity = dataType === 'humidity';
+
+          // Для температуры: отклонение от среднего значения диапазона (колонка только для температуры)
           const limitMin = limits.temperature?.min;
           const limitMax = limits.temperature?.max;
           const hasLimits = typeof limitMin === 'number' && typeof limitMax === 'number';
@@ -3996,6 +4046,145 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             .filter((val): val is number => val !== null);
           const maxDeviationMin = deviationMinValues.length > 0 ? Math.max(...deviationMinValues) : null;
           const maxDeviationMax = deviationMaxValues.length > 0 ? Math.max(...deviationMaxValues) : null;
+
+          // Соответствие критериям для влажности (по лимитам влажности)
+          const getMeetsLimitsHumidity = (result: (typeof visibleAnalysisResults)[0]) => {
+            if (result.isExternal) return '-';
+            const minH = (result as any).minHumidity;
+            const maxH = (result as any).maxHumidity;
+            if (minH === '-' || maxH === '-') return '-';
+            const hMin = limits.humidity?.min;
+            const hMax = limits.humidity?.max;
+            if (hMin === undefined && hMax === undefined) return '-';
+            const minVal = parseFloat(minH);
+            const maxVal = parseFloat(maxH);
+            if (isNaN(minVal) || isNaN(maxVal)) return '-';
+            const okMin = hMin === undefined || minVal >= hMin;
+            const okMax = hMax === undefined || maxVal <= hMax;
+            return (okMin && okMax) ? 'Да' : 'Нет';
+          };
+
+          if (isHumidity) {
+            // Таблица для типа данных «Влажность»: Мин. ОВ %, Макс. ОВ %, Среднее ОВ %; без колонки отклонения
+            return (
+              <>
+              <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      № зоны измерения
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Уровень измерения (м.)
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Наименование логгера
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Серийный № логгера
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Мин. ОВ %
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Макс. ОВ %
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Среднее ОВ %
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Соответствие критериям
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {visibleAnalysisResults.map((result, index) => {
+                    const minH = (result as any).minHumidity ?? '-';
+                    const maxH = (result as any).maxHumidity ?? '-';
+                    const avgH = (result as any).avgHumidity ?? '-';
+                    const minVal = typeof minH === 'string' ? parseFloat(minH) : NaN;
+                    const maxVal = typeof maxH === 'string' ? parseFloat(maxH) : NaN;
+                    const meetsLimitsH = getMeetsLimitsHumidity(result);
+                    return (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {result.zoneNumber === 'Внешний' || result.zoneNumber === '0' ? 'Внешняя влажность' : result.zoneNumber}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {result.measurementLevel === '-' ? '-' : parseFloat(result.measurementLevel).toFixed(1).replace('.', ',')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {result.loggerName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {result.serialNumber}
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center ${
+                          !result.isExternal && !isNaN(minVal) &&
+                          globalMinHumidity !== null && minVal === globalMinHumidity
+                            ? 'bg-blue-200'
+                            : ''
+                        }`}>
+                          {minH}
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center ${
+                          !result.isExternal && !isNaN(maxVal) &&
+                          globalMaxHumidity !== null && maxVal === globalMaxHumidity
+                            ? 'bg-red-200'
+                            : ''
+                        }`}>
+                          {maxH}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                          {avgH === '-' || !avgH ? '-' : parseFloat(avgH).toFixed(1).replace('.', ',')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            meetsLimitsH === 'Да'
+                              ? 'bg-green-100 text-green-800'
+                              : meetsLimitsH === 'Нет'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {meetsLimitsH}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Обозначения:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-blue-200 rounded"></div>
+                  <span>Минимальное значение ОВ в выбранном периоде</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-red-200 rounded"></div>
+                  <span>Максимальное значение ОВ в выбранном периоде</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Да</span>
+                  <span>Соответствует лимитам</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Нет</span>
+                  <span>Не соответствует лимитам</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 text-xs text-gray-600">
+              <strong>Примечание:</strong> При изменении масштаба графика статистика пересчитывается только для выбранного временного периода.
+            </div>
+            </>
+            );
+          }
+
+          // Таблица для типа данных «Температура» (с колонкой отклонения)
           return (
             <>
             <div className="overflow-x-auto">

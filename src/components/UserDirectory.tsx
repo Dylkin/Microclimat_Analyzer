@@ -16,14 +16,16 @@ const UserDirectory: React.FC = () => {
     fullName: '',
     email: '',
     password: '',
-    role: 'specialist' as UserRole
+    role: 'specialist' as UserRole,
+    position: ''
   });
 
   const [editUser, setEditUser] = useState({
     fullName: '',
     email: '',
     password: '',
-    role: 'specialist' as UserRole
+    role: 'specialist' as UserRole,
+    position: ''
   });
 
   const roleLabels: Record<UserRole, string> = {
@@ -57,7 +59,8 @@ const UserDirectory: React.FC = () => {
         fullName: '',
         email: '',
         password: '',
-        role: 'specialist'
+        role: 'specialist',
+        position: ''
       });
       setShowAddForm(false);
       alert('Пользователь успешно добавлен');
@@ -76,7 +79,8 @@ const UserDirectory: React.FC = () => {
       fullName: user.fullName,
       email: user.email,
       password: '',
-      role: user.role
+      role: user.role,
+      position: user.position ?? ''
     });
     setEditingUser(user.id);
   };
@@ -95,7 +99,7 @@ const UserDirectory: React.FC = () => {
 
     setOperationLoading(true);
     try {
-      const payload: Partial<User> = { fullName: editUser.fullName, email: editUser.email, role: editUser.role };
+      const payload: Partial<User> = { fullName: editUser.fullName, email: editUser.email, role: editUser.role, position: editUser.position || undefined };
       if (editUser.password.trim()) {
         payload.password = editUser.password;
       }
@@ -270,6 +274,19 @@ const UserDirectory: React.FC = () => {
               </select>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Должность
+              </label>
+              <input
+                type="text"
+                value={newUser.position}
+                onChange={(e) => setNewUser(prev => ({ ...prev, position: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Например: Инженер"
+              />
+            </div>
+
           </div>
 
           <div className="flex justify-end space-x-3 mt-6">
@@ -304,6 +321,9 @@ const UserDirectory: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Роль
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Должность
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Пароль
@@ -371,6 +391,21 @@ const UserDirectory: React.FC = () => {
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                         {roleLabels[user.role] || 'Неизвестная роль'}
                       </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {editingUser === user.id ? (
+                      <input
+                        type="text"
+                        value={editUser.position}
+                        onChange={(e) => setEditUser(prev => ({ ...prev, position: e.target.value }))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Должность"
+                        title="Должность"
+                        aria-label="Должность"
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-500">{user.position || '—'}</div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

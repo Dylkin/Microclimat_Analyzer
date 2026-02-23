@@ -129,7 +129,7 @@ async function parseRedhonSpecifications() {
         });
 
         const $detail = load(detailResponse.data);
-        const detailText = $detail.text();
+        const detailText = $detail('body').text();
 
         // Ищем характеристики в таблицах или тексте страницы
         // Шаг установки объема дозы

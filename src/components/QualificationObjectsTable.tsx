@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Edit2, Trash2, MapPin, FileImage, Building, Car, Refrigerator, Snowflake, Eye, X } from 'lucide-react';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
 import { QualificationObjectForm } from './QualificationObjectForm';
@@ -40,6 +40,15 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
   viewingQualificationObject = null,
   onCancelQualificationObjectView,
 }) => {
+  // Сортировка по полю «Тип» по алфавиту (по отображаемой подписи)
+  const sortedObjects = useMemo(() => {
+    return [...objects].sort((a, b) => {
+      const labelA = QualificationObjectTypeLabels[a.type as keyof typeof QualificationObjectTypeLabels] ?? a.type;
+      const labelB = QualificationObjectTypeLabels[b.type as keyof typeof QualificationObjectTypeLabels] ?? b.type;
+      return labelA.localeCompare(labelB, 'ru');
+    });
+  }, [objects]);
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'помещение':
@@ -137,7 +146,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
             <p className="text-gray-500">Загрузка объектов квалификации...</p>
           </div>
-        ) : objects.length > 0 ? (
+        ) : sortedObjects.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -163,7 +172,7 @@ export const QualificationObjectsTable: React.FC<QualificationObjectsTableProps>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {objects.map((obj, index) => (
+                {sortedObjects.map((obj, index) => (
                   <React.Fragment key={obj.id}>
                     <tr className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">

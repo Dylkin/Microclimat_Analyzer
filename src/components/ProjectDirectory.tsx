@@ -358,30 +358,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     }
   };
 
-  // Получение иконки статуса
-  const getStatusIcon = (status: ProjectStatus) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case 'documents_submission':
-        return <FileText className="w-4 h-4 text-blue-600" />;
-      case 'contract_negotiation':
-      case 'report_approval':
-        return <Clock className="w-4 h-4 text-yellow-600" />;
-      // case 'protocol_preparation': // Удалено - статус больше не используется
-      case 'report_preparation':
-        return <FileText className="w-4 h-4 text-blue-600" />;
-      case 'testing_execution':
-        return <Play className="w-4 h-4 text-purple-600" />;
-      case 'report_printing':
-        return <Printer className="w-4 h-4 text-green-600" />;
-      case 'not_suitable':
-        return <AlertCircle className="w-4 h-4 text-red-600" />;
-      default:
-        return <AlertCircle className="w-4 h-4 text-blue-600" />;
-    }
-  };
-
   // Получение действия для статуса проекта
   const getProjectAction = (status: ProjectStatus, projectType?: ProjectType) => {
     // Для проектов типа 'qualification' не показываем действие для статуса 'documents_submission'
@@ -871,14 +847,11 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                               ))}
                           </select>
                         ) : (
-                          <div className="flex items-center space-x-2">
-                            {getStatusIcon(project.status)}
-                            <span
-                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ProjectStatusColors[project.status]}`}
-                            >
-                              {ProjectStatusLabels[project.status]}
-                            </span>
-                          </div>
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${ProjectStatusColors[project.status]}`}
+                          >
+                            {ProjectStatusLabels[project.status]}
+                          </span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

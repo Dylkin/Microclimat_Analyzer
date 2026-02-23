@@ -12,9 +12,9 @@ const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (req: express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     // Разрешаем только .docx файлы
-    if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+    if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
         file.originalname.endsWith('.docx')) {
       cb(null, true);
     } else {

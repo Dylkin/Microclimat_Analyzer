@@ -10,7 +10,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, full_name, email, role, is_default, created_at, updated_at FROM users ORDER BY created_at ASC'
+      'SELECT id, full_name, email, role, position, is_default, created_at, updated_at FROM users ORDER BY created_at ASC'
     );
     
     const users = result.rows.map(row => ({
@@ -19,6 +19,7 @@ router.get('/', async (req, res) => {
       email: row.email,
       password: '', // Не возвращаем пароль
       role: row.role,
+      position: row.position ?? undefined,
       isDefault: row.is_default
     }));
     
@@ -34,7 +35,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      'SELECT id, full_name, email, role, is_default, created_at, updated_at FROM users WHERE id = $1',
+      'SELECT id, full_name, email, role, position, is_default, created_at, updated_at FROM users WHERE id = $1',
       [id]
     );
     
@@ -49,6 +50,7 @@ router.get('/:id', async (req, res) => {
       email: row.email,
       password: '',
       role: row.role,
+      position: row.position ?? undefined,
       isDefault: row.is_default
     });
   } catch (error) {
@@ -99,7 +101,7 @@ router.post('/login', async (req, res) => {
 // POST /api/users - Создать пользователя
 router.post('/', async (req, res) => {
   try {
-    const { fullName, email, password, role, isDefault } = req.body;
+    const { fullName, email, password, role, position, isDefault } = req.body;
     // #region agent log
     try {
       const fs = await import('fs');
@@ -117,10 +119,10 @@ router.post('/', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     const result = await pool.query(
-      `INSERT INTO users (full_name, email, password, role, is_default)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, full_name, email, role, is_default, created_at, updated_at`,
-      [fullName, email, hashedPassword, role || 'user', isDefault || false]
+      `INSERT INTO users (full_name, email, password, role, position, is_default)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, full_name, email, role, position, is_default, created_at, updated_at`,
+      [fullName, email, hashedPassword, role || 'user', position ?? null, isDefault || false]
     );
     
     const user = result.rows[0];
@@ -130,6 +132,7 @@ router.post('/', async (req, res) => {
       email: user.email,
       password: '',
       role: user.role,
+      position: user.position ?? undefined,
       isDefault: user.is_default
     });
   } catch (error: any) {
@@ -156,7 +159,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullName, email, password, role, isDefault } = req.body;
+    const { fullName, email, password, role, position, isDefault } = req.body;
     
     const updates: string[] = [];
     const values: any[] = [];
@@ -179,6 +182,10 @@ router.put('/:id', async (req, res) => {
       updates.push(`role = $${paramCount++}`);
       values.push(role);
     }
+    if (position !== undefined) {
+      updates.push(`position = $${paramCount++}`);
+      values.push(position || null);
+    }
     if (isDefault !== undefined) {
       updates.push(`is_default = $${paramCount++}`);
       values.push(isDefault);
@@ -193,7 +200,7 @@ router.put('/:id', async (req, res) => {
     
     const result = await pool.query(
       `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramCount}
-       RETURNING id, full_name, email, role, is_default, created_at, updated_at`,
+       RETURNING id, full_name, email, role, position, is_default, created_at, updated_at`,
       values
     );
     
@@ -208,6 +215,7 @@ router.put('/:id', async (req, res) => {
       email: user.email,
       password: '',
       role: user.role,
+      position: user.position ?? undefined,
       isDefault: user.is_default
     });
   } catch (error: any) {

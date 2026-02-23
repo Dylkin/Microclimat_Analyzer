@@ -50,7 +50,7 @@ async function parseProductSpecificationsFromUrl() {
         });
 
         const $ = load(response.data);
-        const pageText = $.text();
+        const pageText = $('body').text();
 
         const updates: string[] = [];
         const values: any[] = [];
@@ -62,7 +62,7 @@ async function parseProductSpecificationsFromUrl() {
           // Ищем в таблицах
           const channelsTable = $('td, th').filter((idx, el) => {
             const text = $(el).text().toLowerCase();
-            return text.includes('канал') && (text.includes('количество') || text.match(/\d+/));
+            return Boolean(text.includes('канал') && (text.includes('количество') || text.match(/\d+/)));
           }).first();
 
           if (channelsTable.length > 0) {
