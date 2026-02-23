@@ -1,37 +1,14 @@
 import { DocumentApprovalService } from '../documentApprovalService';
+import { apiClient } from '../apiClient';
 
-// Mock для Supabase
-const mockSupabase = {
-  auth: {
-    getUser: jest.fn(() => Promise.resolve({ 
-      data: { user: { id: 'test-user', email: 'test@example.com' } }, 
-      error: null 
-    }))
-  },
-  from: jest.fn(() => ({
-    insert: jest.fn(() => ({
-      select: jest.fn(() => ({
-        single: jest.fn(() => Promise.resolve({ 
-          data: { id: 'test-id' }, 
-          error: null 
-        }))
-      }))
-    })),
-    select: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        order: jest.fn(() => Promise.resolve({ 
-          data: [], 
-          error: null 
-        }))
-      }))
-    }))
-  }))
-};
-
-// Mock для createClient
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => mockSupabase)
+jest.mock('../apiClient', () => ({
+  apiClient: {
+    get: jest.fn(),
+    post: jest.fn()
+  }
 }));
+
+const mockApi = apiClient as jest.Mocked<typeof apiClient>;
 
 describe('DocumentApprovalService', () => {
   let service: DocumentApprovalService;
@@ -39,188 +16,119 @@ describe('DocumentApprovalService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new DocumentApprovalService();
+    mockApi.get.mockResolvedValue([]);
+    mockApi.get.mockImplementation((url: string) => {
+      if (url.startsWith('/users/')) {
+        return Promise.resolve({ full_name: 'Test User', email: 'test@example.com' });
+      }
+      if (url.includes('comments/')) {
+        return Promise.resolve([]);
+      }
+      if (url.includes('approvals/')) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve([]);
+    });
+    mockApi.post.mockResolvedValue({
+      id: 'test-id',
+      document_id: 'test-doc-id',
+      user_id: 'test-user-id',
+      user_name: 'Test User',
+      status: 'approved',
+      comment: 'Test comment',
+      created_at: '2023-01-01T00:00:00Z',
+      updated_at: '2023-01-01T00:00:00Z'
+    });
   });
 
   describe('getComments', () => {
     test('returns empty array for comments', async () => {
       const result = await service.getComments('test-doc-id');
-      
+
       expect(result).toEqual([]);
-    });
-
-    test('handles service not configured', async () => {
-      // Создаем сервис без Supabase
-      const serviceWithoutSupabase = new DocumentApprovalService();
-      // @ts-ignore
-      serviceWithoutSupabase.supabase = null;
-
-      await expect(serviceWithoutSupabase.getComments('test-doc-id'))
-        .rejects.toThrow('Supabase не настроен');
+      expect(mockApi.get).toHaveBeenCalledWith('/document-approval/comments/test-doc-id');
     });
   });
 
   describe('getApprovalHistory', () => {
     test('returns empty array for approval history', async () => {
       const result = await service.getApprovalHistory('test-doc-id');
-      
+
       expect(result).toEqual([]);
-    });
-
-    test('handles service not configured', async () => {
-      // Создаем сервис без Supabase
-      const serviceWithoutSupabase = new DocumentApprovalService();
-      // @ts-ignore
-      serviceWithoutSupabase.supabase = null;
-
-      await expect(serviceWithoutSupabase.getApprovalHistory('test-doc-id'))
-        .rejects.toThrow('Supabase не настроен');
+      expect(mockApi.get).toHaveBeenCalledWith(expect.stringContaining('test-doc-id'));
     });
   });
 
   describe('addComment', () => {
     test('adds comment successfully', async () => {
-      const result = await service.addComment('test-doc-id', 'Test comment', 'test-user-id');
-      
-      expect(result).toEqual({
-        id: expect.any(String),
-        documentId: 'test-doc-id',
-        userId: 'test-user',
-        userName: 'test@example.com',
+      mockApi.post.mockResolvedValueOnce({
+        id: 'test-id',
+        document_id: 'test-doc-id',
+        user_id: 'test-user-id',
+        user_name: 'Test User',
         comment: 'Test comment',
-        createdAt: expect.any(Date),
-        updatedAt: expect.any(Date)
+        created_at: '2023-01-01T00:00:00Z',
+        updated_at: '2023-01-01T00:00:00Z'
       });
+
+      const result = await service.addComment('test-doc-id', 'Test comment', 'test-user-id');
+
+      expect(result.documentId).toBe('test-doc-id');
+      expect(result.comment).toBe('Test comment');
+      expect(mockApi.post).toHaveBeenCalledWith('/document-approval/comments', expect.any(Object));
     });
 
-    test('handles authentication error', async () => {
-      mockSupabase.auth.getUser.mockResolvedValueOnce({ 
-        data: { user: null }, 
-        error: new Error('Auth error') 
-      });
+    test('handles API error', async () => {
+      mockApi.get.mockRejectedValueOnce(new Error('User not found'));
+      mockApi.post.mockRejectedValueOnce(new Error('Ошибка сохранения комментария'));
 
       await expect(service.addComment('test-doc-id', 'Test comment', 'test-user-id'))
-        .rejects.toThrow('Требуется аутентификация для добавления комментариев');
-    });
-
-    test('handles service not configured', async () => {
-      const serviceWithoutSupabase = new DocumentApprovalService();
-      // @ts-ignore
-      serviceWithoutSupabase.supabase = null;
-
-      await expect(serviceWithoutSupabase.addComment('test-doc-id', 'Test comment', 'test-user-id'))
-        .rejects.toThrow('Supabase не настроен');
+        .rejects.toThrow();
     });
   });
 
   describe('approveDocument', () => {
     test('approves document successfully', async () => {
       const result = await service.approveDocument('test-doc-id', 'test-user-id', 'Approval comment');
-      
-      expect(result).toEqual({
-        id: expect.any(String),
-        documentId: 'test-doc-id',
-        userId: 'test-user',
-        userName: 'test@example.com',
-        status: 'approved',
-        comment: 'Approval comment',
-        createdAt: expect.any(Date),
-        updatedAt: expect.any(Date)
-      });
-    });
 
-    test('approves document without comment', async () => {
-      const result = await service.approveDocument('test-doc-id', 'test-user-id');
-      
-      expect(result.comment).toBeUndefined();
-    });
-
-    test('handles authentication error', async () => {
-      mockSupabase.auth.getUser.mockResolvedValueOnce({ 
-        data: { user: null }, 
-        error: new Error('Auth error') 
-      });
-
-      await expect(service.approveDocument('test-doc-id', 'test-user-id'))
-        .rejects.toThrow('Требуется аутентификация для согласования документов');
+      expect(result.documentId).toBe('test-doc-id');
+      expect(mockApi.post).toHaveBeenCalledWith('/document-approval/approve', expect.any(Object));
     });
   });
 
   describe('rejectDocument', () => {
     test('rejects document successfully', async () => {
-      const result = await service.rejectDocument('test-doc-id', 'test-user-id', 'Rejection comment');
-      
-      expect(result).toEqual({
-        id: expect.any(String),
-        documentId: 'test-doc-id',
-        userId: 'test-user',
-        userName: 'test@example.com',
+      mockApi.post.mockResolvedValueOnce({
+        id: 'test-id',
+        document_id: 'test-doc-id',
+        user_id: 'test-user-id',
+        user_name: 'Test User',
         status: 'rejected',
         comment: 'Rejection comment',
-        createdAt: expect.any(Date),
-        updatedAt: expect.any(Date)
-      });
-    });
-
-    test('rejects document without comment', async () => {
-      const result = await service.rejectDocument('test-doc-id', 'test-user-id');
-      
-      expect(result.comment).toBeUndefined();
-    });
-
-    test('handles authentication error', async () => {
-      mockSupabase.auth.getUser.mockResolvedValueOnce({ 
-        data: { user: null }, 
-        error: new Error('Auth error') 
+        created_at: '2023-01-01T00:00:00Z',
+        updated_at: '2023-01-01T00:00:00Z'
       });
 
-      await expect(service.rejectDocument('test-doc-id', 'test-user-id'))
-        .rejects.toThrow('Требуется аутентификация для отклонения документов');
+      const result = await service.rejectDocument('test-doc-id', 'test-user-id', 'Rejection comment');
+
+      expect(result.status).toBe('rejected');
+      expect(mockApi.post).toHaveBeenCalledWith('/document-approval/reject', expect.any(Object));
     });
   });
 
   describe('getApprovalStatus', () => {
-    test('returns approval status with empty data', async () => {
-      const result = await service.getApprovalStatus('test-doc-id');
-      
-      expect(result).toEqual({
+    test('returns approval status', async () => {
+      mockApi.get.mockResolvedValueOnce({
         documentId: 'test-doc-id',
         status: 'pending',
-        lastApproval: undefined,
         comments: [],
         approvalHistory: []
       });
-    });
 
-    test('handles service not configured', async () => {
-      const serviceWithoutSupabase = new DocumentApprovalService();
-      // @ts-ignore
-      serviceWithoutSupabase.supabase = null;
+      const result = await service.getApprovalStatus('test-doc-id');
 
-      await expect(serviceWithoutSupabase.getApprovalStatus('test-doc-id'))
-        .rejects.toThrow('Supabase не настроен');
+      expect(result.documentId).toBe('test-doc-id');
+      expect(result.status).toBe('pending');
     });
   });
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

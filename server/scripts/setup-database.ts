@@ -235,7 +235,7 @@ const main = async () => {
     }
 
     // Путь к папке миграций
-    const migrationsDir = path.join(__dirname, '../../supabase/migrations');
+    const migrationsDir = path.join(__dirname, '../../migrations');
     
     // Проверяем наличие папки миграций
     let migrationFiles: string[] = [];
@@ -244,8 +244,7 @@ const main = async () => {
       migrationFiles = files
         .filter(file => file.endsWith('.sql'))
         .sort()
-        // Отфильтровываем Supabase-специфичные миграции, которые зависят от схемы auth/ролей/политик
-        // и не нужны в самостоятельной установке PostgreSQL.
+        // Отфильтровываем миграции, зависящие от внешней auth/ролей/политик (не нужны в standalone PostgreSQL).
         // Оставляем только "базовые" миграции и нашу актуальную add_not_suitable_status.
         .filter(file => {
           // Всегда оставляем миграцию для статуса "not_suitable"
@@ -264,10 +263,10 @@ const main = async () => {
           if (file === '20250101180000_add_creating_report_status.sql') return false;
           if (file === '20250102000000_create_audit_logs.sql') return false;
 
-          // Оставляем все "ранние" структурные миграции (2025-01-01 .. 2025-01-02 и др. до Supabase-пакета)
+          // Оставляем все "ранние" структурные миграции (2025-01-01 .. 2025-01-02 и др.)
           if (file < '20250700000000_') return true;
 
-          // Все остальные (Supabase/политики/роль authenticated и т.п.) — пропускаем
+          // Остальные (политики RLS/роль authenticated и т.п.) — пропускаем в standalone PostgreSQL
           return false;
         });
     } catch (error) {

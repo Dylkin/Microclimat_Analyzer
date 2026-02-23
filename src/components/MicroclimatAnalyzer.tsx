@@ -381,7 +381,7 @@ const MicroclimatAnalyzer: React.FC<MicroclimatAnalyzerProps> = ({
       if (f.id === fileId) {
         const updatedFile = { ...f, [field]: value };
         
-        // Обновляем в базе данных если файл был сохранен и Supabase доступен
+        // Обновляем в базе данных если файл был сохранен и сервер доступен
         if (uploadedFileService.isAvailable()) {
           const updates: any = {};
           if (field === 'zoneNumber') updates.zoneNumber = value as number;

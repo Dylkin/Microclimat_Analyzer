@@ -33,7 +33,7 @@
 4. `onSubmit` возвращает сохраненный объект с ID из базы данных
 5. Получаем ID сохраненного объекта: `const objectId = savedObject?.id || finalFormData.id`
 6. Загружаем файл "План объекта" с правильным ID: `await qualificationObjectService.uploadPlanFile(objectId, planFile)`
-7. Файл успешно сохраняется в Supabase Storage и URL записывается в базу данных
+7. Файл успешно сохраняется на сервере и URL записывается в базу данных
 
 ## Тестирование
 

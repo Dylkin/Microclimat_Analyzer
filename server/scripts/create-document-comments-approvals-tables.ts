@@ -13,7 +13,7 @@ async function createDocumentCommentsApprovalsTables() {
   try {
     console.log('Создание таблиц document_comments и document_approvals...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000006_create_document_comments_and_approvals.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000006_create_document_comments_and_approvals.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
     
     await pool.query(sql);

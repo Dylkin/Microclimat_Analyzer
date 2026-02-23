@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Building, Car, Refrigerator, Snowflake, CheckSquare, Square, FileText, ExternalLink, MoreVertical, Eye, Play, BarChart3 } from 'lucide-react';
+import { Building, Car, Refrigerator, Snowflake, CheckSquare, Square, FileText, ExternalLink, MoreVertical, Eye, Pencil, Play, BarChart3 } from 'lucide-react';
 import { QualificationObject, QualificationObjectTypeLabels } from '../../types/QualificationObject';
 import { qualificationObjectService } from '../../utils/qualificationObjectService';
 import { QualificationProtocolWithDocument } from '../../utils/qualificationProtocolService';
@@ -11,6 +11,7 @@ import { projectService } from '../../utils/projectService';
 interface QualificationObjectsCRUDProps {
   contractorId: string;
   contractorName: string;
+  contractorAddress?: string; // Адрес контрагента для автоподстановки в поле «Адрес»
   projectId?: string;
   project?: any; // Добавляем полный объект проекта
   projectQualificationObjects?: Array<{
@@ -31,6 +32,7 @@ interface QualificationObjectsCRUDProps {
 
 export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> = ({ 
   contractorId, 
+  contractorAddress,
   // contractorName,
   projectId,
   project,
@@ -270,7 +272,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
           </div>
           <QualificationObjectForm
             contractorId={contractorId}
-            contractorAddress=""
+            contractorAddress={contractorAddress ?? ''}
             initialData={editingObject || viewingObject || undefined}
             onSubmit={handleUpdate}
             onCancel={() => {
@@ -520,6 +522,31 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                           <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            setLoadingObject(true);
+                            const fullObject = await qualificationObjectService.getQualificationObjectById(obj.id, projectId);
+                            setEditingObject(fullObject);
+                            setViewingObject(null);
+                            setObjectMode('edit');
+                          } catch (error) {
+                            console.error('Ошибка загрузки объекта квалификации:', error);
+                            alert(`Ошибка загрузки объекта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+                          } finally {
+                            setLoadingObject(false);
+                          }
+                        }}
+                        disabled={loadingObject}
+                        className={`${loadingObject ? 'opacity-50 cursor-wait' : 'text-amber-600 hover:text-amber-900'}`}
+                        title={loadingObject ? 'Загрузка...' : 'Редактировать объект квалификации'}
+                      >
+                        {loadingObject ? (
+                          <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Pencil className="w-4 h-4" />
                         )}
                       </button>
                       {showExecuteButton && (

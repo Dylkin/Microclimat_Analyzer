@@ -36,9 +36,6 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('react') || id.includes('react-dom')) {
               return 'react-vendor';
             }
-            if (id.includes('@supabase')) {
-              return 'supabase-vendor';
-            }
             if (id.includes('d3-')) {
               return 'd3-vendor';
             }

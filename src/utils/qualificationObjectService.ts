@@ -253,6 +253,8 @@ class QualificationObjectService {
       inventoryNumber: data.inventoryNumber || data.inventory_number || '',
       chamberVolume: data.chamberVolume ? parseFloat(data.chamberVolume) : (data.chamber_volume ? parseFloat(data.chamber_volume) : undefined),
       serialNumber: data.serialNumber || data.serial_number || '',
+      manufactureDate: data.manufactureDate || data.manufacture_date || undefined,
+      expiryDate: data.expiryDate || data.expiry_date || undefined,
       testDataFileUrl: data.testDataFileUrl || data.test_data_file_url || '',
       testDataFileName: data.testDataFileName || data.test_data_file_name || '',
       createdAt: data.createdAt ? new Date(data.createdAt) : (data.created_at ? new Date(data.created_at) : new Date()),
@@ -327,6 +329,8 @@ class QualificationObjectService {
       if (data.inventoryNumber !== undefined) dbData.inventoryNumber = data.inventoryNumber;
       if (data.chamberVolume !== undefined) dbData.chamberVolume = data.chamberVolume;
       if (data.serialNumber !== undefined) dbData.serialNumber = data.serialNumber;
+      if ((data as any).manufactureDate !== undefined) dbData.manufactureDate = (data as any).manufactureDate;
+      if ((data as any).expiryDate !== undefined) dbData.expiryDate = (data as any).expiryDate;
       
       // JSONB поля - передаем как объекты, API сам сериализует
       if (data.measurementZones !== undefined) {

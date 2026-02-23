@@ -13,7 +13,7 @@ async function createProjectFilesTracking() {
   try {
     console.log('Создание таблицы project_files для отслеживания всех файлов проекта...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000007_create_project_files_tracking.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000007_create_project_files_tracking.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
     
     await pool.query(sql);

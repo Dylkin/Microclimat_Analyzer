@@ -22,7 +22,7 @@ async function renameContractToReportTemplate() {
     console.log('🔄 Применение миграции для переименования contract_template в report_template...');
 
     // Читаем файл миграции
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250102000005_rename_contract_template_to_report_template.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250102000005_rename_contract_template_to_report_template.sql');
     const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
 
     // Применяем миграцию

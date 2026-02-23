@@ -34,6 +34,6 @@ export default {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],
   transformIgnorePatterns: [
-    'node_modules/(?!(.*\\.mjs$|@supabase|@testing-library))'
+    'node_modules/(?!(.*\\.mjs$|@testing-library))'
   ]
 };

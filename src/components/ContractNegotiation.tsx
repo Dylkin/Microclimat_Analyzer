@@ -445,6 +445,7 @@ const ContractNegotiation: React.FC<ContractNegotiationProps> = ({ project, onBa
       <QualificationObjectsCRUD 
         contractorId={currentProject.contractorId}
         contractorName={currentProject.contractorName || 'Неизвестный контрагент'}
+        contractorAddress={contractor?.address}
         projectId={currentProject.id}
         project={currentProject}
         projectQualificationObjects={currentProject.qualificationObjects}

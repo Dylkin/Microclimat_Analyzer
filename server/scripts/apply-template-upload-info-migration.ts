@@ -13,7 +13,7 @@ async function applyMigration() {
     await client.query('BEGIN');
     
     // Читаем файл миграции
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250102000003_add_template_upload_info.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250102000003_add_template_upload_info.sql');
     const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
     
     // Выполняем миграцию

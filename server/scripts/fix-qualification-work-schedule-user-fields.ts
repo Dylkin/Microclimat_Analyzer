@@ -11,7 +11,7 @@ async function fixQualificationWorkScheduleUserFields() {
   try {
     console.log('Применение миграции для изменения типа полей completed_by и cancelled_by...');
     
-    const migrationPath = join(__dirname, '../../supabase/migrations/20250101000013_fix_qualification_work_schedule_user_fields.sql');
+    const migrationPath = join(__dirname, '../../migrations/20250101000013_fix_qualification_work_schedule_user_fields.sql');
     const migrationSQL = readFileSync(migrationPath, 'utf-8');
     
     await pool.query(migrationSQL);

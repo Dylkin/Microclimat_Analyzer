@@ -13,7 +13,7 @@ async function fixProjectDocumentsColumns() {
   try {
     console.log('Исправление колонок в таблице project_documents...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000003_fix_project_documents_columns.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000003_fix_project_documents_columns.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
     
     await pool.query(sql);

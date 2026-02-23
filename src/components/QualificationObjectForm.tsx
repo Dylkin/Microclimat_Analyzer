@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Building, Car, Refrigerator, Snowflake, Upload, X, FileText, Image, Eye } from 'lucide-react';
 import { 
   QualificationObject, 
@@ -75,7 +75,9 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     bodyVolume: initialData?.bodyVolume || undefined,
     inventoryNumber: initialData?.inventoryNumber || '',
     chamberVolume: initialData?.chamberVolume || undefined,
-    serialNumber: initialData?.serialNumber || ''
+    serialNumber: initialData?.serialNumber || '',
+    manufactureDate: initialData?.manufactureDate || '',
+    expiryDate: initialData?.expiryDate || ''
   });
 
   const [planFile, setPlanFile] = useState<File | null>(null);
@@ -84,6 +86,14 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   const [error, setError] = useState<string | null>(null);
   const [uploadedPlanUrl, setUploadedPlanUrl] = useState<string | null>(initialData?.planFileUrl || null);
 
+  // При смене типа на тип с полем «Адрес» подставляем адрес контрагента, если адрес пустой
+  const typesWithAddress = ['помещение', 'холодильная_камера', 'холодильник', 'термоконтейнер', 'морозильник'];
+  useEffect(() => {
+    if (mode === 'view') return;
+    if (contractorAddress && typesWithAddress.includes(formData.type)) {
+      setFormData(prev => (prev.address ? prev : { ...prev, address: contractorAddress }));
+    }
+  }, [formData.type, contractorAddress, mode]);
 
   const handleInputChange = (field: keyof CreateQualificationObjectData, value: any) => {
     if (mode === 'view') return; // Не изменяем данные в режиме просмотра
@@ -259,10 +269,10 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               />
             </div>
 
-            {/* Объем кузова */}
+            {/* Объем (м³) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объем кузова (м³)
+                Объем (м³)
               </label>
               <input
                 type="number"
@@ -271,7 +281,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                 onChange={(e) => handleInputChange('bodyVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 readOnly={mode === 'view'}
-                placeholder="Введите объем кузова"
+                placeholder="Введите объем"
               />
             </div>
           </div>
@@ -331,44 +341,6 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               />
             </div>
 
-            {/* Объем камеры */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Объем камеры (м³/л)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.chamberVolume || ''}
-                onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                readOnly={mode === 'view'}
-                placeholder="Введите объем камеры"
-              />
-            </div>
-          </div>
-        );
-      
-      case 'холодильник':
-      case 'морозильник':
-      case 'термоконтейнер':
-        return (
-          <div className="space-y-4">
-            {/* Производитель */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Производитель
-              </label>
-              <input
-                type="text"
-                value={formData.manufacturer || ''}
-                onChange={(e) => handleInputChange('manufacturer', e.target.value)}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                readOnly={mode === 'view'}
-                placeholder="Введите производителя"
-              />
-            </div>
-
             {/* Серийный номер */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -384,11 +356,56 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               />
             </div>
 
-            {/* Инвентарный номер */}
+            {/* Объем (м³) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Инвентарный номер
+                Объем (м³)
               </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.chamberVolume || ''}
+                onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите объем"
+              />
+            </div>
+          </div>
+        );
+      
+      case 'холодильник':
+        return (
+          <div className="space-y-4">
+            {/* Объем (м³) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Объем (м³)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.chamberVolume || ''}
+                onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите объем"
+              />
+            </div>
+            {/* Производитель, Инвентарный номер, Серийный номер */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Производитель</label>
+              <input
+                type="text"
+                value={formData.manufacturer || ''}
+                onChange={(e) => handleInputChange('manufacturer', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите производителя"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Инвентарный номер</label>
               <input
                 type="text"
                 value={formData.inventoryNumber || ''}
@@ -396,6 +413,140 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 readOnly={mode === 'view'}
                 placeholder="Введите инвентарный номер"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Серийный номер</label>
+              <input
+                type="text"
+                value={formData.serialNumber || ''}
+                onChange={(e) => handleInputChange('serialNumber', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите серийный номер"
+              />
+            </div>
+          </div>
+        );
+
+      case 'морозильник':
+        return (
+          <div className="space-y-4">
+            {/* Объем (м³) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Объем (м³)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.chamberVolume || ''}
+                onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите объем"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Производитель</label>
+              <input
+                type="text"
+                value={formData.manufacturer || ''}
+                onChange={(e) => handleInputChange('manufacturer', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите производителя"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Инвентарный номер</label>
+              <input
+                type="text"
+                value={formData.inventoryNumber || ''}
+                onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите инвентарный номер"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Серийный номер</label>
+              <input
+                type="text"
+                value={formData.serialNumber || ''}
+                onChange={(e) => handleInputChange('serialNumber', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите серийный номер"
+              />
+            </div>
+          </div>
+        );
+
+      case 'термоконтейнер':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Инвентарный номер</label>
+              <input
+                type="text"
+                value={formData.inventoryNumber || ''}
+                onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите инвентарный номер"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Серийный номер</label>
+              <input
+                type="text"
+                value={formData.serialNumber || ''}
+                onChange={(e) => handleInputChange('serialNumber', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите серийный номер"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Объем (м³)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.chamberVolume || ''}
+                onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите объем"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Производитель</label>
+              <input
+                type="text"
+                value={formData.manufacturer || ''}
+                onChange={(e) => handleInputChange('manufacturer', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="Введите производителя"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Дата изготовления</label>
+              <input
+                type="date"
+                value={formData.manufactureDate || ''}
+                onChange={(e) => handleInputChange('manufactureDate', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Срок годности до (дата)</label>
+              <input
+                type="date"
+                value={formData.expiryDate || ''}
+                onChange={(e) => handleInputChange('expiryDate', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
               />
             </div>
           </div>
@@ -451,10 +602,10 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         />
       </div>
 
-      {/* Объем кузова */}
+      {/* Объем (м³) - автомобиль */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Объем кузова (м³)
+          Объем (м³)
         </label>
         <input
           type="number"
@@ -462,7 +613,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           value={formData.bodyVolume || ''}
           onChange={(e) => handleInputChange('bodyVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="Введите объем кузова"
+          placeholder="Введите объем"
         />
       </div>
 
@@ -480,10 +631,10 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
         />
       </div>
 
-      {/* Объем камеры */}
+      {/* Объем (м³) - камера/холодильник */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Объем камеры (м³/л)
+          Объем (м³)
         </label>
         <input
           type="number"
@@ -491,7 +642,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
           value={formData.chamberVolume || ''}
           onChange={(e) => handleInputChange('chamberVolume', e.target.value ? parseFloat(e.target.value) : undefined)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="Введите объем камеры"
+          placeholder="Введите объем"
         />
       </div>
 
@@ -767,7 +918,9 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Объем</label>
+                        <label className="block text-xs text-gray-500 mb-1">
+                          {formData.type === 'помещение' ? 'Площадь (м²)' : 'Объем (м³)'}
+                        </label>
                         <input
                           type="number"
                           step="0.01"
@@ -778,7 +931,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                             mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''
                           }`}
                           readOnly={mode === 'view'}
-                          placeholder="0.00"
+                          placeholder={formData.type === 'помещение' ? '0.00' : '0.00'}
                         />
                       </div>
                     </div>

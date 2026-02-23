@@ -12,7 +12,7 @@ const __dirname = dirname(__filename);
 
 async function applyMigration() {
   try {
-    const migrationPath = join(__dirname, '../../supabase/migrations/20250120000000_add_manufacturer_suppliers_to_equipment_sections.sql');
+    const migrationPath = join(__dirname, '../../migrations/20250120000000_add_manufacturer_suppliers_to_equipment_sections.sql');
     const sql = readFileSync(migrationPath, 'utf-8');
     
     await pool.query(sql);

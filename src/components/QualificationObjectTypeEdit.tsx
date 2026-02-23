@@ -55,24 +55,45 @@ const getTypeFields = (typeKey: string) => {
         { label: 'Название', field: 'name', type: 'text' },
         { label: 'VIN номер', field: 'vin', type: 'text' },
         { label: 'Регистрационный номер', field: 'registrationNumber', type: 'text' },
-        { label: 'Объем кузова (м³)', field: 'bodyVolume', type: 'number' },
+        { label: 'Объем (м³)', field: 'bodyVolume', type: 'number' },
         { label: 'Производитель', field: 'manufacturer', type: 'text' }
       ];
     case 'холодильная_камера':
       return [
         { label: 'Название', field: 'name', type: 'text' },
         { label: 'Адрес', field: 'address', type: 'text' },
-        { label: 'Объем камеры (м³)', field: 'chamberVolume', type: 'number' },
+        { label: 'Объем (м³)', field: 'chamberVolume', type: 'number' },
+        { label: 'Инвентарный номер', field: 'inventoryNumber', type: 'text' },
+        { label: 'Серийный номер', field: 'serialNumber', type: 'text' },
         { label: 'Производитель', field: 'manufacturer', type: 'text' },
         { label: 'Климатическая система', field: 'climateSystem', type: 'text' }
       ];
     case 'холодильник':
+      return [
+        { label: 'Название', field: 'name', type: 'text' },
+        { label: 'Адрес', field: 'address', type: 'text' },
+        { label: 'Объем (м³)', field: 'chamberVolume', type: 'number' },
+        { label: 'Инвентарный номер', field: 'inventoryNumber', type: 'text' },
+        { label: 'Серийный номер', field: 'serialNumber', type: 'text' },
+        { label: 'Производитель', field: 'manufacturer', type: 'text' }
+      ];
     case 'морозильник':
+      return [
+        { label: 'Название', field: 'name', type: 'text' },
+        { label: 'Объем (м³)', field: 'chamberVolume', type: 'number' },
+        { label: 'Инвентарный номер', field: 'inventoryNumber', type: 'text' },
+        { label: 'Серийный номер', field: 'serialNumber', type: 'text' },
+        { label: 'Производитель', field: 'manufacturer', type: 'text' }
+      ];
+    case 'термоконтейнер':
       return [
         { label: 'Название', field: 'name', type: 'text' },
         { label: 'Инвентарный номер', field: 'inventoryNumber', type: 'text' },
         { label: 'Серийный номер', field: 'serialNumber', type: 'text' },
-        { label: 'Производитель', field: 'manufacturer', type: 'text' }
+        { label: 'Объем (м³)', field: 'chamberVolume', type: 'number' },
+        { label: 'Производитель', field: 'manufacturer', type: 'text' },
+        { label: 'Дата изготовления', field: 'manufactureDate', type: 'date' },
+        { label: 'Срок годности до (дата)', field: 'expiryDate', type: 'date' }
       ];
     default:
       return [];

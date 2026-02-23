@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $rootDir = Split-Path -Parent $PSScriptRoot
-$sqlFile = Join-Path $rootDir 'supabase\migrations\20260201000000_add_project_qualification_object_data.sql'
+$sqlFile = Join-Path $rootDir 'migrations\20260201000000_add_project_qualification_object_data.sql'
 
 if (-not (Test-Path $sqlFile)) {
   throw "SQL file not found: $sqlFile"

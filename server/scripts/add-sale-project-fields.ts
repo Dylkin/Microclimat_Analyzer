@@ -22,7 +22,7 @@ async function addSaleProjectFields() {
     console.log('🔄 Применение миграции для добавления полей проектов типа "Продажа"...');
 
     // Читаем файл миграции
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250102000007_add_sale_project_fields.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250102000007_add_sale_project_fields.sql');
     const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
 
     // Применяем миграцию

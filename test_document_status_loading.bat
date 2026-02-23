@@ -46,8 +46,8 @@ echo   * "Загрузка истории согласований для док
 echo   * "Загружена история согласований: [данные]"
 echo.
 echo Тест 5 - Проверка в базе данных:
-echo - Откройте Supabase Dashboard
-echo - Перейдите в Table Editor
+echo - Откройте клиент PostgreSQL (pgAdmin, DBeaver и т.п.)
+echo - Подключитесь к базе и откройте таблицы
 echo - Проверьте таблицы:
 echo   * document_comments - должны быть комментарии
 echo   * document_approvals - должны быть записи согласований

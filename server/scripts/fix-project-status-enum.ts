@@ -13,7 +13,7 @@ async function fixProjectStatusEnum() {
   try {
     console.log('Исправление enum project_status...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000002_fix_project_status_enum.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000002_fix_project_status_enum.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
     
     await pool.query(sql);

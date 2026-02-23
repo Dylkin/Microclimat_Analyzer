@@ -9,7 +9,7 @@ async function applySectionFieldsMigration() {
   try {
     console.log('Применение миграции для новых полей разделов...\n');
     
-    const migrationPath = join(process.cwd(), 'supabase/migrations/20250108000002_add_section_fields.sql');
+    const migrationPath = join(process.cwd(), 'migrations/20250108000002_add_section_fields.sql');
     const sql = readFileSync(migrationPath, 'utf-8');
     
     try {

@@ -37,6 +37,8 @@ export interface QualificationObject {
   inventoryNumber?: string;
   chamberVolume?: number;
   serialNumber?: string;
+  manufactureDate?: string; // ISO date, для термоконтейнера
+  expiryDate?: string; // ISO date, для термоконтейнера
   testDataFileUrl?: string;
   testDataFileName?: string;
   createdAt?: Date;
@@ -82,6 +84,8 @@ export interface CreateQualificationObjectData {
   inventoryNumber?: string;
   chamberVolume?: number;
   serialNumber?: string;
+  manufactureDate?: string;
+  expiryDate?: string;
   testDataFile?: File;
   measurementZones?: Omit<MeasurementZone, 'id'>[];
 }

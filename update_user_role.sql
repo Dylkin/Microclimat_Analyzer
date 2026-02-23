@@ -1,5 +1,5 @@
 -- Скрипт для обновления роли пользователя на администратора
--- Выполнять в Supabase SQL Editor
+-- Выполнять в PostgreSQL (psql или клиенте БД)
 
 -- 1. Проверяем структуру таблицы users
 SELECT 
@@ -47,19 +47,4 @@ SELECT
 FROM public.users u
 WHERE u.email = 'pavel.dylkin@gmail.com';
 
--- 7. Также обновляем роль в auth.users (user_metadata)
--- Это нужно для того, чтобы роль была доступна в Supabase Auth
-UPDATE auth.users 
-SET 
-  raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || '{"role": "admin"}'::jsonb,
-  updated_at = now()
-WHERE email = 'pavel.dylkin@gmail.com';
-
--- 8. Проверяем обновление в auth.users
-SELECT 
-  id,
-  email,
-  raw_user_meta_data,
-  updated_at
-FROM public.users 
-WHERE email = 'pavel.dylkin@gmail.com';
+-- 7. Роль хранится в public.users (столбец role). Дополнительные таблицы auth.* не используются (проект на PostgreSQL).

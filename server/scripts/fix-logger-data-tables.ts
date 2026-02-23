@@ -14,7 +14,7 @@ async function fixLoggerDataTables() {
   try {
     console.log('Исправление структуры таблиц для данных логгеров...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000010_fix_logger_data_tables.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000010_fix_logger_data_tables.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
 
     await client.query(sql);

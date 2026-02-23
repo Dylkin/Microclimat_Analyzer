@@ -22,7 +22,7 @@ async function addProjectType() {
     console.log('🔄 Применение миграции для добавления поля type в таблицу projects...');
 
     // Читаем файл миграции
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250102000004_add_project_type.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250102000004_add_project_type.sql');
     const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
 
     // Применяем миграцию

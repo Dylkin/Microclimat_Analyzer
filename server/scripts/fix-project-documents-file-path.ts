@@ -13,7 +13,7 @@ async function fixProjectDocumentsFilePath() {
   try {
     console.log('Исправление ограничения NOT NULL для file_path...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000005_fix_project_documents_file_path_nullable.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000005_fix_project_documents_file_path_nullable.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
     
     await pool.query(sql);

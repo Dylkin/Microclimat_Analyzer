@@ -13,7 +13,7 @@ async function removeProtocolPreparationStatus() {
   try {
     console.log('Удаление статуса protocol_preparation из enum project_status...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000008_remove_protocol_preparation_status.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000008_remove_protocol_preparation_status.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
     
     await pool.query(sql);

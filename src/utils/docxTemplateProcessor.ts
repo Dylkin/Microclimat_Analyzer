@@ -22,6 +22,10 @@ export interface TemplateReportData {
   markers?: any[]; // Маркеры для вычисления дополнительных значений
   acceptanceCriterion?: string; // Критерий приемлемости для temperature_recovery
   zoomState?: { startTime: number; endTime: number; scale: number }; // Выделенный диапазон данных на графике
+  /** Должность пользователя из справочника (плейсхолдер {Position}) */
+  position?: string;
+  /** Только значение площади объекта (плейсхолдер {Size}) */
+  objectSize?: string;
 }
 
 export class DocxTemplateProcessor {
@@ -1346,6 +1350,20 @@ export class DocxTemplateProcessor {
       console.log('registrationNumber is empty or undefined:', data.registrationNumber, 'replacing {RegistrationNumber} with empty string');
       result = result.replace(/{RegistrationNumber}/g, '');
     }
+
+    // Обработка плейсхолдера {Position} — должность пользователя из справочника
+    if (data.position) {
+      result = result.replace(/{Position}/g, this.escapeXml(data.position));
+    } else {
+      result = result.replace(/{Position}/g, '');
+    }
+
+    // Обработка плейсхолдера {Size} — площадь объекта, тип помещения или зоны хранения
+    if (data.objectSize) {
+      result = result.replace(/{Size}/g, this.escapeXml(data.objectSize));
+    } else {
+      result = result.replace(/{Size}/g, '');
+    }
     
     // Исправляем неправильные плейсхолдеры с двойными скобками перед обработкой
     result = result.replace(/\{\{Table\}\}/g, '{Table}');
@@ -1503,7 +1521,7 @@ export class DocxTemplateProcessor {
     
     // 2. Исправляем плейсхолдеры, разбитые XML тегами
     const placeholders = [
-      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'Table', 'Limits', 'Executor', 'TestDate', 'ReportNo', 'ReportDate', 'title', 'date', 'RegistrationNumber'
+      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'Table', 'Limits', 'Executor', 'TestDate', 'ReportNo', 'ReportDate', 'title', 'date', 'RegistrationNumber', 'Position', 'Size'
     ];
     
     placeholders.forEach(placeholder => {
@@ -1931,6 +1949,136 @@ export class DocxTemplateProcessor {
   }
 
   /**
+   * Создание таблицы для влажности (empty_volume / loaded_volume) — в соответствии с страницей «Анализ данных»
+   */
+  private createHumidityTableXml(
+    sortedResults: any[],
+    escapeXml: (text: string) => string,
+    limits: any = {}
+  ): string {
+    const headerCell = (text: string) => `
+        <w:tc>
+          <w:tcPr>
+            <w:tcBorders>
+              <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+              <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            </w:tcBorders>
+            <w:shd w:val="clear" w:color="auto" w:fill="4472C4"/>
+          </w:tcPr>
+          <w:p>
+            <w:pPr><w:jc w:val="center"/></w:pPr>
+            <w:r><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t>${escapeXml(text)}</w:t></w:r>
+          </w:p>
+        </w:tc>`;
+
+    const headerRow = `
+      <w:tr>
+        ${headerCell('№ зоны измерения')}
+        ${headerCell('Уровень измерения (м.)')}
+        ${headerCell('Наименование логгера')}
+        ${headerCell('Серийный № логгера')}
+        ${headerCell('Мин. ОВ %')}
+        ${headerCell('Макс. ОВ %')}
+        ${headerCell('Среднее ОВ %')}
+        ${headerCell('Соответствие критериям')}
+      </w:tr>`;
+
+    const nonExternalResults = sortedResults.filter((r: any) => !r.isExternal);
+    const minHValues = nonExternalResults
+      .map((r: any) => parseFloat(r.minHumidity))
+      .filter((val: number) => !isNaN(val));
+    const maxHValues = nonExternalResults
+      .map((r: any) => parseFloat(r.maxHumidity))
+      .filter((val: number) => !isNaN(val));
+    const globalMinH = minHValues.length > 0 ? Math.min(...minHValues) : null;
+    const globalMaxH = maxHValues.length > 0 ? Math.max(...maxHValues) : null;
+
+    const dataRows = sortedResults.map((result: any) => {
+      const minH = result.minHumidity ?? '-';
+      const maxH = result.maxHumidity ?? '-';
+      const avgH = result.avgHumidity ?? '-';
+      const minVal = typeof minH === 'string' ? parseFloat(minH) : minH;
+      const maxVal = typeof maxH === 'string' ? parseFloat(maxH) : maxH;
+
+      let meetsLimits = '-';
+      if (!result.isExternal && minH !== '-' && maxH !== '-') {
+        const hMin = limits?.humidity?.min;
+        const hMax = limits?.humidity?.max;
+        if (typeof hMin === 'number' || typeof hMax === 'number') {
+          const okMin = hMin === undefined || !isNaN(minVal) && minVal >= hMin;
+          const okMax = hMax === undefined || !isNaN(maxVal) && maxVal <= hMax;
+          meetsLimits = (okMin && okMax) ? 'Да' : 'Нет';
+        }
+      }
+
+      const minHFormatted = (minH !== '-' && minH !== undefined && minH !== null)
+        ? (typeof minVal === 'number' && !isNaN(minVal) ? minVal.toFixed(1).replace('.', ',') : String(minH))
+        : '-';
+      const maxHFormatted = (maxH !== '-' && maxH !== undefined && maxH !== null)
+        ? (typeof maxVal === 'number' && !isNaN(maxVal) ? maxVal.toFixed(1).replace('.', ',') : String(maxH))
+        : '-';
+      const avgNum = typeof avgH === 'number' ? avgH : parseFloat(avgH);
+      const avgHFormatted = (avgH !== '-' && avgH !== undefined && avgH !== null && !isNaN(avgNum))
+        ? avgNum.toFixed(1).replace('.', ',')
+        : '-';
+
+      const minHColor = (!result.isExternal && !isNaN(minVal) && globalMinH !== null && minVal === globalMinH) ? 'ADD8E6' : 'FFFFFF';
+      const maxHColor = (!result.isExternal && !isNaN(maxVal) && globalMaxH !== null && maxVal === globalMaxH) ? 'FFB6C1' : 'FFFFFF';
+      const complianceColor = meetsLimits === 'Да' ? 'C6EFCE' : meetsLimits === 'Нет' ? 'FFC7CE' : 'FFFFFF';
+
+      const zoneDisplay = result.zoneNumber?.toString() === '0' ? 'Внешний' : (result.zoneNumber ?? '-');
+      const levelDisplay = result.measurementLevel === '-' || result.measurementLevel == null
+        ? '-'
+        : (parseFloat(result.measurementLevel).toFixed(1).replace('.', ','));
+
+      return `
+        <w:tr>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(String(zoneDisplay))}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(levelDisplay)}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.loggerName ?? '')}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(result.serialNumber ?? '')}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="${minHColor}"/></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(minHFormatted)}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="${maxHColor}"/></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(maxHFormatted)}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(avgHFormatted)}</w:t></w:r></w:p>
+          </w:tc>
+          <w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/></w:tcBorders><w:shd w:val="clear" w:color="auto" w:fill="${complianceColor}"/></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${escapeXml(meetsLimits)}</w:t></w:r></w:p>
+          </w:tc>
+        </w:tr>`;
+    }).join('');
+
+    return `
+      <w:tbl>
+        <w:tblPr>
+          <w:tblW w:w="0" w:type="auto"/>
+          <w:tblBorders>
+            <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          </w:tblBorders>
+        </w:tblPr>
+        ${headerRow}
+        ${dataRows}
+      </w:tbl>`;
+  }
+
+  /**
    * Создание стандартной таблицы для empty_volume и loaded_volume
    */
   private createStandardTableXml(
@@ -1960,6 +2108,11 @@ export class DocxTemplateProcessor {
 
       return 0;
     });
+
+    // Таблица для влажности — в соответствии со страницей «Анализ данных» (без колонки отклонения)
+    if (dataType === 'humidity') {
+      return this.createHumidityTableXml(sortedResults, escapeXml, limits);
+    }
 
     // Находим глобальные минимальные и максимальные значения (исключая внешние датчики)
     const nonExternalResults = sortedResults.filter(result => !result.isExternal);

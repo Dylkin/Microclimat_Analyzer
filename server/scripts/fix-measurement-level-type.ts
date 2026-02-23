@@ -14,7 +14,7 @@ async function fixMeasurementLevelType() {
   try {
     console.log('Исправление типа measurement_level...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000011_fix_measurement_level_type.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000011_fix_measurement_level_type.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
 
     await client.query(sql);

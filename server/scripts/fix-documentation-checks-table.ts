@@ -13,7 +13,7 @@ async function fixDocumentationChecksTable() {
   try {
     console.log('Исправление таблицы documentation_checks...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000009_fix_documentation_checks_table.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000009_fix_documentation_checks_table.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
     
     await pool.query(sql);

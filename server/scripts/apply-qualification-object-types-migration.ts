@@ -6,7 +6,7 @@ async function applyMigration() {
   try {
     console.log('🔧 Применение миграции для типов объектов квалификации...');
     
-    const migrationPath = path.join(process.cwd(), 'supabase', 'migrations', '20250102000002_create_qualification_object_types.sql');
+    const migrationPath = path.join(process.cwd(), 'migrations', '20250102000002_create_qualification_object_types.sql');
     const migrationSQL = fs.readFileSync(migrationPath, 'utf-8');
     
     await pool.query(migrationSQL);

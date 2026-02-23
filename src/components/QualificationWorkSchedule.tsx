@@ -341,7 +341,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         currentProjectId = urlParams.get('projectId') || undefined;
       }
 
-      // Получаем файлы из Supabase Storage
+      // Получаем файлы из хранилища на сервере
       const storageFilesData = await qualificationObjectService.getLoggerRemovalFiles(qualificationObjectId, currentProjectId);
       console.log('Загруженные файлы из Storage:', storageFilesData);
       console.log('Количество файлов из Storage:', Object.keys(storageFilesData).length);
@@ -1419,7 +1419,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       
       console.log('QualificationWorkSchedule: ProjectId найден:', currentProjectId);
       
-      // Сначала загружаем файл в Supabase Storage
+      // Сначала загружаем файл в хранилище на сервере
       console.log('QualificationWorkSchedule: Загружаем файл в Storage:', file.name);
       setParsingProgress(prev => ({
         ...prev,
@@ -1732,7 +1732,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
       // Проверяем доступность сервиса
       if (!qualificationWorkScheduleService.isAvailable()) {
-        throw new Error('Сервис сохранения недоступен. Проверьте настройки Supabase.');
+        throw new Error('Сервис сохранения недоступен. Проверьте подключение к серверу.');
       }
 
       // Используем метод saveWorkSchedule для полного обновления расписания

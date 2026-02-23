@@ -5,6 +5,15 @@ import { QualificationWorkSchedule } from '../QualificationWorkSchedule';
 import { qualificationWorkScheduleService } from '../../utils/qualificationWorkScheduleService';
 import { loggerDataService } from '../../utils/loggerDataService';
 
+// Mock API client (uses import.meta, not available in Jest)
+jest.mock('../../utils/apiClient', () => ({
+  apiClient: {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    delete: jest.fn()
+  }
+}));
 // Mock для сервисов
 jest.mock('../../utils/qualificationWorkScheduleService');
 jest.mock('../../utils/loggerDataService');
@@ -12,24 +21,6 @@ jest.mock('../../utils/qualificationObjectService');
 
 const mockQualificationWorkScheduleService = qualificationWorkScheduleService as jest.Mocked<typeof qualificationWorkScheduleService>;
 const mockLoggerDataService = loggerDataService as jest.Mocked<typeof loggerDataService>;
-
-// Mock для Supabase
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => ({
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          order: jest.fn(() => Promise.resolve({ data: [], error: null }))
-        }))
-      }))
-    })),
-    storage: {
-      from: jest.fn(() => ({
-        list: jest.fn(() => Promise.resolve({ data: [], error: null }))
-      }))
-    }
-  }))
-}));
 
 describe('QualificationWorkSchedule', () => {
   const defaultProps = {

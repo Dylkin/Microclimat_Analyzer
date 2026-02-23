@@ -22,7 +22,7 @@ async function addContractorRole() {
     console.log('🔄 Применение миграции для добавления поля role в таблицу contractors...');
 
     // Читаем файл миграции
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250102000006_add_contractor_role.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250102000006_add_contractor_role.sql');
     const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
 
     // Применяем миграцию

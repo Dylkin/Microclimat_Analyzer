@@ -14,7 +14,7 @@ async function makeLoggerDataFieldsNullable() {
   try {
     console.log('Делаем поля device_type, device_model, serial_number nullable в logger_data_records...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000012_make_logger_data_fields_nullable.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000012_make_logger_data_fields_nullable.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
 
     await client.query(sql);

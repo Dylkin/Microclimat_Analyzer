@@ -13,7 +13,7 @@ async function addMissingColumns() {
   try {
     console.log('Добавление недостающих колонок в qualification_objects...');
 
-    const migrationPath = path.join(__dirname, '../../supabase/migrations/20250101000000_add_qualification_objects_file_fields.sql');
+    const migrationPath = path.join(__dirname, '../../migrations/20250101000000_add_qualification_objects_file_fields.sql');
     const sql = await fs.readFile(migrationPath, 'utf-8');
     
     await pool.query(sql);

@@ -44,7 +44,9 @@ const upsertProjectObjectData = async (
     inventoryNumber: { column: 'inventory_number' },
     chamberVolume: { column: 'chamber_volume' },
     serialNumber: { column: 'serial_number' },
-    manufacturer: { column: 'manufacturer' }
+    manufacturer: { column: 'manufacturer' },
+    manufactureDate: { column: 'manufacture_date' },
+    expiryDate: { column: 'expiry_date' }
   };
 
   const columns: string[] = [];
@@ -120,6 +122,8 @@ router.get('/', async (req, res) => {
           COALESCE(pqod.chamber_volume, qo.chamber_volume) as chamber_volume,
           COALESCE(pqod.serial_number, qo.serial_number) as serial_number,
           COALESCE(pqod.manufacturer, qo.manufacturer) as manufacturer,
+          COALESCE(pqod.manufacture_date, qo.manufacture_date) as manufacture_date,
+          COALESCE(pqod.expiry_date, qo.expiry_date) as expiry_date,
           COALESCE(pqod.created_at, qo.created_at) as created_at,
           COALESCE(pqod.updated_at, qo.updated_at) as updated_at,
           c.name as contractor_name
@@ -148,6 +152,7 @@ router.get('/', async (req, res) => {
           qo.address, qo.latitude, qo.longitude, qo.area,
           qo.vin, qo.registration_number, qo.body_volume,
           qo.inventory_number, qo.chamber_volume, qo.serial_number, qo.manufacturer,
+          qo.manufacture_date, qo.expiry_date,
           qo.created_at, qo.updated_at,
           COALESCE(qo.contractor_id, p.contractor_id) as final_contractor_id,
           c.name as contractor_name
@@ -193,6 +198,8 @@ router.get('/', async (req, res) => {
       chamberVolume: row.chamber_volume ? parseFloat(row.chamber_volume) : undefined,
       serialNumber: row.serial_number || undefined,
       manufacturer: row.manufacturer || undefined,
+      manufactureDate: row.manufacture_date ? (typeof row.manufacture_date === 'string' ? row.manufacture_date : row.manufacture_date.toISOString?.().slice(0, 10)) : undefined,
+      expiryDate: row.expiry_date ? (typeof row.expiry_date === 'string' ? row.expiry_date : row.expiry_date.toISOString?.().slice(0, 10)) : undefined,
       contractor: row.contractor_name ? { name: row.contractor_name } : undefined,
       createdAt: row.created_at ? new Date(row.created_at) : undefined,
       updatedAt: row.updated_at ? new Date(row.updated_at) : undefined
@@ -244,6 +251,8 @@ router.get('/:id', async (req, res) => {
           COALESCE(pqod.chamber_volume, qo.chamber_volume) as chamber_volume,
           COALESCE(pqod.serial_number, qo.serial_number) as serial_number,
           COALESCE(pqod.manufacturer, qo.manufacturer) as manufacturer,
+          COALESCE(pqod.manufacture_date, qo.manufacture_date) as manufacture_date,
+          COALESCE(pqod.expiry_date, qo.expiry_date) as expiry_date,
           COALESCE(pqod.created_at, qo.created_at) as created_at,
           COALESCE(pqod.updated_at, qo.updated_at) as updated_at,
           c.name as contractor_name
@@ -268,6 +277,7 @@ router.get('/:id', async (req, res) => {
           qo.address, qo.latitude, qo.longitude, qo.area,
           qo.vin, qo.registration_number, qo.body_volume,
           qo.inventory_number, qo.chamber_volume, qo.serial_number, qo.manufacturer,
+          qo.manufacture_date, qo.expiry_date,
           qo.created_at, qo.updated_at,
           COALESCE(qo.contractor_id, p.contractor_id) as final_contractor_id,
           c.name as contractor_name
@@ -285,6 +295,7 @@ router.get('/:id', async (req, res) => {
     }
     
     const row = result.rows[0];
+    const toDateStr = (v: any) => (v ? (typeof v === 'string' ? v : v.toISOString?.().slice(0, 10)) : undefined);
     res.json({
       id: row.id,
       projectId: project_id || row.project_id || undefined,
@@ -312,6 +323,8 @@ router.get('/:id', async (req, res) => {
       chamberVolume: row.chamber_volume ? parseFloat(row.chamber_volume) : undefined,
       serialNumber: row.serial_number || undefined,
       manufacturer: row.manufacturer || undefined,
+      manufactureDate: toDateStr(row.manufacture_date),
+      expiryDate: toDateStr(row.expiry_date),
       contractor: row.contractor_name ? { name: row.contractor_name } : undefined,
       createdAt: row.created_at ? new Date(row.created_at) : undefined,
       updatedAt: row.updated_at ? new Date(row.updated_at) : undefined
@@ -355,6 +368,8 @@ router.post('/', async (req, res) => {
       chamberVolume,
       serialNumber,
       manufacturer,
+      manufactureDate,
+      expiryDate,
       ...restFields
     } = otherFields;
 
@@ -433,6 +448,16 @@ router.post('/', async (req, res) => {
       insertValues.push(manufacturer || null);
       paramIndex++;
     }
+    if (manufactureDate !== undefined) {
+      insertFields.push('manufacture_date');
+      insertValues.push(manufactureDate || null);
+      paramIndex++;
+    }
+    if (expiryDate !== undefined) {
+      insertFields.push('expiry_date');
+      insertValues.push(expiryDate || null);
+      paramIndex++;
+    }
 
     const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ');
 
@@ -502,6 +527,8 @@ router.post('/', async (req, res) => {
           pqod.chamber_volume,
           pqod.serial_number,
           pqod.manufacturer,
+          pqod.manufacture_date,
+          pqod.expiry_date,
           pqod.created_at,
           pqod.updated_at,
           c.name as contractor_name
@@ -526,6 +553,7 @@ router.post('/', async (req, res) => {
           qo.address, qo.latitude, qo.longitude, qo.area,
           qo.vin, qo.registration_number, qo.body_volume,
           qo.inventory_number, qo.chamber_volume, qo.serial_number, qo.manufacturer,
+          qo.manufacture_date, qo.expiry_date,
           qo.created_at, qo.updated_at,
           COALESCE(qo.contractor_id, p.contractor_id) as final_contractor_id,
           c.name as contractor_name
@@ -539,6 +567,7 @@ router.post('/', async (req, res) => {
     }
 
     const fullRow = fullResult.rows[0];
+    const toDateStr = (v: any) => (v ? (typeof v === 'string' ? v : v.toISOString?.().slice(0, 10)) : undefined);
     res.status(201).json({
       id: fullRow.id,
       projectId: projectId || fullRow.project_id,
@@ -566,6 +595,8 @@ router.post('/', async (req, res) => {
       chamberVolume: fullRow.chamber_volume ? parseFloat(fullRow.chamber_volume) : undefined,
       serialNumber: fullRow.serial_number || undefined,
       manufacturer: fullRow.manufacturer || undefined,
+      manufactureDate: toDateStr(fullRow.manufacture_date),
+      expiryDate: toDateStr(fullRow.expiry_date),
       contractor: fullRow.contractor_name ? { name: fullRow.contractor_name } : undefined,
       createdAt: fullRow.created_at ? new Date(fullRow.created_at) : undefined,
       updatedAt: fullRow.updated_at ? new Date(fullRow.updated_at) : undefined
@@ -658,6 +689,8 @@ router.put('/:id', async (req, res) => {
       chamberVolume,
       serialNumber,
       manufacturer,
+      manufactureDate,
+      expiryDate,
       contractorId: updateContractorId
     } = otherFields;
 
@@ -708,6 +741,14 @@ router.put('/:id', async (req, res) => {
     if (manufacturer !== undefined && !isProjectScoped) {
       updates.push(`manufacturer = $${paramIndex++}`);
       params.push(manufacturer || null);
+    }
+    if (manufactureDate !== undefined && !isProjectScoped) {
+      updates.push(`manufacture_date = $${paramIndex++}`);
+      params.push(manufactureDate || null);
+    }
+    if (expiryDate !== undefined && !isProjectScoped) {
+      updates.push(`expiry_date = $${paramIndex++}`);
+      params.push(expiryDate || null);
     }
 
     const projectData = {
@@ -775,6 +816,8 @@ router.put('/:id', async (req, res) => {
           pqod.chamber_volume,
           pqod.serial_number,
           pqod.manufacturer,
+          pqod.manufacture_date,
+          pqod.expiry_date,
           pqod.created_at,
           pqod.updated_at,
           c.name as contractor_name
@@ -795,6 +838,7 @@ router.put('/:id', async (req, res) => {
           qo.id, qo.project_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.created_at, qo.updated_at,
+          qo.manufacture_date, qo.expiry_date,
           p.contractor_id,
           c.name as contractor_name
         FROM qualification_objects qo
@@ -807,6 +851,7 @@ router.put('/:id', async (req, res) => {
     }
 
     const row = result.rows[0];
+    const putToDateStr = (v: any) => (v ? (typeof v === 'string' ? v : v.toISOString?.().slice(0, 10)) : undefined);
     res.json({
       id: row.id,
       projectId: projectId || row.project_id,
@@ -819,6 +864,8 @@ router.put('/:id', async (req, res) => {
       measurementZones: row.measurement_zones || [],
       workSchedule: row.work_schedule || [],
       contractorId: row.contractor_id || undefined,
+      manufactureDate: putToDateStr(row.manufacture_date),
+      expiryDate: putToDateStr(row.expiry_date),
       contractor: row.contractor_name ? { name: row.contractor_name } : undefined,
       createdAt: row.created_at ? new Date(row.created_at) : undefined,
       updatedAt: row.updated_at ? new Date(row.updated_at) : undefined
@@ -856,7 +903,8 @@ router.patch('/:id', async (req, res) => {
       'plan_file_url', 'plan_file_name', 'test_data_file_url', 'test_data_file_name',
       'address', 'latitude', 'longitude', 'geocoded_at', 'area',
       'vin', 'registration_number', 'body_volume',
-      'inventory_number', 'chamber_volume', 'serial_number', 'manufacturer'
+      'inventory_number', 'chamber_volume', 'serial_number', 'manufacturer',
+      'manufacture_date', 'expiry_date'
     ];
 
     const projectFieldMap: Record<string, string> = {
@@ -881,7 +929,9 @@ router.patch('/:id', async (req, res) => {
       inventory_number: 'inventoryNumber',
       chamber_volume: 'chamberVolume',
       serial_number: 'serialNumber',
-      manufacturer: 'manufacturer'
+      manufacturer: 'manufacturer',
+      manufacture_date: 'manufactureDate',
+      expiry_date: 'expiryDate'
     };
 
     const projectData: Record<string, any> = {};
@@ -1027,6 +1077,8 @@ router.patch('/:id', async (req, res) => {
           pqod.chamber_volume,
           pqod.serial_number,
           pqod.manufacturer,
+          pqod.manufacture_date,
+          pqod.expiry_date,
           pqod.created_at,
           pqod.updated_at,
           c.name as contractor_name
@@ -1047,6 +1099,7 @@ router.patch('/:id', async (req, res) => {
           qo.id, qo.project_id, qo.name, qo.object_type, qo.climate_system,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.created_at, qo.updated_at,
+          qo.manufacture_date, qo.expiry_date,
           p.contractor_id,
           c.name as contractor_name
         FROM qualification_objects qo
@@ -1059,6 +1112,7 @@ router.patch('/:id', async (req, res) => {
     }
 
     const row = result.rows[0];
+    const patchToDateStr = (v: any) => (v ? (typeof v === 'string' ? v : v.toISOString?.().slice(0, 10)) : undefined);
     res.json({
       id: row.id,
       projectId: projectId || row.project_id,
@@ -1070,6 +1124,8 @@ router.patch('/:id', async (req, res) => {
       measurementZones: row.measurement_zones || [],
       workSchedule: row.work_schedule || [],
       contractorId: row.contractor_id || undefined,
+      manufactureDate: patchToDateStr(row.manufacture_date),
+      expiryDate: patchToDateStr(row.expiry_date),
       contractor: row.contractor_name ? { name: row.contractor_name } : undefined,
       createdAt: row.created_at ? new Date(row.created_at) : undefined,
       updatedAt: row.updated_at ? new Date(row.updated_at) : undefined

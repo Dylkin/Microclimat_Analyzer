@@ -368,7 +368,7 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
                   )}
                   {selectedQualificationObject.bodyVolume !== undefined && selectedQualificationObject.bodyVolume !== null && (
                     <div>
-                      <span className="font-medium text-gray-800">Объем кузова (м³):</span>
+                      <span className="font-medium text-gray-800">Объем (м³):</span>
                       <p className="text-gray-700">{selectedQualificationObject.bodyVolume}</p>
                     </div>
                   )}
@@ -385,7 +385,7 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ project, analysisData, onBa
                   )}
                   {selectedQualificationObject.chamberVolume !== undefined && selectedQualificationObject.chamberVolume !== null && (
                     <div>
-                      <span className="font-medium text-gray-800">Объем камеры (м³):</span>
+                      <span className="font-medium text-gray-800">Объем (м³):</span>
                       <p className="text-gray-700">{selectedQualificationObject.chamberVolume}</p>
                     </div>
                   )}

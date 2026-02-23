@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Settings, Plus, Trash2, Edit2, Save, X, BarChart, Thermometer, Droplets, Download, FileText, ExternalLink, XCircle, CheckCircle, ChevronDown, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react';
 import { UploadedFile } from '../types/FileData';
-import { StorageZone } from '../types/QualificationObject';
+import { StorageZone, QualificationObjectTypeLabels } from '../types/QualificationObject';
 import { TimeSeriesChart } from './TimeSeriesChart';
 import { useTimeSeriesData } from '../hooks/useTimeSeriesData';
 import { ChartLimits, VerticalMarker, ZoomState, DataType, MarkerType, TimeSeriesPoint } from '../types/TimeSeriesData';
@@ -27,7 +27,7 @@ interface TimeSeriesAnalyzerProps {
 }
 
 export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, onBack, qualificationObjectId, projectId, storageZones }) => {
-  const { user } = useAuth();
+  const { user, users } = useAuth();
   const restrictedDebugRoles = new Set([
     'specialist',
     'director',
@@ -1856,6 +1856,12 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
       const selectedStorageZoneLabel = selectedStorageZoneName
         ? `${selectedStorageZoneName}${selectedStorageZoneVolumeLabel}`
         : '';
+
+      // Для плейсхолдера {Size} — только значение площади (без типа помещения и зон хранения)
+      const objectSize =
+        qualificationObject?.area !== undefined && qualificationObject?.area !== null
+          ? String(qualificationObject.area)
+          : '';
       
       const templateData: TemplateReportData = {
         title: `Отчет по анализу временных рядов - ${dataTypeLabel}`,
@@ -1870,6 +1876,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         testTypeLabel: convertedTestType || '', // Передаем преобразованное название для плейсхолдера {NameTest}
         limits: limits,
         executor: user?.fullName || '',
+        position: user ? (users.find(u => u.id === user.id)?.position ?? '') : '', // Должность из справочника пользователей для {Position}
+        objectSize, // Площадь, тип помещения, зоны хранения для {Size}
         testDate: (() => {
           console.log('🔍 DEBUG testDate:');
           console.log('  - dateStr:', dateStr);

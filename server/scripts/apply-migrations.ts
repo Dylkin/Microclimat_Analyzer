@@ -77,7 +77,7 @@ const main = async () => {
     }
 
     // Путь к папке миграций
-    const migrationsDir = path.join(__dirname, '../../supabase/migrations');
+    const migrationsDir = path.join(__dirname, '../../migrations');
     
     // Проверяем наличие папки миграций
     let migrationFiles: string[] = [];
@@ -95,6 +95,8 @@ const main = async () => {
           if (file === '20260130000002_add_storage_zones.sql') return true;
           // Миграция для проектных данных объектов квалификации
           if (file === '20260201000000_add_project_qualification_object_data.sql') return true;
+          // Миграция для полей дат объектов квалификации (термоконтейнер)
+          if (file === '20260223000000_add_qualification_object_date_fields.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:
@@ -103,10 +105,10 @@ const main = async () => {
           if (file === '20250101180000_add_creating_report_status.sql') return false;
           if (file === '20250102000000_create_audit_logs.sql') return false;
 
-          // Оставляем все "ранние" структурные миграции (2025-01-01 .. 2025-01-02 и др. до Supabase-пакета)
+          // Оставляем все "ранние" структурные миграции (2025-01-01 .. 2025-01-02 и др.)
           if (file < '20250700000000_') return true;
 
-          // Все остальные (Supabase/политики/роль authenticated и т.п.) — пропускаем
+          // Остальные (политики RLS/роль authenticated и т.п.) — пропускаем в standalone PostgreSQL
           return false;
         });
     } catch (error) {

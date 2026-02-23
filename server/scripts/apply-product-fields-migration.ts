@@ -9,7 +9,7 @@ async function applyProductFieldsMigration() {
   try {
     console.log('Применение миграции для новых полей карточек товаров...\n');
     
-    const migrationPath = join(process.cwd(), 'supabase/migrations/20250108000001_add_product_card_fields.sql');
+    const migrationPath = join(process.cwd(), 'migrations/20250108000001_add_product_card_fields.sql');
     const sql = readFileSync(migrationPath, 'utf-8');
     
     try {

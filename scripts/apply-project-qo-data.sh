@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SQL_FILE="$ROOT_DIR/supabase/migrations/20260201000000_add_project_qualification_object_data.sql"
+SQL_FILE="$ROOT_DIR/migrations/20260201000000_add_project_qualification_object_data.sql"
 
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"

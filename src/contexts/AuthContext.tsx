@@ -224,7 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         // Fallback к локальному хранению
-        console.log('Supabase недоступен, используем локальное хранение');
+        console.log('Сервер недоступен, используем локальное хранение');
         addedUser = {
           ...newUser,
           id: Date.now().toString()
