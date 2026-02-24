@@ -76,6 +76,21 @@ const main = async () => {
       }
     }
 
+    // Для существующих БД: добавить manufacture_date, expiry_date если таблицы есть, а колонок нет (исправляет 500 на GET /api/qualification-objects)
+    for (const table of ['qualification_objects', 'project_qualification_object_data']) {
+      try {
+        await pool.query(`
+          ALTER TABLE public.${table}
+            ADD COLUMN IF NOT EXISTS manufacture_date DATE,
+            ADD COLUMN IF NOT EXISTS expiry_date DATE
+        `);
+        console.log(`✅ Колонки manufacture_date/expiry_date проверены в ${table}`);
+      } catch (e: any) {
+        if (e?.code === '42P01') console.log(`⏭️  Таблица ${table} ещё не создана, пропускаем`);
+        else throw e;
+      }
+    }
+
     // Путь к папке миграций
     const migrationsDir = path.join(__dirname, '../../migrations');
     

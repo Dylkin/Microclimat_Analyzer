@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS public.qualification_objects (
   chamber_volume NUMERIC(10,2),
   serial_number TEXT,
   manufacturer TEXT,
+  manufacture_date DATE,
+  expiry_date DATE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -152,6 +154,8 @@ CREATE TABLE IF NOT EXISTS public.project_qualification_object_data (
   chamber_volume NUMERIC(10,2),
   serial_number TEXT,
   manufacturer TEXT,
+  manufacture_date DATE,
+  expiry_date DATE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(project_id, qualification_object_id)
