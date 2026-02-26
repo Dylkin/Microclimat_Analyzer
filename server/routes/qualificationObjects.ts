@@ -61,6 +61,9 @@ const upsertProjectObjectData = async (
     if (key === 'geocodedAt' && value instanceof Date) {
       value = value.toISOString();
     }
+    if ((key === 'manufactureDate' || key === 'expiryDate') && (value === '' || value === null)) {
+      value = null;
+    }
     columns.push(config.column);
     values.push(value);
   });
@@ -952,6 +955,8 @@ router.patch('/:id', async (req, res) => {
         if (dbKey === 'temperature_limits' || dbKey === 'humidity_limits' || 
             dbKey === 'storage_zones' || dbKey === 'measurement_zones' || dbKey === 'work_schedule') {
           params.push(JSON.stringify(value));
+        } else if (dbKey === 'manufacture_date' || dbKey === 'expiry_date') {
+          params.push((value === '' || value === null) ? null : value);
         } else {
           params.push(value);
         }

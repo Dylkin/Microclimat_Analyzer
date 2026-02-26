@@ -329,8 +329,12 @@ class QualificationObjectService {
       if (data.inventoryNumber !== undefined) dbData.inventoryNumber = data.inventoryNumber;
       if (data.chamberVolume !== undefined) dbData.chamberVolume = data.chamberVolume;
       if (data.serialNumber !== undefined) dbData.serialNumber = data.serialNumber;
-      if ((data as any).manufactureDate !== undefined) dbData.manufactureDate = (data as any).manufactureDate;
-      if ((data as any).expiryDate !== undefined) dbData.expiryDate = (data as any).expiryDate;
+      // manufactureDate и expiryDate только для термоконтейнера
+      const isThermoContainer = data.type === 'термоконтейнер' || (data as any).objectType === 'thermo_container';
+      if (isThermoContainer) {
+        if ((data as any).manufactureDate !== undefined) dbData.manufactureDate = (data as any).manufactureDate;
+        if ((data as any).expiryDate !== undefined) dbData.expiryDate = (data as any).expiryDate;
+      }
       
       // JSONB поля - передаем как объекты, API сам сериализует
       if (data.measurementZones !== undefined) {
