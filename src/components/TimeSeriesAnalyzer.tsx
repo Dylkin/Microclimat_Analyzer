@@ -1888,6 +1888,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         reportNo: '',
         reportDate: '',
         registrationNumber: qualificationObject?.registrationNumber || '',
+        serialNumber: qualificationObject?.serialNumber || '',
+        inventoryNumber: qualificationObject?.inventoryNumber || '',
         points: data?.points || [], // Передаем точки данных для вычисления дополнительных значений
         markers: markers || [], // Передаем маркеры для вычисления дополнительных значений
         acceptanceCriterion: contractFields.acceptanceCriterion || '', // Передаем критерий приемлемости
@@ -3420,49 +3422,74 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
         setConclusions(conclusionText);
       } else {
-        const startTimeStr = startTime.toLocaleString('ru-RU', {
+        // Помещение, температура: начало и завершение — только дата
+        const startTimeStr = startTime.toLocaleDateString('ru-RU', {
           day: '2-digit',
           month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
+          year: 'numeric'
         });
-        const endTimeStr = endTime.toLocaleString('ru-RU', {
+        const endTimeStr = endTime.toLocaleDateString('ru-RU', {
           day: '2-digit',
           month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
+          year: 'numeric'
         });
-        const minValueStr = `${minTempResult.minTemp}°C в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.`;
-        const maxValueStr = `${maxTempResult.maxTemp}°C в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.`;
-        const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Длительность испытания: </b>${durationText}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
+        const minLoggerName = (minTempResult as any).loggerName || `зона ${minTempResult.zoneNumber}, высота ${minTempResult.measurementLevel} м`;
+        const maxLoggerName = (maxTempResult as any).loggerName || `зона ${maxTempResult.zoneNumber}, высота ${maxTempResult.measurementLevel} м`;
+        const minValueStr = `${minTempResult.minTemp}°C, логгер ${minLoggerName}.`;
+        const maxValueStr = `${maxTempResult.maxTemp}°C, логгер ${maxLoggerName}.`;
+        const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
         setConclusions(conclusionText);
       }
     } else {
-      // Для других типов испытаний используем стандартное форматирование
-      const minValStr = isHumidity ? `${(minTempResult as any).minHumidity}%` : `${minTempResult.minTemp}°C`;
-      const maxValStr = isHumidity ? `${(maxTempResult as any).maxHumidity}%` : `${maxTempResult.maxTemp}°C`;
-      const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })}.
+      // Для температуры у объектов Морозильник, Холодильник, Холодильная камера — тот же формат, что и для помещения (с жирным, без длительности)
+      const refrigerationTypes: string[] = ['морозильник', 'холодильник', 'холодильная_камера'];
+      const isRefrigerationObject = qualificationObject?.type && refrigerationTypes.includes(String(qualificationObject.type).toLowerCase());
+      const useRoomStyleForTemperature = !isHumidity && isRefrigerationObject;
+
+      if (useRoomStyleForTemperature) {
+        const resultStr = `${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
+        // Начало и завершение испытания — только дата (как для помещения)
+        const startTimeStr = startTime.toLocaleDateString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+        const endTimeStr = endTime.toLocaleDateString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+        const minLoggerName = (minTempResult as any).loggerName || `зона ${minTempResult.zoneNumber}, высота ${minTempResult.measurementLevel} м`;
+        const maxLoggerName = (maxTempResult as any).loggerName || `зона ${maxTempResult.zoneNumber}, высота ${maxTempResult.measurementLevel} м`;
+        const minValueStr = `${minTempResult.minTemp}°C, логгер ${minLoggerName}.`;
+        const maxValueStr = `${maxTempResult.maxTemp}°C, логгер ${maxLoggerName}.`;
+        const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
+        setConclusions(conclusionText);
+      } else {
+        // Для других типов испытаний / влажность — стандартное форматирование
+        const minValStr = isHumidity ? `${(minTempResult as any).minHumidity}%` : `${minTempResult.minTemp}°C`;
+        const maxValStr = isHumidity ? `${(maxTempResult as any).maxHumidity}%` : `${maxTempResult.maxTemp}°C`;
+        const conclusionText = `Начало испытания: ${startTime.toLocaleString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}.
 Завершение испытания: ${endTime.toLocaleString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })}.
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}.
 Длительность испытания: ${durationText}.
 Зафиксированное минимальное значение: ${minValStr} в зоне измерения ${minTempResult.zoneNumber} на высоте ${minTempResult.measurementLevel} м.
 Зафиксированное максимальное значение: ${maxValStr} в зоне измерения ${maxTempResult.zoneNumber} на высоте ${maxTempResult.measurementLevel} м.
 Результаты испытания ${meetsLimits ? 'соответствуют' : 'не соответствуют'} заданному критерию приемлемости.`;
 
-      setConclusions(conclusionText);
+        setConclusions(conclusionText);
+      }
     }
   };
 

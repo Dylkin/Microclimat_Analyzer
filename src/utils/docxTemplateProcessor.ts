@@ -26,6 +26,10 @@ export interface TemplateReportData {
   position?: string;
   /** Только значение площади объекта (плейсхолдер {Size}) */
   objectSize?: string;
+  /** Серийный номер объекта квалификации (плейсхолдер {SerialNumber}) */
+  serialNumber?: string;
+  /** Инвентарный номер объекта квалификации (плейсхолдер {InventoryNumber}) */
+  inventoryNumber?: string;
 }
 
 export class DocxTemplateProcessor {
@@ -1364,6 +1368,20 @@ export class DocxTemplateProcessor {
     } else {
       result = result.replace(/{Size}/g, '');
     }
+
+    // Обработка плейсхолдера {SerialNumber} — серийный номер объекта квалификации
+    if (data.serialNumber) {
+      result = result.replace(/{SerialNumber}/g, this.escapeXml(data.serialNumber));
+    } else {
+      result = result.replace(/{SerialNumber}/g, '');
+    }
+
+    // Обработка плейсхолдера {InventoryNumber} — инвентарный номер объекта квалификации
+    if (data.inventoryNumber) {
+      result = result.replace(/{InventoryNumber}/g, this.escapeXml(data.inventoryNumber));
+    } else {
+      result = result.replace(/{InventoryNumber}/g, '');
+    }
     
     // Исправляем неправильные плейсхолдеры с двойными скобками перед обработкой
     result = result.replace(/\{\{Table\}\}/g, '{Table}');
@@ -1521,7 +1539,7 @@ export class DocxTemplateProcessor {
     
     // 2. Исправляем плейсхолдеры, разбитые XML тегами
     const placeholders = [
-      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'Table', 'Limits', 'Executor', 'TestDate', 'ReportNo', 'ReportDate', 'title', 'date', 'RegistrationNumber', 'Position', 'Size'
+      'Result', 'Object', 'ConditioningSystem', 'System', 'NameTest', 'chart', 'Table', 'Limits', 'Executor', 'TestDate', 'ReportNo', 'ReportDate', 'title', 'date', 'RegistrationNumber', 'Position', 'Size', 'SerialNumber', 'InventoryNumber'
     ];
     
     placeholders.forEach(placeholder => {
