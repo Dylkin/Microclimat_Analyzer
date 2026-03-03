@@ -3433,10 +3433,20 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           month: '2-digit',
           year: 'numeric'
         });
-        const minLoggerName = (minTempResult as any).loggerName || `зона ${minTempResult.zoneNumber}, высота ${minTempResult.measurementLevel} м`;
-        const maxLoggerName = (maxTempResult as any).loggerName || `зона ${maxTempResult.zoneNumber}, высота ${maxTempResult.measurementLevel} м`;
-        const minValueStr = `${minTempResult.minTemp}°C, логгер ${minLoggerName}.`;
-        const maxValueStr = `${maxTempResult.maxTemp}°C, логгер ${maxLoggerName}.`;
+        // Для Холодильник и Морозильник — «в зоне измерения X», для остальных — «логгер DL-XXX»
+        const fridgeFreezerTypes = ['холодильник', 'морозильник'];
+        const isFridgeOrFreezer = qualificationObject?.type && fridgeFreezerTypes.includes(String(qualificationObject.type).toLowerCase());
+        let minValueStr: string;
+        let maxValueStr: string;
+        if (isFridgeOrFreezer) {
+          minValueStr = `${minTempResult.minTemp}°C, в зоне измерения ${minTempResult.zoneNumber}.`;
+          maxValueStr = `${maxTempResult.maxTemp}°C, в зоне измерения ${maxTempResult.zoneNumber}.`;
+        } else {
+          const minLoggerName = (minTempResult as any).loggerName || `зона ${minTempResult.zoneNumber}, высота ${minTempResult.measurementLevel} м`;
+          const maxLoggerName = (maxTempResult as any).loggerName || `зона ${maxTempResult.zoneNumber}, высота ${maxTempResult.measurementLevel} м`;
+          minValueStr = `${minTempResult.minTemp}°C, логгер ${minLoggerName}.`;
+          maxValueStr = `${maxTempResult.maxTemp}°C, логгер ${maxLoggerName}.`;
+        }
         const conclusionText = `<b>Начало испытания: </b>${startTimeStr}.\n<b>Завершение испытания: </b>${endTimeStr}.\n<b>Зафиксированное минимальное значение: </b>${minValueStr}\n<b>Зафиксированное максимальное значение: </b>${maxValueStr}\n<b>Результаты испытания: </b>${resultStr}`;
         setConclusions(conclusionText);
       }

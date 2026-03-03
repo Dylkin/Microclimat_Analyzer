@@ -3,7 +3,7 @@ import { scaleLinear, scaleTime } from 'd3-scale';
 import { extent, bisector } from 'd3-array';
 import { timeFormat } from 'd3-time-format';
 import { select, pointer } from 'd3-selection';
-// Категориальная палитра с максимальной различимостью
+// Категориальная палитра с максимальной различимостью (все цвета уникальны)
 const CATEGORICAL_PALETTE = [
   '#FF0000', // Красный (яркий)
   '#00FF00', // Зеленый (яркий)
@@ -22,7 +22,32 @@ const CATEGORICAL_PALETTE = [
   '#FF4081', // Розовый
   '#40FF00', // Лаймовый
   '#0040FF', // Кобальтовый
+  '#E6194B', '#3CB44B', '#4363D8', '#F58231', '#911EB4', '#46F0F0', '#F032E6', '#D2F53D',
+  '#FABEBE', '#00CED1', '#E6BEFF', '#AA6E28', '#FFFACD', '#1F78B4', '#33A02C', '#FB9A99',
+  '#A6CEE3', '#FDCDAC', '#CAB2D6', '#B2DF8A', '#FDBF6F', '#C7C7C7', '#6A3D9A', '#B15928',
 ];
+
+/** Возвращает цвет по индексу: из палитры или генерирует по HSL. */
+function getUniqueColor(index: number): string {
+  if (index < CATEGORICAL_PALETTE.length) {
+    return CATEGORICAL_PALETTE[index];
+  }
+  const hue = (index * 137.5) % 360; // золотой угол для разнообразия
+  const s = 65 + (index % 4) * 8;
+  const l = 45 + (index % 5) * 6;
+  const h = hue / 360;
+  const s_ = s / 100;
+  const l_ = l / 100;
+  const a = s_ * Math.min(l_, 1 - l_);
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12;
+    return l_ - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+  };
+  const r = Math.round(f(0) * 255);
+  const g = Math.round(f(8) * 255);
+  const b = Math.round(f(4) * 255);
+  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
 import { TimeSeriesPoint, ChartLimits, VerticalMarker, ZoomState, TooltipData, DataType } from '../types/TimeSeriesData';
 
 interface TimeSeriesChartProps {
@@ -114,20 +139,18 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   }, [filteredData]);
 
 
-  // Получаем уникальные файлы и назначаем им цвета
-  // Серый цвет зарезервирован для внешнего датчика (zoneNumber === 0)
-  // Остальные датчики используют категориальную палитру
+  // Назначаем каждому логгеру цвет: внешний датчик (zone 0) — всегда серый, остальные — уникальные
   const fileColors = React.useMemo(() => {
     const files = Array.from(dataByFile.keys());
     const colors = new Map<string, string>();
-    
-    // Разделяем файлы на внешние и не внешние
+    const usedHex = new Set<string>(['#6b7280']); // серый занят внешним датчиком
+
     const externalFiles: string[] = [];
     const nonExternalFiles: string[] = [];
-    
+
     files.forEach(file => {
       const fileDataPoint = data.find(d => d.fileId === file);
-      const isExternal = fileDataPoint?.zoneNumber === 0 || 
+      const isExternal = fileDataPoint?.zoneNumber === 0 ||
                          fileDataPoint?.loggerName?.toLowerCase().includes('внешний');
       if (isExternal) {
         externalFiles.push(file);
@@ -135,17 +158,24 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
         nonExternalFiles.push(file);
       }
     });
-    
-    // Для внешних датчиков всегда используем серый цвет
+
+    // Внешний датчик (zone 0): всегда серый, никогда не присваивать другой цвет
     externalFiles.forEach(file => {
-      colors.set(file, '#6B7280'); // Серый цвет для внешнего датчика
+      colors.set(file, '#6B7280');
     });
-    
-    // Для остальных датчиков используем категориальную палитру
-    nonExternalFiles.forEach((file, index) => {
-      colors.set(file, CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length]);
+
+    let colorIndex = 0;
+    nonExternalFiles.forEach(file => {
+      let color = getUniqueColor(colorIndex);
+      while (usedHex.has(color.toLowerCase())) {
+        colorIndex += 1;
+        color = getUniqueColor(colorIndex);
+      }
+      colorIndex += 1;
+      usedHex.add(color.toLowerCase());
+      colors.set(file, color);
     });
-    
+
     return colors;
   }, [dataByFile, data]);
 
