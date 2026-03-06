@@ -31,7 +31,16 @@ export interface ChartLimits {
   };
 }
 
-export type MarkerType = 'test_start' | 'test_end' | 'door_opening' | 'door_closing' | 'power' | 'temperature_recovery';
+export type MarkerType =
+  | 'test_start'
+  | 'test_end'
+  | 'door_opening'
+  | 'door_closing'
+  | 'power'
+  | 'temperature_recovery'
+  // Дополнительные маркеры, не влияющие на расчёт результатов и выводов
+  | 'power_off_event'
+  | 'power_on_event';
 
 export interface VerticalMarker {
   id: string;

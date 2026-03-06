@@ -1682,6 +1682,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         return 'Восстановление температуры';
       case 'power':
         return 'Электропитание';
+      case 'power_off_event':
+        return 'Питание выключено';
+      case 'power_on_event':
+        return 'Питание включено';
       default:
         return 'Неизвестно';
     }
@@ -3969,6 +3973,30 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                               title="Тип маркера: Восстановление температуры"
                             >
                               Восстановление температуры
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'power_off_event')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'power_off_event'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Питание выключено (не участвует в формировании Результатов анализа и Выводов)"
+                            >
+                              Питание выключено
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'power_on_event')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'power_on_event'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Питание включено (не участвует в формировании Результатов анализа и Выводов)"
+                            >
+                              Питание включено
                             </button>
                           </div>
                         )}
