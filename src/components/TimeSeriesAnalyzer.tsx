@@ -1647,6 +1647,14 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
             label = currentLabel || 'Отключение'; // По умолчанию, если тип испытания не определен
           }
         }
+        // Если тип изменен на "power_off_event", устанавливаем название "Питание выключено"
+        else if (type === 'power_off_event') {
+          label = 'Питание выключено';
+        }
+        // Если тип изменен на "power_on_event", устанавливаем название "Питание включено"
+        else if (type === 'power_on_event') {
+          label = 'Питание включено';
+        }
         
         return { ...m, type, color, label };
       }
@@ -3902,17 +3910,47 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                       <div className="flex items-center space-x-2">
                         <span className="text-xs text-gray-500">Тип:</span>
                         {contractFields.testType === 'power_off' || contractFields.testType === 'power_on' ? (
-                          // Для фиксированных типов просто показываем текст
-                          <span 
-                            className="text-xs px-2 py-1 bg-white border border-gray-200 rounded cursor-default"
-                            title={contractFields.testType === 'power_off'
-                              ? 'Для типа испытания "Испытание на сбой электропитания (отключение)" доступны только маркеры типа "Электропитание" с наименованием "Отключение"'
-                              : 'Для типа испытания "Испытание на сбой электропитания (включение)" доступны только маркеры типа "Электропитание" с наименованием "Включение"'}
-                          >
-                            {getMarkerTypeLabel(marker.type)}
-                          </span>
+                          // Для испытаний на сбой электропитания показываем переключатель типов маркеров питания
+                          <div className="flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'power')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'power'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Электропитание (участвует в формировании Результатов анализа и Выводов)"
+                            >
+                              Электропитание
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'power_off_event')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'power_off_event'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Питание выключено (не участвует в формировании Результатов анализа и Выводов)"
+                            >
+                              Питание выключено
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'power_on_event')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'power_on_event'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Питание включено (не участвует в формировании Результатов анализа и Выводов)"
+                            >
+                              Питание включено
+                            </button>
+                          </div>
                         ) : (
-                          // Для типов с выбором используем переключатель
+                          // Для остальных типов испытаний используем расширенный переключатель типов маркеров
                           <div className="flex items-center space-x-2">
                             <button
                               type="button"
