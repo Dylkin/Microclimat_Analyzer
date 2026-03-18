@@ -29,6 +29,8 @@ interface QualificationWorkScheduleProps {
   qualificationObjectName: string;
   projectId?: string;
   project?: any; // Добавляем полный объект проекта
+  planFileUrl?: string; // Публичный URL файла плана объекта
+  planFileName?: string; // Имя файла плана объекта
   onPageChange?: (page: string, data?: any) => void;
   mode?: 'view' | 'edit'; // Режим просмотра или редактирования
   hideTestDocuments?: boolean; // Скрыть блок "Документы по испытанию" и "Информация о расписании"
@@ -70,6 +72,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   qualificationObjectName,
   projectId,
   project,
+  planFileUrl,
+  planFileName,
   onPageChange,
   mode = 'edit',
   hideTestDocuments = false
@@ -102,6 +106,16 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   const [stageCompletionLoading, setStageCompletionLoading] = useState<{ [key: string]: boolean }>({});
   const [loggerFileKeysByLoggerName, setLoggerFileKeysByLoggerName] = useState<{ [key: string]: string[] }>({});
   const prevMeasurementZonesRef = useRef<MeasurementZone[]>([]);
+
+  // Проверяем, есть ли загруженный план объекта в формате .drawio
+  const hasDrawioPlan = (() => {
+    if (!planFileUrl && !planFileName) return false;
+    const lowerName = (planFileName || '').toLowerCase();
+    const lowerUrl = (planFileUrl || '').toLowerCase();
+    if (lowerName.endsWith('.drawio')) return true;
+    if (lowerUrl.endsWith('.drawio') || lowerUrl.includes('.drawio')) return true;
+    return false;
+  })();
 
   useEffect(() => {
     prevMeasurementZonesRef.current = measurementZones;
@@ -1863,6 +1877,39 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
     }
   };
 
+  // Открытие редактора схем для размещения логгеров на плане объекта
+  const handleOpenPlanInEditor = () => {
+    console.log('QualificationWorkSchedule: handleOpenPlanInEditor вызвана', {
+      qualificationObjectId,
+      qualificationObjectName,
+      projectId,
+      project,
+      planFileUrl,
+      planFileName,
+      hasDrawioPlan,
+      onPageChange: !!onPageChange
+    });
+
+    if (!hasDrawioPlan || !planFileUrl) {
+      alert('Для размещения логгеров на схеме необходимо загрузить план объекта в формате .drawio в блоке "План объекта".');
+      return;
+    }
+
+    if (!onPageChange || !project) {
+      console.warn('QualificationWorkSchedule: onPageChange или project не определены - переход к редактору схем недоступен');
+      alert('Открыть схему можно только из раздела "Проведение испытаний" в управлении проектами.');
+      return;
+    }
+
+    onPageChange('logger_plan_editor', {
+      project,
+      qualificationObjectId,
+      qualificationObjectName,
+      planFileUrl,
+      planFileName
+    });
+  };
+
   // Получение иконки для этапа
   const getStageIcon = (stage: QualificationWorkStage) => {
     if (stage.isCompleted) {
@@ -2007,10 +2054,41 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                       }`}
                       title={`Дата этапа: ${stage.name}`}
                     />
-                    
-                    {/* Блок расстановки оборудования для этапа "Расстановка логгеров" */}
+                    {/* Блок расстановки оборудования и размещения на схеме для этапа "Расстановка логгеров" */}
                     {stage.name === 'Расстановка логгеров' && (
-                      <div className={`mt-4 ${stage.isCompleted || mode === 'view' ? 'pointer-events-none opacity-60' : ''}`}>
+                      <div
+                        className={`mt-4 ${stage.isCompleted || mode === 'view' ? 'pointer-events-none opacity-60' : ''}`}
+                      >
+                        <div className="mb-3 flex items-center justify-between">
+                          <div className="text-sm text-gray-700">
+                            Разместите логгеры на плане объекта в редакторе схем.
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleOpenPlanInEditor}
+                            disabled={!hasDrawioPlan}
+                            className={`inline-flex items-center px-3 py-1.5 border text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                              hasDrawioPlan
+                                ? 'border-indigo-600 text-indigo-600 hover:bg-indigo-50 focus:ring-indigo-500'
+                                : 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-100'
+                            }`}
+                            title={
+                              hasDrawioPlan
+                                ? 'Открыть план объекта в редакторе draw.io для размещения логгеров'
+                                : 'Загрузите файл плана в формате .drawio в блоке "План объекта", чтобы активировать кнопку'
+                            }
+                          >
+                            Разместить на схеме
+                          </button>
+                        </div>
+                        {!hasDrawioPlan && (
+                          <p className="text-xs text-gray-500 mb-3">
+                            Кнопка станет активной после загрузки файла плана объекта в формате <span className="font-mono">.drawio</span> в блоке
+                            {' '}
+                            &laquo;План объекта&raquo;.
+                          </p>
+                        )}
+
                         <EquipmentPlacement
                           qualificationObjectId={qualificationObjectId}
                           initialZones={measurementZones}

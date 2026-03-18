@@ -30,6 +30,11 @@ const TenderSearch = lazy(() => import('./components/TenderSearch'));
 const QualificationObjectTypes = lazy(() => import('./components/QualificationObjectTypes'));
 const ReleasePage = lazy(() => import('./components/ReleasePage').then(m => ({ default: m.ReleasePage })));
 const QualificationObjectWindow = lazy(() => import('./components/QualificationObjectWindow').then(m => ({ default: m.QualificationObjectWindow })));
+const LoggerPlacementPlanEditor = lazy(() =>
+  import('./components/LoggerPlacementPlanEditor').then((m) => ({
+    default: m.LoggerPlacementPlanEditor
+  }))
+);
 
 // Loading component
 const LoadingSpinner: React.FC = () => (
@@ -229,6 +234,29 @@ const AppContent: React.FC = () => {
             }}
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;
+      case 'logger_plan_editor': {
+        const projectForEditor = pageData?.project || selectedProject;
+        const qualificationObjectId = pageData?.qualificationObjectId;
+        const planFileUrl = pageData?.planFileUrl;
+        const planFileName = pageData?.planFileName;
+        const qualificationObjectName = pageData?.qualificationObjectName;
+
+        return hasAccess('analyzer') &&
+          projectForEditor &&
+          qualificationObjectId &&
+          planFileUrl
+          ? wrapWithSuspense(
+              <LoggerPlacementPlanEditor
+                project={projectForEditor}
+                qualificationObjectId={qualificationObjectId}
+                qualificationObjectName={qualificationObjectName}
+                planFileUrl={planFileUrl}
+                planFileName={planFileName}
+                onBack={() => handlePageChange('testing_execution', projectForEditor)}
+              />
+            )
+          : <div>Доступ запрещен или данные плана не найдены</div>;
+      }
       case 'help':
         return hasAccess('help') ? wrapWithSuspense(<Help />) : <div>Доступ запрещен</div>;
       case 'users':

@@ -148,9 +148,23 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     }
 
     if (type === 'plan') {
-      const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'image/tiff', 'image/bmp'];
-      if (!allowedTypes.includes(file.type)) {
-        return 'Поддерживаются только файлы: JPG, PNG, PDF, TIFF, BMP';
+      const allowedMimeTypes = [
+        'image/jpeg',
+        'image/png',
+        'application/pdf',
+        'image/tiff',
+        'image/bmp',
+        'application/xml',
+        'text/xml'
+      ];
+      const allowedExtensions = ['.drawio'];
+      const fileType = file.type;
+      const fileName = file.name.toLowerCase();
+      const hasAllowedMimeType = fileType ? allowedMimeTypes.includes(fileType) : false;
+      const hasAllowedExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+
+      if (!hasAllowedMimeType && !hasAllowedExtension) {
+        return 'Поддерживаются только файлы: JPG, PNG, PDF, TIFF, BMP, DRAWIO';
       }
     } else {
       const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf', 'image/tiff', 'image/bmp'];
@@ -734,7 +748,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                 Просмотреть загруженный файл
               </a>
             </div>
-            <label className="cursor-pointer block">
+              <label className="cursor-pointer block">
               <input
                 type="file"
                 accept={accept}
@@ -747,7 +761,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                   Заменить файл
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {type === 'plan' ? 'JPG, PNG, PDF, TIFF, BMP до 10MB' : 'JPG, PNG, PDF, TIFF, BMP до 10MB'}
+                  {type === 'plan' ? 'JPG, PNG, PDF, TIFF, BMP, DRAWIO до 10MB' : 'JPG, PNG, PDF, TIFF, BMP до 10MB'}
                 </p>
               </div>
             </label>
@@ -766,7 +780,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                 Нажмите для выбора файла
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                {type === 'plan' ? 'JPG, PNG, PDF, TIFF, BMP до 10MB' : 'JPG, PNG, PDF, TIFF, BMP до 10MB'}
+                {type === 'plan' ? 'JPG, PNG, PDF, TIFF, BMP, DRAWIO до 10MB' : 'JPG, PNG, PDF, TIFF, BMP до 10MB'}
               </p>
             </div>
           </label>
@@ -947,6 +961,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               title="План объекта"
               file={planFile}
               onChange={(file) => handleFileChange('plan', file)}
+              accept="image/*,.pdf,.tiff,.tif,.bmp,.drawio,.xml"
               type="plan"
               uploadedUrl={uploadedPlanUrl}
             />
@@ -996,6 +1011,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             onPageChange={onPageChange}
             mode={mode === 'create' ? 'edit' : (mode || 'edit')}
             hideTestDocuments={hideWorkSchedule}
+            planFileUrl={uploadedPlanUrl || initialData.planFileUrl}
+            planFileName={initialData.planFileName}
           />
         </div>
       )}
