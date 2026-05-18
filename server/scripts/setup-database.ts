@@ -51,7 +51,7 @@ const ensureEquipmentTables = async () => {
     // Создаем ENUM тип для типов оборудования
     await pool.query(`
       DO $$ BEGIN
-        CREATE TYPE equipment_type AS ENUM ('-', 'Testo 174T', 'Testo 174H');
+        CREATE TYPE equipment_type AS ENUM ('-', 'Testo 174T', 'Testo 174H', 'EClerk-M-RHT');
       EXCEPTION
         WHEN duplicate_object THEN null;
       END $$;

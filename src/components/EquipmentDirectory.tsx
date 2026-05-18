@@ -30,7 +30,7 @@ const EquipmentDirectory: React.FC = () => {
     byType: Record<EquipmentType, number>;
   }>({
     total: 0,
-    byType: { '-': 0, 'Testo 174T': 0, 'Testo 174H': 0 }
+    byType: { '-': 0, 'Testo 174T': 0, 'Testo 174H': 0, 'EClerk-M-RHT': 0 }
   });
 
   // Form state
@@ -674,6 +674,7 @@ const EquipmentDirectory: React.FC = () => {
                 <option value="-">Не указано</option>
                 <option value="Testo 174T">Testo 174T</option>
                 <option value="Testo 174H">Testo 174H</option>
+                <option value="EClerk-M-RHT">EClerk-M-RHT</option>
               </select>
             </div>
 
@@ -1165,7 +1166,7 @@ const EquipmentDirectory: React.FC = () => {
       {/* Statistics */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Статистика оборудования</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-indigo-600">{stats.total}</div>
             <div className="text-sm text-gray-500">Всего оборудования</div>
@@ -1177,6 +1178,10 @@ const EquipmentDirectory: React.FC = () => {
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">{stats.byType['Testo 174H']}</div>
             <div className="text-sm text-gray-500">Testo 174H</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-violet-600">{stats.byType['EClerk-M-RHT']}</div>
+            <div className="text-sm text-gray-500">EClerk-M-RHT</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-gray-600">{stats.byType['-']}</div>

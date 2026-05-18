@@ -7,13 +7,27 @@ import { qualificationProtocolService, QualificationProtocolWithDocument } from 
 import { ProjectInfo } from './contract/ProjectInfo';
 import { QualificationObjectsCRUD } from './contract/QualificationObjectsCRUD';
 
+export interface TestingExecutionReturnFocus {
+  qualificationObjectId: string;
+  workScheduleStageName?: string;
+}
+
 interface TestingExecutionProps {
   project: Project;
   onBack: () => void;
   onPageChange?: (page: string, data?: any) => void;
+  /** Восстановить форму редактирования объекта и (опционально) прокрутку к этапу расписания */
+  returnFocus?: TestingExecutionReturnFocus | null;
+  onReturnFocusHandled?: () => void;
 }
 
-const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onBack, onPageChange }) => {
+const TestingExecution: React.FC<TestingExecutionProps> = ({
+  project,
+  onBack,
+  onPageChange,
+  returnFocus,
+  onReturnFocusHandled
+}) => {
   const [contractor, setContractor] = useState<Contractor | null>(null);
   const [qualificationProtocols, setQualificationProtocols] = useState<QualificationProtocolWithDocument[]>([]);
   const [, setLoading] = useState(false);
@@ -118,6 +132,9 @@ const TestingExecution: React.FC<TestingExecutionProps> = ({ project, onBack, on
         onPageChange={onPageChange}
         contextPage="testing_execution"
         showExecuteButton={true}
+        autoOpenEditForObjectId={returnFocus?.qualificationObjectId ?? null}
+        scrollToWorkScheduleStageName={returnFocus?.workScheduleStageName ?? null}
+        onAutoOpenEditHandled={onReturnFocusHandled}
       />
     </div>
   );

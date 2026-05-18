@@ -6,22 +6,37 @@ import { sendEmail } from '../services/mailService.js';
 
 const router = express.Router();
 
+function mapUserRow(row: Record<string, unknown>) {
+  const staffPositionName = (row.staff_position_name as string | null) ?? null;
+  const legacyPosition = (row.position as string | null) ?? null;
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    email: row.email,
+    password: '',
+    role: row.role,
+    position: staffPositionName ?? legacyPosition ?? undefined,
+    staffPositionId: (row.staff_position_id as string | null) ?? null,
+    staffDepartmentName: (row.staff_department_name as string | null) ?? undefined,
+    staffPositionName: staffPositionName ?? undefined,
+    isDefault: row.is_default
+  };
+}
+
+const usersSelectJoin = `
+  SELECT u.id, u.full_name, u.email, u.role, u.position, u.staff_position_id, u.is_default, u.created_at, u.updated_at,
+         d.name AS staff_department_name,
+         sp.name AS staff_position_name
+  FROM users u
+  LEFT JOIN staff_positions sp ON sp.id = u.staff_position_id
+  LEFT JOIN staff_departments d ON d.id = sp.department_id
+`;
+
 // GET /api/users - Получить всех пользователей
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT id, full_name, email, role, position, is_default, created_at, updated_at FROM users ORDER BY created_at ASC'
-    );
-    
-    const users = result.rows.map(row => ({
-      id: row.id,
-      fullName: row.full_name,
-      email: row.email,
-      password: '', // Не возвращаем пароль
-      role: row.role,
-      position: row.position ?? undefined,
-      isDefault: row.is_default
-    }));
+    const result = await pool.query(`${usersSelectJoin} ORDER BY u.created_at ASC`);
+    const users = result.rows.map(mapUserRow);
     
     res.json(users);
   } catch (error) {
@@ -34,25 +49,13 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query(
-      'SELECT id, full_name, email, role, position, is_default, created_at, updated_at FROM users WHERE id = $1',
-      [id]
-    );
+    const result = await pool.query(`${usersSelectJoin} WHERE u.id = $1`, [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
     
-    const row = result.rows[0];
-    res.json({
-      id: row.id,
-      fullName: row.full_name,
-      email: row.email,
-      password: '',
-      role: row.role,
-      position: row.position ?? undefined,
-      isDefault: row.is_default
-    });
+    res.json(mapUserRow(result.rows[0] as Record<string, unknown>));
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: 'Ошибка получения пользователя' });
@@ -98,10 +101,49 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// POST /api/users/:id/change-password — смена пароля с проверкой текущего (для личного кабинета)
+router.post('/:id/change-password', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { oldPassword, newPassword } = req.body as { oldPassword?: string; newPassword?: string };
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ error: 'Текущий и новый пароль обязательны' });
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ error: 'Новый пароль должен быть не короче 6 символов' });
+    }
+
+    const result = await pool.query('SELECT id, password FROM users WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+
+    const stored = result.rows[0].password as string;
+    const isValid =
+      (await bcrypt.compare(oldPassword, stored)) || oldPassword === stored;
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Неверный текущий пароль' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2', [
+      hashedPassword,
+      id
+    ]);
+
+    res.json({ message: 'Пароль успешно изменен' });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ error: 'Ошибка смены пароля' });
+  }
+});
+
 // POST /api/users - Создать пользователя
 router.post('/', async (req, res) => {
   try {
-    const { fullName, email, password, role, position, isDefault } = req.body;
+    const { fullName, email, password, role, position, staffPositionId, isDefault } = req.body;
     // #region agent log
     try {
       const fs = await import('fs');
@@ -117,24 +159,32 @@ router.post('/', async (req, res) => {
     
     // Хешируем пароль
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    let positionVal: string | null = position ?? null;
+    let staffPositionIdVal: string | null = null;
+    const sid =
+      staffPositionId !== undefined && staffPositionId !== null && String(staffPositionId).trim() !== ''
+        ? String(staffPositionId).trim()
+        : null;
+    if (sid) {
+      const posRes = await pool.query('SELECT name FROM staff_positions WHERE id = $1', [sid]);
+      if (posRes.rows.length === 0) {
+        return res.status(400).json({ error: 'Указанная должность не найдена в справочнике структуры предприятия' });
+      }
+      staffPositionIdVal = sid;
+      positionVal = posRes.rows[0].name as string;
+    }
     
     const result = await pool.query(
-      `INSERT INTO users (full_name, email, password, role, position, is_default)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, full_name, email, role, position, is_default, created_at, updated_at`,
-      [fullName, email, hashedPassword, role || 'user', position ?? null, isDefault || false]
+      `INSERT INTO users (full_name, email, password, role, position, staff_position_id, is_default)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, full_name, email, role, position, staff_position_id, is_default, created_at, updated_at`,
+      [fullName, email, hashedPassword, role || 'user', positionVal, staffPositionIdVal, isDefault || false]
     );
-    
-    const user = result.rows[0];
-    res.status(201).json({
-      id: user.id,
-      fullName: user.full_name,
-      email: user.email,
-      password: '',
-      role: user.role,
-      position: user.position ?? undefined,
-      isDefault: user.is_default
-    });
+
+    const created = result.rows[0];
+    const withNames = await pool.query(`${usersSelectJoin} WHERE u.id = $1`, [created.id]);
+    res.status(201).json(mapUserRow(withNames.rows[0] as Record<string, unknown>));
   } catch (error: any) {
     console.error('Error creating user:', error);
     // #region agent log
@@ -159,8 +209,8 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullName, email, password, role, position, isDefault } = req.body;
-    
+    const { fullName, email, password, role, position, staffPositionId, isDefault } = req.body;
+
     const updates: string[] = [];
     const values: any[] = [];
     let paramCount = 1;
@@ -182,7 +232,26 @@ router.put('/:id', async (req, res) => {
       updates.push(`role = $${paramCount++}`);
       values.push(role);
     }
-    if (position !== undefined) {
+    if (staffPositionId !== undefined) {
+      const sid =
+        staffPositionId !== null && staffPositionId !== undefined && String(staffPositionId).trim() !== ''
+          ? String(staffPositionId).trim()
+          : null;
+      if (sid) {
+        const posRes = await pool.query('SELECT name FROM staff_positions WHERE id = $1', [sid]);
+        if (posRes.rows.length === 0) {
+          return res.status(400).json({ error: 'Указанная должность не найдена в справочнике структуры предприятия' });
+        }
+        updates.push(`staff_position_id = $${paramCount++}`);
+        values.push(sid);
+        updates.push(`position = $${paramCount++}`);
+        values.push(posRes.rows[0].name as string);
+      } else {
+        updates.push(`staff_position_id = NULL`);
+        updates.push(`position = $${paramCount++}`);
+        values.push(position !== undefined ? position || null : null);
+      }
+    } else if (position !== undefined) {
       updates.push(`position = $${paramCount++}`);
       values.push(position || null);
     }
@@ -197,27 +266,19 @@ router.put('/:id', async (req, res) => {
     
     updates.push(`updated_at = NOW()`);
     values.push(id);
-    
+
     const result = await pool.query(
       `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramCount}
-       RETURNING id, full_name, email, role, position, is_default, created_at, updated_at`,
+       RETURNING id`,
       values
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
-    
-    const user = result.rows[0];
-    res.json({
-      id: user.id,
-      fullName: user.full_name,
-      email: user.email,
-      password: '',
-      role: user.role,
-      position: user.position ?? undefined,
-      isDefault: user.is_default
-    });
+
+    const withNames = await pool.query(`${usersSelectJoin} WHERE u.id = $1`, [id]);
+    res.json(mapUserRow(withNames.rows[0] as Record<string, unknown>));
   } catch (error: any) {
     console.error('Error updating user:', error);
     if (error.code === '23505') {

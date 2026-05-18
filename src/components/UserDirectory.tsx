@@ -1,8 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit2, Trash2, Save, X, Key, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { User, UserRole } from '../types/User';
 import { userService } from '../utils/userService';
+import { staffDirectoryService } from '../utils/staffDirectoryService';
+import type { StaffDirectoryData } from '../types/StaffDirectory';
+
+function findDepartmentIdForPosition(data: StaffDirectoryData, positionId: string): string {
+  for (const d of data.departments) {
+    if (d.positions.some((p) => p.id === positionId)) return d.id;
+  }
+  return '';
+}
 
 const UserDirectory: React.FC = () => {
   const { users, addUser, updateUser, deleteUser, user: currentUser } = useAuth();
@@ -12,12 +21,17 @@ const UserDirectory: React.FC = () => {
   const [sendingResetEmail, setSendingResetEmail] = useState<string | null>(null);
   const [operationLoading, setOperationLoading] = useState(false);
 
+  const [staffData, setStaffData] = useState<StaffDirectoryData | null>(null);
+  const [staffLoading, setStaffLoading] = useState(true);
+  const [staffLoadError, setStaffLoadError] = useState<string | null>(null);
+
   const [newUser, setNewUser] = useState({
     fullName: '',
     email: '',
     password: '',
     role: 'specialist' as UserRole,
-    position: ''
+    staffDepartmentId: '',
+    staffPositionId: ''
   });
 
   const [editUser, setEditUser] = useState({
@@ -25,8 +39,43 @@ const UserDirectory: React.FC = () => {
     email: '',
     password: '',
     role: 'specialist' as UserRole,
-    position: ''
+    staffDepartmentId: '',
+    staffPositionId: ''
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setStaffLoading(true);
+      setStaffLoadError(null);
+      try {
+        const data = await staffDirectoryService.getDirectory();
+        if (!cancelled) {
+          setStaffData(data);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setStaffLoadError(e instanceof Error ? e.message : 'Не удалось загрузить структуру предприятия');
+        }
+      } finally {
+        if (!cancelled) setStaffLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Если справочник догрузился после открытия формы редактирования — восстановить отдел по должности */
+  useEffect(() => {
+    if (!staffData || !editingUser) return;
+    setEditUser((prev) => {
+      if (!prev.staffPositionId) return prev;
+      const d = findDepartmentIdForPosition(staffData, prev.staffPositionId);
+      if (d && d !== prev.staffDepartmentId) return { ...prev, staffDepartmentId: d };
+      return prev;
+    });
+  }, [staffData, editingUser]);
 
   const roleLabels: Record<UserRole, string> = {
     admin: 'Администратор',
@@ -51,7 +100,13 @@ const UserDirectory: React.FC = () => {
     setOperationLoading(true);
     try {
       console.log('Начинаем добавление пользователя:', newUser);
-      await addUser(newUser);
+      await addUser({
+        fullName: newUser.fullName,
+        email: newUser.email,
+        password: newUser.password,
+        role: newUser.role,
+        staffPositionId: newUser.staffPositionId || undefined
+      });
       console.log('Пользователь успешно добавлен');
       
       // Сбрасываем форму только после успешного добавления
@@ -60,7 +115,8 @@ const UserDirectory: React.FC = () => {
         email: '',
         password: '',
         role: 'specialist',
-        position: ''
+        staffDepartmentId: '',
+        staffPositionId: ''
       });
       setShowAddForm(false);
       alert('Пользователь успешно добавлен');
@@ -75,12 +131,18 @@ const UserDirectory: React.FC = () => {
   };
 
   const handleEditUser = (user: User) => {
+    let deptId = '';
+    const posId = user.staffPositionId ?? '';
+    if (staffData && posId) {
+      deptId = findDepartmentIdForPosition(staffData, posId);
+    }
     setEditUser({
       fullName: user.fullName,
       email: user.email,
       password: '',
       role: user.role,
-      position: user.position ?? ''
+      staffDepartmentId: deptId,
+      staffPositionId: posId
     });
     setEditingUser(user.id);
   };
@@ -99,7 +161,12 @@ const UserDirectory: React.FC = () => {
 
     setOperationLoading(true);
     try {
-      const payload: Partial<User> = { fullName: editUser.fullName, email: editUser.email, role: editUser.role, position: editUser.position || undefined };
+      const payload: Partial<User> = {
+        fullName: editUser.fullName,
+        email: editUser.email,
+        role: editUser.role,
+        staffPositionId: editUser.staffPositionId ? editUser.staffPositionId : null
+      };
       if (editUser.password.trim()) {
         payload.password = editUser.password;
       }
@@ -274,17 +341,58 @@ const UserDirectory: React.FC = () => {
               </select>
             </div>
 
+          </div>
+
+          {staffLoadError && (
+            <p className="text-sm text-amber-700 mt-2">
+              {staffLoadError} Отдел и должность из справочника недоступны до устранения ошибки.
+            </p>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Отдел
+              </label>
+              <select
+                value={newUser.staffDepartmentId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setNewUser((prev) => ({ ...prev, staffDepartmentId: v, staffPositionId: '' }));
+                }}
+                disabled={staffLoading || !!staffLoadError || !staffData}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
+                title="Отдел из справочника «Структура предприятия»"
+                aria-label="Отдел из структуры предприятия"
+              >
+                <option value="">{staffLoading ? 'Загрузка…' : 'Не выбрано'}</option>
+                {staffData?.departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Должность
               </label>
-              <input
-                type="text"
-                value={newUser.position}
-                onChange={(e) => setNewUser(prev => ({ ...prev, position: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Например: Инженер"
-              />
+              <select
+                value={newUser.staffPositionId}
+                onChange={(e) => setNewUser((prev) => ({ ...prev, staffPositionId: e.target.value }))}
+                disabled={staffLoading || !!staffLoadError || !newUser.staffDepartmentId}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
+                title="Должность из справочника «Структура предприятия»"
+                aria-label="Должность из структуры предприятия"
+              >
+                <option value="">{newUser.staffDepartmentId ? 'Не выбрано' : 'Сначала выберите отдел'}</option>
+                {(staffData?.departments.find((d) => d.id === newUser.staffDepartmentId)?.positions ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
           </div>
@@ -321,6 +429,9 @@ const UserDirectory: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Роль
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Отдел
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Должность
@@ -395,17 +506,49 @@ const UserDirectory: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingUser === user.id ? (
-                      <input
-                        type="text"
-                        value={editUser.position}
-                        onChange={(e) => setEditUser(prev => ({ ...prev, position: e.target.value }))}
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="Должность"
-                        title="Должность"
-                        aria-label="Должность"
-                      />
+                      <select
+                        value={editUser.staffDepartmentId}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setEditUser((prev) => ({ ...prev, staffDepartmentId: v, staffPositionId: '' }));
+                        }}
+                        disabled={staffLoading || !!staffLoadError || !staffData}
+                        className="w-full min-w-[160px] px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
+                        title="Отдел из справочника «Структура предприятия»"
+                        aria-label="Отдел из структуры предприятия"
+                      >
+                        <option value="">{staffLoading ? 'Загрузка…' : 'Не выбрано'}</option>
+                        {staffData?.departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
-                      <div className="text-sm text-gray-500">{user.position || '—'}</div>
+                      <div className="text-sm text-gray-500">{user.staffDepartmentName || '—'}</div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {editingUser === user.id ? (
+                      <select
+                        value={editUser.staffPositionId}
+                        onChange={(e) => setEditUser((prev) => ({ ...prev, staffPositionId: e.target.value }))}
+                        disabled={staffLoading || !!staffLoadError || !editUser.staffDepartmentId}
+                        className="w-full min-w-[160px] px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
+                        title="Должность из справочника «Структура предприятия»"
+                        aria-label="Должность из структуры предприятия"
+                      >
+                        <option value="">{editUser.staffDepartmentId ? 'Не выбрано' : 'Сначала отдел'}</option>
+                        {(staffData?.departments.find((d) => d.id === editUser.staffDepartmentId)?.positions ?? []).map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="text-sm text-gray-500">
+                        {user.staffPositionName || user.position || '—'}
+                      </div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

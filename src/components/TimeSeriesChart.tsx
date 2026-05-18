@@ -151,7 +151,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     files.forEach(file => {
       const fileDataPoint = data.find(d => d.fileId === file);
       const isExternal = fileDataPoint?.zoneNumber === 0 ||
-                         fileDataPoint?.loggerName?.toLowerCase().includes('внешний');
+        fileDataPoint?.loggerName?.toLowerCase().includes('внешний');
       if (isExternal) {
         externalFiles.push(file);
       } else {
@@ -188,18 +188,18 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   // Фильтруем данные по времени если применен зум для расчета Y-домена
   let dataForYScale = filteredData;
   if (zoomState) {
-    dataForYScale = filteredData.filter(d => 
+    dataForYScale = filteredData.filter(d =>
       d.timestamp >= zoomState.startTime && d.timestamp <= zoomState.endTime
     );
   }
-  
+
   // Если после фильтрации по времени нет данных, используем все данные
   if (dataForYScale.length === 0) {
     dataForYScale = filteredData;
   }
-  
+
   let yDomain = extent(dataForYScale, d => dataType === 'temperature' ? d.temperature! : d.humidity!) as [number, number];
-  
+
   // Применяем пользовательские лимиты если они установлены
   if (limits && limits[dataType]) {
     const userLimits = limits[dataType]!;
@@ -221,7 +221,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
       }
     }
   }
-  
+
   const yScale = scaleLinear()
     .domain(yDomain)
     .nice()
@@ -266,7 +266,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
         // Получаем имя файла из данных
         const fileName = data.find(d => d.fileId === point.fileId)?.fileId || '';
         const shortFileName = fileName.substring(0, 6);
-        
+
         setTooltip({
           x: mouseX,
           y: mouseY,
@@ -356,7 +356,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
 
     // Фильтруем по времени если применен зум
     if (zoomState) {
-      dataToRender = fileData.filter(d => 
+      dataToRender = fileData.filter(d =>
         d.timestamp >= zoomState.startTime && d.timestamp <= zoomState.endTime
       );
     }
@@ -392,10 +392,10 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               const color = fileColors.get(fileId);
               // Проверяем, является ли это внешним датчиком по zoneNumber или названию
               const fileData = data.find(d => d.fileId === fileId);
-              const isExternal = fileData?.zoneNumber === 0 || 
-                                 fileData?.zoneNumber === null ||
-                                 fileData?.zoneNumber === undefined ||
-                                 fileData?.loggerName?.toLowerCase().includes('внешний');
+              const isExternal = fileData?.zoneNumber === 0 ||
+                fileData?.zoneNumber === null ||
+                fileData?.zoneNumber === undefined ||
+                fileData?.loggerName?.toLowerCase().includes('внешний');
               // Для внешнего датчика всегда используем серый цвет
               const displayColor = isExternal ? '#6B7280' : (color || '#3b82f6');
               // Используем название логгера, если оно есть, иначе fallback на fileId
@@ -419,24 +419,24 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                   return newSet;
                 });
               };
-              
+
               return (
-                <span 
-                  key={fileId} 
+                <span
+                  key={fileId}
                   className="inline-flex items-center space-x-1 mr-3 cursor-pointer hover:opacity-70 transition-opacity"
                   onClick={toggleLogger}
                   title={isHidden ? `Показать ${displayName}` : `Скрыть ${displayName}`}
                 >
-                  <div 
+                  <div
                     className="w-2 h-2 rounded-full"
-                    style={{ 
+                    style={{
                       backgroundColor: displayColor,
                       opacity: isHidden ? 0.3 : 1
                     }}
                     title={`Цвет для ${displayName}`}
                   ></div>
-                  <span 
-                    style={{ 
+                  <span
+                    style={{
                       opacity: isHidden ? 0.5 : 1,
                       textDecoration: isHidden ? 'line-through' : 'none'
                     }}
@@ -496,7 +496,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               </text>
             </g>
           ))}
-          
+
           {/* Отображение лимитов на оси Y */}
           {limits && limits[dataType] && (
             <>
@@ -505,7 +505,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                 const yPos = yScale(minLimit);
                 // Проверяем, не совпадает ли лимит с существующим тиком (с небольшой погрешностью)
                 const isNearTick = yScale.ticks(5).some(tick => Math.abs(yScale(tick) - yPos) < 2);
-                
+
                 return (
                   <g key={`limit-min-${minLimit}`}>
                     <text
@@ -537,7 +537,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                 const yPos = yScale(maxLimit);
                 // Проверяем, не совпадает ли лимит с существующим тиком (с небольшой погрешностью)
                 const isNearTick = yScale.ticks(5).some(tick => Math.abs(yScale(tick) - yPos) < 2);
-                
+
                 return (
                   <g key={`limit-max-${maxLimit}`}>
                     <text
@@ -573,13 +573,13 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             const domain = xScale.domain();
             const startTime = domain[0];
             const endTime = domain[1];
-            
+
             // Вычисляем общий временной диапазон в миллисекундах
             const timeRange = endTime.getTime() - startTime.getTime();
-            
+
             // Количество меток: увеличиваем в 2 раза (с 16 до 32)
             const tickCount = 32;
-            
+
             // Создаем равномерно распределенные метки
             const ticks: Date[] = [];
             for (let i = 0; i < tickCount; i++) {
@@ -587,7 +587,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               const tickTime = startTime.getTime() + (timeRange * i) / (tickCount - 1);
               ticks.push(new Date(tickTime));
             }
-            
+
             return ticks.map(tick => (
               <g key={tick.getTime()}>
                 <line
@@ -646,7 +646,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           // Четные маркеры (индекс 0, 2, 4...) размещаем выше, нечетные (индекс 1, 3, 5...) - ниже
           // Это соответствует: 1-й маркер (индекс 0) - выше, 2-й маркер (индекс 1) - ниже, и т.д.
           const labelY = index % 2 === 0 ? -10 : -25;
-          
+
           return (
             <g key={marker.id} transform={`translate(${margin.left}, ${margin.top})`}>
               <line
@@ -684,28 +684,28 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
           {Array.from(dataByFile.entries())
             .filter(([fileId]) => !hiddenLoggers.has(fileId))
             .map(([fileId, fileData]) => {
-            // Проверяем, является ли это внешним датчиком
-            const fileDataPoint = data.find(d => d.fileId === fileId);
-            const isExternal = fileDataPoint?.zoneNumber === 0 || 
-                               fileDataPoint?.loggerName?.toLowerCase().includes('внешний');
-            
-            // Для внешнего датчика всегда используем серый цвет
-            const pathColor = isExternal 
-              ? '#6B7280' 
-              : (dataByFile.size > 1 ? (fileColors.get(fileId) || color) : color);
-            
-            return (
-              <path
-                key={fileId}
-                d={createPathForFile(fileData)}
-                fill="none"
-                stroke={pathColor}
-                strokeWidth={1.5}
-                opacity={0.8}
-                clipPath={`url(#clip-${dataType})`}
-              />
-            );
-          })}
+              // Проверяем, является ли это внешним датчиком
+              const fileDataPoint = data.find(d => d.fileId === fileId);
+              const isExternal = fileDataPoint?.zoneNumber === 0 ||
+                fileDataPoint?.loggerName?.toLowerCase().includes('внешний');
+
+              // Для внешнего датчика всегда используем серый цвет
+              const pathColor = isExternal
+                ? '#6B7280'
+                : (dataByFile.size > 1 ? (fileColors.get(fileId) || color) : color);
+
+              return (
+                <path
+                  key={fileId}
+                  d={createPathForFile(fileData)}
+                  fill="none"
+                  stroke={pathColor}
+                  strokeWidth={1.5}
+                  opacity={0.8}
+                  clipPath={`url(#clip-${dataType})`}
+                />
+              );
+            })}
         </g>
 
         {/* Область выделения */}

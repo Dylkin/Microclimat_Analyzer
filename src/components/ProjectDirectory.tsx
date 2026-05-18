@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, Building2, CheckCircle, Clock, AlertCircle, Play, FileText, AlertTriangle, Calendar, Printer, Eye, ArrowUp, ArrowDown } from 'lucide-react';
+import { FolderOpen, Plus, Edit2, Trash2, Save, X, Search, Building2, CheckCircle, Clock, AlertCircle, Play, FileText, AlertTriangle, Calendar, Printer, Eye, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Project, ProjectStatus, ProjectStatusLabels, ProjectStatusColors, ProjectType, ProjectTypeLabels } from '../types/Project';
 import { Contractor } from '../types/Contractor';
 import { QualificationObject, QualificationObjectTypeLabels } from '../types/QualificationObject';
@@ -30,6 +30,8 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState<'createdAt' | 'tenderDate'>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [operationLoading, setOperationLoading] = useState(false);
@@ -43,11 +45,23 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     description: string;
     contractorId: string;
     qualificationObjectIds: string[];
+    totalCostWithVat?: number;
+    startDatePlanned?: string;
+    startDateActual?: string;
+    endDatePlanned?: string;
+    endDateActual?: string;
+    paymentDate?: string;
     type?: 'qualification' | 'sale';
   }>({
     description: '',
     contractorId: '',
-    qualificationObjectIds: []
+    qualificationObjectIds: [],
+    totalCostWithVat: undefined,
+    startDatePlanned: '',
+    startDateActual: '',
+    endDatePlanned: '',
+    endDateActual: '',
+    paymentDate: ''
   });
 
   const [editProject, setEditProject] = useState<{
@@ -177,6 +191,22 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     setFilteredProjects(sortProjects(filtered, sortColumn, sortDirection));
   }, [searchTerm, projects, sortColumn, sortDirection]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortColumn, sortDirection, projects.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / itemsPerPage));
+  const paginatedProjects = filteredProjects.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
   // Получение объектов квалификации для выбранного контрагента
   const getQualificationObjectsForContractor = (contractorId: string) => {
     return qualificationObjects.filter(obj => obj.contractorId === contractorId);
@@ -267,7 +297,13 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       const projectData = {
         ...newProject,
         contractorId: trimmedContractorId,
-        name: projectName
+        name: projectName,
+        totalCostWithVat: newProject.totalCostWithVat,
+        startDatePlanned: newProject.startDatePlanned ? new Date(newProject.startDatePlanned) : undefined,
+        startDateActual: newProject.startDateActual ? new Date(newProject.startDateActual) : undefined,
+        endDatePlanned: newProject.endDatePlanned ? new Date(newProject.endDatePlanned) : undefined,
+        endDateActual: newProject.endDateActual ? new Date(newProject.endDateActual) : undefined,
+        paymentDate: newProject.paymentDate ? new Date(newProject.paymentDate) : undefined,
       };
 
       // Final validation before database call
@@ -298,7 +334,13 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       setNewProject({
         description: '',
         contractorId: '',
-        qualificationObjectIds: []
+        qualificationObjectIds: [],
+        totalCostWithVat: undefined,
+        startDatePlanned: '',
+        startDateActual: '',
+        endDatePlanned: '',
+        endDateActual: '',
+        paymentDate: '',
       });
       setShowAddForm(false);
       alert('Проект успешно создан');
@@ -453,7 +495,18 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         <div className="flex space-x-2">
           <button
             onClick={() => {
-              setNewProject({ description: '', contractorId: '', qualificationObjectIds: [], type: 'qualification' });
+              setNewProject({
+                description: '',
+                contractorId: '',
+                qualificationObjectIds: [],
+                totalCostWithVat: undefined,
+                startDatePlanned: '',
+                startDateActual: '',
+                endDatePlanned: '',
+                endDateActual: '',
+                paymentDate: '',
+                type: 'qualification'
+              });
               setShowAddForm(true);
             }}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
@@ -463,7 +516,18 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
           </button>
           <button
             onClick={() => {
-              setNewProject({ description: '', contractorId: '', qualificationObjectIds: [], type: 'sale' });
+              setNewProject({
+                description: '',
+                contractorId: '',
+                qualificationObjectIds: [],
+                totalCostWithVat: undefined,
+                startDatePlanned: '',
+                startDateActual: '',
+                endDatePlanned: '',
+                endDateActual: '',
+                paymentDate: '',
+                type: 'sale'
+              });
               setShowAddForm(true);
             }}
             className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
@@ -516,7 +580,18 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
             try {
               const addedProject = await projectService.addProject(projectData, user?.id);
               setProjects(prev => [...prev, addedProject]);
-              setNewProject({ description: '', contractorId: '', qualificationObjectIds: [], type: undefined });
+              setNewProject({
+                description: '',
+                contractorId: '',
+                qualificationObjectIds: [],
+                totalCostWithVat: undefined,
+                startDatePlanned: '',
+                startDateActual: '',
+                endDatePlanned: '',
+                endDateActual: '',
+                paymentDate: '',
+                type: undefined
+              });
               setShowAddForm(false);
             } catch (error: any) {
               console.error('Ошибка создания проекта:', error);
@@ -526,7 +601,18 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
             }
           }}
           onCancel={() => {
-            setNewProject({ description: '', contractorId: '', qualificationObjectIds: [], type: undefined });
+            setNewProject({
+              description: '',
+              contractorId: '',
+              qualificationObjectIds: [],
+              totalCostWithVat: undefined,
+              startDatePlanned: '',
+              startDateActual: '',
+              endDatePlanned: '',
+              endDateActual: '',
+              paymentDate: '',
+              type: undefined
+            });
             setShowAddForm(false);
           }}
           loading={operationLoading}
@@ -643,6 +729,94 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               )}
             </div>
 
+            {/* План-факт по стоимости и срокам */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Стоимость, руб с НДС
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={newProject.totalCostWithVat ?? ''}
+                  onChange={(e) =>
+                    setNewProject((prev) => ({
+                      ...prev,
+                      totalCostWithVat: e.target.value === '' ? undefined : Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Введите стоимость"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Дата начала (план)
+                </label>
+                <input
+                  type="date"
+                  value={newProject.startDatePlanned || ''}
+                  onChange={(e) => setNewProject((prev) => ({ ...prev, startDatePlanned: e.target.value }))}
+                  title="Дата начала (план)"
+                  aria-label="Дата начала (план)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Дата начала (факт)
+                </label>
+                <input
+                  type="date"
+                  value={newProject.startDateActual || ''}
+                  onChange={(e) => setNewProject((prev) => ({ ...prev, startDateActual: e.target.value }))}
+                  title="Дата начала (факт)"
+                  aria-label="Дата начала (факт)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Дата завершения (план)
+                </label>
+                <input
+                  type="date"
+                  value={newProject.endDatePlanned || ''}
+                  onChange={(e) => setNewProject((prev) => ({ ...prev, endDatePlanned: e.target.value }))}
+                  title="Дата завершения (план)"
+                  aria-label="Дата завершения (план)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Дата завершения (факт)
+                </label>
+                <input
+                  type="date"
+                  value={newProject.endDateActual || ''}
+                  onChange={(e) => setNewProject((prev) => ({ ...prev, endDateActual: e.target.value }))}
+                  title="Дата завершения (факт)"
+                  aria-label="Дата завершения (факт)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Дата оплаты
+                </label>
+                <input
+                  type="date"
+                  value={newProject.paymentDate || ''}
+                  onChange={(e) => setNewProject((prev) => ({ ...prev, paymentDate: e.target.value }))}
+                  title="Дата оплаты"
+                  aria-label="Дата оплаты"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
             {/* Кнопки */}
             <div className="flex justify-end space-x-3">
               <button
@@ -672,8 +846,9 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               <p className="text-gray-500">Загрузка проектов...</p>
             </div>
           ) : filteredProjects.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+            <>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -747,8 +922,8 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredProjects.map((project) => (
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {paginatedProjects.map((project) => (
                     <tr key={project.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-2">
@@ -911,9 +1086,90 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                       </td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                  <div className="flex-1 flex justify-between sm:hidden">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      Предыдущая
+                    </button>
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      Следующая
+                    </button>
+                  </div>
+                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm text-gray-700">
+                        Показано <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> до{' '}
+                        <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredProjects.length)}</span> из{' '}
+                        <span className="font-medium">{filteredProjects.length}</span> проектов
+                      </p>
+                    </div>
+                    <div>
+                      <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                        <button
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          title="Предыдущая страница"
+                          aria-label="Предыдущая страница"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => handlePageChange(pageNum)}
+                              className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                currentPage === pageNum
+                                  ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
+                                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+
+                        <button
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          title="Следующая страница"
+                          aria-label="Следующая страница"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </nav>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-8 text-gray-500">
               <FolderOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />

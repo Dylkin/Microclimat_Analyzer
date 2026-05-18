@@ -31,6 +31,8 @@ const upsertProjectObjectData = async (
     workSchedule: { column: 'work_schedule', json: true },
     planFileUrl: { column: 'plan_file_url' },
     planFileName: { column: 'plan_file_name' },
+    equipmentPlacementPlanFileUrl: { column: 'equipment_placement_plan_file_url' },
+    equipmentPlacementPlanFileName: { column: 'equipment_placement_plan_file_name' },
     testDataFileUrl: { column: 'test_data_file_url' },
     testDataFileName: { column: 'test_data_file_name' },
     address: { column: 'address' },
@@ -111,6 +113,8 @@ router.get('/', async (req, res) => {
           COALESCE(pqod.work_schedule, qo.work_schedule) as work_schedule,
           COALESCE(pqod.plan_file_url, qo.plan_file_url) as plan_file_url,
           COALESCE(pqod.plan_file_name, qo.plan_file_name) as plan_file_name,
+          COALESCE(pqod.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_url) as equipment_placement_plan_file_url,
+          COALESCE(pqod.equipment_placement_plan_file_name, qo.equipment_placement_plan_file_name) as equipment_placement_plan_file_name,
           COALESCE(pqod.test_data_file_url, qo.test_data_file_url) as test_data_file_url,
           COALESCE(pqod.test_data_file_name, qo.test_data_file_name) as test_data_file_name,
           COALESCE(pqod.address, qo.address) as address,
@@ -151,6 +155,7 @@ router.get('/', async (req, res) => {
           qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
+          qo.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_name,
           qo.test_data_file_url, qo.test_data_file_name,
           qo.address, qo.latitude, qo.longitude, qo.area,
           qo.vin, qo.registration_number, qo.body_volume,
@@ -188,6 +193,8 @@ router.get('/', async (req, res) => {
       workSchedule: row.work_schedule || [],
       planFileUrl: row.plan_file_url || undefined,
       planFileName: row.plan_file_name || undefined,
+      equipmentPlacementPlanFileUrl: row.equipment_placement_plan_file_url || undefined,
+      equipmentPlacementPlanFileName: row.equipment_placement_plan_file_name || undefined,
       testDataFileUrl: row.test_data_file_url || undefined,
       testDataFileName: row.test_data_file_name || undefined,
       address: row.address || undefined,
@@ -240,6 +247,8 @@ router.get('/:id', async (req, res) => {
           COALESCE(pqod.work_schedule, qo.work_schedule) as work_schedule,
           COALESCE(pqod.plan_file_url, qo.plan_file_url) as plan_file_url,
           COALESCE(pqod.plan_file_name, qo.plan_file_name) as plan_file_name,
+          COALESCE(pqod.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_url) as equipment_placement_plan_file_url,
+          COALESCE(pqod.equipment_placement_plan_file_name, qo.equipment_placement_plan_file_name) as equipment_placement_plan_file_name,
           COALESCE(pqod.test_data_file_url, qo.test_data_file_url) as test_data_file_url,
           COALESCE(pqod.test_data_file_name, qo.test_data_file_name) as test_data_file_name,
           COALESCE(pqod.address, qo.address) as address,
@@ -276,6 +285,7 @@ router.get('/:id', async (req, res) => {
           qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
+          qo.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_name,
           qo.test_data_file_url, qo.test_data_file_name,
           qo.address, qo.latitude, qo.longitude, qo.area,
           qo.vin, qo.registration_number, qo.body_volume,
@@ -313,6 +323,8 @@ router.get('/:id', async (req, res) => {
       workSchedule: row.work_schedule || [],
       planFileUrl: row.plan_file_url || undefined,
       planFileName: row.plan_file_name || undefined,
+      equipmentPlacementPlanFileUrl: row.equipment_placement_plan_file_url || undefined,
+      equipmentPlacementPlanFileName: row.equipment_placement_plan_file_name || undefined,
       testDataFileUrl: row.test_data_file_url || undefined,
       testDataFileName: row.test_data_file_name || undefined,
       address: row.address || undefined,
@@ -516,6 +528,8 @@ router.post('/', async (req, res) => {
           pqod.work_schedule,
           pqod.plan_file_url,
           pqod.plan_file_name,
+          pqod.equipment_placement_plan_file_url,
+          pqod.equipment_placement_plan_file_name,
           pqod.test_data_file_url,
           pqod.test_data_file_name,
           pqod.address,
@@ -552,6 +566,7 @@ router.post('/', async (req, res) => {
           qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
+          qo.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_name,
           qo.test_data_file_url, qo.test_data_file_name,
           qo.address, qo.latitude, qo.longitude, qo.area,
           qo.vin, qo.registration_number, qo.body_volume,
@@ -585,6 +600,8 @@ router.post('/', async (req, res) => {
       workSchedule: fullRow.work_schedule || [],
       planFileUrl: fullRow.plan_file_url || undefined,
       planFileName: fullRow.plan_file_name || undefined,
+      equipmentPlacementPlanFileUrl: fullRow.equipment_placement_plan_file_url || undefined,
+      equipmentPlacementPlanFileName: fullRow.equipment_placement_plan_file_name || undefined,
       testDataFileUrl: fullRow.test_data_file_url || undefined,
       testDataFileName: fullRow.test_data_file_name || undefined,
       address: fullRow.address || undefined,
@@ -805,6 +822,8 @@ router.put('/:id', async (req, res) => {
           pqod.work_schedule,
           pqod.plan_file_url,
           pqod.plan_file_name,
+          pqod.equipment_placement_plan_file_url,
+          pqod.equipment_placement_plan_file_name,
           pqod.test_data_file_url,
           pqod.test_data_file_name,
           pqod.address,
@@ -866,6 +885,10 @@ router.put('/:id', async (req, res) => {
       humidityLimits: row.humidity_limits || { min: null, max: null },
       measurementZones: row.measurement_zones || [],
       workSchedule: row.work_schedule || [],
+      planFileUrl: row.plan_file_url || undefined,
+      planFileName: row.plan_file_name || undefined,
+      equipmentPlacementPlanFileUrl: row.equipment_placement_plan_file_url || undefined,
+      equipmentPlacementPlanFileName: row.equipment_placement_plan_file_name || undefined,
       contractorId: row.contractor_id || undefined,
       manufactureDate: putToDateStr(row.manufacture_date),
       expiryDate: putToDateStr(row.expiry_date),
@@ -903,7 +926,9 @@ router.patch('/:id', async (req, res) => {
     const allowedFields = [
       'project_id', 'contractor_id', 'name', 'object_type', 'climate_system',
       'temperature_limits', 'humidity_limits', 'storage_zones', 'measurement_zones', 'work_schedule',
-      'plan_file_url', 'plan_file_name', 'test_data_file_url', 'test_data_file_name',
+      'plan_file_url', 'plan_file_name',
+      'equipment_placement_plan_file_url', 'equipment_placement_plan_file_name',
+      'test_data_file_url', 'test_data_file_name',
       'address', 'latitude', 'longitude', 'geocoded_at', 'area',
       'vin', 'registration_number', 'body_volume',
       'inventory_number', 'chamber_volume', 'serial_number', 'manufacturer',
@@ -919,6 +944,8 @@ router.patch('/:id', async (req, res) => {
       work_schedule: 'workSchedule',
       plan_file_url: 'planFileUrl',
       plan_file_name: 'planFileName',
+      equipment_placement_plan_file_url: 'equipmentPlacementPlanFileUrl',
+      equipment_placement_plan_file_name: 'equipmentPlacementPlanFileName',
       test_data_file_url: 'testDataFileUrl',
       test_data_file_name: 'testDataFileName',
       address: 'address',
@@ -986,7 +1013,7 @@ router.patch('/:id', async (req, res) => {
     }
     
     // Если обновляются файлы планов, регистрируем их в project_files
-    if (updates.planFileUrl || updates.testDataFileUrl) {
+    if (updates.planFileUrl || updates.testDataFileUrl || updates.equipmentPlacementPlanFileUrl) {
       let fileProjectId = projectId;
       if (!fileProjectId) {
         const objectResult = await pool.query(
@@ -1041,6 +1068,28 @@ router.patch('/:id', async (req, res) => {
               id
             ]);
           }
+
+          if (updates.equipmentPlacementPlanFileUrl) {
+            await pool.query(`
+              INSERT INTO project_files (
+                project_id, file_type, file_category, file_name, original_file_name,
+                file_url, file_size, mime_type, related_table, related_id
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+              ON CONFLICT DO NOTHING
+            `, [
+              fileProjectId,
+              'plan',
+              'equipment_placement_scheme',
+              updates.equipmentPlacementPlanFileName || 'equipment_placement_scheme',
+              updates.equipmentPlacementPlanFileName || 'equipment_placement_scheme',
+              updates.equipmentPlacementPlanFileUrl,
+              null,
+              null,
+              'qualification_objects',
+              id
+            ]);
+          }
         } catch (fileTrackingError: any) {
           // Игнорируем ошибку, если таблица project_files не существует
           if (fileTrackingError.code !== '42P01') {
@@ -1068,6 +1117,8 @@ router.patch('/:id', async (req, res) => {
           pqod.work_schedule,
           pqod.plan_file_url,
           pqod.plan_file_name,
+          pqod.equipment_placement_plan_file_url,
+          pqod.equipment_placement_plan_file_name,
           pqod.test_data_file_url,
           pqod.test_data_file_name,
           pqod.address,
@@ -1128,6 +1179,10 @@ router.patch('/:id', async (req, res) => {
       humidityLimits: row.humidity_limits || { min: null, max: null },
       measurementZones: row.measurement_zones || [],
       workSchedule: row.work_schedule || [],
+      planFileUrl: row.plan_file_url || undefined,
+      planFileName: row.plan_file_name || undefined,
+      equipmentPlacementPlanFileUrl: row.equipment_placement_plan_file_url || undefined,
+      equipmentPlacementPlanFileName: row.equipment_placement_plan_file_name || undefined,
       contractorId: row.contractor_id || undefined,
       manufactureDate: patchToDateStr(row.manufacture_date),
       expiryDate: patchToDateStr(row.expiry_date),

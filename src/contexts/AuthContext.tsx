@@ -242,18 +242,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Обновление пользователя
   const updateUser = async (id: string, updatedUser: Partial<User>) => {
     try {
-      // Пытаемся обновить в базе данных
       if (userService.isAvailable()) {
         try {
-          await userService.updateUser(id, updatedUser);
+          const merged = await userService.updateUser(id, updatedUser);
+          setUsers(prev => prev.map(u => (u.id === id ? { ...u, ...merged } : u)));
           console.log('Пользователь обновлен в БД:', id);
         } catch (error) {
           console.error('Ошибка обновления в БД:', error);
           throw error;
         }
+      } else {
+        setUsers(prev => prev.map(u => (u.id === id ? { ...u, ...updatedUser } : u)));
       }
-
-      setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updatedUser } : u));
     } catch (error) {
       console.error('Ошибка обновления пользователя:', error);
       throw error;
@@ -291,25 +291,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const targetUser = users.find(u => u.id === userId);
       if (!targetUser) return false;
-      
-      // Проверяем старый пароль
-      if (targetUser.password !== oldPassword) return false;
-      
-      // Обновляем пароль в базе данных
+
       if (userService.isAvailable()) {
         try {
-          await userService.resetPassword(userId, newPassword);
-        } catch (error) {
+          await userService.changePassword(userId, oldPassword, newPassword);
+        } catch (error: unknown) {
+          const status =
+            typeof error === 'object' && error !== null && 'status' in error
+              ? (error as { status: number }).status
+              : undefined;
+          const msg = error instanceof Error ? error.message : '';
+          if (status === 401 || msg.includes('Неверный')) return false;
           console.error('Ошибка смены пароля в БД:', error);
           throw error;
         }
+        setUsers(prev => prev.map(u => (u.id === userId ? { ...u, password: '' } : u)));
+        return true;
       }
-      
-      // Обновляем локальное состояние
-      setUsers(prev => prev.map(u => 
-        u.id === userId ? { ...u, password: newPassword } : u
-      ));
-      
+
+      if (targetUser.password !== oldPassword) return false;
+
+      setUsers(prev => prev.map(u => (u.id === userId ? { ...u, password: newPassword } : u)));
       return true;
     } catch (error) {
       console.error('Ошибка смены пароля:', error);

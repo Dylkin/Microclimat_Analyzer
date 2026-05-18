@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { MailSettingsPage } from './components/MailSettingsPage';
+import { FinancePage } from './components/FinancePage';
+import { TaxSettingsPage } from './components/TaxSettingsPage';
 import type { ContractorDirectoryProps, ContractorDirectoryFocusRequest } from './components/ContractorDirectory';
 import './index.css';
 
@@ -10,6 +12,7 @@ import './index.css';
 const MicroclimatAnalyzer = lazy(() => import('./components/MicroclimatAnalyzer'));
 const Help = lazy(() => import('./components/Help'));
 const UserDirectory = lazy(() => import('./components/admin-panels').then(m => ({ default: m.UserDirectory })));
+const StaffDirectory = lazy(() => import('./components/admin-panels').then(m => ({ default: m.StaffDirectory })));
 const ContractorDirectory = lazy(() =>
   import('./components/admin-panels').then((m) => ({
     default: m.ContractorDirectory as React.ComponentType<ContractorDirectoryProps>
@@ -29,6 +32,9 @@ const ResetPassword = lazy(() => import('./components/ResetPassword'));
 const TenderSearch = lazy(() => import('./components/TenderSearch'));
 const QualificationObjectTypes = lazy(() => import('./components/QualificationObjectTypes'));
 const ReleasePage = lazy(() => import('./components/ReleasePage').then(m => ({ default: m.ReleasePage })));
+const PersonalProfilePage = lazy(() =>
+  import('./components/PersonalProfilePage').then((m) => ({ default: m.PersonalProfilePage }))
+);
 const QualificationObjectWindow = lazy(() => import('./components/QualificationObjectWindow').then(m => ({ default: m.QualificationObjectWindow })));
 const LoggerPlacementPlanEditor = lazy(() =>
   import('./components/LoggerPlacementPlanEditor').then((m) => ({
@@ -190,14 +196,32 @@ const AppContent: React.FC = () => {
             onPageChange={handlePageChange}
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;
-      case 'testing_execution':
+      case 'testing_execution': {
+        const testingFocus =
+          pageData?.focusQualificationObjectId
+            ? {
+                qualificationObjectId: pageData.focusQualificationObjectId as string,
+                workScheduleStageName: pageData.focusWorkScheduleStageName as string | undefined
+              }
+            : null;
         return hasAccess('analyzer') && selectedProject ? wrapWithSuspense(
           <TestingExecution 
             project={selectedProject}
             onBack={() => handlePageChange('projects')}
             onPageChange={handlePageChange}
+            returnFocus={testingFocus}
+            onReturnFocusHandled={() => {
+              setPageData((prev: any) => {
+                if (!prev?.focusQualificationObjectId) return prev;
+                const next = { ...prev };
+                delete next.focusQualificationObjectId;
+                delete next.focusWorkScheduleStageName;
+                return next;
+              });
+            }}
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;
+      }
       case 'creating_report':
         return hasAccess('analyzer') && selectedProject ? wrapWithSuspense(
           <CreatingReport 
@@ -252,7 +276,13 @@ const AppContent: React.FC = () => {
                 qualificationObjectName={qualificationObjectName}
                 planFileUrl={planFileUrl}
                 planFileName={planFileName}
-                onBack={() => handlePageChange('testing_execution', projectForEditor)}
+                onBack={() =>
+                  handlePageChange('testing_execution', {
+                    project: projectForEditor,
+                    focusQualificationObjectId: qualificationObjectId,
+                    focusWorkScheduleStageName: 'Расстановка логгеров'
+                  })
+                }
               />
             )
           : <div>Доступ запрещен или данные плана не найдены</div>;
@@ -261,6 +291,8 @@ const AppContent: React.FC = () => {
         return hasAccess('help') ? wrapWithSuspense(<Help />) : <div>Доступ запрещен</div>;
       case 'users':
         return canAccessUsersDirectory ? wrapWithSuspense(<UserDirectory />) : <div>Доступ запрещен</div>;
+      case 'staff-directory':
+        return hasAccess('analyzer') ? wrapWithSuspense(<StaffDirectory />) : <div>Доступ запрещен</div>;
       case 'audit_logs':
         return hasAccess('admin') ? wrapWithSuspense(<AuditLogs onBack={() => handlePageChange('projects')} />) : <div>Доступ запрещен</div>;
       case 'contractors':
@@ -284,6 +316,12 @@ const AppContent: React.FC = () => {
         return hasAccess('analyzer') ? wrapWithSuspense(<TenderSearch />) : <div>Доступ запрещен</div>;
       case 'mail-settings':
         return hasAccess('analyzer') ? wrapWithSuspense(<MailSettingsPage />) : <div>Доступ запрещен</div>;
+      case 'tax-settings':
+        return hasAccess('analyzer') ? wrapWithSuspense(<TaxSettingsPage />) : <div>Доступ запрещен</div>;
+      case 'finance':
+        return hasAccess('analyzer') ? wrapWithSuspense(<FinancePage />) : <div>Доступ запрещен</div>;
+      case 'profile':
+        return wrapWithSuspense(<PersonalProfilePage />);
       case 'release':
         return hasAccess('analyzer') ? wrapWithSuspense(<ReleasePage />) : <div>Доступ запрещен</div>;
       default:

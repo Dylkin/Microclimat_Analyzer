@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, BarChart3, Menu, X, HelpCircle, Users, Building2, FolderOpen, Wrench, Activity, Settings, ChevronDown, ChevronRight, Search, Package, ShoppingCart } from 'lucide-react';
+import { LogOut, BarChart3, Menu, X, HelpCircle, Users, Building2, FolderOpen, Wrench, Activity, Settings, ChevronDown, ChevronRight, Search, Package, ShoppingCart, Briefcase } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -19,6 +19,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       key: 'users',
       icon: Users,
       access: 'users' as const
+    },
+    {
+      name: 'Структура предприятия',
+      key: 'staff-directory',
+      icon: Briefcase,
+      access: 'analyzer' as const
     },
     {
       name: 'Контрагенты',
@@ -77,6 +83,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         {
           name: 'Настройки почты',
           key: 'mail-settings',
+          icon: Settings,
+          access: 'analyzer' as const
+        },
+        {
+          name: 'Налоги',
+          key: 'tax-settings',
+          icon: Settings,
+          access: 'analyzer' as const
+        },
+        {
+          name: 'Финансы',
+          key: 'finance',
           icon: Settings,
           access: 'analyzer' as const
         },
@@ -146,15 +164,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
               const Icon = item.icon;
               const hasChildren = item.children && item.children.length > 0;
               const isExpanded = expandedMenus.has(item.key);
-              
+
               if (hasChildren) {
                 return (
                   <div key={item.key}>
                     <button
                       onClick={() => toggleMenu(item.key)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                      }`}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        }`}
                     >
                       <div className="flex items-center">
                         <Icon className="w-5 h-5 mr-3" />
@@ -177,11 +194,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                                 onPageChange(child.key);
                                 setSidebarOpen(false);
                               }}
-                              className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                currentPage === child.key
-                                  ? 'bg-indigo-100 text-indigo-700'
-                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                              }`}
+                              className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentPage === child.key
+                                ? 'bg-indigo-100 text-indigo-700'
+                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                }`}
                             >
                               <ChildIcon className="w-4 h-4 mr-3" />
                               {child.name}
@@ -193,7 +209,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                   </div>
                 );
               }
-              
+
               return (
                 <button
                   key={item.key}
@@ -201,11 +217,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                     onPageChange(item.key);
                     setSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    currentPage === item.key
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
+                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentPage === item.key
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
                 >
                   <Icon className="w-5 h-5 mr-3" />
                   {item.name}
@@ -227,15 +242,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
               const Icon = item.icon;
               const hasChildren = item.children && item.children.length > 0;
               const isExpanded = expandedMenus.has(item.key);
-              
+
               if (hasChildren) {
                 return (
                   <div key={item.key}>
                     <button
                       onClick={() => toggleMenu(item.key)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                      }`}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        }`}
                     >
                       <div className="flex items-center">
                         <Icon className="w-5 h-5 mr-3" />
@@ -255,11 +269,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                             <button
                               key={child.key}
                               onClick={() => onPageChange(child.key)}
-                              className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                currentPage === child.key
-                                  ? 'bg-indigo-100 text-indigo-700'
-                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                              }`}
+                              className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentPage === child.key
+                                ? 'bg-indigo-100 text-indigo-700'
+                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                }`}
                             >
                               <ChildIcon className="w-4 h-4 mr-3" />
                               {child.name}
@@ -271,16 +284,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                   </div>
                 );
               }
-              
+
               return (
                 <button
                   key={item.key}
                   onClick={() => onPageChange(item.key)}
-                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    currentPage === item.key
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
+                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentPage === item.key
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
                 >
                   <Icon className="w-5 h-5 mr-3" />
                   {item.name}
@@ -303,10 +315,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
             >
               <Menu className="w-6 h-6" />
             </button>
-            
+
             <div className="flex items-center space-x-4">
               <div className="text-sm text-gray-600">
-                <span className="font-medium">{user?.fullName}</span>
+                <button
+                  type="button"
+                  onClick={() => onPageChange('profile')}
+                  className="font-medium text-indigo-700 hover:text-indigo-900 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded"
+                  title="Личный кабинет"
+                >
+                  {user?.fullName}
+                </button>
                 <span className="ml-2 text-gray-400">({getRoleLabel(user?.role || '')})</span>
               </div>
               <button

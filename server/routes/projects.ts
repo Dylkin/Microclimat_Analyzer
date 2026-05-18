@@ -50,19 +50,36 @@ router.get('/', (req, res, next) => {
   next();
 }, requireAuth, async (req, res) => {
   try {
-    // Проверяем наличие полей tender_link и tender_date
-    const tenderFieldsCheck = await pool.query(`
+    // Проверяем наличие дополнительных полей проекта
+    const projectFieldsCheck = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_schema = 'public' 
       AND table_name = 'projects' 
-      AND column_name IN ('tender_link', 'tender_date')
+      AND column_name IN (
+        'tender_link', 'tender_date',
+        'total_cost_with_vat',
+        'start_date_planned', 'start_date_actual',
+        'end_date_planned', 'end_date_actual',
+        'payment_date'
+      )
     `);
-    const hasTenderFields = tenderFieldsCheck.rows.length > 0;
+    const projectColumns = projectFieldsCheck.rows.map((r: any) => r.column_name);
+    const hasTenderFields = projectColumns.includes('tender_link') || projectColumns.includes('tender_date');
+    const hasPlanningFields =
+      projectColumns.includes('total_cost_with_vat') &&
+      projectColumns.includes('start_date_planned') &&
+      projectColumns.includes('start_date_actual') &&
+      projectColumns.includes('end_date_planned') &&
+      projectColumns.includes('end_date_actual') &&
+      projectColumns.includes('payment_date');
     
-    const selectFields = hasTenderFields
-      ? 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.tender_link, p.tender_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name'
-      : 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name';
+    const baseFields = 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name';
+    const tenderFields = hasTenderFields ? ', p.tender_link, p.tender_date' : '';
+    const planningFields = hasPlanningFields
+      ? ', p.total_cost_with_vat, p.start_date_planned, p.start_date_actual, p.end_date_planned, p.end_date_actual, p.payment_date'
+      : '';
+    const selectFields = `${baseFields}${tenderFields}${planningFields}`;
     
     const result = await pool.query(`
       SELECT ${selectFields}
@@ -208,6 +225,12 @@ router.get('/', (req, res, next) => {
         contractDate: row.contract_date ? new Date(row.contract_date) : undefined,
         tenderLink: row.tender_link || undefined,
         tenderDate: row.tender_date ? new Date(row.tender_date) : undefined,
+        totalCostWithVat: row.total_cost_with_vat != null ? parseFloat(row.total_cost_with_vat) : undefined,
+        startDatePlanned: row.start_date_planned ? new Date(row.start_date_planned) : undefined,
+        startDateActual: row.start_date_actual ? new Date(row.start_date_actual) : undefined,
+        endDatePlanned: row.end_date_planned ? new Date(row.end_date_planned) : undefined,
+        endDateActual: row.end_date_actual ? new Date(row.end_date_actual) : undefined,
+        paymentDate: row.payment_date ? new Date(row.payment_date) : undefined,
         status: row.status,
         createdBy: row.created_by,
         createdAt: new Date(row.created_at),
@@ -251,19 +274,36 @@ router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Проверяем наличие полей tender_link и tender_date
-    const tenderFieldsCheck = await pool.query(`
+    // Проверяем наличие дополнительных полей проекта
+    const projectFieldsCheck = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_schema = 'public' 
       AND table_name = 'projects' 
-      AND column_name IN ('tender_link', 'tender_date')
+      AND column_name IN (
+        'tender_link', 'tender_date',
+        'total_cost_with_vat',
+        'start_date_planned', 'start_date_actual',
+        'end_date_planned', 'end_date_actual',
+        'payment_date'
+      )
     `);
-    const hasTenderFields = tenderFieldsCheck.rows.length > 0;
+    const projectColumns = projectFieldsCheck.rows.map((r: any) => r.column_name);
+    const hasTenderFields = projectColumns.includes('tender_link') || projectColumns.includes('tender_date');
+    const hasPlanningFields =
+      projectColumns.includes('total_cost_with_vat') &&
+      projectColumns.includes('start_date_planned') &&
+      projectColumns.includes('start_date_actual') &&
+      projectColumns.includes('end_date_planned') &&
+      projectColumns.includes('end_date_actual') &&
+      projectColumns.includes('payment_date');
     
-    const selectFields = hasTenderFields
-      ? 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.tender_link, p.tender_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name'
-      : 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name';
+    const baseFields = 'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name';
+    const tenderFields = hasTenderFields ? ', p.tender_link, p.tender_date' : '';
+    const planningFields = hasPlanningFields
+      ? ', p.total_cost_with_vat, p.start_date_planned, p.start_date_actual, p.end_date_planned, p.end_date_actual, p.payment_date'
+      : '';
+    const selectFields = `${baseFields}${tenderFields}${planningFields}`;
     
     const projectResult = await pool.query(`
       SELECT ${selectFields}
@@ -442,6 +482,12 @@ router.get('/:id', requireAuth, async (req, res) => {
       contractDate: projectRow.contract_date ? new Date(projectRow.contract_date) : undefined,
       tenderLink: projectRow.tender_link || undefined,
       tenderDate: projectRow.tender_date ? new Date(projectRow.tender_date) : undefined,
+      totalCostWithVat: projectRow.total_cost_with_vat != null ? parseFloat(projectRow.total_cost_with_vat) : undefined,
+      startDatePlanned: projectRow.start_date_planned ? new Date(projectRow.start_date_planned) : undefined,
+      startDateActual: projectRow.start_date_actual ? new Date(projectRow.start_date_actual) : undefined,
+      endDatePlanned: projectRow.end_date_planned ? new Date(projectRow.end_date_planned) : undefined,
+      endDateActual: projectRow.end_date_actual ? new Date(projectRow.end_date_actual) : undefined,
+      paymentDate: projectRow.payment_date ? new Date(projectRow.payment_date) : undefined,
       status: projectRow.status,
       createdBy: projectRow.created_by,
       createdAt: new Date(projectRow.created_at),
@@ -484,27 +530,80 @@ router.post('/', requireAuth, async (req, res) => {
   try {
     await client.query('BEGIN');
     
-    const { name, description, type, contractorId, contractNumber, contractDate, tenderLink, tenderDate, status, createdBy, qualificationObjectIds, items: projectItemsData } = req.body;
+    const {
+      name,
+      description,
+      type,
+      contractorId,
+      contractNumber,
+      contractDate,
+      tenderLink,
+      tenderDate,
+      totalCostWithVat,
+      startDatePlanned,
+      startDateActual,
+      endDatePlanned,
+      endDateActual,
+      paymentDate,
+      status,
+      createdBy,
+      qualificationObjectIds,
+      items: projectItemsData
+    } = req.body;
     
     if (!name || !contractorId) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Название и подрядчик обязательны' });
     }
     
-    // Проверяем наличие полей tender_link и tender_date
-    const tenderFieldsCheck = await client.query(`
+    // Проверяем наличие дополнительных полей проекта
+    const projectFieldsCheck = await client.query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_schema = 'public' 
       AND table_name = 'projects' 
-      AND column_name IN ('tender_link', 'tender_date')
+      AND column_name IN (
+        'tender_link', 'tender_date',
+        'total_cost_with_vat',
+        'start_date_planned', 'start_date_actual',
+        'end_date_planned', 'end_date_actual',
+        'payment_date'
+      )
     `);
-    const hasTenderFields = tenderFieldsCheck.rows.length > 0;
+    const projectColumns = projectFieldsCheck.rows.map((r: any) => r.column_name);
+    const hasTenderFields = projectColumns.includes('tender_link') || projectColumns.includes('tender_date');
+    const hasPlanningFields =
+      projectColumns.includes('total_cost_with_vat') &&
+      projectColumns.includes('start_date_planned') &&
+      projectColumns.includes('start_date_actual') &&
+      projectColumns.includes('end_date_planned') &&
+      projectColumns.includes('end_date_actual') &&
+      projectColumns.includes('payment_date');
     
-    // Формируем запрос с учетом наличия полей
-    const insertFields = hasTenderFields
-      ? 'INSERT INTO projects (name, description, type, contractor_id, contract_number, contract_date, tender_link, tender_date, status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, name, description, type, contractor_id, contract_number, contract_date, tender_link, tender_date, status, created_by, created_at, updated_at'
-      : 'INSERT INTO projects (name, description, type, contractor_id, contract_number, contract_date, status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, name, description, type, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at';
+    const insertColumns = ['name', 'description', 'type', 'contractor_id', 'contract_number', 'contract_date'];
+    const insertValues: any[] = [name, description || null, type || 'qualification', contractorId, contractNumber || null, contractDate || null];
+    if (hasTenderFields) {
+      insertColumns.push('tender_link', 'tender_date');
+      insertValues.push(tenderLink || null, tenderDate || null);
+    }
+    if (hasPlanningFields) {
+      insertColumns.push(
+        'total_cost_with_vat',
+        'start_date_planned',
+        'start_date_actual',
+        'end_date_planned',
+        'end_date_actual',
+        'payment_date',
+      );
+      insertValues.push(
+        totalCostWithVat ?? null,
+        startDatePlanned || null,
+        startDateActual || null,
+        endDatePlanned || null,
+        endDateActual || null,
+        paymentDate || null,
+      );
+    }
     
     // Начальный статус по умолчанию:
     // - Квалификация: "Согласование договора"
@@ -513,9 +612,16 @@ router.post('/', requireAuth, async (req, res) => {
     const initialStatus =
       status || (normalizedType === 'qualification' ? 'contract_negotiation' : 'documents_submission');
     
-    const insertValues = hasTenderFields
-      ? [name, description || null, type || 'qualification', contractorId, contractNumber || null, contractDate || null, tenderLink || null, tenderDate || null, initialStatus, createdBy || null]
-      : [name, description || null, type || 'qualification', contractorId, contractNumber || null, contractDate || null, initialStatus, createdBy || null];
+    insertColumns.push('status', 'created_by');
+    insertValues.push(initialStatus, createdBy || null);
+    const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ');
+    const returnColumns = [
+      'id', 'name', 'description', 'type', 'contractor_id', 'contract_number', 'contract_date',
+      ...(hasTenderFields ? ['tender_link', 'tender_date'] : []),
+      ...(hasPlanningFields ? ['total_cost_with_vat', 'start_date_planned', 'start_date_actual', 'end_date_planned', 'end_date_actual', 'payment_date'] : []),
+      'status', 'created_by', 'created_at', 'updated_at'
+    ].join(', ');
+    const insertFields = `INSERT INTO projects (${insertColumns.join(', ')}) VALUES (${placeholders}) RETURNING ${returnColumns}`;
     
     // Создаем проект
     const result = await client.query(insertFields, insertValues);
@@ -678,8 +784,9 @@ router.post('/', requireAuth, async (req, res) => {
     const fullProjectResult = await pool.query(`
       SELECT 
         p.id, p.name, p.description, p.type, p.contractor_id, 
-        p.contract_number, p.contract_date, p.status, 
-        p.created_by, p.created_at, p.updated_at,
+        p.contract_number, p.contract_date, p.tender_link, p.tender_date,
+        p.total_cost_with_vat, p.start_date_planned, p.start_date_actual, p.end_date_planned, p.end_date_actual, p.payment_date,
+        p.status, p.created_by, p.created_at, p.updated_at,
         c.name as contractor_name
       FROM projects p
       LEFT JOIN contractors c ON p.contractor_id = c.id
@@ -806,6 +913,12 @@ router.post('/', requireAuth, async (req, res) => {
       contractDate: projectRow.contract_date ? new Date(projectRow.contract_date) : undefined,
       tenderLink: projectRow.tender_link || undefined,
       tenderDate: projectRow.tender_date ? new Date(projectRow.tender_date) : undefined,
+      totalCostWithVat: projectRow.total_cost_with_vat != null ? parseFloat(projectRow.total_cost_with_vat) : undefined,
+      startDatePlanned: projectRow.start_date_planned ? new Date(projectRow.start_date_planned) : undefined,
+      startDateActual: projectRow.start_date_actual ? new Date(projectRow.start_date_actual) : undefined,
+      endDatePlanned: projectRow.end_date_planned ? new Date(projectRow.end_date_planned) : undefined,
+      endDateActual: projectRow.end_date_actual ? new Date(projectRow.end_date_actual) : undefined,
+      paymentDate: projectRow.payment_date ? new Date(projectRow.payment_date) : undefined,
       status: projectRow.status,
       createdBy: projectRow.created_by,
       createdAt: new Date(projectRow.created_at),
@@ -834,6 +947,12 @@ router.put('/:id', requireAuth, async (req, res) => {
       contractorId,
       contractNumber,
       contractDate,
+      totalCostWithVat,
+      startDatePlanned,
+      startDateActual,
+      endDatePlanned,
+      endDateActual,
+      paymentDate,
       status,
       qualificationObjectIds,
       items: projectItems,
@@ -867,6 +986,30 @@ router.put('/:id', requireAuth, async (req, res) => {
       updates.push(`contract_date = $${paramCount++}`);
       values.push(contractDate);
     }
+    if (totalCostWithVat !== undefined) {
+      updates.push(`total_cost_with_vat = $${paramCount++}`);
+      values.push(totalCostWithVat);
+    }
+    if (startDatePlanned !== undefined) {
+      updates.push(`start_date_planned = $${paramCount++}`);
+      values.push(startDatePlanned);
+    }
+    if (startDateActual !== undefined) {
+      updates.push(`start_date_actual = $${paramCount++}`);
+      values.push(startDateActual);
+    }
+    if (endDatePlanned !== undefined) {
+      updates.push(`end_date_planned = $${paramCount++}`);
+      values.push(endDatePlanned);
+    }
+    if (endDateActual !== undefined) {
+      updates.push(`end_date_actual = $${paramCount++}`);
+      values.push(endDateActual);
+    }
+    if (paymentDate !== undefined) {
+      updates.push(`payment_date = $${paramCount++}`);
+      values.push(paymentDate);
+    }
     if (status !== undefined) {
       updates.push(`status = $${paramCount++}`);
       values.push(status);
@@ -886,7 +1029,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 
       const result = await client.query(
         `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramCount}
-         RETURNING id, name, description, type, contractor_id, contract_number, contract_date, status, created_by, created_at, updated_at`,
+         RETURNING id, name, description, type, contractor_id, contract_number, contract_date, total_cost_with_vat, start_date_planned, start_date_actual, end_date_planned, end_date_actual, payment_date, status, created_by, created_at, updated_at`,
         values,
       );
 
@@ -1139,6 +1282,12 @@ router.put('/:id', requireAuth, async (req, res) => {
       contractDate: projectRow.contract_date ? new Date(projectRow.contract_date) : undefined,
       tenderLink: projectRow.tender_link || undefined,
       tenderDate: projectRow.tender_date ? new Date(projectRow.tender_date) : undefined,
+      totalCostWithVat: projectRow.total_cost_with_vat != null ? parseFloat(projectRow.total_cost_with_vat) : undefined,
+      startDatePlanned: projectRow.start_date_planned ? new Date(projectRow.start_date_planned) : undefined,
+      startDateActual: projectRow.start_date_actual ? new Date(projectRow.start_date_actual) : undefined,
+      endDatePlanned: projectRow.end_date_planned ? new Date(projectRow.end_date_planned) : undefined,
+      endDateActual: projectRow.end_date_actual ? new Date(projectRow.end_date_actual) : undefined,
+      paymentDate: projectRow.payment_date ? new Date(projectRow.payment_date) : undefined,
       status: projectRow.status,
       createdBy: projectRow.created_by,
       createdAt: new Date(projectRow.created_at),

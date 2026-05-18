@@ -1,15 +1,17 @@
-export type EquipmentType = '-' | 'Testo 174T' | 'Testo 174H';
+export type EquipmentType = '-' | 'Testo 174T' | 'Testo 174H' | 'EClerk-M-RHT';
 
 export const EquipmentTypeLabels: Record<EquipmentType, string> = {
   '-': 'Не указано',
   'Testo 174T': 'Testo 174T',
-  'Testo 174H': 'Testo 174H'
+  'Testo 174H': 'Testo 174H',
+  'EClerk-M-RHT': 'EClerk-M-RHT'
 };
 
 export const EquipmentTypeColors: Record<EquipmentType, string> = {
   '-': 'bg-gray-100 text-gray-800',
   'Testo 174T': 'bg-blue-100 text-blue-800',
-  'Testo 174H': 'bg-green-100 text-green-800'
+  'Testo 174H': 'bg-green-100 text-green-800',
+  'EClerk-M-RHT': 'bg-violet-100 text-violet-800'
 };
 
 export interface Equipment {

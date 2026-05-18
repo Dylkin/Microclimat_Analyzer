@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Building, Car, Refrigerator, Snowflake, CheckSquare, Square, FileText, ExternalLink, MoreVertical, Eye, Pencil, Play, BarChart3 } from 'lucide-react';
 import { QualificationObject, QualificationObjectTypeLabels } from '../../types/QualificationObject';
 import { qualificationObjectService } from '../../utils/qualificationObjectService';
@@ -28,6 +28,12 @@ interface QualificationObjectsCRUDProps {
   onQualificationObjectStateChange?: (isOpen: boolean) => void;
   showExecuteButton?: boolean; // Показывать кнопку "Выполнить" для страницы "Проведение испытаний"
   contextPage?: string; // Для диагностики/контекстного поведения
+  /** После возврата с дочерней страницы (например редактор схемы) — открыть редактирование этого объекта */
+  autoOpenEditForObjectId?: string | null;
+  /** Прокрутить к этапу расписания после открытия формы (например «Расстановка логгеров») */
+  scrollToWorkScheduleStageName?: string | null;
+  /** Вызывается после успешного авто-открытия, чтобы сбросить контекст в родителе */
+  onAutoOpenEditHandled?: () => void;
 }
 
 export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> = ({ 
@@ -42,7 +48,10 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   onPageChange,
   onQualificationObjectStateChange,
   showExecuteButton = false,
-  contextPage
+  contextPage,
+  autoOpenEditForObjectId = null,
+  scrollToWorkScheduleStageName = null,
+  onAutoOpenEditHandled
 }) => {
   const [objects, setObjects] = useState<QualificationObject[]>([]);
   const [loading, setLoading] = useState(false);
@@ -53,6 +62,9 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
   const [loadingObject, setLoadingObject] = useState(false);
   // const [showForm, setShowForm] = useState(false);
   const [selectedObjects, setSelectedObjects] = useState<Set<string>>(new Set());
+  const handledAutoOpenRef = useRef<string | null>(null);
+  /** Сохраняем этап для прокрутки после сброса returnFocus в App */
+  const [pendingScheduleScrollStage, setPendingScheduleScrollStage] = useState<string | null>(null);
 
   const canShowDataAnalysisIcon = Boolean(onPageChange && project);
   const showDataAnalysisIcon = canShowDataAnalysisIcon && contextPage !== 'contract_negotiation';
@@ -108,6 +120,12 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
     loadObjects();
   }, [contractorId]);
 
+  useEffect(() => {
+    if (!autoOpenEditForObjectId) {
+      handledAutoOpenRef.current = null;
+    }
+  }, [autoOpenEditForObjectId]);
+
   // Инициализация выбранных объектов на основе данных проекта
   // Используем строку ID для стабильности зависимостей
   const projectQualificationObjectIds = useMemo(() => {
@@ -122,6 +140,47 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
     if (!filterToProjectSelection) return objects;
     return objects.filter((o) => projectQualificationObjectIdSet.has(o.id));
   }, [filterToProjectSelection, objects, projectQualificationObjectIdSet]);
+
+  useEffect(() => {
+    if (!autoOpenEditForObjectId || loading) return;
+    if (!displayedObjects.some((o) => o.id === autoOpenEditForObjectId)) return;
+    if (handledAutoOpenRef.current === autoOpenEditForObjectId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingObject(true);
+        const fullObject = await qualificationObjectService.getQualificationObjectById(
+          autoOpenEditForObjectId,
+          projectId
+        );
+        if (cancelled) return;
+        setEditingObject(fullObject);
+        setViewingObject(null);
+        setObjectMode('edit');
+        handledAutoOpenRef.current = autoOpenEditForObjectId;
+        if (scrollToWorkScheduleStageName) {
+          setPendingScheduleScrollStage(scrollToWorkScheduleStageName);
+        }
+        onAutoOpenEditHandled?.();
+      } catch (error) {
+        console.error('Ошибка авто-открытия объекта квалификации:', error);
+      } finally {
+        if (!cancelled) setLoadingObject(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    autoOpenEditForObjectId,
+    loading,
+    displayedObjects,
+    projectId,
+    onAutoOpenEditHandled,
+    scrollToWorkScheduleStageName
+  ]);
 
   useEffect(() => {
     if (projectQualificationObjects.length > 0) {
@@ -261,6 +320,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
                 setEditingObject(null);
                 setViewingObject(null);
                 setObjectMode(null);
+                setPendingScheduleScrollStage(null);
               }}
               className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
@@ -279,6 +339,7 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
               setEditingObject(null);
               setViewingObject(null);
               setObjectMode(null);
+              setPendingScheduleScrollStage(null);
             }}
             hideTypeSelection={true}
             projectId={projectId}
@@ -287,6 +348,8 @@ export const QualificationObjectsCRUD: React.FC<QualificationObjectsCRUDProps> =
             mode={viewingObject ? 'view' : (objectMode || 'edit')}
             showCloseButtonInView={false}
             hideWorkSchedule={!showExecuteButton}
+            scrollToWorkScheduleStageName={pendingScheduleScrollStage ?? undefined}
+            onScrollToWorkScheduleStageHandled={() => setPendingScheduleScrollStage(null)}
           />
         </div>
       ) : (

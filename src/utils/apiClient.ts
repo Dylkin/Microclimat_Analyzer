@@ -18,6 +18,14 @@ export interface ApiError {
   details?: any;
 }
 
+/** fetch() допускает только ISO-8859-1 в значениях заголовков; UTF-8 передаём как B64:… */
+function headerValueLatin1OrB64(value: string): string {
+  if (/^[\u0000-\u00ff]*$/.test(value)) {
+    return value;
+  }
+  return `B64:${btoa(unescape(encodeURIComponent(value)))}`;
+}
+
 // Класс для работы с API
 class ApiClient {
   private baseUrl: string;
@@ -37,6 +45,17 @@ class ApiClient {
       localStorage.setItem('auth_token', token);
     } else if (typeof window !== 'undefined') {
       localStorage.removeItem('auth_token');
+    }
+  }
+
+  private getCurrentUserFromStorage(): { id?: string; fullName?: string } | null {
+    if (typeof window === 'undefined') return null;
+    const userStr = localStorage.getItem('currentUser');
+    if (!userStr) return null;
+    try {
+      return JSON.parse(userStr) as { id?: string; fullName?: string };
+    } catch {
+      return null;
     }
   }
 
@@ -121,6 +140,12 @@ class ApiClient {
         parsedUser: currentUserParsed,
         userIdFromParsed: currentUserParsed?.id
       });
+    }
+
+    const cu = this.getCurrentUserFromStorage();
+    const displayName = cu?.fullName?.trim();
+    if (displayName) {
+      headers['x-user-fullname'] = headerValueLatin1OrB64(displayName);
     }
 
     try {

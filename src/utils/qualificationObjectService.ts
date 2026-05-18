@@ -3,6 +3,10 @@ import { QualificationObject, CreateQualificationObjectData } from '../types/Qua
 import { sanitizeFileName } from './fileNameUtils';
 import { getMimeType } from './mimeTypeUtils';
 
+/** Имя файла копии плана для схемы размещения (отчёт), отдельно от «План объекта». */
+export const EQUIPMENT_PLACEMENT_SCHEME_REPORT_FILE_NAME =
+  'Схема размещения измерительного оборудования (отчет).drawio';
+
 type StorageFileObject = {
   name: string;
   id?: string;
@@ -151,6 +155,95 @@ class QualificationObjectService {
     }
   }
 
+  /**
+   * Гарантирует наличие отдельной копии плана для схемы размещения (отчёт).
+   * При первом вызове копирует текущий план объекта в хранилище проекта и сохраняет ссылки в объекте.
+   */
+  async ensureEquipmentPlacementSchemeCopy(
+    objectId: string,
+    projectId: string | undefined,
+    sourcePlanUrl: string | undefined
+  ): Promise<{ url: string; name: string }> {
+    const obj = await this.getQualificationObjectById(objectId, projectId);
+    const existing = (obj.equipmentPlacementPlanFileUrl || '').trim();
+    if (existing) {
+      return {
+        url: existing,
+        name: obj.equipmentPlacementPlanFileName || EQUIPMENT_PLACEMENT_SCHEME_REPORT_FILE_NAME
+      };
+    }
+
+    const src = (sourcePlanUrl || obj.planFileUrl || '').trim();
+    if (!src) {
+      throw new Error('Не указан файл плана объекта (.drawio).');
+    }
+
+    const isAbsolute = /^https?:\/\//i.test(src);
+    const origin =
+      typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '';
+    const fetchUrl = isAbsolute ? src : `${origin}${src}`;
+
+    const response = await fetch(fetchUrl, { credentials: 'include' });
+    if (!response.ok) {
+      throw new Error(`Не удалось загрузить план для копирования (HTTP ${response.status}).`);
+    }
+    const text = await response.text();
+    if (!text.includes('<mxfile') && !text.includes('<mxGraphModel')) {
+      throw new Error('Файл плана не похож на документ draw.io (.drawio).');
+    }
+
+    const reportName = EQUIPMENT_PLACEMENT_SCHEME_REPORT_FILE_NAME;
+    const file = new File([text], reportName, { type: 'application/xml' });
+    const basePath = this.buildProjectPath('equipment-placement-schemes', objectId, projectId);
+    const storagePath = `${basePath}/${Date.now()}-${sanitizeFileName(reportName)}`;
+
+    const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
+      bucket: 'qualification-objects',
+      path: storagePath
+    });
+
+    const publicUrl = uploadResult.data?.publicUrl || `/uploads/qualification-objects/${storagePath}`;
+
+    await apiClient.patch(`/qualification-objects/${objectId}`, {
+      equipmentPlacementPlanFileUrl: publicUrl,
+      equipmentPlacementPlanFileName: reportName,
+      projectId
+    });
+
+    return { url: publicUrl, name: reportName };
+  }
+
+  /**
+   * Сохраняет актуальное содержимое схемы размещения (draw.io XML) в хранилище и обновляет ссылки на объекте.
+   * Маркеры mc-place-* должны быть удалены вызывающим кодом, если они будут пересобраны при следующем слиянии.
+   */
+  async uploadEquipmentPlacementSchemeFile(
+    objectId: string,
+    xmlContent: string,
+    projectId?: string,
+    fileName?: string
+  ): Promise<{ url: string; name: string }> {
+    const reportName = fileName?.trim() || EQUIPMENT_PLACEMENT_SCHEME_REPORT_FILE_NAME;
+    const file = new File([xmlContent], reportName, { type: 'application/xml' });
+    const basePath = this.buildProjectPath('equipment-placement-schemes', objectId, projectId);
+    const storagePath = `${basePath}/${Date.now()}-${sanitizeFileName(reportName)}`;
+
+    const uploadResult = await apiClient.uploadFile('/storage/upload', file, {
+      bucket: 'qualification-objects',
+      path: storagePath
+    });
+
+    const publicUrl = uploadResult.data?.publicUrl || `/uploads/qualification-objects/${storagePath}`;
+
+    await apiClient.patch(`/qualification-objects/${objectId}`, {
+      equipmentPlacementPlanFileUrl: publicUrl,
+      equipmentPlacementPlanFileName: reportName,
+      projectId
+    });
+
+    return { url: publicUrl, name: reportName };
+  }
+
   async uploadTestDataFile(objectId: string, file: File, projectId?: string): Promise<string> {
     try {
       // Очищаем имя файла от недопустимых символов
@@ -242,6 +335,10 @@ class QualificationObjectService {
       climateSystem: data.climateSystem || data.climate_system || '',
       planFileUrl: data.planFileUrl || data.plan_file_url || '',
       planFileName: data.planFileName || data.plan_file_name || '',
+      equipmentPlacementPlanFileUrl:
+        data.equipmentPlacementPlanFileUrl || data.equipment_placement_plan_file_url || '',
+      equipmentPlacementPlanFileName:
+        data.equipmentPlacementPlanFileName || data.equipment_placement_plan_file_name || '',
       address: data.address || '',
       latitude: data.latitude ? parseFloat(data.latitude) : undefined,
       longitude: data.longitude ? parseFloat(data.longitude) : undefined,
@@ -314,6 +411,12 @@ class QualificationObjectService {
       // Поля, которые есть только в QualificationObject
       if ('planFileUrl' in data && data.planFileUrl !== undefined) dbData.planFileUrl = data.planFileUrl;
       if ('planFileName' in data && data.planFileName !== undefined) dbData.planFileName = data.planFileName;
+      if ('equipmentPlacementPlanFileUrl' in data && data.equipmentPlacementPlanFileUrl !== undefined) {
+        dbData.equipmentPlacementPlanFileUrl = data.equipmentPlacementPlanFileUrl;
+      }
+      if ('equipmentPlacementPlanFileName' in data && data.equipmentPlacementPlanFileName !== undefined) {
+        dbData.equipmentPlacementPlanFileName = data.equipmentPlacementPlanFileName;
+      }
       if ('geocodedAt' in data && data.geocodedAt !== undefined) dbData.geocodedAt = data.geocodedAt?.toISOString();
       if ('testDataFileUrl' in data && data.testDataFileUrl !== undefined) dbData.testDataFileUrl = data.testDataFileUrl;
       if ('testDataFileName' in data && data.testDataFileName !== undefined) dbData.testDataFileName = data.testDataFileName;

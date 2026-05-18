@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Trash2, MapPin, CheckCircle, Save } from 'lucide-react';
 import { MeasurementZone, MeasurementLevel } from '../types/QualificationObject';
-import { Equipment } from '../types/Equipment';
+import { Equipment, EquipmentType } from '../types/Equipment';
 import { equipmentService } from '../utils/equipmentService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 
@@ -11,6 +11,8 @@ interface EquipmentPlacementProps {
   onZonesChange?: (zones: MeasurementZone[]) => void;
   readOnly?: boolean;
   projectId?: string;
+  /** Блок над справкой «Информация о расстановке оборудования» (например кнопка «Разместить на схеме»). */
+  abovePlacementInfo?: React.ReactNode;
 }
 
 export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
@@ -18,7 +20,8 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
   initialZones = [],
   onZonesChange,
   readOnly = false,
-  projectId
+  projectId,
+  abovePlacementInfo
 }) => {
   // Инициализируем с зоной 0 (Внешняя температура), если зон нет
   const initializeZones = (zones: MeasurementZone[]): MeasurementZone[] => {
@@ -141,7 +144,8 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
         id: `level-${Date.now()}-${Math.random()}`,
         level: level.level,
         equipmentId: '', // Не копируем привязку к оборудованию
-        equipmentName: ''
+        equipmentName: '',
+        equipmentType: undefined
       }));
     }
     
@@ -196,7 +200,8 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
           id: `level-${Date.now()}`,
           level: 0,
           equipmentId: '',
-          equipmentName: ''
+          equipmentName: '',
+          equipmentType: undefined
         };
         return {
           ...zone,
@@ -236,13 +241,26 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
   };
 
   // Обновление оборудования для уровня
-  const updateMeasurementLevelEquipment = (zoneId: string, levelId: string, equipmentId: string, equipmentName: string) => {
+  const updateMeasurementLevelEquipment = (
+    zoneId: string,
+    levelId: string,
+    equipmentId: string,
+    equipmentName: string,
+    equipmentType?: EquipmentType
+  ) => {
     setMeasurementZones(prev => prev.map(zone => {
       if (zone.id === zoneId) {
         return {
           ...zone,
-          measurementLevels: zone.measurementLevels.map(l => 
-            l.id === levelId ? { ...l, equipmentId, equipmentName } : l
+          measurementLevels: zone.measurementLevels.map(l =>
+            l.id === levelId
+              ? {
+                  ...l,
+                  equipmentId,
+                  equipmentName,
+                  equipmentType: equipmentId ? equipmentType : undefined
+                }
+              : l
           )
         };
       }
@@ -263,10 +281,35 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
   const handleEquipmentSelect = (zoneId: string, levelId: string, equipmentId: string) => {
     const selectedEquipment = equipment.find(eq => eq.id === equipmentId);
     if (selectedEquipment) {
-      updateMeasurementLevelEquipment(zoneId, levelId, equipmentId, selectedEquipment.name);
+      updateMeasurementLevelEquipment(
+        zoneId,
+        levelId,
+        equipmentId,
+        selectedEquipment.name,
+        selectedEquipment.type
+      );
       setEquipmentSearchTerms(prev => ({ ...prev, [levelId]: selectedEquipment.name }));
     }
   };
+
+  // Подстановка типа логгера для ранее сохранённых уровней (только equipmentId в JSON).
+  useEffect(() => {
+    if (equipmentLoading || equipment.length === 0) return;
+    setMeasurementZones(prev => {
+      let changed = false;
+      const next = prev.map(zone => ({
+        ...zone,
+        measurementLevels: zone.measurementLevels.map(l => {
+          if (!l.equipmentId || l.equipmentType) return l;
+          const eq = equipment.find(e => e.id === l.equipmentId);
+          if (!eq) return l;
+          changed = true;
+          return { ...l, equipmentType: eq.type };
+        })
+      }));
+      return changed ? next : prev;
+    });
+  }, [equipment, equipmentLoading]);
 
   // Сохранение зон измерения в базу данных
   const handleSave = async () => {
@@ -507,6 +550,10 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
             <span>{saving ? 'Сохранение...' : 'Сохранить'}</span>
           </button>
         </div>
+      )}
+
+      {abovePlacementInfo != null && abovePlacementInfo !== false && (
+        <div className="mt-4">{abovePlacementInfo}</div>
       )}
 
       {/* Информация о расстановке */}

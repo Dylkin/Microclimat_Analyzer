@@ -22,6 +22,9 @@ interface QualificationObjectFormProps {
   mode?: 'view' | 'edit' | 'create'; // Добавляем режим работы
   hideWorkSchedule?: boolean; // Скрыть блок "План график проведения квалификационных работ" и все его подблоки
   showCloseButtonInView?: boolean; // Показывать кнопку "Закрыть" в режиме просмотра
+  /** Прокрутить к этапу расписания по имени после монтирования (например при возврате с редактора схемы) */
+  scrollToWorkScheduleStageName?: string;
+  onScrollToWorkScheduleStageHandled?: () => void;
 }
 
 const getTypeIcon = (type: QualificationObjectType) => {
@@ -53,10 +56,11 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   onPageChange,
   mode = 'create',
   hideWorkSchedule = false,
-  showCloseButtonInView = true
+  showCloseButtonInView = true,
+  scrollToWorkScheduleStageName,
+  onScrollToWorkScheduleStageHandled
 }) => {
   // Все хуки должны быть вызваны до любых условных возвратов
-  console.log('QualificationObjectForm получил projectId:', projectId);
   const initialStorageZones = (initialData?.storageZones || []).map((zone, index) => ({
     ...zone,
     id: zone.id || `storage-zone-${Date.now()}-${index}`
@@ -965,6 +969,44 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               type="plan"
               uploadedUrl={uploadedPlanUrl}
             />
+            {initialData?.id && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Схема расположения измерительного оборудования
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Файл формата draw.io с указанием мест установки измерительного оборудования создаётся и
+                  сохраняется на странице «Размещение логгеров на схеме» (этап «Расстановка логгеров» в плане
+                  графика работ).
+                </p>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  {(initialData.equipmentPlacementPlanFileUrl || '').trim() ? (
+                    <div className="flex items-center space-x-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                      <Eye className="w-4 h-4 text-green-600 shrink-0" />
+                      <div className="min-w-0">
+                        <a
+                          href={initialData.equipmentPlacementPlanFileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-green-700 hover:text-green-800 underline break-all"
+                        >
+                          {initialData.equipmentPlacementPlanFileName?.trim() ||
+                            'Открыть схему (.drawio)'}
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start space-x-2 text-sm text-gray-600">
+                      <FileText className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                      <span>
+                        Файл ещё не сформирован. При наличии плана объекта в формате draw.io откройте
+                        размещение логгеров на схеме и сохраните документ в редакторе.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1013,6 +1055,9 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
             hideTestDocuments={hideWorkSchedule}
             planFileUrl={uploadedPlanUrl || initialData.planFileUrl}
             planFileName={initialData.planFileName}
+            equipmentPlacementPlanFileUrl={initialData.equipmentPlacementPlanFileUrl}
+            scrollToStageNameOnMount={scrollToWorkScheduleStageName}
+            onScrollToStageHandled={onScrollToWorkScheduleStageHandled}
           />
         </div>
       )}

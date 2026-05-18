@@ -6,7 +6,12 @@ export interface User {
   email: string;
   password: string;
   role: UserRole;
+  /** Текстовая должность (устаревшее) или подпись, синхронизируемая с штатной должностью */
   position?: string;
+  /** Должность из справочника «Структура предприятия» */
+  staffPositionId?: string | null;
+  staffDepartmentName?: string;
+  staffPositionName?: string;
   isDefault?: boolean;
 }
 

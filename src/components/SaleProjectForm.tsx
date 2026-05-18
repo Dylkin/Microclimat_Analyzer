@@ -44,6 +44,12 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
   const [showContractorDropdown, setShowContractorDropdown] = useState(false);
   const [tenderLink, setTenderLink] = useState('');
   const [tenderDate, setTenderDate] = useState('');
+  const [totalCostWithVat, setTotalCostWithVat] = useState<string>('');
+  const [startDatePlanned, setStartDatePlanned] = useState('');
+  const [startDateActual, setStartDateActual] = useState('');
+  const [endDatePlanned, setEndDatePlanned] = useState('');
+  const [endDateActual, setEndDateActual] = useState('');
+  const [paymentDate, setPaymentDate] = useState('');
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [supplierSearches, setSupplierSearches] = useState<Record<number, string>>({});
   const [showSupplierDropdowns, setShowSupplierDropdowns] = useState<Record<number, boolean>>({});
@@ -447,6 +453,12 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
       contractorId,
       tenderLink: tenderLink || undefined,
       tenderDate: tenderDate ? new Date(tenderDate) : undefined,
+      totalCostWithVat: totalCostWithVat ? Number(totalCostWithVat) : undefined,
+      startDatePlanned: startDatePlanned ? new Date(startDatePlanned) : undefined,
+      startDateActual: startDateActual ? new Date(startDateActual) : undefined,
+      endDatePlanned: endDatePlanned ? new Date(endDatePlanned) : undefined,
+      endDateActual: endDateActual ? new Date(endDateActual) : undefined,
+      paymentDate: paymentDate ? new Date(paymentDate) : undefined,
       qualificationObjectIds: [],
       items: items.map((item, itemIndex) => {
         // Если наименование указано пользователем, используем его
@@ -612,6 +624,89 @@ export const SaleProjectForm: React.FC<SaleProjectFormProps> = ({
             aria-label="Дата тендера"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Стоимость, руб с НДС
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={totalCostWithVat}
+            onChange={(e) => setTotalCostWithVat(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Введите стоимость"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Дата начала (план)
+            </label>
+            <input
+              type="date"
+              value={startDatePlanned}
+              onChange={(e) => setStartDatePlanned(e.target.value)}
+              title="Дата начала (план)"
+              aria-label="Дата начала (план)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Дата начала (факт)
+            </label>
+            <input
+              type="date"
+              value={startDateActual}
+              onChange={(e) => setStartDateActual(e.target.value)}
+              title="Дата начала (факт)"
+              aria-label="Дата начала (факт)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Дата завершения (план)
+            </label>
+            <input
+              type="date"
+              value={endDatePlanned}
+              onChange={(e) => setEndDatePlanned(e.target.value)}
+              title="Дата завершения (план)"
+              aria-label="Дата завершения (план)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Дата завершения (факт)
+            </label>
+            <input
+              type="date"
+              value={endDateActual}
+              onChange={(e) => setEndDateActual(e.target.value)}
+              title="Дата завершения (факт)"
+              aria-label="Дата завершения (факт)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Дата оплаты
+            </label>
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              title="Дата оплаты"
+              aria-label="Дата оплаты"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
         </div>
 
         {/* Товары */}

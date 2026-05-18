@@ -10,6 +10,11 @@ import { VI2ParsingService } from '../utils/vi2Parser';
 import { XLSParser } from '../utils/xlsParser';
 import { loggerDataService } from '../utils/loggerDataService';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  drawioXmlHasLoggerPlacementMarkers,
+  parseLoggerPlacementPositionsFromDrawioXml,
+  parseMeasurementZonesFromLoggerPlacementDrawioXml
+} from '../utils/loggerPlacementDrawioMerge';
 
 interface QualificationWorkStage {
   id: string;
@@ -31,9 +36,14 @@ interface QualificationWorkScheduleProps {
   project?: any; // Добавляем полный объект проекта
   planFileUrl?: string; // Публичный URL файла плана объекта
   planFileName?: string; // Имя файла плана объекта
+  /** Сохранённая схема расположения измерительного оборудования (.drawio), если есть — подтягиваются зоны для «Расстановка логгеров». */
+  equipmentPlacementPlanFileUrl?: string;
   onPageChange?: (page: string, data?: any) => void;
   mode?: 'view' | 'edit'; // Режим просмотра или редактирования
   hideTestDocuments?: boolean; // Скрыть блок "Документы по испытанию" и "Информация о расписании"
+  /** После загрузки этапов — прокрутить к карточке этапа с этим именем (один раз) */
+  scrollToStageNameOnMount?: string;
+  onScrollToStageHandled?: () => void;
 }
 
 const QUALIFICATION_STAGES: Omit<QualificationWorkStage, 'id' | 'startDate' | 'endDate' | 'isCompleted'>[] = [
@@ -74,9 +84,12 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   project,
   planFileUrl,
   planFileName,
+  equipmentPlacementPlanFileUrl,
   onPageChange,
   mode = 'edit',
-  hideTestDocuments = false
+  hideTestDocuments = false,
+  scrollToStageNameOnMount,
+  onScrollToStageHandled
 }) => {
   const sortStagesByOrder = (stagesToSort: any[]) => {
     const orderMap = new Map(QUALIFICATION_STAGES.map((stage, index) => [stage.name, index]));
@@ -105,7 +118,9 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   const [parsingProgress, setParsingProgress] = useState<{ [key: string]: number }>({});
   const [stageCompletionLoading, setStageCompletionLoading] = useState<{ [key: string]: boolean }>({});
   const [loggerFileKeysByLoggerName, setLoggerFileKeysByLoggerName] = useState<{ [key: string]: string[] }>({});
+  const [placementEditorPreparing, setPlacementEditorPreparing] = useState(false);
   const prevMeasurementZonesRef = useRef<MeasurementZone[]>([]);
+  const scrollToStageHandledRef = useRef(false);
 
   // Проверяем, есть ли загруженный план объекта в формате .drawio
   const hasDrawioPlan = (() => {
@@ -117,9 +132,42 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
     return false;
   })();
 
+  const hasEquipmentPlacementSchemeUrl = !!(equipmentPlacementPlanFileUrl || '').trim();
+
+  const canOpenLoggerPlacementEditor =
+    (hasDrawioPlan && !!(planFileUrl || '').trim()) || hasEquipmentPlacementSchemeUrl;
+
   useEffect(() => {
     prevMeasurementZonesRef.current = measurementZones;
   }, [measurementZones]);
+
+  useEffect(() => {
+    scrollToStageHandledRef.current = false;
+  }, [scrollToStageNameOnMount, qualificationObjectId]);
+
+  useEffect(() => {
+    if (!scrollToStageNameOnMount || loading) return;
+    if (scrollToStageHandledRef.current) return;
+    const target = stages.find((s) => s.name === scrollToStageNameOnMount);
+    if (!target) {
+      if (stages.length > 0) {
+        scrollToStageHandledRef.current = true;
+        onScrollToStageHandled?.();
+      }
+      return;
+    }
+    scrollToStageHandledRef.current = true;
+    const elId = `qualification-work-stage-${target.id}`;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.getElementById(elId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        onScrollToStageHandled?.();
+      });
+    });
+  }, [loading, stages, scrollToStageNameOnMount, onScrollToStageHandled]);
 
 
   // Загрузка расписания из базы данных
@@ -524,64 +572,128 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
   // Загрузка зон измерения из объекта квалификации
   const loadMeasurementZones = async () => {
-    // Убрана проверка isAvailable - API клиент всегда доступен
+    const addExternalSensorZoneIfMissing = (base: MeasurementZone[]): MeasurementZone[] => {
+      if (base.some((zone) => zone.zoneNumber === 0)) {
+        return base;
+      }
+      const externalZone: MeasurementZone = {
+        id: `zone-external-${Date.now()}`,
+        zoneNumber: 0,
+        measurementLevels: [
+          {
+            id: `level-external-${Date.now()}`,
+            level: 1.0,
+            equipmentId: '',
+            equipmentName: ''
+          }
+        ]
+      };
+      const renumbered = base.map((zone, index) => ({
+        ...zone,
+        zoneNumber: index + 1
+      }));
+      return [externalZone, ...renumbered];
+    };
+
+    const applySavedEquipmentSchemeToZones = async (
+      baseZones: MeasurementZone[],
+      obj: { equipmentPlacementPlanFileUrl?: string }
+    ): Promise<MeasurementZone[]> => {
+      const schemeUrl = (
+        (obj.equipmentPlacementPlanFileUrl || '').trim() ||
+        (equipmentPlacementPlanFileUrl || '').trim()
+      );
+      if (!schemeUrl) {
+        return baseZones;
+      }
+      try {
+        const isAbsolute = /^https?:\/\//i.test(schemeUrl);
+        const origin =
+          typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '';
+        const fetchUrl = isAbsolute ? schemeUrl : `${origin}${schemeUrl}`;
+        const response = await fetch(fetchUrl, { credentials: 'include' });
+        if (!response.ok) {
+          console.warn('QualificationWorkSchedule: схема размещения оборудования, HTTP', response.status);
+          return baseZones;
+        }
+        const xml = await response.text();
+        if (!xml.includes('<mxfile') && !xml.includes('<mxGraphModel')) {
+          return baseZones;
+        }
+        if (!drawioXmlHasLoggerPlacementMarkers(xml)) {
+          return baseZones;
+        }
+        const rebuilt = parseMeasurementZonesFromLoggerPlacementDrawioXml(xml);
+        const hasUserMeasurementZones = baseZones.some((z) => z.zoneNumber !== 0);
+        // Полная структура из схемы — пока нет пользовательских зон (≠0), чтобы не затереть уже заведённую таблицу.
+        if (rebuilt.length > 0 && !hasUserMeasurementZones) {
+          const next = addExternalSensorZoneIfMissing(rebuilt);
+          if (JSON.stringify(next) !== JSON.stringify(baseZones)) {
+            await qualificationObjectService.updateMeasurementZones(qualificationObjectId, next, projectId);
+          }
+          return next;
+        }
+        const withPos = parseLoggerPlacementPositionsFromDrawioXml(xml, baseZones);
+        if (JSON.stringify(withPos) !== JSON.stringify(baseZones)) {
+          await qualificationObjectService.updateMeasurementZones(qualificationObjectId, withPos, projectId);
+        }
+        return withPos;
+      } catch (e) {
+        console.error('QualificationWorkSchedule: не удалось применить схему размещения оборудования', e);
+        return baseZones;
+      }
+    };
 
     try {
       console.log('Загрузка зон измерения для объекта:', qualificationObjectId);
-      const qualificationObject = await qualificationObjectService.getQualificationObjectById(qualificationObjectId, projectId);
+      const qualificationObject = await qualificationObjectService.getQualificationObjectById(
+        qualificationObjectId,
+        projectId
+      );
       console.log('Загруженный объект квалификации:', qualificationObject);
-      
-      if (qualificationObject && qualificationObject.measurementZones) {
-        console.log('Найдены зоны измерения:', qualificationObject.measurementZones);
-        
-        // Проверяем, есть ли зона "Внешний датчик" (зона с номером 0)
-        const hasExternalZone = qualificationObject.measurementZones.some(zone => zone.zoneNumber === 0);
-        
+
+      if (!qualificationObject) {
+        setMeasurementZones([]);
+        return;
+      }
+
+      let zones: MeasurementZone[] = Array.isArray(qualificationObject.measurementZones)
+        ? [...qualificationObject.measurementZones]
+        : [];
+
+      if (zones.length > 0) {
+        console.log('Найдены зоны измерения:', zones);
+        const hasExternalZone = zones.some((zone) => zone.zoneNumber === 0);
         if (!hasExternalZone) {
           console.log('QualificationWorkSchedule: Зона "Внешний датчик" не найдена, создаем её');
           try {
-            // Создаем зону "Внешний датчик" с номером 0
-            const externalZone: MeasurementZone = {
-              id: `zone-external-${Date.now()}`,
-              zoneNumber: 0,
-              measurementLevels: [
-                {
-                  id: `level-external-${Date.now()}`,
-                  level: 1.0,
-                  equipmentId: '',
-                  equipmentName: ''
-                }
-              ]
-            };
-            
-            // Добавляем зону "Внешний датчик" в начало списка
-            // Перенумеровываем остальные зоны, начиная с 0
-            const renumberedZones = qualificationObject.measurementZones.map((zone, index) => ({
-              ...zone,
-              zoneNumber: index + 1 // Старые зоны начинаются с 1, но теперь должны начинаться с 0
-            }));
-            const updatedZones = [externalZone, ...renumberedZones];
-            
-            // Сохраняем обновленные зоны
-            await qualificationObjectService.updateMeasurementZones(qualificationObjectId, updatedZones, projectId);
-            
+            const updatedZones = addExternalSensorZoneIfMissing(zones);
+            await qualificationObjectService.updateMeasurementZones(
+              qualificationObjectId,
+              updatedZones,
+              projectId
+            );
             console.log('QualificationWorkSchedule: Зона "Внешний датчик" успешно создана');
-            setMeasurementZones(updatedZones);
+            zones = updatedZones;
           } catch (error) {
             console.error('QualificationWorkSchedule: Ошибка создания зоны "Внешний датчик":', error);
-            setMeasurementZones(qualificationObject.measurementZones);
+            zones = Array.isArray(qualificationObject.measurementZones)
+              ? qualificationObject.measurementZones
+              : [];
           }
-        } else {
-          setMeasurementZones(qualificationObject.measurementZones);
         }
-        
-        // Загружаем уже сохраненные данные логгеров
+        zones = await applySavedEquipmentSchemeToZones(zones, qualificationObject);
+        setMeasurementZones(zones);
         await loadLoggerRemovalFiles();
       } else {
         console.log('Зоны измерения не найдены или пусты');
-        setMeasurementZones([]);
-        // НЕ очищаем loggerRemovalFiles, чтобы сохранить уже загруженные файлы
-        // setLoggerRemovalFiles({});
+        const merged = await applySavedEquipmentSchemeToZones([], qualificationObject);
+        if (merged.length > 0) {
+          setMeasurementZones(merged);
+          await loadLoggerRemovalFiles();
+        } else {
+          setMeasurementZones([]);
+        }
       }
     } catch (error) {
       console.error('Ошибка загрузки зон измерения:', error);
@@ -592,7 +704,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   useEffect(() => {
     loadSchedule();
     loadMeasurementZones();
-  }, [qualificationObjectId]);
+  }, [qualificationObjectId, projectId, equipmentPlacementPlanFileUrl]);
 
   // Обработка изменения дат
   const handleDateChange = (stageId: string, field: 'startDate' | 'endDate', value: string) => {
@@ -1877,8 +1989,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
     }
   };
 
-  // Открытие редактора схем для размещения логгеров на плане объекта
-  const handleOpenPlanInEditor = () => {
+  // Открытие редактора схем для размещения логгеров на плане объекта (отдельная копия плана — схема отчёта)
+  const handleOpenPlanInEditor = async () => {
     console.log('QualificationWorkSchedule: handleOpenPlanInEditor вызвана', {
       qualificationObjectId,
       qualificationObjectName,
@@ -1890,8 +2002,10 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       onPageChange: !!onPageChange
     });
 
-    if (!hasDrawioPlan || !planFileUrl) {
-      alert('Для размещения логгеров на схеме необходимо загрузить план объекта в формате .drawio в блоке "План объекта".');
+    if (!canOpenLoggerPlacementEditor) {
+      alert(
+        'Для размещения логгеров на схеме загрузите план объекта в формате .drawio в блоке «План объекта» либо сохраните схему расположения измерительного оборудования в карточке объекта.'
+      );
       return;
     }
 
@@ -1901,13 +2015,28 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       return;
     }
 
-    onPageChange('logger_plan_editor', {
-      project,
-      qualificationObjectId,
-      qualificationObjectName,
-      planFileUrl,
-      planFileName
-    });
+    setPlacementEditorPreparing(true);
+    try {
+      const { url: schemeUrl, name: schemeName } =
+        await qualificationObjectService.ensureEquipmentPlacementSchemeCopy(
+          qualificationObjectId,
+          projectId,
+          planFileUrl
+        );
+
+      onPageChange('logger_plan_editor', {
+        project,
+        qualificationObjectId,
+        qualificationObjectName,
+        planFileUrl: schemeUrl,
+        planFileName: schemeName
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      alert(`Не удалось подготовить схему размещения: ${message}`);
+    } finally {
+      setPlacementEditorPreparing(false);
+    }
   };
 
   // Получение иконки для этапа
@@ -1983,7 +2112,11 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
               stageNames: stages.map(s => s.name)
             });
             return stages.map((stage, index) => (
-          <div key={stage.id} className={`border rounded-lg p-4 relative ${getStageColor(stage)}`}>
+          <div
+            key={stage.id}
+            id={`qualification-work-stage-${stage.id}`}
+            className={`border rounded-lg p-4 relative ${getStageColor(stage)}`}
+          >
             <div className="flex items-start space-x-4">
               <div className="flex-shrink-0 mt-1">
                 {getStageIcon(stage)}
@@ -2059,33 +2192,15 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                       <div
                         className={`mt-4 ${stage.isCompleted || mode === 'view' ? 'pointer-events-none opacity-60' : ''}`}
                       >
-                        <div className="mb-3 flex items-center justify-between">
-                          <div className="text-sm text-gray-700">
-                            Разместите логгеры на плане объекта в редакторе схем.
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleOpenPlanInEditor}
-                            disabled={!hasDrawioPlan}
-                            className={`inline-flex items-center px-3 py-1.5 border text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                              hasDrawioPlan
-                                ? 'border-indigo-600 text-indigo-600 hover:bg-indigo-50 focus:ring-indigo-500'
-                                : 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-100'
-                            }`}
-                            title={
-                              hasDrawioPlan
-                                ? 'Открыть план объекта в редакторе draw.io для размещения логгеров'
-                                : 'Загрузите файл плана в формате .drawio в блоке "План объекта", чтобы активировать кнопку'
-                            }
-                          >
-                            Разместить на схеме
-                          </button>
-                        </div>
-                        {!hasDrawioPlan && (
+                        <p className="text-sm text-gray-700 mb-3">
+                          Разместите логгеры на плане объекта в редакторе схем. При сохранённой схеме расположения
+                          измерительного оборудования таблица ниже заполняется по данным этой схемы.
+                        </p>
+                        {!canOpenLoggerPlacementEditor && (
                           <p className="text-xs text-gray-500 mb-3">
-                            Кнопка станет активной после загрузки файла плана объекта в формате <span className="font-mono">.drawio</span> в блоке
-                            {' '}
-                            &laquo;План объекта&raquo;.
+                            Кнопка станет активной после загрузки плана объекта в формате{' '}
+                            <span className="font-mono">.drawio</span> в блоке &laquo;План объекта&raquo; либо после
+                            сохранения схемы расположения измерительного оборудования в карточке объекта.
                           </p>
                         )}
 
@@ -2095,6 +2210,36 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                           onZonesChange={handleZonesChange}
                           readOnly={mode === 'view'}
                           projectId={projectId}
+                          abovePlacementInfo={
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleOpenPlanInEditor()}
+                                disabled={!canOpenLoggerPlacementEditor || placementEditorPreparing}
+                                className={`inline-flex items-center justify-center px-3 py-1.5 border text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 self-end sm:self-auto ${
+                                  !canOpenLoggerPlacementEditor
+                                    ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-100'
+                                    : placementEditorPreparing
+                                      ? 'border-indigo-600 text-indigo-600 cursor-wait bg-indigo-50/80'
+                                      : 'border-indigo-600 text-indigo-600 hover:bg-indigo-50 focus:ring-indigo-500'
+                                }`}
+                                title={
+                                  canOpenLoggerPlacementEditor
+                                    ? 'Открыть схему в редакторе draw.io для размещения логгеров'
+                                    : 'Нужен план .drawio или сохранённая схема расположения измерительного оборудования'
+                                }
+                              >
+                                {placementEditorPreparing ? (
+                                  <>
+                                    <span className="inline-block w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mr-2" />
+                                    Подготовка…
+                                  </>
+                                ) : (
+                                  'Разместить на схеме'
+                                )}
+                              </button>
+                            </div>
+                          }
                         />
                       </div>
                     )}

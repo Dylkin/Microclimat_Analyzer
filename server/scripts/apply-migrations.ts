@@ -63,7 +63,7 @@ const main = async () => {
 
     // Путь к основному SQL файлу
     const setupSqlPath = path.join(__dirname, '../../database_setup.sql');
-    
+
     // Проверяем основной файл
     if (await fs.access(setupSqlPath).then(() => true).catch(() => false)) {
       const setupFilename = 'database_setup.sql';
@@ -93,7 +93,7 @@ const main = async () => {
 
     // Путь к папке миграций
     const migrationsDir = path.join(__dirname, '../../migrations');
-    
+
     // Проверяем наличие папки миграций
     let migrationFiles: string[] = [];
     try {
@@ -112,6 +112,19 @@ const main = async () => {
           if (file === '20260201000000_add_project_qualification_object_data.sql') return true;
           // Миграция для полей дат объектов квалификации (термоконтейнер)
           if (file === '20260223000000_add_qualification_object_date_fields.sql') return true;
+          // Отдельный файл схемы размещения оборудования (копия плана для отчёта)
+          if (file === '20260322120000_add_equipment_placement_plan_files.sql') return true;
+          // Справочник структурных подразделений и должностей
+          if (file === '20260428100000_add_staff_directory.sql') return true;
+          // Переименование подразделения и добавление должности "Директор"
+          if (file === '20260509140000_rename_buh_and_add_director.sql') return true;
+          // История изменений окладов и дата «Действует с» для должностей
+          if (file === '20260509160000_staff_position_salary_history.sql') return true;
+          if (file === '20260509170000_staff_positions_salary_effective_from.sql') return true;
+          // Связь пользователя с должностью из структуры предприятия
+          if (file === '20260513140000_users_staff_position_id.sql') return true;
+          // Годовая таблица расходов (страница «Финансы»)
+          if (file === '20260518120000_add_finance_expense_data.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:
@@ -140,7 +153,7 @@ const main = async () => {
       console.log(`📄 Применение миграции: ${file}`);
       const filePath = path.join(migrationsDir, file);
       const sql = await fs.readFile(filePath, 'utf-8');
-      
+
       try {
         await applyMigration(file, sql);
       } catch (error: any) {
@@ -203,7 +216,7 @@ const addTestoLoggers = async () => {
     for (let n = 1; n <= 100; n++) {
       const name = `DL-${String(n).padStart(3, '0')}`;
       const serialNumber = name;
-      
+
       testo174TValues.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
       testo174TParams.push('Testo 174T', name, serialNumber);
     }
@@ -224,7 +237,7 @@ const addTestoLoggers = async () => {
     for (let n = 1; n <= 100; n++) {
       const name = `DL-${String(n + 200).padStart(3, '0')}`;
       const serialNumber = name;
-      
+
       testo174HValues.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
       testo174HParams.push('Testo 174H', name, serialNumber);
     }

@@ -27,6 +27,8 @@ import testHeadersRouter from './routes/testHeaders.js';
 import releaseRouter from './routes/release.js';
 import equipmentSectionsRouter from './routes/equipmentSections.js';
 import equipmentCardsRouter from './routes/equipmentCards.js';
+import staffDirectoryRouter from './routes/staffDirectory.js';
+import financeRouter from './routes/finance.js';
 console.log('🔍 Загружен releaseRouter из ./routes/release.js');
 
 dotenv.config();
@@ -76,6 +78,8 @@ app.use('/api/release', releaseRouter);
 console.log('✅ /api/release роутер зарегистрирован');
 app.use('/api/equipment-sections', equipmentSectionsRouter);
 app.use('/api/equipment-cards', equipmentCardsRouter);
+app.use('/api/staff-directory', staffDirectoryRouter);
+app.use('/api/finance', financeRouter);
 app.use('/api', testHeadersRouter);
 
 // Error handling middleware

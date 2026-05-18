@@ -20,6 +20,12 @@ export interface Project {
   contractNumber?: string;
   contractDate?: Date;
   tenderDate?: Date;
+  totalCostWithVat?: number;
+  startDatePlanned?: Date;
+  startDateActual?: Date;
+  endDatePlanned?: Date;
+  endDateActual?: Date;
+  paymentDate?: Date;
   status: ProjectStatus;
   createdBy?: string;
   createdByName?: string;
@@ -81,6 +87,12 @@ export interface CreateProjectData {
   contractorId: string;
   tenderLink?: string;
   tenderDate?: Date;
+  totalCostWithVat?: number;
+  startDatePlanned?: Date;
+  startDateActual?: Date;
+  endDatePlanned?: Date;
+  endDateActual?: Date;
+  paymentDate?: Date;
   qualificationObjectIds: string[];
   items?: Omit<ProjectItem, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>[];
   stageAssignments?: {
@@ -94,6 +106,12 @@ export interface UpdateProjectData {
   description?: string;
   contractNumber?: string;
   contractDate?: Date;
+  totalCostWithVat?: number;
+  startDatePlanned?: Date;
+  startDateActual?: Date;
+  endDatePlanned?: Date;
+  endDateActual?: Date;
+  paymentDate?: Date;
   status?: ProjectStatus;
   qualificationObjectIds?: string[];
   /** Обновление товаров проекта (Подача документов — блок «Товары и возможные поставщики») */

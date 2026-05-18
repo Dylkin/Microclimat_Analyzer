@@ -1,3 +1,5 @@
+import type { EquipmentType } from './Equipment';
+
 export type QualificationObjectType = 
   | 'помещение'
   | 'автомобиль' 
@@ -41,6 +43,9 @@ export interface QualificationObject {
   expiryDate?: string; // ISO date, для термоконтейнера
   testDataFileUrl?: string;
   testDataFileName?: string;
+  /** Схема расположения измерительного оборудования (.drawio), формируется на этапе расстановки логгеров */
+  equipmentPlacementPlanFileUrl?: string;
+  equipmentPlacementPlanFileName?: string;
   createdAt?: Date;
   updatedAt?: Date;
   measurementZones?: MeasurementZone[];
@@ -55,6 +60,9 @@ export interface StorageZone {
 export interface MeasurementZone {
   id: string;
   zoneNumber: number;
+  /** Позиция зоны на плане, доли ширины/высоты страницы (0–100) */
+  planPosX?: number;
+  planPosY?: number;
   measurementLevels: MeasurementLevel[];
 }
 
@@ -63,6 +71,10 @@ export interface MeasurementLevel {
   level: number; // в метрах, дробное число
   equipmentId?: string;
   equipmentName?: string;
+  equipmentType?: EquipmentType;
+  /** Позиция уровня на плане, доли ширины/высоты страницы (0–100) */
+  planPosX?: number;
+  planPosY?: number;
 }
 
 export interface CreateQualificationObjectData {

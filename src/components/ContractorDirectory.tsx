@@ -333,13 +333,15 @@ const ContractorDirectory: React.FC<ContractorDirectoryProps> = ({
         setQualificationObjects(prev => prev.map(obj => 
           obj.id === editingQualificationObject.id ? savedObject : obj
         ));
-        setEditingQualificationObject(null);
+        // Оставляем форму смонтированной, чтобы дочерний handleSubmit успел завершить uploadPlanFile и обновить превью
+        setEditingQualificationObject(savedObject);
       } else {
         // Добавляем новый объект
         savedObject = await qualificationObjectService.createQualificationObject(objectData);
         setQualificationObjects(prev => [...prev, savedObject]);
+        setEditingQualificationObject(savedObject);
+        setShowAddQualificationForm(true);
       }
-      setShowAddQualificationForm(false);
       
       return savedObject;
     } catch (error) {

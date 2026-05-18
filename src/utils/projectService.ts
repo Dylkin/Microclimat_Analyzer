@@ -24,6 +24,18 @@ type ProjectDto = {
   contractDate?: string | null;
   tender_date?: string | null;
   tenderDate?: string | null;
+  total_cost_with_vat?: number | string | null;
+  totalCostWithVat?: number | string | null;
+  start_date_planned?: string | null;
+  startDatePlanned?: string | null;
+  start_date_actual?: string | null;
+  startDateActual?: string | null;
+  end_date_planned?: string | null;
+  endDatePlanned?: string | null;
+  end_date_actual?: string | null;
+  endDateActual?: string | null;
+  payment_date?: string | null;
+  paymentDate?: string | null;
   status: ProjectStatus;
   created_by?: string | null;
   createdBy?: string | null;
@@ -185,6 +197,17 @@ const mapProject = (dto: ProjectDto): Project => {
     contractNumber: dto.contractNumber || dto.contract_number || undefined,
     contractDate: toDate(dto.contractDate || dto.contract_date),
     tenderDate: toDate(dto.tenderDate || dto.tender_date),
+    totalCostWithVat:
+      dto.totalCostWithVat !== undefined && dto.totalCostWithVat !== null
+        ? Number(dto.totalCostWithVat)
+        : dto.total_cost_with_vat !== undefined && dto.total_cost_with_vat !== null
+        ? Number(dto.total_cost_with_vat)
+        : undefined,
+    startDatePlanned: toDate(dto.startDatePlanned || dto.start_date_planned),
+    startDateActual: toDate(dto.startDateActual || dto.start_date_actual),
+    endDatePlanned: toDate(dto.endDatePlanned || dto.end_date_planned),
+    endDateActual: toDate(dto.endDateActual || dto.end_date_actual),
+    paymentDate: toDate(dto.paymentDate || dto.payment_date),
     status: status,
     createdBy: dto.createdBy || dto.created_by || undefined,
     createdAt: toDate(dto.createdAt || dto.created_at) || new Date(),
@@ -218,6 +241,12 @@ class ProjectService {
       contractorId: project.contractorId,
       tenderLink: project.tenderLink,
       tenderDate: project.tenderDate,
+      totalCostWithVat: project.totalCostWithVat,
+      startDatePlanned: project.startDatePlanned,
+      startDateActual: project.startDateActual,
+      endDatePlanned: project.endDatePlanned,
+      endDateActual: project.endDateActual,
+      paymentDate: project.paymentDate,
       qualificationObjectIds: project.qualificationObjectIds,
       items: project.items,
       stageAssignments: project.stageAssignments,
@@ -238,6 +267,34 @@ class ProjectService {
     }
     if (updates.contractDate !== undefined) {
       payload.contractDate = updates.contractDate.toISOString();
+    }
+    if (updates.totalCostWithVat !== undefined) {
+      payload.totalCostWithVat = updates.totalCostWithVat;
+    }
+    if (updates.startDatePlanned !== undefined) {
+      payload.startDatePlanned = updates.startDatePlanned
+        ? updates.startDatePlanned.toISOString()
+        : null;
+    }
+    if (updates.startDateActual !== undefined) {
+      payload.startDateActual = updates.startDateActual
+        ? updates.startDateActual.toISOString()
+        : null;
+    }
+    if (updates.endDatePlanned !== undefined) {
+      payload.endDatePlanned = updates.endDatePlanned
+        ? updates.endDatePlanned.toISOString()
+        : null;
+    }
+    if (updates.endDateActual !== undefined) {
+      payload.endDateActual = updates.endDateActual
+        ? updates.endDateActual.toISOString()
+        : null;
+    }
+    if (updates.paymentDate !== undefined) {
+      payload.paymentDate = updates.paymentDate
+        ? updates.paymentDate.toISOString()
+        : null;
     }
     if (updates.status !== undefined) {
       payload.status = updates.status;

@@ -32,5 +32,3 @@ pool.query('SELECT NOW()')
   .catch((err) => {
     console.error('Database connection failed:', err);
   });
-
-

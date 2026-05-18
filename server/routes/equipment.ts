@@ -107,7 +107,8 @@ router.get('/stats', async (req, res) => {
       byType: {
         '-': 0,
         'Testo 174T': 0,
-        'Testo 174H': 0
+        'Testo 174H': 0,
+        'EClerk-M-RHT': 0
       }
     };
     

@@ -73,6 +73,16 @@ class UserService {
     }
   }
 
+  /** Смена пароля при вводе текущего (личный кабинет) */
+  async changePassword(id: string, oldPassword: string, newPassword: string): Promise<void> {
+    try {
+      await apiClient.post(`/users/${id}/change-password`, { oldPassword, newPassword });
+    } catch (error) {
+      console.error('Ошибка при смене пароля:', error);
+      throw error;
+    }
+  }
+
   // Отправка письма для сброса пароля по email
   async sendPasswordResetEmail(email: string): Promise<void> {
     try {
