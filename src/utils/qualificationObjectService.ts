@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { normalizeMeasurementZones } from './measurementZonesUtils';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { sanitizeFileName } from './fileNameUtils';
 import { getMimeType } from './mimeTypeUtils';
@@ -288,16 +289,17 @@ class QualificationObjectService {
 
   // Маппинг данных из API в QualificationObject
   private mapFromApi(data: any): QualificationObject {
-    // Обработка measurement_zones из JSONB
-    let measurementZones = [];
+    // Обработка measurement_zones из JSONB (camelCase и snake_case)
+    let measurementZones: ReturnType<typeof normalizeMeasurementZones> = [];
     try {
       const measurementZonesData = data.measurementZones || data.measurement_zones;
       if (measurementZonesData) {
-        if (Array.isArray(measurementZonesData)) {
-          measurementZones = measurementZonesData;
-        } else if (typeof measurementZonesData === 'string') {
-          measurementZones = JSON.parse(measurementZonesData);
-        }
+        const parsed = Array.isArray(measurementZonesData)
+          ? measurementZonesData
+          : typeof measurementZonesData === 'string'
+            ? JSON.parse(measurementZonesData)
+            : [];
+        measurementZones = normalizeMeasurementZones(parsed);
       }
     } catch (error) {
       console.error('Ошибка обработки measurement_zones:', error);

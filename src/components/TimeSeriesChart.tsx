@@ -244,40 +244,62 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   // Бисектор для поиска ближайшей точки
   const bisectDate = bisector((d: TimeSeriesPoint) => d.timestamp).left;
 
-  // Обработчик движения мыши
+  // Обработчик движения мыши — выбираем серию, ближайшую к курсору по Y
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
     if (!svgRef.current || isSelecting) return;
 
     const [mouseX, mouseY] = pointer(event, svgRef.current);
     const adjustedX = mouseX - margin.left;
+    const adjustedY = mouseY - margin.top;
 
-    if (adjustedX < 0 || adjustedX > innerWidth) {
+    if (adjustedX < 0 || adjustedX > innerWidth || adjustedY < 0 || adjustedY > innerHeight) {
       setTooltip(prev => ({ ...prev, visible: false }));
       return;
     }
 
     const timestamp = xScale.invert(adjustedX).getTime();
-    const index = bisectDate(filteredData, timestamp);
-    const point = filteredData[index];
 
-    if (point) {
-      const value = dataType === 'temperature' ? point.temperature : point.humidity;
+    let closestPoint: TimeSeriesPoint | null = null;
+    let bestYDistance = Infinity;
+
+    for (const [fileId, fileData] of dataByFile) {
+      if (hiddenLoggers.has(fileId)) continue;
+
+      const sortedData = [...fileData].sort((a, b) => a.timestamp - b.timestamp);
+      if (sortedData.length === 0) continue;
+
+      const index = bisectDate(sortedData, timestamp);
+      const candidates: TimeSeriesPoint[] = [];
+      if (index > 0) candidates.push(sortedData[index - 1]);
+      if (index < sortedData.length) candidates.push(sortedData[index]);
+
+      for (const candidate of candidates) {
+        const value = dataType === 'temperature' ? candidate.temperature : candidate.humidity;
+        if (value === undefined || typeof value !== 'number' || isNaN(value)) continue;
+
+        const yDistance = Math.abs(yScale(value) - adjustedY);
+        if (yDistance < bestYDistance) {
+          bestYDistance = yDistance;
+          closestPoint = candidate;
+        }
+      }
+    }
+
+    if (closestPoint !== null) {
+      const value = dataType === 'temperature' ? closestPoint.temperature : closestPoint.humidity;
       if (value !== undefined && typeof value === 'number' && !isNaN(value)) {
-        // Получаем имя файла из данных
-        const fileName = data.find(d => d.fileId === point.fileId)?.fileId || '';
-        const shortFileName = fileName.substring(0, 6);
-
+        const meta = data.find(d => d.fileId === closestPoint.fileId);
         setTooltip({
           x: mouseX,
           y: mouseY,
-          timestamp: point.timestamp,
-          fileName: shortFileName,
-          [dataType]: value as number,
+          timestamp: closestPoint.timestamp,
+          loggerName: closestPoint.loggerName || meta?.loggerName,
+          [dataType]: value,
           visible: true
         });
       }
     }
-  }, [filteredData, xScale, margin.left, innerWidth, dataType, bisectDate, isSelecting, data]);
+  }, [dataByFile, hiddenLoggers, xScale, yScale, margin.left, margin.top, innerWidth, innerHeight, dataType, bisectDate, isSelecting, data]);
 
   // Обработчик выхода мыши
   const handleMouseLeave = useCallback(() => {
@@ -749,8 +771,8 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             hour: '2-digit',
             minute: '2-digit'
           })}</div>
-          {tooltip.fileName && (
-            <div className="text-xs text-gray-300">Файл: {tooltip.fileName.substring(0, 6)}</div>
+          {tooltip.loggerName && (
+            <div className="text-xs text-gray-300">{tooltip.loggerName}</div>
           )}
           {tooltip.temperature !== undefined && (
             <div>Температура: {formatValue(tooltip.temperature)}</div>

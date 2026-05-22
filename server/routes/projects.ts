@@ -781,17 +781,24 @@ router.post('/', requireAuth, async (req, res) => {
     await client.query('COMMIT');
     
     // Получаем полную информацию о проекте с объектами квалификации
-    const fullProjectResult = await pool.query(`
-      SELECT 
-        p.id, p.name, p.description, p.type, p.contractor_id, 
-        p.contract_number, p.contract_date, p.tender_link, p.tender_date,
-        p.total_cost_with_vat, p.start_date_planned, p.start_date_actual, p.end_date_planned, p.end_date_actual, p.payment_date,
-        p.status, p.created_by, p.created_at, p.updated_at,
-        c.name as contractor_name
+    // (те же опциональные колонки, что и при INSERT — без жёсткого списка,
+    // иначе ошибка при частично применённых миграциях, например без total_cost_with_vat)
+    const postCreateBaseFields =
+      'p.id, p.name, p.description, p.type, p.contractor_id, p.contract_number, p.contract_date, p.status, p.created_by, p.created_at, p.updated_at, c.name as contractor_name';
+    const postCreateTenderFields = hasTenderFields ? ', p.tender_link, p.tender_date' : '';
+    const postCreatePlanningFields = hasPlanningFields
+      ? ', p.total_cost_with_vat, p.start_date_planned, p.start_date_actual, p.end_date_planned, p.end_date_actual, p.payment_date'
+      : '';
+    const postCreateSelectFields = `${postCreateBaseFields}${postCreateTenderFields}${postCreatePlanningFields}`;
+    const fullProjectResult = await pool.query(
+      `
+      SELECT ${postCreateSelectFields}
       FROM projects p
       LEFT JOIN contractors c ON p.contractor_id = c.id
       WHERE p.id = $1
-    `, [projectId]);
+    `,
+      [projectId],
+    );
     
     const projectRow = fullProjectResult.rows[0];
     

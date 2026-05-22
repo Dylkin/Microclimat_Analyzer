@@ -60,7 +60,7 @@ export interface TooltipData {
   x: number;
   y: number;
   timestamp: number;
-  fileName?: string;
+  loggerName?: string;
   temperature?: number;
   humidity?: number;
   visible: boolean;

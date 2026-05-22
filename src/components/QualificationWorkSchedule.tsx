@@ -15,6 +15,13 @@ import {
   parseLoggerPlacementPositionsFromDrawioXml,
   parseMeasurementZonesFromLoggerPlacementDrawioXml
 } from '../utils/loggerPlacementDrawioMerge';
+import {
+  buildMeasurementZonesFromStorageKeys,
+  buildMeasurementZonesFromSummaries,
+  countMeasurementLevels,
+  deduplicateStorageArtifactLevels,
+  mergeMeasurementZones
+} from '../utils/measurementZonesUtils';
 
 interface QualificationWorkStage {
   id: string;
@@ -595,6 +602,75 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       return [externalZone, ...renumbered];
     };
 
+    const syncMeasurementZonesFromLoggerData = async (
+      baseZones: MeasurementZone[]
+    ): Promise<MeasurementZone[]> => {
+      let currentProjectId = projectId;
+      if (!currentProjectId) {
+        const urlParams = new URLSearchParams(window.location.search);
+        currentProjectId = urlParams.get('projectId') || undefined;
+      }
+      if (!currentProjectId) {
+        return baseZones;
+      }
+
+      const baseCount = countMeasurementLevels(baseZones);
+      let supplemental: MeasurementZone[] = [];
+
+      try {
+        if (loggerDataService.isAvailable()) {
+          const summaries = await loggerDataService.getLoggerDataSummary(
+            currentProjectId,
+            qualificationObjectId
+          );
+          supplemental = buildMeasurementZonesFromSummaries(summaries);
+        }
+      } catch (error) {
+        console.warn('QualificationWorkSchedule: сводки логгеров для синхронизации зон недоступны', error);
+      }
+
+      const summaryCount = countMeasurementLevels(supplemental);
+      let merged = baseZones;
+
+      if (summaryCount > baseCount) {
+        merged = mergeMeasurementZones(baseZones, supplemental);
+      } else {
+        try {
+          const storageFilesData = await qualificationObjectService.getLoggerRemovalFiles(
+            qualificationObjectId,
+            currentProjectId
+          );
+          const fromStorage = buildMeasurementZonesFromStorageKeys(Object.keys(storageFilesData));
+          const storageCount = countMeasurementLevels(fromStorage);
+          if (storageCount > baseCount) {
+            merged = mergeMeasurementZones(baseZones, fromStorage);
+          }
+        } catch (error) {
+          console.warn('QualificationWorkSchedule: Storage для синхронизации зон недоступен', error);
+        }
+      }
+
+      merged = deduplicateStorageArtifactLevels(merged);
+      const mergedCount = countMeasurementLevels(merged);
+      const shouldPersist =
+        mergedCount > baseCount ||
+        JSON.stringify(deduplicateStorageArtifactLevels(baseZones)) !== JSON.stringify(merged);
+
+      if (shouldPersist) {
+        try {
+          await qualificationObjectService.updateMeasurementZones(
+            qualificationObjectId,
+            merged,
+            currentProjectId
+          );
+        } catch (error) {
+          console.error('QualificationWorkSchedule: ошибка сохранения синхронизированных зон', error);
+        }
+      }
+
+      return merged;
+    };
+
     const applySavedEquipmentSchemeToZones = async (
       baseZones: MeasurementZone[],
       obj: { equipmentPlacementPlanFileUrl?: string }
@@ -683,11 +759,13 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
           }
         }
         zones = await applySavedEquipmentSchemeToZones(zones, qualificationObject);
+        zones = deduplicateStorageArtifactLevels(await syncMeasurementZonesFromLoggerData(zones));
         setMeasurementZones(zones);
         await loadLoggerRemovalFiles();
       } else {
         console.log('Зоны измерения не найдены или пусты');
-        const merged = await applySavedEquipmentSchemeToZones([], qualificationObject);
+        let merged = await applySavedEquipmentSchemeToZones([], qualificationObject);
+        merged = deduplicateStorageArtifactLevels(await syncMeasurementZonesFromLoggerData(merged));
         if (merged.length > 0) {
           setMeasurementZones(merged);
           await loadLoggerRemovalFiles();
@@ -1004,9 +1082,6 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         }
 
         if (heightChanged && !existingKey && hasFileForKey(previousKey)) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/6cc9bf76-f0b1-4f01-9c91-807d2948c190',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'QualificationWorkSchedule.tsx:846',message:'preserve file key on height change',data:{levelId:level.id,prevLevel:prev.level,nextLevel:level.level,previousKey,existingKey},timestamp:Date.now(),sessionId:'debug-session',runId:'repro',hypothesisId:'H2'})}).catch(()=>{});
-          // #endregion agent log
           setLoggerFileKeyByLevelId(prevMap => ({
             ...prevMap,
             [level.id]: previousKey
@@ -2207,7 +2282,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                         <EquipmentPlacement
                           qualificationObjectId={qualificationObjectId}
                           initialZones={measurementZones}
-                          onZonesChange={handleZonesChange}
+                          onZonesChange={mode === 'view' ? undefined : handleZonesChange}
                           readOnly={mode === 'view'}
                           projectId={projectId}
                           abovePlacementInfo={

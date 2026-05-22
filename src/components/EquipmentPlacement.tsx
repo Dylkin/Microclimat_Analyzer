@@ -104,16 +104,26 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
     };
   }, []);
 
-  // Уведомляем родительский компонент об изменениях
-  const notifyZonesChange = useCallback(() => {
-    if (onZonesChange) {
-      onZonesChange(measurementZones);
-    }
-  }, [onZonesChange, measurementZones]);
+  // Только явные правки пользователя — не при монтировании и не при подстановке initialZones с сервера.
+  const commitZonesToParent = useCallback(
+    (zones: MeasurementZone[]) => {
+      if (!readOnly && onZonesChange) {
+        onZonesChange(zones);
+      }
+    },
+    [readOnly, onZonesChange]
+  );
 
-  useEffect(() => {
-    notifyZonesChange();
-  }, [notifyZonesChange]);
+  const applyZonesUpdate = useCallback(
+    (updater: (prev: MeasurementZone[]) => MeasurementZone[]) => {
+      setMeasurementZones((prev) => {
+        const next = updater(prev);
+        commitZonesToParent(next);
+        return next;
+      });
+    },
+    [commitZonesToParent]
+  );
 
   // Добавление зоны измерения
   const addMeasurementZone = () => {
@@ -157,15 +167,15 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
     
     // Если это зона 0, добавляем её в начало, иначе в конец
     if (nextZoneNumber === 0) {
-      setMeasurementZones(prev => [newZone, ...prev]);
+      applyZonesUpdate((prev) => [newZone, ...prev]);
     } else {
-      setMeasurementZones(prev => [...prev, newZone].sort((a, b) => a.zoneNumber - b.zoneNumber));
+      applyZonesUpdate((prev) => [...prev, newZone].sort((a, b) => a.zoneNumber - b.zoneNumber));
     }
   };
 
   // Удаление зоны измерения
   const removeMeasurementZone = (zoneId: string) => {
-    setMeasurementZones(prev => {
+    applyZonesUpdate((prev) => {
       const zoneToRemove = prev.find(z => z.id === zoneId);
       // Не позволяем удалять зону 0 (Внешняя температура)
       if (zoneToRemove && zoneToRemove.zoneNumber === 0) {
@@ -194,7 +204,7 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
 
   // Добавление уровня измерения
   const addMeasurementLevel = (zoneId: string) => {
-    setMeasurementZones(prev => prev.map(zone => {
+    applyZonesUpdate((prev) => prev.map((zone) => {
       if (zone.id === zoneId) {
         const newLevel: MeasurementLevel = {
           id: `level-${Date.now()}`,
@@ -214,30 +224,34 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
 
   // Удаление уровня измерения
   const removeMeasurementLevel = (zoneId: string, levelId: string) => {
-    setMeasurementZones(prev => prev.map(zone => {
-      if (zone.id === zoneId) {
-        return {
-          ...zone,
-          measurementLevels: zone.measurementLevels.filter(level => level.id !== levelId)
-        };
-      }
-      return zone;
-    }));
+    applyZonesUpdate((prev) =>
+      prev.map((zone) => {
+        if (zone.id === zoneId) {
+          return {
+            ...zone,
+            measurementLevels: zone.measurementLevels.filter((level) => level.id !== levelId)
+          };
+        }
+        return zone;
+      })
+    );
   };
 
   // Обновление уровня измерения
   const updateMeasurementLevel = (zoneId: string, levelId: string, level: number) => {
-    setMeasurementZones(prev => prev.map(zone => {
-      if (zone.id === zoneId) {
-        return {
-          ...zone,
-          measurementLevels: zone.measurementLevels.map(l => 
-            l.id === levelId ? { ...l, level } : l
-          )
-        };
-      }
-      return zone;
-    }));
+    applyZonesUpdate((prev) =>
+      prev.map((zone) => {
+        if (zone.id === zoneId) {
+          return {
+            ...zone,
+            measurementLevels: zone.measurementLevels.map((l) =>
+              l.id === levelId ? { ...l, level } : l
+            )
+          };
+        }
+        return zone;
+      })
+    );
   };
 
   // Обновление оборудования для уровня
@@ -248,24 +262,26 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
     equipmentName: string,
     equipmentType?: EquipmentType
   ) => {
-    setMeasurementZones(prev => prev.map(zone => {
-      if (zone.id === zoneId) {
-        return {
-          ...zone,
-          measurementLevels: zone.measurementLevels.map(l =>
-            l.id === levelId
-              ? {
-                  ...l,
-                  equipmentId,
-                  equipmentName,
-                  equipmentType: equipmentId ? equipmentType : undefined
-                }
-              : l
-          )
-        };
-      }
-      return zone;
-    }));
+    applyZonesUpdate((prev) =>
+      prev.map((zone) => {
+        if (zone.id === zoneId) {
+          return {
+            ...zone,
+            measurementLevels: zone.measurementLevels.map((l) =>
+              l.id === levelId
+                ? {
+                    ...l,
+                    equipmentId,
+                    equipmentName,
+                    equipmentType: equipmentId ? equipmentType : undefined
+                  }
+                : l
+            )
+          };
+        }
+        return zone;
+      })
+    );
   };
 
   // Фильтрация оборудования по поисковому запросу
