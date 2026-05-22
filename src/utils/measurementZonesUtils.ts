@@ -72,7 +72,8 @@ export function deduplicateStorageArtifactLevels(zones: MeasurementZone[]): Meas
   });
 }
 
-function filterRedundantStorageKeys(keys: string[]): string[] {
+/** Убирает устаревшие папки zone-N-level-0, если есть zone-N-level-0.N (дробный уровень). */
+export function filterRedundantStorageKeys(keys: string[]): string[] {
   const parsed = keys
     .map((key) => {
       const match = key.match(ZONE_LEVEL_KEY_RE);

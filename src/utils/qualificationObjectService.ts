@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import { normalizeMeasurementZones } from './measurementZonesUtils';
+import { filterRedundantStorageKeys, normalizeMeasurementZones } from './measurementZonesUtils';
 import { QualificationObject, CreateQualificationObjectData } from '../types/QualificationObject';
 import { sanitizeFileName } from './fileNameUtils';
 import { getMimeType } from './mimeTypeUtils';
@@ -553,64 +553,58 @@ class QualificationObjectService {
       const storageFolders: StorageFileObject[] = listResult.data || [];
 
       if (storageFolders.length > 0) {
-        console.log('QualificationObjectService: Найдены папки в Storage:', storageFolders.map((f: StorageFileObject) => f.name));
-        
-        for (const folder of storageFolders) {
-          // Пропускаем файлы, обрабатываем только папки
-          if (folder.id) continue;
+        const folderNames = storageFolders.filter((f) => !f.id).map((f) => f.name);
+        const activeFolderNames = filterRedundantStorageKeys(
+          folderNames.filter((name) => name.startsWith('zone-') && name.includes('-level-'))
+        );
+        console.log('QualificationObjectService: Папки в Storage (после фильтра дублей):', activeFolderNames);
 
-          console.log('QualificationObjectService: Обрабатываем папку:', folder.name);
-          
-          if (folder.name.startsWith('zone-') && folder.name.includes('-level-')) {
-            console.log('QualificationObjectService: Папка соответствует паттерну зоны:', folder.name);
-            
-            const zoneListResult = await apiClient.post<{ data: StorageFileObject[] }>('/storage/list', {
-              bucket: 'qualification-objects',
-              prefix: `${prefix}/${folder.name}`
+        for (const folderName of activeFolderNames) {
+          console.log('QualificationObjectService: Обрабатываем папку:', folderName);
+
+          const zoneListResult = await apiClient.post<{ data: StorageFileObject[] }>('/storage/list', {
+            bucket: 'qualification-objects',
+            prefix: `${prefix}/${folderName}`
+          });
+
+          const zoneFileEntries: StorageFileObject[] = zoneListResult.data || [];
+
+          console.log(
+            'QualificationObjectService: Файлы в папке',
+            folderName,
+            ':',
+            zoneFileEntries.map((f: StorageFileObject) => f.name) || []
+          );
+
+          const sortedFiles = zoneFileEntries
+            .filter((f) => f.id)
+            .sort((a, b) => {
+              const dateA = new Date(a.created_at || a.updated_at || 0).getTime();
+              const dateB = new Date(b.created_at || b.updated_at || 0).getTime();
+              return dateB - dateA;
             });
 
-            const zoneFileEntries: StorageFileObject[] = zoneListResult.data || [];
+          if (sortedFiles.length > 0) {
+            const latestFile = sortedFiles[0];
+            const fileKey = folderName;
 
-            console.log(
-              'QualificationObjectService: Файлы в папке',
-              folder.name,
-              ':',
-              zoneFileEntries.map((f: StorageFileObject) => f.name) || []
-            );
+            console.log('QualificationObjectService: Выбран файл для папки', folderName, ':', latestFile.name);
 
-            // Сортируем файлы по дате создания (новые первыми) и берем первый
-            const sortedFiles = zoneFileEntries
-              .filter(f => f.id) // Только файлы
-              .sort((a, b) => {
-                const dateA = new Date(a.created_at || a.updated_at || 0).getTime();
-                const dateB = new Date(b.created_at || b.updated_at || 0).getTime();
-                return dateB - dateA;
-              });
+            const urlResult = await apiClient.post<{ data: { publicUrl: string } }>('/storage/get-public-url', {
+              bucket: 'qualification-objects',
+              path: `${prefix}/${folderName}/${latestFile.name}`
+            });
 
-            if (sortedFiles.length > 0) {
-              const latestFile = sortedFiles[0];
-              const fileKey = folder.name; // zone-1-level-0
-              
-              console.log('QualificationObjectService: Выбран файл для папки', folder.name, ':', latestFile.name);
-              
-              const urlResult = await apiClient.post<{ data: { publicUrl: string } }>('/storage/get-public-url', {
-                bucket: 'qualification-objects',
-                path: `${prefix}/${folder.name}/${latestFile.name}`
-              });
+            filesMap[fileKey] = {
+              name: latestFile.name,
+              url: urlResult.data?.publicUrl || `/uploads/qualification-objects/${prefix}/${folderName}/${latestFile.name}`,
+              size: latestFile.metadata?.size || 0,
+              lastModified: latestFile.updated_at || latestFile.created_at || new Date().toISOString()
+            };
 
-              filesMap[fileKey] = {
-                name: latestFile.name,
-                url: urlResult.data?.publicUrl || `/uploads/qualification-objects/${prefix}/${folder.name}/${latestFile.name}`,
-                size: latestFile.metadata?.size || 0,
-                lastModified: latestFile.updated_at || latestFile.created_at || new Date().toISOString()
-              };
-              
-              console.log('QualificationObjectService: Добавлен файл в карту:', fileKey, latestFile.name);
-            } else {
-              console.log('QualificationObjectService: Нет файлов в папке', folder.name);
-            }
+            console.log('QualificationObjectService: Добавлен файл в карту:', fileKey, latestFile.name);
           } else {
-            console.log('QualificationObjectService: Папка не соответствует паттерну зоны:', folder.name);
+            console.log('QualificationObjectService: Нет файлов в папке', folderName);
           }
         }
       } else {

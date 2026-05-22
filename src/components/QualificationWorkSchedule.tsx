@@ -115,6 +115,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [measurementZones, setMeasurementZones] = useState<MeasurementZone[]>([]);
+  const [measurementZonesLoading, setMeasurementZonesLoading] = useState(false);
+  const [parsingMetaLoaded, setParsingMetaLoaded] = useState(false);
   const [testDocuments, setTestDocuments] = useState<File[]>([]);
   const [loggerRemovalFiles, setLoggerRemovalFiles] = useState<{ [key: string]: File | null }>({});
   const [storageFiles, setStorageFiles] = useState<{ [key: string]: { name: string; url: string; size: number; lastModified: string } }>({});
@@ -574,6 +576,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       console.log('Итоговые файлы из Storage:', Object.keys(storageFilesData).map(key => `${key}: ${storageFilesData[key].name}`));
     } catch (error) {
       console.error('Ошибка загрузки файлов снятия логгеров:', error);
+    } finally {
+      setParsingMetaLoaded(true);
     }
   };
 
@@ -720,7 +724,11 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
       }
     };
 
+    setMeasurementZonesLoading(true);
+    setParsingMetaLoaded(false);
     try {
+      await loadLoggerRemovalFiles();
+
       console.log('Загрузка зон измерения для объекта:', qualificationObjectId);
       const qualificationObject = await qualificationObjectService.getQualificationObjectById(
         qualificationObjectId,
@@ -761,20 +769,19 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         zones = await applySavedEquipmentSchemeToZones(zones, qualificationObject);
         zones = deduplicateStorageArtifactLevels(await syncMeasurementZonesFromLoggerData(zones));
         setMeasurementZones(zones);
-        await loadLoggerRemovalFiles();
       } else {
         console.log('Зоны измерения не найдены или пусты');
         let merged = await applySavedEquipmentSchemeToZones([], qualificationObject);
         merged = deduplicateStorageArtifactLevels(await syncMeasurementZonesFromLoggerData(merged));
-        if (merged.length > 0) {
-          setMeasurementZones(merged);
-          await loadLoggerRemovalFiles();
-        } else {
-          setMeasurementZones([]);
-        }
+        setMeasurementZones(merged.length > 0 ? merged : []);
       }
     } catch (error) {
       console.error('Ошибка загрузки зон измерения:', error);
+      const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      setError(`Ошибка загрузки зон и уровней расстановки оборудования: ${message}`);
+      setMeasurementZones([]);
+    } finally {
+      setMeasurementZonesLoading(false);
     }
   };
 
@@ -2279,6 +2286,11 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                           </p>
                         )}
 
+                        {measurementZonesLoading ? (
+                          <div className="py-6 text-center text-sm text-gray-500">
+                            Загрузка зон и уровней расстановки оборудования…
+                          </div>
+                        ) : (
                         <EquipmentPlacement
                           qualificationObjectId={qualificationObjectId}
                           initialZones={measurementZones}
@@ -2316,6 +2328,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                             </div>
                           }
                         />
+                        )}
                       </div>
                     )}
 
@@ -2500,7 +2513,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                                               const hasStatus = parsingStatus[fileKey] !== undefined;
                                               
                                               // Отладочная информация
-                                              if (storageFile && !hasStatus) {
+                                              if (parsingMetaLoaded && storageFile && !hasStatus) {
                                                 console.warn('QualificationWorkSchedule: Файл в Storage, но нет статуса для', fileKey, {
                                                   fileKey,
                                                   storageFile: storageFile.name,
