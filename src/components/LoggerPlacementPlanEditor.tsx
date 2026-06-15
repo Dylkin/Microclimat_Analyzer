@@ -4,6 +4,7 @@ import { Project } from '../types/Project';
 import { MeasurementZone } from '../types/QualificationObject';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import {
+  createBlankDrawioXml,
   mergeLoggerPlacementIntoDrawioXml,
   parseLoggerPlacementPositionsFromDrawioXml,
   stripLoggerPlacementMarkersFromDrawioXml
@@ -44,7 +45,7 @@ interface LoggerPlacementPlanEditorProps {
   project: Project;
   qualificationObjectId: string;
   qualificationObjectName?: string;
-  planFileUrl: string;
+  planFileUrl?: string;
   planFileName?: string;
   onBack: () => void;
 }
@@ -153,6 +154,7 @@ export const LoggerPlacementPlanEditor: React.FC<LoggerPlacementPlanEditorProps>
   }, [planFileUrl]);
 
   const resolvePlanFetchUrl = useCallback((): string => {
+    if (!planFileUrl) return '';
     const isAbsolute = /^https?:\/\//i.test(planFileUrl);
     const origin =
       typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '';
@@ -189,17 +191,21 @@ export const LoggerPlacementPlanEditor: React.FC<LoggerPlacementPlanEditorProps>
     setStatus('loading');
     setErrorText(null);
 
-    const fetchUrl = resolvePlanFetchUrl();
-
     (async () => {
       try {
-        const response = await fetch(fetchUrl, { credentials: 'include' });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const text = await response.text();
-        if (!text.includes('<mxfile') && !text.includes('<mxGraphModel')) {
-          throw new Error('Файл не похож на корректный документ draw.io (.drawio).');
+        let text: string;
+        if (planFileUrl && planFileUrl.trim().length > 0) {
+          const fetchUrl = resolvePlanFetchUrl();
+          const response = await fetch(fetchUrl, { credentials: 'include' });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          text = await response.text();
+          if (!text.includes('<mxfile') && !text.includes('<mxGraphModel')) {
+            throw new Error('Файл не похож на корректный документ draw.io (.drawio).');
+          }
+        } else {
+          text = createBlankDrawioXml();
         }
         if (cancelled) return;
         baseDiagramXmlRef.current = text;

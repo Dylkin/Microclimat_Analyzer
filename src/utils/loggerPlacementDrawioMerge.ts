@@ -482,3 +482,19 @@ export function mergeLoggerPlacementIntoDrawioXml(
   const serializer = new XMLSerializer();
   return serializer.serializeToString(doc.documentElement);
 }
+
+/** Создаёт пустой документ draw.io (.drawio XML) для новой схемы расположения оборудования. */
+export function createBlankDrawioXml(title = 'Схема расположения измерительного оборудования'): string {
+  const now = new Date().toISOString();
+  const diagramId = `diagram-${Date.now()}`;
+  return `<mxfile host="app.diagrams.net" modified="${now}" agent="MicroclimatAnalyzer" etag="blank" version="24.0.0" type="device">
+  <diagram name="Page-1" id="${diagramId}">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`;
+}

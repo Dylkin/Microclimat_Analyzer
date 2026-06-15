@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Car, Refrigerator, Snowflake, Upload, X, FileText, Image, Eye } from 'lucide-react';
+import { Building, Car, Refrigerator, Snowflake, Upload, X, FileText, Image, Eye, Plus } from 'lucide-react';
 import { 
   QualificationObject, 
   QualificationObjectType, 
@@ -996,12 +996,32 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-start space-x-2 text-sm text-gray-600">
-                      <FileText className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-                      <span>
-                        Файл ещё не сформирован. При наличии плана объекта в формате draw.io откройте
-                        размещение логгеров на схеме и сохраните документ в редакторе.
-                      </span>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-start space-x-2 text-sm text-gray-600">
+                        <FileText className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                        <span>
+                          Файл ещё не сформирован. Создайте схему в редакторе draw.io и сохраните её —
+                          файл будет записан в базу.
+                        </span>
+                      </div>
+                      {project && projectId && onPageChange && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onPageChange('logger_plan_editor', {
+                              project,
+                              qualificationObjectId: initialData.id,
+                              qualificationObjectName: initialData.name,
+                              planFileUrl: '',
+                              planFileName: 'Схема расположения измерительного оборудования.drawio'
+                            })
+                          }
+                          className="inline-flex items-center justify-center px-3 py-1.5 border border-indigo-600 text-sm font-medium rounded-md text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 self-start sm:self-auto shrink-0"
+                        >
+                          <Plus className="w-4 h-4 mr-1.5" />
+                          Создать
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

@@ -267,8 +267,7 @@ const AppContent: React.FC = () => {
 
         return hasAccess('analyzer') &&
           projectForEditor &&
-          qualificationObjectId &&
-          planFileUrl
+          qualificationObjectId
           ? wrapWithSuspense(
               <LoggerPlacementPlanEditor
                 project={projectForEditor}

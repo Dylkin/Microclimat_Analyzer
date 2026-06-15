@@ -49,6 +49,11 @@ class DocumentationCheckService {
         params.append('project_id', projectId);
         const data = await apiClient.get<any>(`/documentation-checks/latest?${params.toString()}`);
 
+        if (!data) {
+          console.log('DocumentationCheckService: Проверка документации не найдена (это нормально для новых объектов)');
+          return null;
+        }
+
         console.log('DocumentationCheckService: Проверка документации загружена:', data);
         return this.mapFromApi(data);
       } catch (error: any) {

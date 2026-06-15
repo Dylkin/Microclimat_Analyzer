@@ -72,7 +72,9 @@ router.get('/latest', async (req, res) => {
     `, [qualification_object_id, project_id]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Проверка не найдена' });
+      // Для новых объектов проверка ещё не создана — возвращаем null вместо 404,
+      // чтобы не писать ошибку в консоль браузера
+      return res.json(null);
     }
 
     const row = result.rows[0];

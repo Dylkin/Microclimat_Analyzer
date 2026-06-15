@@ -125,6 +125,12 @@ const main = async () => {
           if (file === '20260513140000_users_staff_position_id.sql') return true;
           // Годовая таблица расходов (страница «Финансы»)
           if (file === '20260518120000_add_finance_expense_data.sql') return true;
+          // Поля стоимости и план/факт дат для проектов
+          if (file === '20260510165000_add_project_plan_fact_fields.sql') return true;
+          // Дата оплаты для проектов
+          if (file === '20260510165500_add_project_payment_date.sql') return true;
+          // Геокоординаты и теги контрагентов
+          if (file === '20260614170000_add_contractor_geo_and_tags_fields.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:
