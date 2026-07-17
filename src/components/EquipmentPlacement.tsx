@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Trash2, MapPin, CheckCircle, Save } from 'lucide-react';
+import { Plus, Trash2, MapPin, CheckCircle, Save, History } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { MeasurementZone, MeasurementLevel } from '../types/QualificationObject';
 import { Equipment, EquipmentType } from '../types/Equipment';
 import { equipmentService } from '../utils/equipmentService';
@@ -11,6 +12,9 @@ interface EquipmentPlacementProps {
   onZonesChange?: (zones: MeasurementZone[]) => void;
   readOnly?: boolean;
   projectId?: string;
+  /** Дата и исполнитель последнего сохранения расстановки оборудования. */
+  savedAt?: Date | string;
+  savedBy?: string;
   /** Блок над справкой «Информация о расстановке оборудования» (например кнопка «Разместить на схеме»). */
   abovePlacementInfo?: React.ReactNode;
 }
@@ -21,6 +25,8 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
   onZonesChange,
   readOnly = false,
   projectId,
+  savedAt,
+  savedBy,
   abovePlacementInfo
 }) => {
   // Инициализируем с зоной 0 (Внешняя температура), если зон нет
@@ -52,6 +58,7 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
   const [equipmentLoading, setEquipmentLoading] = useState(false);
   const [equipmentSearchTerms, setEquipmentSearchTerms] = useState<{ [levelId: string]: string }>({});
   const [showEquipmentDropdowns, setShowEquipmentDropdowns] = useState<{ [levelId: string]: boolean }>({});
+  const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -336,7 +343,8 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
     setSaveSuccess(null);
 
     try {
-      await qualificationObjectService.updateMeasurementZones(qualificationObjectId, measurementZones, projectId);
+      const savedByName = user?.fullName || user?.email || 'Неизвестный пользователь';
+      await qualificationObjectService.updateMeasurementZones(qualificationObjectId, measurementZones, projectId, savedByName);
       setSaveSuccess('Зоны измерения успешно сохранены');
       
       // Автоматически скрываем сообщение об успехе через 3 секунды
@@ -355,6 +363,18 @@ export const EquipmentPlacement: React.FC<EquipmentPlacementProps> = ({
     <div className="border-t border-gray-200 pt-6">
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Расстановка оборудования</h3>
+        {savedAt && (
+          <div className="mt-2 inline-flex items-center px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-md">
+            <History className="w-4 h-4 mr-2 flex-shrink-0" />
+            <span>
+              Загружена расстановка оборудования от{' '}
+              {typeof savedAt === 'string'
+                ? new Date(savedAt).toLocaleString('ru-RU')
+                : savedAt.toLocaleString('ru-RU')}
+              {savedBy ? `, ${savedBy}` : ''}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Сообщения об успехе и ошибках */}

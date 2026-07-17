@@ -67,6 +67,13 @@ const ContractorDirectory: React.FC<ContractorDirectoryProps> = ({
     contacts: []
   });
 
+  // Сортировка контрагентов по наименованию (алфавитный порядок, регистронезависимо)
+  const sortContractorsByName = (contractorsToSort: Contractor[]): Contractor[] => {
+    return [...contractorsToSort].sort((a, b) =>
+      a.name.localeCompare(b.name, 'ru-RU', { sensitivity: 'base' })
+    );
+  };
+
   // Загрузка контрагентов
   const loadContractors = async () => {
     setLoading(true);
@@ -74,8 +81,9 @@ const ContractorDirectory: React.FC<ContractorDirectoryProps> = ({
 
     try {
       const data = await contractorService.getAllContractors();
-      setContractors(data);
-      setFilteredContractors(data);
+      const sortedData = sortContractorsByName(data);
+      setContractors(sortedData);
+      setFilteredContractors(sortedData);
       console.log('Контрагенты загружены:', data.length);
     } catch (error) {
       console.error('Ошибка загрузки контрагентов:', error);
@@ -119,7 +127,7 @@ const ContractorDirectory: React.FC<ContractorDirectoryProps> = ({
       });
     });
 
-    setFilteredContractors(filtered);
+    setFilteredContractors(sortContractorsByName(filtered));
   }, [searchTerm, contractors]);
 
   // Загрузка объектов квалификации для контрагента

@@ -97,7 +97,12 @@ class QualificationObjectService {
   }
 
   // Обновление зон измерения для объекта квалификации
-  async updateMeasurementZones(objectId: string, measurementZones: any[], projectId?: string): Promise<QualificationObject> {
+  async updateMeasurementZones(
+    objectId: string,
+    measurementZones: any[],
+    projectId?: string,
+    savedBy?: string
+  ): Promise<QualificationObject> {
     try {
       console.log('Сохранение зон измерения:', {
         objectId,
@@ -105,10 +110,16 @@ class QualificationObjectService {
         zones: measurementZones
       });
 
-      const data = await apiClient.patch<any>(`/qualification-objects/${objectId}`, {
+      const patchBody: Record<string, any> = {
         measurementZones: measurementZones,
         projectId
-      });
+      };
+      if (savedBy) {
+        patchBody.equipmentPlacementSavedAt = new Date().toISOString();
+        patchBody.equipmentPlacementSavedBy = savedBy;
+      }
+
+      const data = await apiClient.patch<any>(`/qualification-objects/${objectId}`, patchBody);
 
       console.log('Зоны измерения успешно сохранены:', data);
       return this.mapFromApi(data);
@@ -341,6 +352,11 @@ class QualificationObjectService {
         data.equipmentPlacementPlanFileUrl || data.equipment_placement_plan_file_url || '',
       equipmentPlacementPlanFileName:
         data.equipmentPlacementPlanFileName || data.equipment_placement_plan_file_name || '',
+      equipmentPlacementSavedAt: data.equipmentPlacementSavedAt
+        ? new Date(data.equipmentPlacementSavedAt)
+        : (data.equipment_placement_saved_at ? new Date(data.equipment_placement_saved_at) : undefined),
+      equipmentPlacementSavedBy:
+        data.equipmentPlacementSavedBy || data.equipment_placement_saved_by || undefined,
       address: data.address || '',
       latitude: data.latitude ? parseFloat(data.latitude) : undefined,
       longitude: data.longitude ? parseFloat(data.longitude) : undefined,

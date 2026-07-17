@@ -46,6 +46,9 @@ export interface QualificationObject {
   /** Схема расположения измерительного оборудования (.drawio), формируется на этапе расстановки логгеров */
   equipmentPlacementPlanFileUrl?: string;
   equipmentPlacementPlanFileName?: string;
+  /** Дата и исполнитель последнего сохранения расстановки оборудования */
+  equipmentPlacementSavedAt?: Date;
+  equipmentPlacementSavedBy?: string;
   createdAt?: Date;
   updatedAt?: Date;
   measurementZones?: MeasurementZone[];

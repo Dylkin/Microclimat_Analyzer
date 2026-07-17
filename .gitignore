@@ -23,6 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env*
 bd.env
 deploy.env
 prod.dump
+.playwright-mcp/
+equipment_placement_loaded_message.png
+equipment_placement_loaded_message_full.png

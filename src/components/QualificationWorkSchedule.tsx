@@ -115,6 +115,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [measurementZones, setMeasurementZones] = useState<MeasurementZone[]>([]);
+  const [measurementZonesSavedAt, setMeasurementZonesSavedAt] = useState<Date | undefined>(undefined);
+  const [measurementZonesSavedBy, setMeasurementZonesSavedBy] = useState<string | undefined>(undefined);
   const [measurementZonesLoading, setMeasurementZonesLoading] = useState(false);
   const [parsingMetaLoaded, setParsingMetaLoaded] = useState(false);
   const [testDocuments, setTestDocuments] = useState<File[]>([]);
@@ -738,8 +740,13 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
 
       if (!qualificationObject) {
         setMeasurementZones([]);
+        setMeasurementZonesSavedAt(undefined);
+        setMeasurementZonesSavedBy(undefined);
         return;
       }
+
+      setMeasurementZonesSavedAt(qualificationObject.equipmentPlacementSavedAt);
+      setMeasurementZonesSavedBy(qualificationObject.equipmentPlacementSavedBy);
 
       let zones: MeasurementZone[] = Array.isArray(qualificationObject.measurementZones)
         ? [...qualificationObject.measurementZones]
@@ -2297,6 +2304,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                           onZonesChange={mode === 'view' ? undefined : handleZonesChange}
                           readOnly={mode === 'view'}
                           projectId={projectId}
+                          savedAt={measurementZonesSavedAt}
+                          savedBy={measurementZonesSavedBy}
                           abovePlacementInfo={
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
                               <button

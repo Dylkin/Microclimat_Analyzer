@@ -108,6 +108,8 @@ const main = async () => {
           if (file === '20260130000000_add_thermocontainer_type.sql') return true;
           // Миграция для списка "Зоны хранения"
           if (file === '20260130000002_add_storage_zones.sql') return true;
+          // Миграция для метаданных последнего сохранения расстановки оборудования
+          if (file === '20260704000000_add_equipment_placement_saved_metadata.sql') return true;
           // Миграция для проектных данных объектов квалификации
           if (file === '20260201000000_add_project_qualification_object_data.sql') return true;
           // Миграция для полей дат объектов квалификации (термоконтейнер)
