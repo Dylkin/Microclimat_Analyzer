@@ -3,7 +3,7 @@ module.exports = {
     name: 'microclimat-api',
     script: 'npm',
     args: 'run server:prod',
-    cwd: '/home/stas/Microclimat_Analyzer',
+    cwd: '/opt/Microclimat_Analyzer',
     instances: 1,
     exec_mode: 'fork',
     autorestart: true,
