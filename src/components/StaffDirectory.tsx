@@ -336,7 +336,7 @@ const StaffDirectory: React.FC = () => {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Фонд оплаты труда (ФОТ)</h2>
         <p className="text-sm text-gray-600 mb-3">
           Расчёт по формуле суммы окладов с коэффициентом нагрузки: оклад × (1 + подоходный + белгосстрах + ФСЗН
-          работодателя + % на отпускные + НДС + рентабельность) / 100. Ставки берутся со страницы «Налоги» (текущий
+          работодателя + % на отпускные + НДС + рентабельность) / 100. Ставки берутся со страницы «Переменные» (текущий
           коэффициент {new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 4 }).format(payrollMultiplier)}).
         </p>
         <div className="text-xl font-semibold text-indigo-700 mb-4">Общий ФОТ предприятия: {formatRub(payroll.total)}</div>

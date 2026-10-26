@@ -87,7 +87,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
           access: 'analyzer' as const
         },
         {
-          name: 'Налоги',
+          name: 'Переменные',
           key: 'tax-settings',
           icon: Settings,
           access: 'analyzer' as const

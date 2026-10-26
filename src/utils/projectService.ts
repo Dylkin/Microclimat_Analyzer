@@ -26,6 +26,26 @@ type ProjectDto = {
   tenderDate?: string | null;
   total_cost_with_vat?: number | string | null;
   totalCostWithVat?: number | string | null;
+  loggers_count?: number | null;
+  loggersCount?: number | null;
+  protocol_print_copies?: number | null;
+  protocolPrintCopies?: number | null;
+  report_print_copies?: number | null;
+  reportPrintCopies?: number | null;
+  travel_expenses?: number | string | null;
+  travelExpenses?: number | string | null;
+  protocol_preparation_start_date?: string | null;
+  protocolPreparationStartDate?: string | null;
+  protocol_preparation_end_date?: string | null;
+  protocolPreparationEndDate?: string | null;
+  testing_start_date?: string | null;
+  testingStartDate?: string | null;
+  testing_end_date?: string | null;
+  testingEndDate?: string | null;
+  report_preparation_start_date?: string | null;
+  reportPreparationStartDate?: string | null;
+  report_preparation_end_date?: string | null;
+  reportPreparationEndDate?: string | null;
   start_date_planned?: string | null;
   startDatePlanned?: string | null;
   start_date_actual?: string | null;
@@ -203,6 +223,36 @@ const mapProject = (dto: ProjectDto): Project => {
         : dto.total_cost_with_vat !== undefined && dto.total_cost_with_vat !== null
         ? Number(dto.total_cost_with_vat)
         : undefined,
+    loggersCount:
+      dto.loggersCount !== undefined && dto.loggersCount !== null
+        ? Number(dto.loggersCount)
+        : dto.loggers_count !== undefined && dto.loggers_count !== null
+        ? Number(dto.loggers_count)
+        : undefined,
+    protocolPrintCopies:
+      dto.protocolPrintCopies !== undefined && dto.protocolPrintCopies !== null
+        ? Number(dto.protocolPrintCopies)
+        : dto.protocol_print_copies !== undefined && dto.protocol_print_copies !== null
+        ? Number(dto.protocol_print_copies)
+        : undefined,
+    reportPrintCopies:
+      dto.reportPrintCopies !== undefined && dto.reportPrintCopies !== null
+        ? Number(dto.reportPrintCopies)
+        : dto.report_print_copies !== undefined && dto.report_print_copies !== null
+        ? Number(dto.report_print_copies)
+        : undefined,
+    travelExpenses:
+      dto.travelExpenses !== undefined && dto.travelExpenses !== null
+        ? Number(dto.travelExpenses)
+        : dto.travel_expenses !== undefined && dto.travel_expenses !== null
+        ? Number(dto.travel_expenses)
+        : undefined,
+    protocolPreparationStartDate: toDate(dto.protocolPreparationStartDate || dto.protocol_preparation_start_date),
+    protocolPreparationEndDate: toDate(dto.protocolPreparationEndDate || dto.protocol_preparation_end_date),
+    testingStartDate: toDate(dto.testingStartDate || dto.testing_start_date),
+    testingEndDate: toDate(dto.testingEndDate || dto.testing_end_date),
+    reportPreparationStartDate: toDate(dto.reportPreparationStartDate || dto.report_preparation_start_date),
+    reportPreparationEndDate: toDate(dto.reportPreparationEndDate || dto.report_preparation_end_date),
     startDatePlanned: toDate(dto.startDatePlanned || dto.start_date_planned),
     startDateActual: toDate(dto.startDateActual || dto.start_date_actual),
     endDatePlanned: toDate(dto.endDatePlanned || dto.end_date_planned),
@@ -242,6 +292,16 @@ class ProjectService {
       tenderLink: project.tenderLink,
       tenderDate: project.tenderDate,
       totalCostWithVat: project.totalCostWithVat,
+      loggersCount: project.loggersCount,
+      protocolPrintCopies: project.protocolPrintCopies,
+      reportPrintCopies: project.reportPrintCopies,
+      travelExpenses: project.travelExpenses,
+      protocolPreparationStartDate: project.protocolPreparationStartDate,
+      protocolPreparationEndDate: project.protocolPreparationEndDate,
+      testingStartDate: project.testingStartDate,
+      testingEndDate: project.testingEndDate,
+      reportPreparationStartDate: project.reportPreparationStartDate,
+      reportPreparationEndDate: project.reportPreparationEndDate,
       startDatePlanned: project.startDatePlanned,
       startDateActual: project.startDateActual,
       endDatePlanned: project.endDatePlanned,
@@ -270,6 +330,48 @@ class ProjectService {
     }
     if (updates.totalCostWithVat !== undefined) {
       payload.totalCostWithVat = updates.totalCostWithVat;
+    }
+    if (updates.loggersCount !== undefined) {
+      payload.loggersCount = updates.loggersCount;
+    }
+    if (updates.protocolPrintCopies !== undefined) {
+      payload.protocolPrintCopies = updates.protocolPrintCopies;
+    }
+    if (updates.reportPrintCopies !== undefined) {
+      payload.reportPrintCopies = updates.reportPrintCopies;
+    }
+    if (updates.travelExpenses !== undefined) {
+      payload.travelExpenses = updates.travelExpenses;
+    }
+    if (updates.protocolPreparationStartDate !== undefined) {
+      payload.protocolPreparationStartDate = updates.protocolPreparationStartDate
+        ? updates.protocolPreparationStartDate.toISOString()
+        : null;
+    }
+    if (updates.protocolPreparationEndDate !== undefined) {
+      payload.protocolPreparationEndDate = updates.protocolPreparationEndDate
+        ? updates.protocolPreparationEndDate.toISOString()
+        : null;
+    }
+    if (updates.testingStartDate !== undefined) {
+      payload.testingStartDate = updates.testingStartDate
+        ? updates.testingStartDate.toISOString()
+        : null;
+    }
+    if (updates.testingEndDate !== undefined) {
+      payload.testingEndDate = updates.testingEndDate
+        ? updates.testingEndDate.toISOString()
+        : null;
+    }
+    if (updates.reportPreparationStartDate !== undefined) {
+      payload.reportPreparationStartDate = updates.reportPreparationStartDate
+        ? updates.reportPreparationStartDate.toISOString()
+        : null;
+    }
+    if (updates.reportPreparationEndDate !== undefined) {
+      payload.reportPreparationEndDate = updates.reportPreparationEndDate
+        ? updates.reportPreparationEndDate.toISOString()
+        : null;
     }
     if (updates.startDatePlanned !== undefined) {
       payload.startDatePlanned = updates.startDatePlanned

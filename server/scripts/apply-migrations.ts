@@ -133,6 +133,10 @@ const main = async () => {
           if (file === '20260510165500_add_project_payment_date.sql') return true;
           // Геокоординаты и теги контрагентов
           if (file === '20260614170000_add_contractor_geo_and_tags_fields.sql') return true;
+          // Поля расходов на испытания для проектов (логгеры, печатные экземпляры, командировочные)
+          if (file === '20261017230600_add_project_testing_expense_fields.sql') return true;
+          // План проведения работ для проектов (подготовка протоколов, испытания, подготовка отчетов)
+          if (file === '20261017233352_add_project_work_plan_fields.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:

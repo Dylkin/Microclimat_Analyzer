@@ -1655,6 +1655,10 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         else if (type === 'power_on_event') {
           label = 'Питание включено';
         }
+        // Если тип изменен на "door_opening_sanitation", устанавливаем название "Открытие двери, санобработка"
+        else if (type === 'door_opening_sanitation') {
+          label = 'Открытие двери, санобработка';
+        }
         
         return { ...m, type, color, label };
       }
@@ -1694,6 +1698,8 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
         return 'Питание выключено';
       case 'power_on_event':
         return 'Питание включено';
+      case 'door_opening_sanitation':
+        return 'Открытие двери, санобработка';
       default:
         return 'Неизвестно';
     }
@@ -3949,6 +3955,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                             >
                               Питание включено
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'door_opening_sanitation')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'door_opening_sanitation'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Открытие двери, санобработка (не участвует в формировании Результатов анализа и Выводов)"
+                            >
+                              Открытие двери, санобработка
+                            </button>
                           </div>
                         ) : (
                           // Для остальных типов испытаний используем расширенный переключатель типов маркеров
@@ -4000,6 +4018,18 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
                               title="Тип маркера: Закрытие двери (не участвует в формировании выводов)"
                             >
                               Закрытие двери
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMarkerType(marker.id, 'door_opening_sanitation')}
+                              className={`text-xs px-3 py-1 rounded transition-colors ${
+                                marker.type === 'door_opening_sanitation'
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Тип маркера: Открытие двери, санобработка (не участвует в формировании Результатов анализа и Выводов)"
+                            >
+                              Открытие двери, санобработка
                             </button>
                             <button
                               type="button"

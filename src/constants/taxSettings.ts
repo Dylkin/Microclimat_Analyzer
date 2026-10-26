@@ -6,11 +6,14 @@ export interface TaxSettings {
   vacationPay: number;
   vat: number;
   profitability: number;
+  loggerDayCost: number;
+  protocolPrintCost: number;
+  reportPrintCost: number;
 }
 
 export const TAX_SETTINGS_STORAGE_KEY = 'microclimat:tax-settings';
 
-/** Событие после сохранения настроек на странице «Налоги» (в той же вкладке storage не срабатывает). */
+/** Событие после сохранения настроек на странице «Переменные» (в той же вкладке storage не срабатывает). */
 export const TAX_SETTINGS_CHANGED_EVENT = 'microclimat:tax-settings-changed';
 
 export const DEFAULT_TAX_SETTINGS: TaxSettings = {
@@ -20,7 +23,10 @@ export const DEFAULT_TAX_SETTINGS: TaxSettings = {
   fsznEmployee: 1,
   vacationPay: 9.25,
   vat: 20,
-  profitability: 10
+  profitability: 10,
+  loggerDayCost: 3,
+  protocolPrintCost: 30,
+  reportPrintCost: 70
 };
 
 export function loadTaxSettingsFromLocalStorage(): TaxSettings {
@@ -35,7 +41,10 @@ export function loadTaxSettingsFromLocalStorage(): TaxSettings {
       fsznEmployee: typeof parsed.fsznEmployee === 'number' ? parsed.fsznEmployee : DEFAULT_TAX_SETTINGS.fsznEmployee,
       vacationPay: typeof parsed.vacationPay === 'number' ? parsed.vacationPay : DEFAULT_TAX_SETTINGS.vacationPay,
       vat: typeof parsed.vat === 'number' ? parsed.vat : DEFAULT_TAX_SETTINGS.vat,
-      profitability: typeof parsed.profitability === 'number' ? parsed.profitability : DEFAULT_TAX_SETTINGS.profitability
+      profitability: typeof parsed.profitability === 'number' ? parsed.profitability : DEFAULT_TAX_SETTINGS.profitability,
+      loggerDayCost: typeof parsed.loggerDayCost === 'number' ? parsed.loggerDayCost : DEFAULT_TAX_SETTINGS.loggerDayCost,
+      protocolPrintCost: typeof parsed.protocolPrintCost === 'number' ? parsed.protocolPrintCost : DEFAULT_TAX_SETTINGS.protocolPrintCost,
+      reportPrintCost: typeof parsed.reportPrintCost === 'number' ? parsed.reportPrintCost : DEFAULT_TAX_SETTINGS.reportPrintCost
     };
   } catch {
     return { ...DEFAULT_TAX_SETTINGS };
@@ -44,7 +53,7 @@ export function loadTaxSettingsFromLocalStorage(): TaxSettings {
 
 /**
  * Коэффициент полной стоимости ФОТ по шаблону: оклад × (1 + Σ ставок),
- * ставки — поля страницы «Налоги» в процентах (как в файле Фот.xlsx: C…H к доле оклада).
+ * ставки — поля страницы «Переменные» в процентах (как в файле Фот.xlsx: C…H к доле оклада).
  * Поле «ФСЗН сотрудник» в этой сумме не участвует (в шаблоне отдельного столбца нет).
  */
 export function payrollFundBurdenMultiplier(settings: TaxSettings): number {

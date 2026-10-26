@@ -31,7 +31,10 @@ export const TaxSettingsPage: React.FC = () => {
         fsznEmployee: typeof parsed.fsznEmployee === 'number' ? parsed.fsznEmployee : DEFAULT_TAX_SETTINGS.fsznEmployee,
         vacationPay: typeof parsed.vacationPay === 'number' ? parsed.vacationPay : DEFAULT_TAX_SETTINGS.vacationPay,
         vat: typeof parsed.vat === 'number' ? parsed.vat : DEFAULT_TAX_SETTINGS.vat,
-        profitability: typeof parsed.profitability === 'number' ? parsed.profitability : DEFAULT_TAX_SETTINGS.profitability
+        profitability: typeof parsed.profitability === 'number' ? parsed.profitability : DEFAULT_TAX_SETTINGS.profitability,
+        loggerDayCost: typeof parsed.loggerDayCost === 'number' ? parsed.loggerDayCost : DEFAULT_TAX_SETTINGS.loggerDayCost,
+        protocolPrintCost: typeof parsed.protocolPrintCost === 'number' ? parsed.protocolPrintCost : DEFAULT_TAX_SETTINGS.protocolPrintCost,
+        reportPrintCost: typeof parsed.reportPrintCost === 'number' ? parsed.reportPrintCost : DEFAULT_TAX_SETTINGS.reportPrintCost
       });
     } catch (loadError) {
       console.error('Ошибка загрузки налоговых настроек:', loadError);
@@ -69,9 +72,9 @@ export const TaxSettingsPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Налоги</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Переменные</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Управление налоговыми ставками и рентабельностью в процентах.
+            Управление налоговыми ставками, рентабельностью в процентах и переменными для расчётов.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -195,7 +198,73 @@ export const TaxSettingsPage: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Стоимость использования логгера в день, руб. без НДС</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={settings.loggerDayCost}
+              onChange={(e) => handleNumberChange('loggerDayCost', e.target.value)}
+              title="Стоимость использования логгера в день, руб. без НДС"
+              placeholder="3"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Средняя стоимость печати протокола, руб. без НДС</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={settings.protocolPrintCost}
+              onChange={(e) => handleNumberChange('protocolPrintCost', e.target.value)}
+              title="Средняя стоимость печати протокола, руб. без НДС"
+              placeholder="30"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Средняя стоимость печати отчёта, руб. без НДС</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={settings.reportPrintCost}
+              onChange={(e) => handleNumberChange('reportPrintCost', e.target.value)}
+              title="Средняя стоимость печати отчёта, руб. без НДС"
+              placeholder="70"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
         </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Формула расчёта рекомендуемой стоимости проекта</h2>
+        <p className="text-sm text-gray-600 mb-2">
+          На форме создания проекта под блоком «План проведения работ» выводится рекомендуемая стоимость (руб. с НДС),
+          вычисляемая по формуле:
+        </p>
+        <div className="text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-lg p-4 leading-relaxed">
+          (Кол-во логгеров для проведения испытаний × Стоимость использования логгера в день, руб. без НДС × кол-во календарных дней в периоде «Проведение испытаний»
+          + Кол-во печатных экземпляров протоколов × Средняя стоимость печати протокола, руб. без НДС
+          + Кол-во печатных экземпляров отчётов × Средняя стоимость печати отчёта, руб. без НДС
+          + Командировочные расходы
+          + (Кол-во печатных экземпляров протоколов × 2 дня + Кол-во печатных экземпляров отчётов × 3 дня) × (ФОТ отдела валидации + ФОТ администрации / 3 + ФОТ отдела продаж / 3) / 20,6
+          + Плановая прибыль: сумма всех значений × Рентабельность / 100)
+          × (1 + НДС / 100)
+        </div>
+        <p className="text-sm text-gray-600 mt-2">
+          ФОТ отделов берётся со страницы «Структура предприятия» (сумма окладов должностей с коэффициентом нагрузки).
+          Деление на 20,6 — среднее количество рабочих дней в месяце (месячный ФОТ переводится в дневную ставку).
+          Трудоёмкость для ФОТ считается по документам: один протокол = 2 дня, один отчёт = 3 дня.
+          Плановая прибыль = сумма всех слагаемых × Рентабельность / 100 (рентабельность со страницы «Переменные»).
+          Если отдел с нужным названием не найден, его ФОТ в расчёте принимается равным нулю.
+        </p>
       </div>
     </div>
   );

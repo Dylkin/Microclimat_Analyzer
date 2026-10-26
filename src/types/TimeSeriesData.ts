@@ -40,7 +40,8 @@ export type MarkerType =
   | 'temperature_recovery'
   // Дополнительные маркеры, не влияющие на расчёт результатов и выводов
   | 'power_off_event'
-  | 'power_on_event';
+  | 'power_on_event'
+  | 'door_opening_sanitation';
 
 export interface VerticalMarker {
   id: string;

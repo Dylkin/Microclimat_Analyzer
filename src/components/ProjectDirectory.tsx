@@ -8,12 +8,45 @@ import { contractorService } from '../utils/contractorService';
 import { qualificationObjectService } from '../utils/qualificationObjectService';
 import { useAuth } from '../contexts/AuthContext';
 import { SaleProjectForm } from './SaleProjectForm';
+import { staffDirectoryService } from '../utils/staffDirectoryService';
+import type { Department } from '../types/StaffDirectory';
+import {
+  loadTaxSettingsFromLocalStorage,
+  payrollFundBurdenMultiplier,
+  TAX_SETTINGS_CHANGED_EVENT,
+  type TaxSettings
+} from '../constants/taxSettings';
 // import { QualificationObjectForm } from './QualificationObjectForm';
 
 // UUID validation function
 function isValidUUID(uuid: string): boolean {
   const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return regex.test(uuid);
+}
+
+// Количество рабочих дней (пн–пт) в периоде, включая обе границы; 0 если даты не заданы или период невалиден
+function countWorkingDays(start: string | undefined, end: string | undefined): number {
+  if (!start || !end) return 0;
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end}T00:00:00`);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate < startDate) return 0;
+  let count = 0;
+  const current = new Date(startDate);
+  while (current <= endDate) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) count += 1;
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+}
+
+// Количество календарных дней в периоде, включая обе границы; 0 если даты не заданы или период невалиден
+function countCalendarDays(start: string | undefined, end: string | undefined): number {
+  if (!start || !end) return 0;
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end}T00:00:00`);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate < startDate) return 0;
+  return Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
 }
 
 interface ProjectDirectoryProps {
@@ -46,10 +79,16 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     contractorId: string;
     qualificationObjectIds: string[];
     totalCostWithVat?: number;
-    startDatePlanned?: string;
-    startDateActual?: string;
-    endDatePlanned?: string;
-    endDateActual?: string;
+    loggersCount?: number;
+    protocolPrintCopies?: number;
+    reportPrintCopies?: number;
+    travelExpenses?: number;
+    protocolPreparationStartDate?: string;
+    protocolPreparationEndDate?: string;
+    testingStartDate?: string;
+    testingEndDate?: string;
+    reportPreparationStartDate?: string;
+    reportPreparationEndDate?: string;
     paymentDate?: string;
     type?: 'qualification' | 'sale';
   }>({
@@ -57,10 +96,16 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     contractorId: '',
     qualificationObjectIds: [],
     totalCostWithVat: undefined,
-    startDatePlanned: '',
-    startDateActual: '',
-    endDatePlanned: '',
-    endDateActual: '',
+    loggersCount: undefined,
+    protocolPrintCopies: undefined,
+    reportPrintCopies: undefined,
+    travelExpenses: undefined,
+    protocolPreparationStartDate: '',
+    protocolPreparationEndDate: '',
+    testingStartDate: '',
+    testingEndDate: '',
+    reportPreparationStartDate: '',
+    reportPreparationEndDate: '',
     paymentDate: ''
   });
 
@@ -73,6 +118,74 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     status: 'contract_negotiation',
     qualificationObjectIds: []
   });
+
+  // Данные для расчёта рекомендуемой стоимости: ФОТ отделов (со страницы «Структура предприятия») и переменные
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [taxSettings, setTaxSettings] = useState<TaxSettings>(() => loadTaxSettingsFromLocalStorage());
+
+  useEffect(() => {
+    staffDirectoryService
+      .getDirectory()
+      .then((data) => setDepartments(data.departments))
+      .catch((e) => console.error('Ошибка загрузки структуры предприятия:', e));
+  }, []);
+
+  useEffect(() => {
+    const syncTax = () => setTaxSettings(loadTaxSettingsFromLocalStorage());
+    window.addEventListener('storage', syncTax);
+    window.addEventListener(TAX_SETTINGS_CHANGED_EVENT, syncTax);
+    return () => {
+      window.removeEventListener('storage', syncTax);
+      window.removeEventListener(TAX_SETTINGS_CHANGED_EVENT, syncTax);
+    };
+  }, []);
+
+  // Расчёт рекомендуемой стоимости (руб. с НДС) по формуле со страницы «Переменные»
+  const workPlanDays =
+    countWorkingDays(newProject.protocolPreparationStartDate, newProject.protocolPreparationEndDate) +
+    countWorkingDays(newProject.testingStartDate, newProject.testingEndDate) +
+    countWorkingDays(newProject.reportPreparationStartDate, newProject.reportPreparationEndDate);
+
+  const payrollMultiplier = payrollFundBurdenMultiplier(taxSettings);
+  const fotByDepartmentName = new Map(
+    departments.map((d) => {
+      const base = d.positions.reduce((acc, p) => acc + Number(p.salary), 0);
+      return [d.name.trim().toLowerCase(), base * payrollMultiplier] as const;
+    })
+  );
+  const fotOf = (name: string) => fotByDepartmentName.get(name.toLowerCase()) ?? 0;
+  const fotValidation = fotOf('Отдел валидации');
+  const fotAdministration = fotOf('Администрация');
+  const fotSales = fotOf('Отдел продаж');
+  // Среднее кол-во рабочих дней в месяце — для перевода месячного ФОТ в дневную ставку
+  const AVERAGE_WORKING_DAYS_PER_MONTH = 20.6;
+  const workDaysFotRate =
+    (fotValidation + fotAdministration / 3 + fotSales / 3) / AVERAGE_WORKING_DAYS_PER_MONTH;
+
+  const fmtCalc = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
+
+  // Амортизация оборудования: логгеры × стоимость в день × календарные дни периода «Проведение испытаний»
+  const testingCalendarDays = countCalendarDays(newProject.testingStartDate, newProject.testingEndDate);
+  const loggerCostTerm = (newProject.loggersCount ?? 0) * taxSettings.loggerDayCost * testingCalendarDays;
+  const protocolPrintTerm = (newProject.protocolPrintCopies ?? 0) * taxSettings.protocolPrintCost;
+  const reportPrintTerm = (newProject.reportPrintCopies ?? 0) * taxSettings.reportPrintCost;
+  // Обеспечение ФОТ: трудоёмкость из количества документов (1 протокол = 2 дня, 1 отчёт = 3 дня)
+  const fotDays = (newProject.protocolPrintCopies ?? 0) * 2 + (newProject.reportPrintCopies ?? 0) * 3;
+  const workDaysFotTerm = fotDays * workDaysFotRate;
+  const recommendedCostBase =
+    loggerCostTerm +
+    protocolPrintTerm +
+    reportPrintTerm +
+    (newProject.travelExpenses ?? 0) +
+    workDaysFotTerm;
+  const planProfitTerm = recommendedCostBase * (taxSettings.profitability / 100);
+  const vatTerm = (recommendedCostBase + planProfitTerm) * (taxSettings.vat / 100);
+  const recommendedCostWithVat = recommendedCostBase + planProfitTerm + vatTerm;
+  const hasRecommendedCostInputs =
+    (newProject.loggersCount ?? 0) > 0 ||
+    (newProject.protocolPrintCopies ?? 0) > 0 ||
+    (newProject.reportPrintCopies ?? 0) > 0 ||
+    (newProject.travelExpenses ?? 0) > 0;
 
   const getDateMs = (v: unknown): number | null => {
     if (!v) return null;
@@ -299,10 +412,16 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         contractorId: trimmedContractorId,
         name: projectName,
         totalCostWithVat: newProject.totalCostWithVat,
-        startDatePlanned: newProject.startDatePlanned ? new Date(newProject.startDatePlanned) : undefined,
-        startDateActual: newProject.startDateActual ? new Date(newProject.startDateActual) : undefined,
-        endDatePlanned: newProject.endDatePlanned ? new Date(newProject.endDatePlanned) : undefined,
-        endDateActual: newProject.endDateActual ? new Date(newProject.endDateActual) : undefined,
+        loggersCount: newProject.loggersCount,
+        protocolPrintCopies: newProject.protocolPrintCopies,
+        reportPrintCopies: newProject.reportPrintCopies,
+        travelExpenses: newProject.travelExpenses,
+        protocolPreparationStartDate: newProject.protocolPreparationStartDate ? new Date(newProject.protocolPreparationStartDate) : undefined,
+        protocolPreparationEndDate: newProject.protocolPreparationEndDate ? new Date(newProject.protocolPreparationEndDate) : undefined,
+        testingStartDate: newProject.testingStartDate ? new Date(newProject.testingStartDate) : undefined,
+        testingEndDate: newProject.testingEndDate ? new Date(newProject.testingEndDate) : undefined,
+        reportPreparationStartDate: newProject.reportPreparationStartDate ? new Date(newProject.reportPreparationStartDate) : undefined,
+        reportPreparationEndDate: newProject.reportPreparationEndDate ? new Date(newProject.reportPreparationEndDate) : undefined,
         paymentDate: newProject.paymentDate ? new Date(newProject.paymentDate) : undefined,
       };
 
@@ -336,10 +455,16 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         contractorId: '',
         qualificationObjectIds: [],
         totalCostWithVat: undefined,
-        startDatePlanned: '',
-        startDateActual: '',
-        endDatePlanned: '',
-        endDateActual: '',
+        loggersCount: undefined,
+        protocolPrintCopies: undefined,
+        reportPrintCopies: undefined,
+        travelExpenses: undefined,
+        protocolPreparationStartDate: '',
+        protocolPreparationEndDate: '',
+        testingStartDate: '',
+        testingEndDate: '',
+        reportPreparationStartDate: '',
+        reportPreparationEndDate: '',
         paymentDate: '',
       });
       setShowAddForm(false);
@@ -500,10 +625,16 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 contractorId: '',
                 qualificationObjectIds: [],
                 totalCostWithVat: undefined,
-                startDatePlanned: '',
-                startDateActual: '',
-                endDatePlanned: '',
-                endDateActual: '',
+                loggersCount: undefined,
+                protocolPrintCopies: undefined,
+                reportPrintCopies: undefined,
+                travelExpenses: undefined,
+                protocolPreparationStartDate: '',
+                protocolPreparationEndDate: '',
+                testingStartDate: '',
+                testingEndDate: '',
+                reportPreparationStartDate: '',
+                reportPreparationEndDate: '',
                 paymentDate: '',
                 type: 'qualification'
               });
@@ -521,10 +652,16 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 contractorId: '',
                 qualificationObjectIds: [],
                 totalCostWithVat: undefined,
-                startDatePlanned: '',
-                startDateActual: '',
-                endDatePlanned: '',
-                endDateActual: '',
+                loggersCount: undefined,
+                protocolPrintCopies: undefined,
+                reportPrintCopies: undefined,
+                travelExpenses: undefined,
+                protocolPreparationStartDate: '',
+                protocolPreparationEndDate: '',
+                testingStartDate: '',
+                testingEndDate: '',
+                reportPreparationStartDate: '',
+                reportPreparationEndDate: '',
                 paymentDate: '',
                 type: 'sale'
               });
@@ -585,10 +722,16 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 contractorId: '',
                 qualificationObjectIds: [],
                 totalCostWithVat: undefined,
-                startDatePlanned: '',
-                startDateActual: '',
-                endDatePlanned: '',
-                endDateActual: '',
+                loggersCount: undefined,
+                protocolPrintCopies: undefined,
+                reportPrintCopies: undefined,
+                travelExpenses: undefined,
+                protocolPreparationStartDate: '',
+                protocolPreparationEndDate: '',
+                testingStartDate: '',
+                testingEndDate: '',
+                reportPreparationStartDate: '',
+                reportPreparationEndDate: '',
                 paymentDate: '',
                 type: undefined
               });
@@ -606,10 +749,16 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               contractorId: '',
               qualificationObjectIds: [],
               totalCostWithVat: undefined,
-              startDatePlanned: '',
-              startDateActual: '',
-              endDatePlanned: '',
-              endDateActual: '',
+              loggersCount: undefined,
+              protocolPrintCopies: undefined,
+              reportPrintCopies: undefined,
+              travelExpenses: undefined,
+              protocolPreparationStartDate: '',
+              protocolPreparationEndDate: '',
+              testingStartDate: '',
+              testingEndDate: '',
+              reportPreparationStartDate: '',
+              reportPreparationEndDate: '',
               paymentDate: '',
               type: undefined
             });
@@ -729,8 +878,212 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               )}
             </div>
 
+            {/* Расходы на испытания */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Кол-во логгеров для проведения испытаний
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={newProject.loggersCount ?? ''}
+                  onChange={(e) =>
+                    setNewProject((prev) => ({
+                      ...prev,
+                      loggersCount: e.target.value === '' ? undefined : Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Введите количество"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Кол-во печатных экземпляров протоколов
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={newProject.protocolPrintCopies ?? ''}
+                  onChange={(e) =>
+                    setNewProject((prev) => ({
+                      ...prev,
+                      protocolPrintCopies: e.target.value === '' ? undefined : Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Введите количество"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Кол-во печатных экземпляров отчетов
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={newProject.reportPrintCopies ?? ''}
+                  onChange={(e) =>
+                    setNewProject((prev) => ({
+                      ...prev,
+                      reportPrintCopies: e.target.value === '' ? undefined : Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Введите количество"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Командировочные расходы
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={newProject.travelExpenses ?? ''}
+                  onChange={(e) =>
+                    setNewProject((prev) => ({
+                      ...prev,
+                      travelExpenses: e.target.value === '' ? undefined : Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Введите сумму"
+                />
+              </div>
+            </div>
+
             {/* План-факт по стоимости и срокам */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  План проведения работ
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border border-gray-200 rounded-lg p-4">
+                  <div className="md:col-span-2 text-sm font-medium text-gray-700">
+                    Подготовка протоколов
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">с</label>
+                    <input
+                      type="date"
+                      value={newProject.protocolPreparationStartDate || ''}
+                      onChange={(e) => setNewProject((prev) => ({ ...prev, protocolPreparationStartDate: e.target.value }))}
+                      title="Подготовка протоколов — с"
+                      aria-label="Подготовка протоколов — с"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">по</label>
+                    <input
+                      type="date"
+                      value={newProject.protocolPreparationEndDate || ''}
+                      onChange={(e) => setNewProject((prev) => ({ ...prev, protocolPreparationEndDate: e.target.value }))}
+                      title="Подготовка протоколов — по"
+                      aria-label="Подготовка протоколов — по"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div className="md:col-span-2 text-sm font-medium text-gray-700">
+                    Проведение испытаний
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">с</label>
+                    <input
+                      type="date"
+                      value={newProject.testingStartDate || ''}
+                      onChange={(e) => setNewProject((prev) => ({ ...prev, testingStartDate: e.target.value }))}
+                      title="Проведение испытаний — с"
+                      aria-label="Проведение испытаний — с"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">по</label>
+                    <input
+                      type="date"
+                      value={newProject.testingEndDate || ''}
+                      onChange={(e) => setNewProject((prev) => ({ ...prev, testingEndDate: e.target.value }))}
+                      title="Проведение испытаний — по"
+                      aria-label="Проведение испытаний — по"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div className="md:col-span-2 text-sm font-medium text-gray-700">
+                    Подготовка отчетов
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">с</label>
+                    <input
+                      type="date"
+                      value={newProject.reportPreparationStartDate || ''}
+                      onChange={(e) => setNewProject((prev) => ({ ...prev, reportPreparationStartDate: e.target.value }))}
+                      title="Подготовка отчетов — с"
+                      aria-label="Подготовка отчетов — с"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">по</label>
+                    <input
+                      type="date"
+                      value={newProject.reportPreparationEndDate || ''}
+                      onChange={(e) => setNewProject((prev) => ({ ...prev, reportPreparationEndDate: e.target.value }))}
+                      title="Подготовка отчетов — по"
+                      aria-label="Подготовка отчетов — по"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+                {workPlanDays > 0 && (
+                  <div className="mt-2 text-sm text-gray-700">
+                    Кол-во рабочих дней: <span className="font-semibold text-indigo-700">{workPlanDays}</span>
+                  </div>
+                )}
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Рекомендуемая стоимость руб. с НДС
+                </label>
+                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-900">
+                  {hasRecommendedCostInputs
+                    ? `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(recommendedCostWithVat)} руб.`
+                    : '—'}
+                </div>
+                {hasRecommendedCostInputs && (
+                  <div className="mt-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1 font-mono">
+                    <div className="font-semibold text-gray-700">Затраты</div>
+                    <div>
+                      Амортизация оборудования: {newProject.loggersCount ?? 0} × {fmtCalc(taxSettings.loggerDayCost)} × {testingCalendarDays} = {fmtCalc(loggerCostTerm)}
+                    </div>
+                    <div>
+                      Печать протоколов и отчетов: {newProject.protocolPrintCopies ?? 0} × {fmtCalc(taxSettings.protocolPrintCost)} = {fmtCalc(protocolPrintTerm)}{' '}
+                      {newProject.reportPrintCopies ?? 0} × {fmtCalc(taxSettings.reportPrintCost)} = {fmtCalc(reportPrintTerm)}
+                    </div>
+                    <div>Командировочные: {fmtCalc(newProject.travelExpenses ?? 0)}</div>
+                    <div>
+                      Обеспечение ФОТ: {fotDays} дн. ({newProject.protocolPrintCopies ?? 0} × 2 + {newProject.reportPrintCopies ?? 0} × 3) × ({fmtCalc(fotValidation)} + {fmtCalc(fotAdministration)} / 3 + {fmtCalc(fotSales)} / 3) / {AVERAGE_WORKING_DAYS_PER_MONTH} = {fmtCalc(workDaysFotTerm)}
+                    </div>
+                    <div>
+                      Плановая прибыль: {fmtCalc(recommendedCostBase)} × {fmtCalc(taxSettings.profitability)} / 100 = {fmtCalc(planProfitTerm)}
+                    </div>
+                    <div>
+                      НДС: ({fmtCalc(recommendedCostBase)} + {fmtCalc(planProfitTerm)}) × {fmtCalc(taxSettings.vat)}% = {fmtCalc(vatTerm)}
+                    </div>
+                    <div className="pt-1 border-t border-gray-200">
+                      Итого с НДС: {fmtCalc(loggerCostTerm)} + {fmtCalc(protocolPrintTerm)} + {fmtCalc(reportPrintTerm)} +{' '}
+                      {fmtCalc(newProject.travelExpenses ?? 0)} + {fmtCalc(workDaysFotTerm)} + {fmtCalc(planProfitTerm)} + {fmtCalc(vatTerm)} ={' '}
+                      {fmtCalc(recommendedCostWithVat)}
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Стоимость, руб с НДС
@@ -748,58 +1101,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="Введите стоимость"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Дата начала (план)
-                </label>
-                <input
-                  type="date"
-                  value={newProject.startDatePlanned || ''}
-                  onChange={(e) => setNewProject((prev) => ({ ...prev, startDatePlanned: e.target.value }))}
-                  title="Дата начала (план)"
-                  aria-label="Дата начала (план)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Дата начала (факт)
-                </label>
-                <input
-                  type="date"
-                  value={newProject.startDateActual || ''}
-                  onChange={(e) => setNewProject((prev) => ({ ...prev, startDateActual: e.target.value }))}
-                  title="Дата начала (факт)"
-                  aria-label="Дата начала (факт)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Дата завершения (план)
-                </label>
-                <input
-                  type="date"
-                  value={newProject.endDatePlanned || ''}
-                  onChange={(e) => setNewProject((prev) => ({ ...prev, endDatePlanned: e.target.value }))}
-                  title="Дата завершения (план)"
-                  aria-label="Дата завершения (план)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Дата завершения (факт)
-                </label>
-                <input
-                  type="date"
-                  value={newProject.endDateActual || ''}
-                  onChange={(e) => setNewProject((prev) => ({ ...prev, endDateActual: e.target.value }))}
-                  title="Дата завершения (факт)"
-                  aria-label="Дата завершения (факт)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               <div>
