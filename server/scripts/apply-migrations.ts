@@ -137,6 +137,9 @@ const main = async () => {
           if (file === '20261017230600_add_project_testing_expense_fields.sql') return true;
           // План проведения работ для проектов (подготовка протоколов, испытания, подготовка отчетов)
           if (file === '20261017233352_add_project_work_plan_fields.sql') return true;
+          // Недостающие значения enum project_status (documents_submission, not_suitable и др.) —
+          // без них смена статуса проекта падает с 500
+          if (file === '20261030121000_add_missing_project_status_enum_values.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:

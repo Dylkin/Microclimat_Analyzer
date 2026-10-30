@@ -1229,7 +1229,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 
       const result = await client.query(
         `UPDATE projects SET ${updates.join(', ')} WHERE id = $${paramCount}
-         RETURNING id, name, description, type, contractor_id, contract_number, contract_date, total_cost_with_vat, loggers_count, protocol_print_copies, report_print_copies, travel_expenses, protocol_preparation_start_date, protocol_preparation_end_date, testing_start_date, testing_end_date, report_preparation_start_date, report_preparation_end_date, start_date_planned, start_date_actual, end_date_planned, end_date_actual, payment_date, status, created_by, created_at, updated_at`,
+         RETURNING id`,
         values,
       );
 
