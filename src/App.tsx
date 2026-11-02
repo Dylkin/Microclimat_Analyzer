@@ -6,6 +6,7 @@ import { MailSettingsPage } from './components/MailSettingsPage';
 import { FinancePage } from './components/FinancePage';
 import { TaxSettingsPage } from './components/TaxSettingsPage';
 import type { ContractorDirectoryProps, ContractorDirectoryFocusRequest } from './components/ContractorDirectory';
+import { canAccessPage, getDefaultPage } from './constants/pageAccess';
 import './index.css';
 
 // Lazy load components for code splitting
@@ -50,7 +51,7 @@ const LoadingSpinner: React.FC = () => (
 );
 
 const AppContent: React.FC = () => {
-  const { user, hasAccess } = useAuth();
+  const { user } = useAuth();
   const [currentPage, setCurrentPage] = useState('projects');
   const [showVisualization, setShowVisualization] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
@@ -116,17 +117,15 @@ const AppContent: React.FC = () => {
     return <Login />;
   }
 
-  const restrictedDirectoryRoles = new Set([
-    'specialist',
-    'director',
-    'manager',
-    'специалист',
-    'руководитель',
-    'менеджер'
-  ]);
-  const canAccessUsersDirectory = hasAccess('users') && !restrictedDirectoryRoles.has((user.role || '').toLowerCase());
-
   const handlePageChange = (page: string, projectData?: any) => {
+    // Защита от перехода на страницы, запрещённые для роли текущего пользователя
+    if (!canAccessPage(user.role, page)) {
+      setCurrentPage(getDefaultPage(user.role));
+      setSelectedProject(null);
+      setPageData(null);
+      return;
+    }
+
     console.log('App: handlePageChange вызван:', {
       page,
       projectData: projectData ? {
@@ -172,7 +171,7 @@ const AppContent: React.FC = () => {
 
     switch (currentPage) {
       case 'analyzer':
-        return hasAccess('analyzer') ? wrapWithSuspense(
+        return canAccessPage(user.role, 'analyzer') ? wrapWithSuspense(
           <MicroclimatAnalyzer 
             showVisualization={showVisualization}
             onShowVisualization={setShowVisualization}
@@ -189,7 +188,7 @@ const AppContent: React.FC = () => {
             fullProject: selectedProject  // Добавляем полный объект для диагностики
           } : null
         });
-        return hasAccess('analyzer') && selectedProject ? wrapWithSuspense(
+        return canAccessPage(user.role, 'contract_negotiation') && selectedProject ? wrapWithSuspense(
           <ContractNegotiation 
             project={selectedProject}
             onBack={() => handlePageChange('projects')}
@@ -204,7 +203,7 @@ const AppContent: React.FC = () => {
                 workScheduleStageName: pageData.focusWorkScheduleStageName as string | undefined
               }
             : null;
-        return hasAccess('analyzer') && selectedProject ? wrapWithSuspense(
+        return canAccessPage(user.role, 'testing_execution') && selectedProject ? wrapWithSuspense(
           <TestingExecution 
             project={selectedProject}
             onBack={() => handlePageChange('projects')}
@@ -223,7 +222,7 @@ const AppContent: React.FC = () => {
         ) : <div>Доступ запрещен или проект не выбран</div>;
       }
       case 'creating_report':
-        return hasAccess('analyzer') && selectedProject ? wrapWithSuspense(
+        return canAccessPage(user.role, 'creating_report') && selectedProject ? wrapWithSuspense(
           <CreatingReport 
             project={selectedProject}
             onBack={() => handlePageChange('projects')}
@@ -231,14 +230,14 @@ const AppContent: React.FC = () => {
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;
       case 'documents_submission':
-        return hasAccess('analyzer') && selectedProject ? wrapWithSuspense(
+        return canAccessPage(user.role, 'documents_submission') && selectedProject ? wrapWithSuspense(
           <DocumentsSubmission
             project={selectedProject}
             onBack={() => handlePageChange('projects')}
           />
         ) : <div>Доступ запрещен или проект не выбран</div>;
       case 'not_suitable':
-        return hasAccess('analyzer') && selectedProject ? wrapWithSuspense(
+        return canAccessPage(user.role, 'not_suitable') && selectedProject ? wrapWithSuspense(
           <NotSuitable
             project={selectedProject}
             onBack={() => handlePageChange('projects')}
@@ -247,7 +246,7 @@ const AppContent: React.FC = () => {
       case 'data_analysis':
         // Используем project из pageData, если он есть, иначе selectedProject
         const projectForAnalysis = pageData?.project || selectedProject;
-        return hasAccess('analyzer') && projectForAnalysis ? wrapWithSuspense(
+        return canAccessPage(user.role, 'data_analysis') && projectForAnalysis ? wrapWithSuspense(
           <DataAnalysis 
             project={projectForAnalysis}
             analysisData={pageData}
@@ -265,7 +264,7 @@ const AppContent: React.FC = () => {
         const planFileName = pageData?.planFileName;
         const qualificationObjectName = pageData?.qualificationObjectName;
 
-        return hasAccess('analyzer') &&
+        return canAccessPage(user.role, 'logger_plan_editor') &&
           projectForEditor &&
           qualificationObjectId
           ? wrapWithSuspense(
@@ -287,15 +286,15 @@ const AppContent: React.FC = () => {
           : <div>Доступ запрещен или данные плана не найдены</div>;
       }
       case 'help':
-        return hasAccess('help') ? wrapWithSuspense(<Help />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'help') ? wrapWithSuspense(<Help />) : <div>Доступ запрещен</div>;
       case 'users':
-        return canAccessUsersDirectory ? wrapWithSuspense(<UserDirectory />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'users') ? wrapWithSuspense(<UserDirectory />) : <div>Доступ запрещен</div>;
       case 'staff-directory':
-        return hasAccess('analyzer') ? wrapWithSuspense(<StaffDirectory />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'staff-directory') ? wrapWithSuspense(<StaffDirectory />) : <div>Доступ запрещен</div>;
       case 'audit_logs':
-        return hasAccess('admin') ? wrapWithSuspense(<AuditLogs onBack={() => handlePageChange('projects')} />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'audit_logs') ? wrapWithSuspense(<AuditLogs onBack={() => handlePageChange('projects')} />) : <div>Доступ запрещен</div>;
       case 'contractors':
-        return hasAccess('analyzer')
+        return canAccessPage(user.role, 'contractors')
           ? wrapWithSuspense(
               <ContractorDirectory
                 focusQualificationObjects={contractorFocusRequest}
@@ -304,25 +303,25 @@ const AppContent: React.FC = () => {
             )
           : <div>Доступ запрещен</div>;
       case 'projects':
-        return hasAccess('analyzer') ? wrapWithSuspense(<ProjectDirectory onPageChange={handlePageChange} />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'projects') ? wrapWithSuspense(<ProjectDirectory onPageChange={handlePageChange} />) : <div>Доступ запрещен</div>;
       case 'equipment':
-        return hasAccess('analyzer') ? wrapWithSuspense(<EquipmentDirectory />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'equipment') ? wrapWithSuspense(<EquipmentDirectory />) : <div>Доступ запрещен</div>;
       case 'products':
-        return hasAccess('analyzer') ? wrapWithSuspense(<ProductsPage />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'products') ? wrapWithSuspense(<ProductsPage />) : <div>Доступ запрещен</div>;
       case 'qualification-objects':
-        return hasAccess('analyzer') ? wrapWithSuspense(<QualificationObjectTypes />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'qualification-objects') ? wrapWithSuspense(<QualificationObjectTypes />) : <div>Доступ запрещен</div>;
       case 'tender-search':
-        return hasAccess('analyzer') ? wrapWithSuspense(<TenderSearch />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'tender-search') ? wrapWithSuspense(<TenderSearch />) : <div>Доступ запрещен</div>;
       case 'mail-settings':
-        return hasAccess('analyzer') ? wrapWithSuspense(<MailSettingsPage />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'mail-settings') ? wrapWithSuspense(<MailSettingsPage />) : <div>Доступ запрещен</div>;
       case 'tax-settings':
-        return hasAccess('analyzer') ? wrapWithSuspense(<TaxSettingsPage />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'tax-settings') ? wrapWithSuspense(<TaxSettingsPage />) : <div>Доступ запрещен</div>;
       case 'finance':
-        return hasAccess('analyzer') ? wrapWithSuspense(<FinancePage />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'finance') ? wrapWithSuspense(<FinancePage />) : <div>Доступ запрещен</div>;
       case 'profile':
         return wrapWithSuspense(<PersonalProfilePage />);
       case 'release':
-        return hasAccess('analyzer') ? wrapWithSuspense(<ReleasePage />) : <div>Доступ запрещен</div>;
+        return canAccessPage(user.role, 'release') ? wrapWithSuspense(<ReleasePage />) : <div>Доступ запрещен</div>;
       default:
         return wrapWithSuspense(
           <MicroclimatAnalyzer 

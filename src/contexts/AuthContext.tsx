@@ -23,7 +23,6 @@ interface AuthContextType {
   resetPassword: (userId: string, newPassword: string) => Promise<boolean>;
   sendPasswordResetEmail: (email: string) => Promise<void>;
   updatePasswordWithToken: (newPassword: string) => Promise<void>;
-  hasAccess: (page: 'analyzer' | 'help' | 'database' | 'users' | 'admin') => boolean;
   reloadUsers: () => Promise<void>;
 }
 
@@ -121,36 +120,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     loadUsers();
   }, []);
-
-  // Проверка доступа к страницам
-  const hasAccess = (page: 'analyzer' | 'help' | 'database' | 'users' | 'admin'): boolean => {
-    if (!user) {
-      console.warn('hasAccess: пользователь не авторизован');
-      return false;
-    }
-
-    console.log('hasAccess: проверка доступа для пользователя:', { 
-      userId: user.id,
-      user: user.email, 
-      role: user.role, 
-      page,
-      fullUser: user
-    });
-
-    switch (user.role) {
-      case 'admin':
-      case 'administrator':
-        return true; // Полный доступ
-      case 'specialist':
-        return page === 'analyzer' || page === 'help' || page === 'database';
-      case 'manager':
-      case 'director':
-        return page === 'analyzer' || page === 'help' || page === 'database';
-      default:
-        console.log('hasAccess: неизвестная роль:', user.role);
-        return false;
-    }
-  };
 
   // Авторизация
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -466,7 +435,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     resetPassword,
     sendPasswordResetEmail,
     updatePasswordWithToken,
-    hasAccess,
     reloadUsers: loadUsers
   };
 

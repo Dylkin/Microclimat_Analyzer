@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessPage } from '../constants/pageAccess';
 import { LogOut, BarChart3, Menu, X, HelpCircle, Users, Building2, FolderOpen, Wrench, Activity, Settings, ChevronDown, ChevronRight, Search, Package, ShoppingCart, Briefcase } from 'lucide-react';
 
 interface LayoutProps {
@@ -9,7 +10,7 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) => {
-  const { user, logout, hasAccess } = useAuth();
+  const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set());
 
@@ -17,104 +18,95 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
     {
       name: 'Пользователи',
       key: 'users',
-      icon: Users,
-      access: 'users' as const
+      icon: Users
     },
     {
       name: 'Структура предприятия',
       key: 'staff-directory',
-      icon: Briefcase,
-      access: 'analyzer' as const
+      icon: Briefcase
     },
     {
       name: 'Контрагенты',
       key: 'contractors',
-      icon: Building2,
-      access: 'analyzer' as const
+      icon: Building2
     },
     {
       name: 'Проекты',
       key: 'projects',
-      icon: FolderOpen,
-      access: 'analyzer' as const
+      icon: FolderOpen
     },
     {
       name: 'Оборудование',
       key: 'equipment',
-      icon: Wrench,
-      access: 'analyzer' as const
+      icon: Wrench
     },
     {
       name: 'Товары',
       key: 'products',
-      icon: ShoppingCart,
-      access: 'analyzer' as const
+      icon: ShoppingCart
     },
     {
       name: 'Объекты квалификации',
       key: 'qualification-objects',
-      icon: Package,
-      access: 'analyzer' as const
+      icon: Package
     },
     {
       name: 'Справка',
       key: 'help',
-      icon: HelpCircle,
-      access: 'help' as const
+      icon: HelpCircle
     },
     {
       name: 'Сервис',
       key: 'service',
       icon: Settings,
-      access: 'analyzer' as const,
       children: [
         {
           name: 'Microclimat Analyzer',
           key: 'analyzer',
-          icon: BarChart3,
-          access: 'analyzer' as const
+          icon: BarChart3
         },
         {
           name: 'Аудит',
           key: 'audit_logs',
-          icon: Activity,
-          access: 'admin' as const
+          icon: Activity
         },
         {
           name: 'Настройки почты',
           key: 'mail-settings',
-          icon: Settings,
-          access: 'analyzer' as const
+          icon: Settings
         },
         {
           name: 'Переменные',
           key: 'tax-settings',
-          icon: Settings,
-          access: 'analyzer' as const
+          icon: Settings
         },
         {
           name: 'Финансы',
           key: 'finance',
-          icon: Settings,
-          access: 'analyzer' as const
+          icon: Settings
         },
         {
           name: 'Релиз',
           key: 'release',
-          icon: Package,
-          access: 'analyzer' as const
+          icon: Package
         },
         {
           name: 'Поиск тендеров',
           key: 'tender-search',
-          icon: Search,
-          access: 'analyzer' as const
+          icon: Search
         }
       ]
     }
   ];
 
-  const availableNavigation = navigation.filter(item => hasAccess(item.access));
+  const availableNavigation = navigation.filter(item => {
+    if (!canAccessPage(user?.role, item.key)) return false;
+    // Родительский пункт с подменю показываем, только если доступен хотя бы один дочерний пункт
+    if (item.children && item.children.length > 0) {
+      return item.children.some(child => canAccessPage(user?.role, child.key));
+    }
+    return true;
+  });
 
   const toggleMenu = (key: string) => {
     setExpandedMenus(prev => {
@@ -133,8 +125,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       case 'admin':
       case 'administrator': return 'Администратор';
       case 'specialist': return 'Специалист';
-      case 'manager': return 'Руководитель';
-      case 'director': return 'Менеджер';
+      case 'manager': return 'Менеджер';
+      case 'director': return 'Руководитель';
       default: return role;
     }
   };
@@ -185,7 +177,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                     </button>
                     {isExpanded && item.children && (
                       <div className="ml-4 mt-1 space-y-1">
-                        {item.children.filter(child => hasAccess(child.access)).map((child) => {
+                        {item.children.filter(child => canAccessPage(user?.role, child.key)).map((child) => {
                           const ChildIcon = child.icon;
                           return (
                             <button
@@ -263,7 +255,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                     </button>
                     {isExpanded && item.children && (
                       <div className="ml-4 mt-1 space-y-1">
-                        {item.children.filter(child => hasAccess(child.access)).map((child) => {
+                        {item.children.filter(child => canAccessPage(user?.role, child.key)).map((child) => {
                           const ChildIcon = child.icon;
                           return (
                             <button

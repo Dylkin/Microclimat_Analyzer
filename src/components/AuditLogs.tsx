@@ -3,13 +3,14 @@ import { Eye, Filter, Download, Calendar, User, Activity } from 'lucide-react';
 import { auditService } from '../utils/auditService';
 import { AuditLog, AuditAction, AuditEntityType } from '../types/AuditLog';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessPage } from '../constants/pageAccess';
 
 interface AuditLogsProps {
   onBack?: () => void;
 }
 
 const AuditLogs: React.FC<AuditLogsProps> = ({ onBack }) => {
-  const { user, hasAccess } = useAuth();
+  const { user } = useAuth();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +23,7 @@ const AuditLogs: React.FC<AuditLogsProps> = ({ onBack }) => {
   });
 
   // Проверяем доступ
-  if (!hasAccess('admin')) {
+  if (!canAccessPage(user?.role, 'audit_logs')) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

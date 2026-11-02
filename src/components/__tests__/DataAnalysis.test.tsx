@@ -48,8 +48,7 @@ jest.mock('../TimeSeriesAnalyzer', () => ({
 // Mock для useAuth
 jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user: { id: 'test-user-id', fullName: 'Test User', email: 'test@test.com', role: 'admin' },
-    hasAccess: () => true
+    user: { id: 'test-user-id', fullName: 'Test User', email: 'test@test.com', role: 'admin' }
   })
 }));
 
