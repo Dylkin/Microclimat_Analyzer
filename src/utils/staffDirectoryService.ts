@@ -56,6 +56,10 @@ class StaffDirectoryService {
     await apiClient.delete<void>(`/staff-directory/positions/${positionId}`);
   }
 
+  async setPositionArchived(positionId: string, archived: boolean): Promise<Position> {
+    return apiClient.post<Position>(`/staff-directory/positions/${positionId}/archive`, { archived });
+  }
+
   async getPayrollTotals(): Promise<PayrollTotals> {
     return apiClient.get<PayrollTotals>('/staff-directory/payroll');
   }

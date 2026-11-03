@@ -6,6 +6,10 @@ export interface Position {
   /** Дата начала действия оклада, YYYY-MM-DD */
   salaryEffectiveFrom: string;
   isDefault: boolean;
+  /** Архивные должности не участвуют в расчёте ФОТ */
+  archived: boolean;
+  /** Количество сотрудников (справочник пользователей) с этой должностью */
+  employeeCount: number;
   createdAt?: string;
   updatedAt?: string;
 }

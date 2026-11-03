@@ -149,7 +149,10 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const payrollMultiplier = payrollFundBurdenMultiplier(taxSettings);
   const fotByDepartmentName = new Map(
     departments.map((d) => {
-      const base = d.positions.reduce((acc, p) => acc + Number(p.salary), 0);
+      // ФОТ = Σ оклад × кол-во сотрудников; архивные должности не участвуют
+      const base = d.positions
+        .filter((p) => !p.archived)
+        .reduce((acc, p) => acc + Number(p.salary) * (p.employeeCount ?? 0), 0);
       return [d.name.trim().toLowerCase(), base * payrollMultiplier] as const;
     })
   );
@@ -159,8 +162,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const fotSales = fotOf('Отдел продаж');
   // Среднее кол-во рабочих дней в месяце — для перевода месячного ФОТ в дневную ставку
   const AVERAGE_WORKING_DAYS_PER_MONTH = 20.6;
-  const workDaysFotRate =
-    (fotValidation + fotAdministration / 3 + fotSales / 3) / AVERAGE_WORKING_DAYS_PER_MONTH;
 
   const fmtCalc = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
 
@@ -169,18 +170,30 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const loggerCostTerm = (newProject.loggersCount ?? 0) * taxSettings.loggerDayCost * testingCalendarDays;
   const protocolPrintTerm = (newProject.protocolPrintCopies ?? 0) * taxSettings.protocolPrintCost;
   const reportPrintTerm = (newProject.reportPrintCopies ?? 0) * taxSettings.reportPrintCost;
-  // Обеспечение ФОТ: трудоёмкость из количества документов (1 протокол = 2 дня, 1 отчёт = 3 дня)
+  // Трудоёмкость подготовки документов: 1 протокол = 2 дня, 1 отчёт = 3 дня
   const fotDays = (newProject.protocolPrintCopies ?? 0) * 2 + (newProject.reportPrintCopies ?? 0) * 3;
-  const workDaysFotTerm = fotDays * workDaysFotRate;
+  // Обеспечение ФОТ Отдела валидации: ФОТ / 20,6 × кол-во дней подготовки протоколов и отчётов
+  const fotValidationTerm = (fotValidation / AVERAGE_WORKING_DAYS_PER_MONTH) * fotDays;
+  // Обеспечение % ФОТ Администрации и Отдела продаж: ФОТ / 20,6 × % отдела Валидации в доходах × кол-во дней подготовки
+  const validationShare = taxSettings.validationRevenueShare / 100;
+  const fotAdministrationTerm = (fotAdministration / AVERAGE_WORKING_DAYS_PER_MONTH) * validationShare * fotDays;
+  const fotSalesTerm = (fotSales / AVERAGE_WORKING_DAYS_PER_MONTH) * validationShare * fotDays;
+  // Обеспечение % маркетинга: расходы на маркетинг (мес.) / 20,6 × % отдела Валидации в доходах
+  const marketingTerm = (taxSettings.monthlyMarketingCosts / AVERAGE_WORKING_DAYS_PER_MONTH) * validationShare;
   const recommendedCostBase =
     loggerCostTerm +
     protocolPrintTerm +
     reportPrintTerm +
     (newProject.travelExpenses ?? 0) +
-    workDaysFotTerm;
+    fotValidationTerm +
+    fotAdministrationTerm +
+    fotSalesTerm +
+    marketingTerm;
   const planProfitTerm = recommendedCostBase * (taxSettings.profitability / 100);
-  const vatTerm = (recommendedCostBase + planProfitTerm) * (taxSettings.vat / 100);
-  const recommendedCostWithVat = recommendedCostBase + planProfitTerm + vatTerm;
+  const bonusTerm = taxSettings.projectBonusAmount;
+  const vatBase = recommendedCostBase + planProfitTerm + bonusTerm;
+  const vatTerm = vatBase * (taxSettings.vat / 100);
+  const recommendedCostWithVat = vatBase + vatTerm;
   const hasRecommendedCostInputs =
     (newProject.loggersCount ?? 0) > 0 ||
     (newProject.protocolPrintCopies ?? 0) > 0 ||
@@ -1068,17 +1081,28 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                     </div>
                     <div>Командировочные: {fmtCalc(newProject.travelExpenses ?? 0)}</div>
                     <div>
-                      Обеспечение ФОТ: {fotDays} дн. ({newProject.protocolPrintCopies ?? 0} × 2 + {newProject.reportPrintCopies ?? 0} × 3) × ({fmtCalc(fotValidation)} + {fmtCalc(fotAdministration)} / 3 + {fmtCalc(fotSales)} / 3) / {AVERAGE_WORKING_DAYS_PER_MONTH} = {fmtCalc(workDaysFotTerm)}
+                      Обеспечение ФОТ Отдел валидации: {fmtCalc(fotValidation)} / {AVERAGE_WORKING_DAYS_PER_MONTH} × {fotDays} = {fmtCalc(fotValidationTerm)}
+                    </div>
+                    <div>
+                      Обеспечение % ФОТ Администрации: {fmtCalc(fotAdministration)} / {AVERAGE_WORKING_DAYS_PER_MONTH} × {fmtCalc(taxSettings.validationRevenueShare)}% × {fotDays} = {fmtCalc(fotAdministrationTerm)}
+                    </div>
+                    <div>
+                      Обеспечение % ФОТ Отдел продаж: {fmtCalc(fotSales)} / {AVERAGE_WORKING_DAYS_PER_MONTH} × {fmtCalc(taxSettings.validationRevenueShare)}% × {fotDays} = {fmtCalc(fotSalesTerm)}
+                    </div>
+                    <div>
+                      Обеспечение % маркетинга: {fmtCalc(taxSettings.monthlyMarketingCosts)} / {AVERAGE_WORKING_DAYS_PER_MONTH} × {fmtCalc(taxSettings.validationRevenueShare)}% = {fmtCalc(marketingTerm)}
                     </div>
                     <div>
                       Плановая прибыль: {fmtCalc(recommendedCostBase)} × {fmtCalc(taxSettings.profitability)} / 100 = {fmtCalc(planProfitTerm)}
                     </div>
+                    <div>Премия: {fmtCalc(bonusTerm)}</div>
                     <div>
-                      НДС: ({fmtCalc(recommendedCostBase)} + {fmtCalc(planProfitTerm)}) × {fmtCalc(taxSettings.vat)}% = {fmtCalc(vatTerm)}
+                      НДС: ({fmtCalc(recommendedCostBase)} + {fmtCalc(planProfitTerm)} + {fmtCalc(bonusTerm)}) × {fmtCalc(taxSettings.vat)}% = {fmtCalc(vatTerm)}
                     </div>
                     <div className="pt-1 border-t border-gray-200">
                       Итого с НДС: {fmtCalc(loggerCostTerm)} + {fmtCalc(protocolPrintTerm)} + {fmtCalc(reportPrintTerm)} +{' '}
-                      {fmtCalc(newProject.travelExpenses ?? 0)} + {fmtCalc(workDaysFotTerm)} + {fmtCalc(planProfitTerm)} + {fmtCalc(vatTerm)} ={' '}
+                      {fmtCalc(newProject.travelExpenses ?? 0)} + {fmtCalc(fotValidationTerm)} + {fmtCalc(fotAdministrationTerm)} +{' '}
+                      {fmtCalc(fotSalesTerm)} + {fmtCalc(marketingTerm)} + {fmtCalc(planProfitTerm)} + {fmtCalc(bonusTerm)} + {fmtCalc(vatTerm)} ={' '}
                       {fmtCalc(recommendedCostWithVat)}
                     </div>
                   </div>

@@ -34,7 +34,11 @@ export const TaxSettingsPage: React.FC = () => {
         profitability: typeof parsed.profitability === 'number' ? parsed.profitability : DEFAULT_TAX_SETTINGS.profitability,
         loggerDayCost: typeof parsed.loggerDayCost === 'number' ? parsed.loggerDayCost : DEFAULT_TAX_SETTINGS.loggerDayCost,
         protocolPrintCost: typeof parsed.protocolPrintCost === 'number' ? parsed.protocolPrintCost : DEFAULT_TAX_SETTINGS.protocolPrintCost,
-        reportPrintCost: typeof parsed.reportPrintCost === 'number' ? parsed.reportPrintCost : DEFAULT_TAX_SETTINGS.reportPrintCost
+        reportPrintCost: typeof parsed.reportPrintCost === 'number' ? parsed.reportPrintCost : DEFAULT_TAX_SETTINGS.reportPrintCost,
+        monthlyOverheadCosts: typeof parsed.monthlyOverheadCosts === 'number' ? parsed.monthlyOverheadCosts : DEFAULT_TAX_SETTINGS.monthlyOverheadCosts,
+        monthlyMarketingCosts: typeof parsed.monthlyMarketingCosts === 'number' ? parsed.monthlyMarketingCosts : DEFAULT_TAX_SETTINGS.monthlyMarketingCosts,
+        projectBonusAmount: typeof parsed.projectBonusAmount === 'number' ? parsed.projectBonusAmount : DEFAULT_TAX_SETTINGS.projectBonusAmount,
+        validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare
       });
     } catch (loadError) {
       console.error('Ошибка загрузки налоговых настроек:', loadError);
@@ -240,6 +244,61 @@ export const TaxSettingsPage: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Накладные расходы без НДС (мес.)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={settings.monthlyOverheadCosts}
+              onChange={(e) => handleNumberChange('monthlyOverheadCosts', e.target.value)}
+              title="Накладные расходы без НДС в месяц, руб."
+              placeholder="1000"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Расходы на маркетинг без НДС (мес.)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={settings.monthlyMarketingCosts}
+              onChange={(e) => handleNumberChange('monthlyMarketingCosts', e.target.value)}
+              title="Расходы на маркетинг без НДС в месяц, руб."
+              placeholder="800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Сумма премии, включаемая в проект, руб.</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={settings.projectBonusAmount}
+              onChange={(e) => handleNumberChange('projectBonusAmount', e.target.value)}
+              title="Сумма премии, включаемая в стоимость проекта, руб."
+              placeholder="100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">% отдела Валидации в общих доходах</label>
+            <input
+              type="number"
+              step="0.1"
+              value={settings.validationRevenueShare}
+              onChange={(e) => handleNumberChange('validationRevenueShare', e.target.value)}
+              title="Доля отдела Валидации в общих доходах, %"
+              placeholder="45"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
         </div>
       </div>
 
@@ -254,14 +313,19 @@ export const TaxSettingsPage: React.FC = () => {
           + Кол-во печатных экземпляров протоколов × Средняя стоимость печати протокола, руб. без НДС
           + Кол-во печатных экземпляров отчётов × Средняя стоимость печати отчёта, руб. без НДС
           + Командировочные расходы
-          + (Кол-во печатных экземпляров протоколов × 2 дня + Кол-во печатных экземпляров отчётов × 3 дня) × (ФОТ отдела валидации + ФОТ администрации / 3 + ФОТ отдела продаж / 3) / 20,6
-          + Плановая прибыль: сумма всех значений × Рентабельность / 100)
+          + Обеспечение ФОТ Отдела валидации: ФОТ Отдела валидации / 20,6 × кол-во дней подготовки протоколов и отчётов
+          + Обеспечение % ФОТ Администрации: ФОТ Администрации / 20,6 × (% отдела Валидации в общих доходах / 100) × кол-во дней подготовки протоколов и отчётов
+          + Обеспечение % ФОТ Отдела продаж: ФОТ Отдела продаж / 20,6 × (% отдела Валидации в общих доходах / 100) × кол-во дней подготовки протоколов и отчётов
+          + Обеспечение % маркетинга: Расходы на маркетинг без НДС (мес.) / 20,6 × (% отдела Валидации в общих доходах / 100)
+          + Плановая прибыль: сумма всех значений × Рентабельность / 100
+          + Сумма премии, включаемая в проект)
           × (1 + НДС / 100)
         </div>
         <p className="text-sm text-gray-600 mt-2">
-          ФОТ отделов берётся со страницы «Структура предприятия» (сумма окладов должностей с коэффициентом нагрузки).
-          Деление на 20,6 — среднее количество рабочих дней в месяце (месячный ФОТ переводится в дневную ставку).
-          Трудоёмкость для ФОТ считается по документам: один протокол = 2 дня, один отчёт = 3 дня.
+          ФОТ отделов берётся со страницы «Структура предприятия» (Σ оклад должности × количество сотрудников с этой
+          должностью, с коэффициентом нагрузки; сотрудники — из справочника пользователей).
+          Деление на 20,6 — среднее количество рабочих дней в месяце (месячный ФОТ и месячные расходы переводятся в дневную ставку).
+          Кол-во дней подготовки протоколов и отчётов считается по документам: один протокол = 2 дня, один отчёт = 3 дня.
           Плановая прибыль = сумма всех слагаемых × Рентабельность / 100 (рентабельность со страницы «Переменные»).
           Если отдел с нужным названием не найден, его ФОТ в расчёте принимается равным нулю.
         </p>

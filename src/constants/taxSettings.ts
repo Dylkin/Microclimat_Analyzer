@@ -9,6 +9,10 @@ export interface TaxSettings {
   loggerDayCost: number;
   protocolPrintCost: number;
   reportPrintCost: number;
+  monthlyOverheadCosts: number;
+  monthlyMarketingCosts: number;
+  projectBonusAmount: number;
+  validationRevenueShare: number;
 }
 
 export const TAX_SETTINGS_STORAGE_KEY = 'microclimat:tax-settings';
@@ -26,7 +30,11 @@ export const DEFAULT_TAX_SETTINGS: TaxSettings = {
   profitability: 10,
   loggerDayCost: 3,
   protocolPrintCost: 30,
-  reportPrintCost: 70
+  reportPrintCost: 70,
+  monthlyOverheadCosts: 1000,
+  monthlyMarketingCosts: 800,
+  projectBonusAmount: 100,
+  validationRevenueShare: 45
 };
 
 export function loadTaxSettingsFromLocalStorage(): TaxSettings {
@@ -44,7 +52,11 @@ export function loadTaxSettingsFromLocalStorage(): TaxSettings {
       profitability: typeof parsed.profitability === 'number' ? parsed.profitability : DEFAULT_TAX_SETTINGS.profitability,
       loggerDayCost: typeof parsed.loggerDayCost === 'number' ? parsed.loggerDayCost : DEFAULT_TAX_SETTINGS.loggerDayCost,
       protocolPrintCost: typeof parsed.protocolPrintCost === 'number' ? parsed.protocolPrintCost : DEFAULT_TAX_SETTINGS.protocolPrintCost,
-      reportPrintCost: typeof parsed.reportPrintCost === 'number' ? parsed.reportPrintCost : DEFAULT_TAX_SETTINGS.reportPrintCost
+      reportPrintCost: typeof parsed.reportPrintCost === 'number' ? parsed.reportPrintCost : DEFAULT_TAX_SETTINGS.reportPrintCost,
+      monthlyOverheadCosts: typeof parsed.monthlyOverheadCosts === 'number' ? parsed.monthlyOverheadCosts : DEFAULT_TAX_SETTINGS.monthlyOverheadCosts,
+      monthlyMarketingCosts: typeof parsed.monthlyMarketingCosts === 'number' ? parsed.monthlyMarketingCosts : DEFAULT_TAX_SETTINGS.monthlyMarketingCosts,
+      projectBonusAmount: typeof parsed.projectBonusAmount === 'number' ? parsed.projectBonusAmount : DEFAULT_TAX_SETTINGS.projectBonusAmount,
+      validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare
     };
   } catch {
     return { ...DEFAULT_TAX_SETTINGS };
@@ -52,17 +64,16 @@ export function loadTaxSettingsFromLocalStorage(): TaxSettings {
 }
 
 /**
- * Коэффициент полной стоимости ФОТ по шаблону: оклад × (1 + Σ ставок),
- * ставки — поля страницы «Переменные» в процентах (как в файле Фот.xlsx: C…H к доле оклада).
- * Поле «ФСЗН сотрудник» в этой сумме не участвует (в шаблоне отдельного столбца нет).
+ * Коэффициент полной стоимости ФОТ: оклад × (1 + Σ ставок),
+ * ставки — подоходный + белгосстрах + ФСЗН работодателя + % на отпускные (поля страницы «Переменные»).
+ * НДС и рентабельность в расчёт ФОТ не входят.
+ * Поле «ФСЗН сотрудник» в этой сумме не участвует.
  */
 export function payrollFundBurdenMultiplier(settings: TaxSettings): number {
   const sumPct =
     settings.incomeTax +
     settings.belgosstrakh +
     settings.fsznEmployer +
-    settings.vacationPay +
-    settings.vat +
-    settings.profitability;
+    settings.vacationPay;
   return 1 + sumPct / 100;
 }

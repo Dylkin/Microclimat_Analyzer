@@ -10,7 +10,9 @@ import {
   RefreshCw,
   History,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Archive,
+  ArchiveRestore
 } from 'lucide-react';
 import { staffDirectoryService } from '../utils/staffDirectoryService';
 import type { Department, SalaryHistoryEntry } from '../types/StaffDirectory';
@@ -115,7 +117,10 @@ const StaffDirectory: React.FC = () => {
 
   const payroll = useMemo(() => {
     const byDepartment = departments.map((department) => {
-      const base = department.positions.reduce((acc, position) => acc + Number(position.salary), 0);
+      // ФОТ = Σ оклад × кол-во сотрудников с должностью; архивные должности не участвуют
+      const base = department.positions
+        .filter((position) => !position.archived)
+        .reduce((acc, position) => acc + Number(position.salary) * (position.employeeCount ?? 0), 0);
       return {
         departmentId: department.id,
         departmentName: department.name,
@@ -265,6 +270,19 @@ const StaffDirectory: React.FC = () => {
     }
   };
 
+  const handleTogglePositionArchived = async (positionId: string, archived: boolean) => {
+    if (!confirm(archived ? 'Переместить должность в архив? Она перестанет участвовать в расчёте ФОТ.' : 'Вернуть должность из архива?')) return;
+    setOperationLoading(true);
+    try {
+      await staffDirectoryService.setPositionArchived(positionId, archived);
+      await loadDirectory();
+    } catch (error) {
+      alert(`Ошибка изменения архива: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
   const scrollToSalaryHistory = () => {
     setHistoryExpanded(true);
     requestAnimationFrame(() => {
@@ -335,9 +353,12 @@ const StaffDirectory: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Фонд оплаты труда (ФОТ)</h2>
         <p className="text-sm text-gray-600 mb-3">
-          Расчёт по формуле суммы окладов с коэффициентом нагрузки: оклад × (1 + подоходный + белгосстрах + ФСЗН
-          работодателя + % на отпускные + НДС + рентабельность) / 100. Ставки берутся со страницы «Переменные» (текущий
-          коэффициент {new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 4 }).format(payrollMultiplier)}).
+          ФОТ отдела = Σ (оклад должности × кол-во сотрудников с этой должностью) × коэффициент нагрузки. Количество
+          сотрудников берётся из справочника пользователей (страница «Пользователи»). Коэффициент нагрузки: оклад × (1 +
+          подоходный + белгосстрах + ФСЗН работодателя + % на отпускные) / 100, ставки — со страницы «Переменные»
+          (текущий коэффициент{' '}
+          {new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 4 }).format(payrollMultiplier)}). НДС и рентабельность в
+          расчёт ФОТ не входят. Архивные должности не участвуют.
         </p>
         <div className="text-xl font-semibold text-indigo-700 mb-4">Общий ФОТ предприятия: {formatRub(payroll.total)}</div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -349,6 +370,234 @@ const StaffDirectory: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {departments.map((department) => (
+        <div key={department.id} className="bg-white rounded-lg shadow p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-1">
+              <Briefcase className="w-5 h-5 text-indigo-600" />
+              {editingDepartmentId === department.id ? (
+                <input
+                  type="text"
+                  value={editingDepartmentDraft.name}
+                  onChange={(e) => setEditingDepartmentDraft({ name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  aria-label="Название отдела"
+                />
+              ) : (
+                <h3 className="text-lg font-semibold text-gray-900">{department.name}</h3>
+              )}
+              {department.isDefault && (
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Базовый отдел</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {editingDepartmentId === department.id ? (
+                <>
+                  <button onClick={() => handleSaveDepartment(department.id)} title="Сохранить">
+                    <Save className="w-4 h-4 text-green-600" />
+                  </button>
+                  <button onClick={() => setEditingDepartmentId(null)} title="Отмена">
+                    <X className="w-4 h-4 text-gray-600" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => startEditDepartment(department)} title="Редактировать">
+                    <Edit2 className="w-4 h-4 text-indigo-600" />
+                  </button>
+                  {!department.isDefault && (
+                    <button onClick={() => handleDeleteDepartment(department.id)} title="Удалить">
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Должность</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Оклад</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Сотрудников</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 whitespace-nowrap">Действует с</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {[...department.positions]
+                  .sort((a, b) => Number(a.archived) - Number(b.archived))
+                  .map((position) => (
+                  <tr key={position.id} className={position.archived ? 'opacity-60 bg-gray-50' : ''}>
+                    <td className="px-4 py-2">
+                      {editingPositionId === position.id ? (
+                        <input
+                          type="text"
+                          value={editingPositionDraft.name}
+                          onChange={(e) => setEditingPositionDraft((prev) => ({ ...prev, name: e.target.value }))}
+                          className="w-full px-2 py-1 border border-gray-300 rounded"
+                          aria-label="Название должности"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span>{position.name}</span>
+                          {position.isDefault && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Базовая</span>
+                          )}
+                          {position.archived && (
+                            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">Архив</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {editingPositionId === position.id ? (
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editingPositionDraft.salary}
+                          onChange={(e) => setEditingPositionDraft((prev) => ({ ...prev, salary: e.target.value }))}
+                          className="w-full px-2 py-1 border border-gray-300 rounded"
+                          aria-label="Оклад должности"
+                        />
+                      ) : (
+                        formatRub(position.salary)
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-center text-gray-800" title="Количество сотрудников с этой должностью (страница «Пользователи»)">
+                      {position.employeeCount ?? 0}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      {editingPositionId === position.id ? (
+                        <input
+                          type="date"
+                          value={editingPositionDraft.effectiveFrom}
+                          onChange={(e) => setEditingPositionDraft((prev) => ({ ...prev, effectiveFrom: e.target.value }))}
+                          className="w-full min-w-[9rem] px-2 py-1 border border-gray-300 rounded"
+                          aria-label="Оклад действует с"
+                        />
+                      ) : (
+                        formatDateRu(position.salaryEffectiveFrom)
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {editingPositionId === position.id ? (
+                        <div className="inline-flex gap-2">
+                          <button onClick={() => handleSavePosition(position.id)} title="Сохранить">
+                            <Save className="w-4 h-4 text-green-600" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingPositionId(null);
+                              setEditingPositionDraft(createEmptyPositionDraft());
+                            }}
+                            title="Отмена"
+                          >
+                            <X className="w-4 h-4 text-gray-600" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="inline-flex gap-2 items-center justify-end flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => openPositionSalaryHistory(position.id)}
+                            title="История изменений оклада"
+                            className="p-0.5 rounded hover:bg-indigo-50 text-indigo-600"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
+                          <button type="button" onClick={() => startEditPosition(position)} title="Редактировать">
+                            <Edit2 className="w-4 h-4 text-indigo-600" />
+                          </button>
+                          {!position.isDefault &&
+                            (position.archived ? (
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePositionArchived(position.id, false)}
+                                title="Вернуть из архива"
+                                className="p-0.5 rounded hover:bg-green-50"
+                              >
+                                <ArchiveRestore className="w-4 h-4 text-green-600" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePositionArchived(position.id, true)}
+                                title="В архив (не участвует в расчёте ФОТ)"
+                                className="p-0.5 rounded hover:bg-gray-200"
+                              >
+                                <Archive className="w-4 h-4 text-gray-500" />
+                              </button>
+                            ))}
+                          {!position.isDefault && (
+                            <button type="button" onClick={() => handleDeletePosition(position.id)} title="Удалить">
+                              <Trash2 className="w-4 h-4 text-red-600" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <input
+              type="text"
+              value={(positionDraftByDepartment[department.id] ?? createEmptyPositionDraft()).name}
+              onChange={(e) =>
+                setPositionDraftByDepartment((prev) => ({
+                  ...prev,
+                  [department.id]: { ...(prev[department.id] ?? createEmptyPositionDraft()), name: e.target.value }
+                }))
+              }
+              className="px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="Новая должность"
+            />
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={(positionDraftByDepartment[department.id] ?? createEmptyPositionDraft()).salary}
+              onChange={(e) =>
+                setPositionDraftByDepartment((prev) => ({
+                  ...prev,
+                  [department.id]: { ...(prev[department.id] ?? createEmptyPositionDraft()), salary: e.target.value }
+                }))
+              }
+              className="px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="Оклад"
+            />
+            <input
+              type="date"
+              title="Оклад действует с (по умолчанию — 1-е число следующего месяца)"
+              value={(positionDraftByDepartment[department.id] ?? createEmptyPositionDraft()).effectiveFrom}
+              onChange={(e) =>
+                setPositionDraftByDepartment((prev) => ({
+                  ...prev,
+                  [department.id]: { ...(prev[department.id] ?? createEmptyPositionDraft()), effectiveFrom: e.target.value }
+                }))
+              }
+              className="px-3 py-2 border border-gray-300 rounded-lg"
+              aria-label="Действует с"
+            />
+            <button
+              onClick={() => handleAddPosition(department.id)}
+              disabled={operationLoading}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Добавить должность
+            </button>
+          </div>
+        </div>
+      ))}
 
       <div
         id="staff-salary-history"
@@ -479,205 +728,6 @@ const StaffDirectory: React.FC = () => {
           </>
         )}
       </div>
-
-      {departments.map((department) => (
-        <div key={department.id} className="bg-white rounded-lg shadow p-6 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-1">
-              <Briefcase className="w-5 h-5 text-indigo-600" />
-              {editingDepartmentId === department.id ? (
-                <input
-                  type="text"
-                  value={editingDepartmentDraft.name}
-                  onChange={(e) => setEditingDepartmentDraft({ name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  aria-label="Название отдела"
-                />
-              ) : (
-                <h3 className="text-lg font-semibold text-gray-900">{department.name}</h3>
-              )}
-              {department.isDefault && (
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Базовый отдел</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {editingDepartmentId === department.id ? (
-                <>
-                  <button onClick={() => handleSaveDepartment(department.id)} title="Сохранить">
-                    <Save className="w-4 h-4 text-green-600" />
-                  </button>
-                  <button onClick={() => setEditingDepartmentId(null)} title="Отмена">
-                    <X className="w-4 h-4 text-gray-600" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button onClick={() => startEditDepartment(department)} title="Редактировать">
-                    <Edit2 className="w-4 h-4 text-indigo-600" />
-                  </button>
-                  {!department.isDefault && (
-                    <button onClick={() => handleDeleteDepartment(department.id)} title="Удалить">
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Должность</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Оклад</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 whitespace-nowrap">Действует с</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {department.positions.map((position) => (
-                  <tr key={position.id}>
-                    <td className="px-4 py-2">
-                      {editingPositionId === position.id ? (
-                        <input
-                          type="text"
-                          value={editingPositionDraft.name}
-                          onChange={(e) => setEditingPositionDraft((prev) => ({ ...prev, name: e.target.value }))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded"
-                          aria-label="Название должности"
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span>{position.name}</span>
-                          {position.isDefault && (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Базовая</span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      {editingPositionId === position.id ? (
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={editingPositionDraft.salary}
-                          onChange={(e) => setEditingPositionDraft((prev) => ({ ...prev, salary: e.target.value }))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded"
-                          aria-label="Оклад должности"
-                        />
-                      ) : (
-                        formatRub(position.salary)
-                      )}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      {editingPositionId === position.id ? (
-                        <input
-                          type="date"
-                          value={editingPositionDraft.effectiveFrom}
-                          onChange={(e) => setEditingPositionDraft((prev) => ({ ...prev, effectiveFrom: e.target.value }))}
-                          className="w-full min-w-[9rem] px-2 py-1 border border-gray-300 rounded"
-                          aria-label="Оклад действует с"
-                        />
-                      ) : (
-                        formatDateRu(position.salaryEffectiveFrom)
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      {editingPositionId === position.id ? (
-                        <div className="inline-flex gap-2">
-                          <button onClick={() => handleSavePosition(position.id)} title="Сохранить">
-                            <Save className="w-4 h-4 text-green-600" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingPositionId(null);
-                              setEditingPositionDraft(createEmptyPositionDraft());
-                            }}
-                            title="Отмена"
-                          >
-                            <X className="w-4 h-4 text-gray-600" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="inline-flex gap-2 items-center justify-end flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => openPositionSalaryHistory(position.id)}
-                            title="История изменений оклада"
-                            className="p-0.5 rounded hover:bg-indigo-50 text-indigo-600"
-                          >
-                            <History className="w-4 h-4" />
-                          </button>
-                          <button type="button" onClick={() => startEditPosition(position)} title="Редактировать">
-                            <Edit2 className="w-4 h-4 text-indigo-600" />
-                          </button>
-                          {!position.isDefault && (
-                            <button type="button" onClick={() => handleDeletePosition(position.id)} title="Удалить">
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <input
-              type="text"
-              value={(positionDraftByDepartment[department.id] ?? createEmptyPositionDraft()).name}
-              onChange={(e) =>
-                setPositionDraftByDepartment((prev) => ({
-                  ...prev,
-                  [department.id]: { ...(prev[department.id] ?? createEmptyPositionDraft()), name: e.target.value }
-                }))
-              }
-              className="px-3 py-2 border border-gray-300 rounded-lg"
-              placeholder="Новая должность"
-            />
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={(positionDraftByDepartment[department.id] ?? createEmptyPositionDraft()).salary}
-              onChange={(e) =>
-                setPositionDraftByDepartment((prev) => ({
-                  ...prev,
-                  [department.id]: { ...(prev[department.id] ?? createEmptyPositionDraft()), salary: e.target.value }
-                }))
-              }
-              className="px-3 py-2 border border-gray-300 rounded-lg"
-              placeholder="Оклад"
-            />
-            <input
-              type="date"
-              title="Оклад действует с (по умолчанию — 1-е число следующего месяца)"
-              value={(positionDraftByDepartment[department.id] ?? createEmptyPositionDraft()).effectiveFrom}
-              onChange={(e) =>
-                setPositionDraftByDepartment((prev) => ({
-                  ...prev,
-                  [department.id]: { ...(prev[department.id] ?? createEmptyPositionDraft()), effectiveFrom: e.target.value }
-                }))
-              }
-              className="px-3 py-2 border border-gray-300 rounded-lg"
-              aria-label="Действует с"
-            />
-            <button
-              onClick={() => handleAddPosition(department.id)}
-              disabled={operationLoading}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Добавить должность
-            </button>
-          </div>
-        </div>
-      ))}
     </div>
   );
 };
