@@ -280,7 +280,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         details: { lines: calculationLines }
       });
       setCalculatedCost(recommendedCostWithVat);
-      alert('Расчёт выполнен и сохранён. Смотрите «Сервис» → «Расчёт стоимости квалификации».');
     } catch (error) {
       alert(`Ошибка сохранения расчёта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
     } finally {
