@@ -9,6 +9,7 @@ import { qualificationObjectService } from '../utils/qualificationObjectService'
 import { useAuth } from '../contexts/AuthContext';
 import { SaleProjectForm } from './SaleProjectForm';
 import { staffDirectoryService } from '../utils/staffDirectoryService';
+import { costCalculationService } from '../utils/costCalculationService';
 import type { Department } from '../types/StaffDirectory';
 import {
   loadTaxSettingsFromLocalStorage,
@@ -83,6 +84,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     protocolPrintCopies?: number;
     reportPrintCopies?: number;
     travelExpenses?: number;
+    transportExpenses?: number;
     protocolPreparationStartDate?: string;
     protocolPreparationEndDate?: string;
     testingStartDate?: string;
@@ -100,6 +102,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     protocolPrintCopies: undefined,
     reportPrintCopies: undefined,
     travelExpenses: undefined,
+    transportExpenses: undefined,
     protocolPreparationStartDate: '',
     protocolPreparationEndDate: '',
     testingStartDate: '',
@@ -141,11 +144,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   }, []);
 
   // Расчёт рекомендуемой стоимости (руб. с НДС) по формуле со страницы «Переменные»
-  const workPlanDays =
-    countWorkingDays(newProject.protocolPreparationStartDate, newProject.protocolPreparationEndDate) +
-    countWorkingDays(newProject.testingStartDate, newProject.testingEndDate) +
-    countWorkingDays(newProject.reportPreparationStartDate, newProject.reportPreparationEndDate);
-
   const payrollMultiplier = payrollFundBurdenMultiplier(taxSettings);
   const fotByDepartmentName = new Map(
     departments.map((d) => {
@@ -178,27 +176,117 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const validationShare = taxSettings.validationRevenueShare / 100;
   const fotAdministrationTerm = (fotAdministration / AVERAGE_WORKING_DAYS_PER_MONTH) * validationShare * fotDays;
   const fotSalesTerm = (fotSales / AVERAGE_WORKING_DAYS_PER_MONTH) * validationShare * fotDays;
-  // Обеспечение % маркетинга: расходы на маркетинг (мес.) / 20,6 × % отдела Валидации в доходах
-  const marketingTerm = (taxSettings.monthlyMarketingCosts / AVERAGE_WORKING_DAYS_PER_MONTH) * validationShare;
-  const recommendedCostBase =
+  // Обеспечение % маркетинга: расходы на маркетинг (мес.) / 20,6 × % отдела Валидации в доходах × кол-во дней подготовки
+  const marketingTerm = (taxSettings.monthlyMarketingCosts / AVERAGE_WORKING_DAYS_PER_MONTH) * validationShare * fotDays;
+  // Прямые расходы: амортизация + печать + командировочные + транспортные
+  const directExpenses =
     loggerCostTerm +
     protocolPrintTerm +
     reportPrintTerm +
     (newProject.travelExpenses ?? 0) +
-    fotValidationTerm +
-    fotAdministrationTerm +
-    fotSalesTerm +
-    marketingTerm;
-  const planProfitTerm = recommendedCostBase * (taxSettings.profitability / 100);
-  const bonusTerm = taxSettings.projectBonusAmount;
-  const vatBase = recommendedCostBase + planProfitTerm + bonusTerm;
-  const vatTerm = vatBase * (taxSettings.vat / 100);
-  const recommendedCostWithVat = vatBase + vatTerm;
+    (newProject.transportExpenses ?? 0);
+  // Обеспечение ФОТ предприятия: валидация + администрация + продажи
+  const fotEnterprise = fotValidationTerm + fotAdministrationTerm + fotSalesTerm;
+  const profitBase = directExpenses + fotEnterprise + marketingTerm;
+  const planProfitTerm = profitBase * (taxSettings.profitability / 100);
+  // Премия = % от плановой прибыли
+  const bonusTerm = planProfitTerm * (taxSettings.projectBonusPercent / 100);
+  const sumWithoutVat = profitBase + planProfitTerm + bonusTerm;
+  const vatTerm = sumWithoutVat * (taxSettings.vat / 100);
+  const recommendedCostWithVat = sumWithoutVat + vatTerm;
   const hasRecommendedCostInputs =
     (newProject.loggersCount ?? 0) > 0 ||
     (newProject.protocolPrintCopies ?? 0) > 0 ||
     (newProject.reportPrintCopies ?? 0) > 0 ||
-    (newProject.travelExpenses ?? 0) > 0;
+    (newProject.travelExpenses ?? 0) > 0 ||
+    (newProject.transportExpenses ?? 0) > 0;
+
+  // Строки детализации расчёта — сохраняются на страницу «Расчёт стоимости квалификации» по кнопке «Рассчитать»
+  const calculationLines = [
+    {
+      label: 'Прямые расходы',
+      value: `${fmtCalc(loggerCostTerm)} + ${fmtCalc(protocolPrintTerm)} + ${fmtCalc(reportPrintTerm)} + ${fmtCalc(newProject.travelExpenses ?? 0)} + ${fmtCalc(newProject.transportExpenses ?? 0)} = ${fmtCalc(directExpenses)}`
+    },
+    {
+      label: '  Амортизация оборудования',
+      value: `${newProject.loggersCount ?? 0} × ${fmtCalc(taxSettings.loggerDayCost)} × ${testingCalendarDays} = ${fmtCalc(loggerCostTerm)}`
+    },
+    {
+      label: '  Печать протоколов и отчётов',
+      value: `${newProject.protocolPrintCopies ?? 0} × ${fmtCalc(taxSettings.protocolPrintCost)} = ${fmtCalc(protocolPrintTerm)}; ${newProject.reportPrintCopies ?? 0} × ${fmtCalc(taxSettings.reportPrintCost)} = ${fmtCalc(reportPrintTerm)}`
+    },
+    { label: '  Командировочные', value: fmtCalc(newProject.travelExpenses ?? 0) },
+    { label: '  Транспортные', value: fmtCalc(newProject.transportExpenses ?? 0) },
+    {
+      label: 'Обеспечение ФОТ предприятия',
+      value: `${fmtCalc(fotValidationTerm)} + ${fmtCalc(fotAdministrationTerm)} + ${fmtCalc(fotSalesTerm)} = ${fmtCalc(fotEnterprise)}`
+    },
+    {
+      label: '  Обеспечение ФОТ Отдел валидации',
+      value: `${fmtCalc(fotValidation)} / ${AVERAGE_WORKING_DAYS_PER_MONTH} × ${fotDays} = ${fmtCalc(fotValidationTerm)}`
+    },
+    {
+      label: '  Обеспечение % ФОТ Администрации',
+      value: `${fmtCalc(fotAdministration)} / ${AVERAGE_WORKING_DAYS_PER_MONTH} × ${fmtCalc(taxSettings.validationRevenueShare)}% × ${fotDays} = ${fmtCalc(fotAdministrationTerm)}`
+    },
+    {
+      label: '  Обеспечение % ФОТ Отдел продаж',
+      value: `${fmtCalc(fotSales)} / ${AVERAGE_WORKING_DAYS_PER_MONTH} × ${fmtCalc(taxSettings.validationRevenueShare)}% × ${fotDays} = ${fmtCalc(fotSalesTerm)}`
+    },
+    {
+      label: 'Обеспечение % маркетинга',
+      value: `${fmtCalc(taxSettings.monthlyMarketingCosts)} / ${AVERAGE_WORKING_DAYS_PER_MONTH} × ${fmtCalc(taxSettings.validationRevenueShare)}% × ${fotDays} = ${fmtCalc(marketingTerm)}`
+    },
+    {
+      label: 'Плановая прибыль',
+      value: `(${fmtCalc(directExpenses)} + ${fmtCalc(fotEnterprise)} + ${fmtCalc(marketingTerm)}) × ${fmtCalc(taxSettings.profitability)} / 100 = ${fmtCalc(planProfitTerm)}`
+    },
+    {
+      label: 'Премия % от прибыли',
+      value: `${fmtCalc(planProfitTerm)} × ${fmtCalc(taxSettings.projectBonusPercent)} / 100 = ${fmtCalc(bonusTerm)}`
+    },
+    {
+      label: 'Сумма без НДС',
+      value: `${fmtCalc(directExpenses)} + ${fmtCalc(fotEnterprise)} + ${fmtCalc(marketingTerm)} + ${fmtCalc(planProfitTerm)} + ${fmtCalc(bonusTerm)} = ${fmtCalc(sumWithoutVat)}`
+    },
+    {
+      label: 'Итого с НДС',
+      value: `${fmtCalc(sumWithoutVat)} + НДС ${fmtCalc(vatTerm)} = ${fmtCalc(recommendedCostWithVat)}`
+    }
+  ];
+
+  const [calculationSaving, setCalculationSaving] = useState(false);
+  // Рассчитанная стоимость — отображается в поле только после нажатия «Рассчитать»; сбрасывается при изменении ввода
+  const [calculatedCost, setCalculatedCost] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCalculatedCost(null);
+  }, [newProject]);
+
+  const handleCalculateCost = async () => {
+    if (!hasRecommendedCostInputs) {
+      alert('Заполните данные для расчёта: количество логгеров, экземпляры протоколов/отчётов или расходы.');
+      return;
+    }
+    if (!newProject.contractorId) {
+      alert('Выберите контрагента — он будет указан в расчёте.');
+      return;
+    }
+    setCalculationSaving(true);
+    try {
+      await costCalculationService.saveCalculation({
+        contractorId: newProject.contractorId,
+        totalWithVat: recommendedCostWithVat,
+        details: { lines: calculationLines }
+      });
+      setCalculatedCost(recommendedCostWithVat);
+      alert('Расчёт выполнен и сохранён. Смотрите «Сервис» → «Расчёт стоимости квалификации».');
+    } catch (error) {
+      alert(`Ошибка сохранения расчёта: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+    } finally {
+      setCalculationSaving(false);
+    }
+  };
 
   const getDateMs = (v: unknown): number | null => {
     if (!v) return null;
@@ -429,6 +517,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         protocolPrintCopies: newProject.protocolPrintCopies,
         reportPrintCopies: newProject.reportPrintCopies,
         travelExpenses: newProject.travelExpenses,
+        transportExpenses: newProject.transportExpenses,
         protocolPreparationStartDate: newProject.protocolPreparationStartDate ? new Date(newProject.protocolPreparationStartDate) : undefined,
         protocolPreparationEndDate: newProject.protocolPreparationEndDate ? new Date(newProject.protocolPreparationEndDate) : undefined,
         testingStartDate: newProject.testingStartDate ? new Date(newProject.testingStartDate) : undefined,
@@ -463,6 +552,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
 
       const createdProject = await projectService.addProject(projectData, user?.id);
       setProjects(prev => [...prev, createdProject]);
+
       setNewProject({
         description: '',
         contractorId: '',
@@ -472,6 +562,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         protocolPrintCopies: undefined,
         reportPrintCopies: undefined,
         travelExpenses: undefined,
+    transportExpenses: undefined,
         protocolPreparationStartDate: '',
         protocolPreparationEndDate: '',
         testingStartDate: '',
@@ -642,6 +733,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 protocolPrintCopies: undefined,
                 reportPrintCopies: undefined,
                 travelExpenses: undefined,
+    transportExpenses: undefined,
                 protocolPreparationStartDate: '',
                 protocolPreparationEndDate: '',
                 testingStartDate: '',
@@ -669,6 +761,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 protocolPrintCopies: undefined,
                 reportPrintCopies: undefined,
                 travelExpenses: undefined,
+    transportExpenses: undefined,
                 protocolPreparationStartDate: '',
                 protocolPreparationEndDate: '',
                 testingStartDate: '',
@@ -739,6 +832,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 protocolPrintCopies: undefined,
                 reportPrintCopies: undefined,
                 travelExpenses: undefined,
+    transportExpenses: undefined,
                 protocolPreparationStartDate: '',
                 protocolPreparationEndDate: '',
                 testingStartDate: '',
@@ -766,6 +860,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               protocolPrintCopies: undefined,
               reportPrintCopies: undefined,
               travelExpenses: undefined,
+    transportExpenses: undefined,
               protocolPreparationStartDate: '',
               protocolPreparationEndDate: '',
               testingStartDate: '',
@@ -969,6 +1064,25 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                   placeholder="Введите сумму"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Транспортные расходы
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={newProject.transportExpenses ?? ''}
+                  onChange={(e) =>
+                    setNewProject((prev) => ({
+                      ...prev,
+                      transportExpenses: e.target.value === '' ? undefined : Number(e.target.value),
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Введите сумму"
+                />
+              </div>
             </div>
 
             {/* План-факт по стоимости и срокам */}
@@ -1054,59 +1168,28 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                     />
                   </div>
                 </div>
-                {workPlanDays > 0 && (
-                  <div className="mt-2 text-sm text-gray-700">
-                    Кол-во рабочих дней: <span className="font-semibold text-indigo-700">{workPlanDays}</span>
-                  </div>
-                )}
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Рекомендуемая стоимость руб. с НДС
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Рекомендуемая стоимость руб. с НДС
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleCalculateCost()}
+                    disabled={calculationSaving}
+                    className="inline-flex items-center px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-400 transition-colors"
+                    title="Выполнить расчёт по формуле и сохранить на страницу «Расчёт стоимости квалификации»"
+                  >
+                    <Play className="w-4 h-4 mr-1" />
+                    {calculationSaving ? 'Сохранение…' : 'Рассчитать'}
+                  </button>
+                </div>
                 <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-900">
-                  {hasRecommendedCostInputs
-                    ? `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(recommendedCostWithVat)} руб.`
+                  {calculatedCost != null
+                    ? `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(calculatedCost)} руб.`
                     : '—'}
                 </div>
-                {hasRecommendedCostInputs && (
-                  <div className="mt-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1 font-mono">
-                    <div className="font-semibold text-gray-700">Затраты</div>
-                    <div>
-                      Амортизация оборудования: {newProject.loggersCount ?? 0} × {fmtCalc(taxSettings.loggerDayCost)} × {testingCalendarDays} = {fmtCalc(loggerCostTerm)}
-                    </div>
-                    <div>
-                      Печать протоколов и отчетов: {newProject.protocolPrintCopies ?? 0} × {fmtCalc(taxSettings.protocolPrintCost)} = {fmtCalc(protocolPrintTerm)}{' '}
-                      {newProject.reportPrintCopies ?? 0} × {fmtCalc(taxSettings.reportPrintCost)} = {fmtCalc(reportPrintTerm)}
-                    </div>
-                    <div>Командировочные: {fmtCalc(newProject.travelExpenses ?? 0)}</div>
-                    <div>
-                      Обеспечение ФОТ Отдел валидации: {fmtCalc(fotValidation)} / {AVERAGE_WORKING_DAYS_PER_MONTH} × {fotDays} = {fmtCalc(fotValidationTerm)}
-                    </div>
-                    <div>
-                      Обеспечение % ФОТ Администрации: {fmtCalc(fotAdministration)} / {AVERAGE_WORKING_DAYS_PER_MONTH} × {fmtCalc(taxSettings.validationRevenueShare)}% × {fotDays} = {fmtCalc(fotAdministrationTerm)}
-                    </div>
-                    <div>
-                      Обеспечение % ФОТ Отдел продаж: {fmtCalc(fotSales)} / {AVERAGE_WORKING_DAYS_PER_MONTH} × {fmtCalc(taxSettings.validationRevenueShare)}% × {fotDays} = {fmtCalc(fotSalesTerm)}
-                    </div>
-                    <div>
-                      Обеспечение % маркетинга: {fmtCalc(taxSettings.monthlyMarketingCosts)} / {AVERAGE_WORKING_DAYS_PER_MONTH} × {fmtCalc(taxSettings.validationRevenueShare)}% = {fmtCalc(marketingTerm)}
-                    </div>
-                    <div>
-                      Плановая прибыль: {fmtCalc(recommendedCostBase)} × {fmtCalc(taxSettings.profitability)} / 100 = {fmtCalc(planProfitTerm)}
-                    </div>
-                    <div>Премия: {fmtCalc(bonusTerm)}</div>
-                    <div>
-                      НДС: ({fmtCalc(recommendedCostBase)} + {fmtCalc(planProfitTerm)} + {fmtCalc(bonusTerm)}) × {fmtCalc(taxSettings.vat)}% = {fmtCalc(vatTerm)}
-                    </div>
-                    <div className="pt-1 border-t border-gray-200">
-                      Итого с НДС: {fmtCalc(loggerCostTerm)} + {fmtCalc(protocolPrintTerm)} + {fmtCalc(reportPrintTerm)} +{' '}
-                      {fmtCalc(newProject.travelExpenses ?? 0)} + {fmtCalc(fotValidationTerm)} + {fmtCalc(fotAdministrationTerm)} +{' '}
-                      {fmtCalc(fotSalesTerm)} + {fmtCalc(marketingTerm)} + {fmtCalc(planProfitTerm)} + {fmtCalc(bonusTerm)} + {fmtCalc(vatTerm)} ={' '}
-                      {fmtCalc(recommendedCostWithVat)}
-                    </div>
-                  </div>
-                )}
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -34,6 +34,8 @@ type ProjectDto = {
   reportPrintCopies?: number | null;
   travel_expenses?: number | string | null;
   travelExpenses?: number | string | null;
+  transport_expenses?: number | string | null;
+  transportExpenses?: number | string | null;
   protocol_preparation_start_date?: string | null;
   protocolPreparationStartDate?: string | null;
   protocol_preparation_end_date?: string | null;
@@ -247,6 +249,12 @@ const mapProject = (dto: ProjectDto): Project => {
         : dto.travel_expenses !== undefined && dto.travel_expenses !== null
         ? Number(dto.travel_expenses)
         : undefined,
+    transportExpenses:
+      dto.transportExpenses !== undefined && dto.transportExpenses !== null
+        ? Number(dto.transportExpenses)
+        : dto.transport_expenses !== undefined && dto.transport_expenses !== null
+        ? Number(dto.transport_expenses)
+        : undefined,
     protocolPreparationStartDate: toDate(dto.protocolPreparationStartDate || dto.protocol_preparation_start_date),
     protocolPreparationEndDate: toDate(dto.protocolPreparationEndDate || dto.protocol_preparation_end_date),
     testingStartDate: toDate(dto.testingStartDate || dto.testing_start_date),
@@ -296,6 +304,7 @@ class ProjectService {
       protocolPrintCopies: project.protocolPrintCopies,
       reportPrintCopies: project.reportPrintCopies,
       travelExpenses: project.travelExpenses,
+      transportExpenses: project.transportExpenses,
       protocolPreparationStartDate: project.protocolPreparationStartDate,
       protocolPreparationEndDate: project.protocolPreparationEndDate,
       testingStartDate: project.testingStartDate,
@@ -342,6 +351,9 @@ class ProjectService {
     }
     if (updates.travelExpenses !== undefined) {
       payload.travelExpenses = updates.travelExpenses;
+    }
+    if (updates.transportExpenses !== undefined) {
+      payload.transportExpenses = updates.transportExpenses;
     }
     if (updates.protocolPreparationStartDate !== undefined) {
       payload.protocolPreparationStartDate = updates.protocolPreparationStartDate

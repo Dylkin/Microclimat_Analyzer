@@ -260,6 +260,10 @@ const main = async () => {
         if (file === '20261030121000_add_missing_project_status_enum_values.sql') return true;
         // Архив должностей (архивные не участвуют в расчёте ФОТ)
         if (file === '20261030121500_add_staff_position_archived.sql') return true;
+        // Транспортные расходы проекта
+        if (file === '20261104103000_add_project_transport_expenses.sql') return true;
+        // История расчётов стоимости квалификации
+        if (file === '20261104110000_add_cost_calculations.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:

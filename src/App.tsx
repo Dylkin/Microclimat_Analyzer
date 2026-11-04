@@ -33,6 +33,7 @@ const ResetPassword = lazy(() => import('./components/ResetPassword'));
 const TenderSearch = lazy(() => import('./components/TenderSearch'));
 const QualificationObjectTypes = lazy(() => import('./components/QualificationObjectTypes'));
 const ReleasePage = lazy(() => import('./components/ReleasePage').then(m => ({ default: m.ReleasePage })));
+const CostCalculationsPage = lazy(() => import('./components/CostCalculationsPage'));
 const PersonalProfilePage = lazy(() =>
   import('./components/PersonalProfilePage').then((m) => ({ default: m.PersonalProfilePage }))
 );
@@ -293,6 +294,8 @@ const AppContent: React.FC = () => {
         return canAccessPage(user.role, 'staff-directory') ? wrapWithSuspense(<StaffDirectory />) : <div>Доступ запрещен</div>;
       case 'audit_logs':
         return canAccessPage(user.role, 'audit_logs') ? wrapWithSuspense(<AuditLogs onBack={() => handlePageChange('projects')} />) : <div>Доступ запрещен</div>;
+      case 'cost-calculations':
+        return canAccessPage(user.role, 'cost-calculations') ? wrapWithSuspense(<CostCalculationsPage />) : <div>Доступ запрещен</div>;
       case 'contractors':
         return canAccessPage(user.role, 'contractors')
           ? wrapWithSuspense(

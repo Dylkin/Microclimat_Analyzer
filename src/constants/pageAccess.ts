@@ -14,6 +14,7 @@ export type PageKey =
   // Пункты подменю «Сервис»
   | 'analyzer'
   | 'audit_logs'
+  | 'cost-calculations'
   | 'mail-settings'
   | 'tax-settings'
   | 'finance'
@@ -48,6 +49,7 @@ const PAGE_ROLES: Record<PageKey, AccessRole[]> = {
   service: ['director'],
   analyzer: ['director'],
   audit_logs: [], // только администратор
+  'cost-calculations': ['director'],
   'mail-settings': ['director'],
   'tax-settings': ['director'],
   finance: ['director'],

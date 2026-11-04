@@ -37,7 +37,7 @@ export const TaxSettingsPage: React.FC = () => {
         reportPrintCost: typeof parsed.reportPrintCost === 'number' ? parsed.reportPrintCost : DEFAULT_TAX_SETTINGS.reportPrintCost,
         monthlyOverheadCosts: typeof parsed.monthlyOverheadCosts === 'number' ? parsed.monthlyOverheadCosts : DEFAULT_TAX_SETTINGS.monthlyOverheadCosts,
         monthlyMarketingCosts: typeof parsed.monthlyMarketingCosts === 'number' ? parsed.monthlyMarketingCosts : DEFAULT_TAX_SETTINGS.monthlyMarketingCosts,
-        projectBonusAmount: typeof parsed.projectBonusAmount === 'number' ? parsed.projectBonusAmount : DEFAULT_TAX_SETTINGS.projectBonusAmount,
+        projectBonusPercent: typeof parsed.projectBonusPercent === 'number' ? parsed.projectBonusPercent : DEFAULT_TAX_SETTINGS.projectBonusPercent,
         validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare
       });
     } catch (loadError) {
@@ -274,15 +274,15 @@ export const TaxSettingsPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Сумма премии, включаемая в проект, руб.</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Премия % от прибыли</label>
             <input
               type="number"
-              step="0.01"
+              step="0.1"
               min="0"
-              value={settings.projectBonusAmount}
-              onChange={(e) => handleNumberChange('projectBonusAmount', e.target.value)}
-              title="Сумма премии, включаемая в стоимость проекта, руб."
-              placeholder="100"
+              value={settings.projectBonusPercent}
+              onChange={(e) => handleNumberChange('projectBonusPercent', e.target.value)}
+              title="Премия в процентах от плановой прибыли, %"
+              placeholder="10"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             />
           </div>
@@ -308,25 +308,47 @@ export const TaxSettingsPage: React.FC = () => {
           На форме создания проекта под блоком «План проведения работ» выводится рекомендуемая стоимость (руб. с НДС),
           вычисляемая по формуле:
         </p>
-        <div className="text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-lg p-4 leading-relaxed">
-          (Кол-во логгеров для проведения испытаний × Стоимость использования логгера в день, руб. без НДС × кол-во календарных дней в периоде «Проведение испытаний»
-          + Кол-во печатных экземпляров протоколов × Средняя стоимость печати протокола, руб. без НДС
-          + Кол-во печатных экземпляров отчётов × Средняя стоимость печати отчёта, руб. без НДС
-          + Командировочные расходы
-          + Обеспечение ФОТ Отдела валидации: ФОТ Отдела валидации / 20,6 × кол-во дней подготовки протоколов и отчётов
-          + Обеспечение % ФОТ Администрации: ФОТ Администрации / 20,6 × (% отдела Валидации в общих доходах / 100) × кол-во дней подготовки протоколов и отчётов
-          + Обеспечение % ФОТ Отдела продаж: ФОТ Отдела продаж / 20,6 × (% отдела Валидации в общих доходах / 100) × кол-во дней подготовки протоколов и отчётов
-          + Обеспечение % маркетинга: Расходы на маркетинг без НДС (мес.) / 20,6 × (% отдела Валидации в общих доходах / 100)
-          + Плановая прибыль: сумма всех значений × Рентабельность / 100
-          + Сумма премии, включаемая в проект)
-          × (1 + НДС / 100)
+        <div className="text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-lg p-4 leading-relaxed space-y-2">
+          <div>
+            <span className="font-semibold">Прямые расходы</span> = Кол-во логгеров для проведения испытаний × Стоимость
+            использования логгера в день, руб. без НДС × кол-во календарных дней в периоде «Проведение испытаний»
+            + Кол-во печатных экземпляров протоколов × Средняя стоимость печати протокола, руб. без НДС
+            + Кол-во печатных экземпляров отчётов × Средняя стоимость печати отчёта, руб. без НДС
+            + Командировочные расходы + Транспортные расходы
+          </div>
+          <div>
+            <span className="font-semibold">Обеспечение ФОТ предприятия</span> = Обеспечение ФОТ Отдела валидации: ФОТ
+            Отдела валидации / 20,6 × кол-во дней подготовки протоколов и отчётов
+            + Обеспечение % ФОТ Администрации: ФОТ Администрации / 20,6 × (% отдела Валидации в общих доходах / 100) ×
+            кол-во дней подготовки протоколов и отчётов
+            + Обеспечение % ФОТ Отдела продаж: ФОТ Отдела продаж / 20,6 × (% отдела Валидации в общих доходах / 100) ×
+            кол-во дней подготовки протоколов и отчётов
+          </div>
+          <div>
+            <span className="font-semibold">Обеспечение % маркетинга</span> = Расходы на маркетинг без НДС (мес.) / 20,6 ×
+            (% отдела Валидации в общих доходах / 100) × кол-во дней подготовки протоколов и отчётов
+          </div>
+          <div>
+            <span className="font-semibold">Плановая прибыль</span> = (Прямые расходы + Обеспечение ФОТ предприятия +
+            Обеспечение % маркетинга) × Рентабельность / 100
+          </div>
+          <div>
+            <span className="font-semibold">Премия</span> = Плановая прибыль × Премия % от прибыли / 100
+          </div>
+          <div>
+            <span className="font-semibold">Сумма без НДС</span> = Прямые расходы + Обеспечение ФОТ предприятия + Обеспечение
+            % маркетинга + Плановая прибыль + Премия
+          </div>
+          <div>
+            <span className="font-semibold">Итого с НДС</span> = Сумма без НДС + НДС, где НДС = Сумма без НДС × НДС / 100
+          </div>
         </div>
         <p className="text-sm text-gray-600 mt-2">
           ФОТ отделов берётся со страницы «Структура предприятия» (Σ оклад должности × количество сотрудников с этой
           должностью, с коэффициентом нагрузки; сотрудники — из справочника пользователей).
           Деление на 20,6 — среднее количество рабочих дней в месяце (месячный ФОТ и месячные расходы переводятся в дневную ставку).
           Кол-во дней подготовки протоколов и отчётов считается по документам: один протокол = 2 дня, один отчёт = 3 дня.
-          Плановая прибыль = сумма всех слагаемых × Рентабельность / 100 (рентабельность со страницы «Переменные»).
+          Ставки (рентабельность, премия % от прибыли, НДС и др.) — со страницы «Переменные».
           Если отдел с нужным названием не найден, его ФОТ в расчёте принимается равным нулю.
         </p>
       </div>

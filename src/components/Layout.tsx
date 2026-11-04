@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { canAccessPage } from '../constants/pageAccess';
-import { LogOut, BarChart3, Menu, X, HelpCircle, Users, Building2, FolderOpen, Wrench, Activity, Settings, ChevronDown, ChevronRight, Search, Package, ShoppingCart, Briefcase } from 'lucide-react';
+import { LogOut, BarChart3, Menu, X, HelpCircle, Users, Building2, FolderOpen, Wrench, Activity, Settings, ChevronDown, ChevronRight, Search, Package, ShoppingCart, Briefcase, Calculator } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -69,6 +69,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
           name: 'Аудит',
           key: 'audit_logs',
           icon: Activity
+        },
+        {
+          name: 'Расчёт стоимости квалификации',
+          key: 'cost-calculations',
+          icon: Calculator
         },
         {
           name: 'Настройки почты',

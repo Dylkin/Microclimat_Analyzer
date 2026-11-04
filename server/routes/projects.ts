@@ -64,6 +64,7 @@ router.get('/', (req, res, next) => {
         'payment_date',
         'loggers_count', 'protocol_print_copies',
         'report_print_copies', 'travel_expenses',
+        'transport_expenses',
         'protocol_preparation_start_date', 'protocol_preparation_end_date',
         'testing_start_date', 'testing_end_date',
         'report_preparation_start_date', 'report_preparation_end_date'
@@ -82,7 +83,8 @@ router.get('/', (req, res, next) => {
       projectColumns.includes('loggers_count') &&
       projectColumns.includes('protocol_print_copies') &&
       projectColumns.includes('report_print_copies') &&
-      projectColumns.includes('travel_expenses');
+      projectColumns.includes('travel_expenses') &&
+      projectColumns.includes('transport_expenses');
     const hasWorkPlanFields =
       projectColumns.includes('protocol_preparation_start_date') &&
       projectColumns.includes('protocol_preparation_end_date') &&
@@ -97,7 +99,7 @@ router.get('/', (req, res, next) => {
       ? ', p.total_cost_with_vat, p.start_date_planned, p.start_date_actual, p.end_date_planned, p.end_date_actual, p.payment_date'
       : '';
     const testingExpenseFields = hasTestingExpenseFields
-      ? ', p.loggers_count, p.protocol_print_copies, p.report_print_copies, p.travel_expenses'
+      ? ', p.loggers_count, p.protocol_print_copies, p.report_print_copies, p.travel_expenses, p.transport_expenses'
       : '';
     const workPlanFields = hasWorkPlanFields
       ? ', p.protocol_preparation_start_date, p.protocol_preparation_end_date, p.testing_start_date, p.testing_end_date, p.report_preparation_start_date, p.report_preparation_end_date'
@@ -253,6 +255,8 @@ router.get('/', (req, res, next) => {
         protocolPrintCopies: row.protocol_print_copies != null ? Number(row.protocol_print_copies) : undefined,
         reportPrintCopies: row.report_print_copies != null ? Number(row.report_print_copies) : undefined,
         travelExpenses: row.travel_expenses != null ? parseFloat(row.travel_expenses) : undefined,
+        transportExpenses: row.transport_expenses != null ? parseFloat(row.transport_expenses) : undefined,
+      transportExpenses: row.transport_expenses != null ? parseFloat(row.transport_expenses) : undefined,
         protocolPreparationStartDate: row.protocol_preparation_start_date ? new Date(row.protocol_preparation_start_date) : undefined,
         protocolPreparationEndDate: row.protocol_preparation_end_date ? new Date(row.protocol_preparation_end_date) : undefined,
         testingStartDate: row.testing_start_date ? new Date(row.testing_start_date) : undefined,
@@ -321,6 +325,7 @@ router.get('/:id', requireAuth, async (req, res) => {
         'payment_date',
         'loggers_count', 'protocol_print_copies',
         'report_print_copies', 'travel_expenses',
+        'transport_expenses',
         'protocol_preparation_start_date', 'protocol_preparation_end_date',
         'testing_start_date', 'testing_end_date',
         'report_preparation_start_date', 'report_preparation_end_date'
@@ -339,7 +344,8 @@ router.get('/:id', requireAuth, async (req, res) => {
       projectColumns.includes('loggers_count') &&
       projectColumns.includes('protocol_print_copies') &&
       projectColumns.includes('report_print_copies') &&
-      projectColumns.includes('travel_expenses');
+      projectColumns.includes('travel_expenses') &&
+      projectColumns.includes('transport_expenses');
     const hasWorkPlanFields =
       projectColumns.includes('protocol_preparation_start_date') &&
       projectColumns.includes('protocol_preparation_end_date') &&
@@ -354,7 +360,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       ? ', p.total_cost_with_vat, p.start_date_planned, p.start_date_actual, p.end_date_planned, p.end_date_actual, p.payment_date'
       : '';
     const testingExpenseFields = hasTestingExpenseFields
-      ? ', p.loggers_count, p.protocol_print_copies, p.report_print_copies, p.travel_expenses'
+      ? ', p.loggers_count, p.protocol_print_copies, p.report_print_copies, p.travel_expenses, p.transport_expenses'
       : '';
     const workPlanFields = hasWorkPlanFields
       ? ', p.protocol_preparation_start_date, p.protocol_preparation_end_date, p.testing_start_date, p.testing_end_date, p.report_preparation_start_date, p.report_preparation_end_date'
@@ -543,6 +549,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       protocolPrintCopies: projectRow.protocol_print_copies != null ? Number(projectRow.protocol_print_copies) : undefined,
       reportPrintCopies: projectRow.report_print_copies != null ? Number(projectRow.report_print_copies) : undefined,
       travelExpenses: projectRow.travel_expenses != null ? parseFloat(projectRow.travel_expenses) : undefined,
+      transportExpenses: projectRow.transport_expenses != null ? parseFloat(projectRow.transport_expenses) : undefined,
       protocolPreparationStartDate: projectRow.protocol_preparation_start_date ? new Date(projectRow.protocol_preparation_start_date) : undefined,
       protocolPreparationEndDate: projectRow.protocol_preparation_end_date ? new Date(projectRow.protocol_preparation_end_date) : undefined,
       testingStartDate: projectRow.testing_start_date ? new Date(projectRow.testing_start_date) : undefined,
@@ -610,6 +617,7 @@ router.post('/', requireAuth, async (req, res) => {
       protocolPrintCopies,
       reportPrintCopies,
       travelExpenses,
+      transportExpenses,
       protocolPreparationStartDate,
       protocolPreparationEndDate,
       testingStartDate,
@@ -646,6 +654,7 @@ router.post('/', requireAuth, async (req, res) => {
         'payment_date',
         'loggers_count', 'protocol_print_copies',
         'report_print_copies', 'travel_expenses',
+        'transport_expenses',
         'protocol_preparation_start_date', 'protocol_preparation_end_date',
         'testing_start_date', 'testing_end_date',
         'report_preparation_start_date', 'report_preparation_end_date'
@@ -664,7 +673,8 @@ router.post('/', requireAuth, async (req, res) => {
       projectColumns.includes('loggers_count') &&
       projectColumns.includes('protocol_print_copies') &&
       projectColumns.includes('report_print_copies') &&
-      projectColumns.includes('travel_expenses');
+      projectColumns.includes('travel_expenses') &&
+      projectColumns.includes('transport_expenses');
     const hasWorkPlanFields =
       projectColumns.includes('protocol_preparation_start_date') &&
       projectColumns.includes('protocol_preparation_end_date') &&
@@ -703,12 +713,14 @@ router.post('/', requireAuth, async (req, res) => {
         'protocol_print_copies',
         'report_print_copies',
         'travel_expenses',
+        'transport_expenses',
       );
       insertValues.push(
         loggersCount ?? null,
         protocolPrintCopies ?? null,
         reportPrintCopies ?? null,
         travelExpenses ?? null,
+        transportExpenses ?? null,
       );
     }
     if (hasWorkPlanFields) {
@@ -744,7 +756,7 @@ router.post('/', requireAuth, async (req, res) => {
       'id', 'name', 'description', 'type', 'contractor_id', 'contract_number', 'contract_date',
       ...(hasTenderFields ? ['tender_link', 'tender_date'] : []),
       ...(hasPlanningFields ? ['total_cost_with_vat', 'start_date_planned', 'start_date_actual', 'end_date_planned', 'end_date_actual', 'payment_date'] : []),
-      ...(hasTestingExpenseFields ? ['loggers_count', 'protocol_print_copies', 'report_print_copies', 'travel_expenses'] : []),
+      ...(hasTestingExpenseFields ? ['loggers_count', 'protocol_print_copies', 'report_print_copies', 'travel_expenses', 'transport_expenses'] : []),
       ...(hasWorkPlanFields ? ['protocol_preparation_start_date', 'protocol_preparation_end_date', 'testing_start_date', 'testing_end_date', 'report_preparation_start_date', 'report_preparation_end_date'] : []),
       'status', 'created_by', 'created_at', 'updated_at'
     ].join(', ');
@@ -917,7 +929,7 @@ router.post('/', requireAuth, async (req, res) => {
       ? ', p.total_cost_with_vat, p.start_date_planned, p.start_date_actual, p.end_date_planned, p.end_date_actual, p.payment_date'
       : '';
     const postCreateTestingExpenseFields = hasTestingExpenseFields
-      ? ', p.loggers_count, p.protocol_print_copies, p.report_print_copies, p.travel_expenses'
+      ? ', p.loggers_count, p.protocol_print_copies, p.report_print_copies, p.travel_expenses, p.transport_expenses'
       : '';
     const postCreateWorkPlanFields = hasWorkPlanFields
       ? ', p.protocol_preparation_start_date, p.protocol_preparation_end_date, p.testing_start_date, p.testing_end_date, p.report_preparation_start_date, p.report_preparation_end_date'
@@ -1058,6 +1070,7 @@ router.post('/', requireAuth, async (req, res) => {
       protocolPrintCopies: projectRow.protocol_print_copies != null ? Number(projectRow.protocol_print_copies) : undefined,
       reportPrintCopies: projectRow.report_print_copies != null ? Number(projectRow.report_print_copies) : undefined,
       travelExpenses: projectRow.travel_expenses != null ? parseFloat(projectRow.travel_expenses) : undefined,
+      transportExpenses: projectRow.transport_expenses != null ? parseFloat(projectRow.transport_expenses) : undefined,
       protocolPreparationStartDate: projectRow.protocol_preparation_start_date ? new Date(projectRow.protocol_preparation_start_date) : undefined,
       protocolPreparationEndDate: projectRow.protocol_preparation_end_date ? new Date(projectRow.protocol_preparation_end_date) : undefined,
       testingStartDate: projectRow.testing_start_date ? new Date(projectRow.testing_start_date) : undefined,
@@ -1102,6 +1115,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       protocolPrintCopies,
       reportPrintCopies,
       travelExpenses,
+      transportExpenses,
       protocolPreparationStartDate,
       protocolPreparationEndDate,
       testingStartDate,
@@ -1165,6 +1179,10 @@ router.put('/:id', requireAuth, async (req, res) => {
     if (travelExpenses !== undefined) {
       updates.push(`travel_expenses = $${paramCount++}`);
       values.push(travelExpenses);
+    }
+    if (transportExpenses !== undefined) {
+      updates.push(`transport_expenses = $${paramCount++}`);
+      values.push(transportExpenses);
     }
     if (protocolPreparationStartDate !== undefined) {
       updates.push(`protocol_preparation_start_date = $${paramCount++}`);
@@ -1383,11 +1401,11 @@ router.put('/:id', requireAuth, async (req, res) => {
       FROM information_schema.columns
       WHERE table_schema = 'public'
       AND table_name = 'projects'
-      AND column_name IN ('loggers_count', 'protocol_print_copies', 'report_print_copies', 'travel_expenses')
+      AND column_name IN ('loggers_count', 'protocol_print_copies', 'report_print_copies', 'travel_expenses', 'transport_expenses')
     `);
-    const hasTestingExpenseFieldsPut = testingExpenseFieldsCheck.rows.length === 4;
+    const hasTestingExpenseFieldsPut = testingExpenseFieldsCheck.rows.length === 5;
     const putTestingExpenseFields = hasTestingExpenseFieldsPut
-      ? ', p.loggers_count, p.protocol_print_copies, p.report_print_copies, p.travel_expenses'
+      ? ', p.loggers_count, p.protocol_print_copies, p.report_print_copies, p.travel_expenses, p.transport_expenses'
       : '';
     const workPlanFieldsCheck = await pool.query(`
       SELECT column_name
@@ -1510,6 +1528,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       protocolPrintCopies: projectRow.protocol_print_copies != null ? Number(projectRow.protocol_print_copies) : undefined,
       reportPrintCopies: projectRow.report_print_copies != null ? Number(projectRow.report_print_copies) : undefined,
       travelExpenses: projectRow.travel_expenses != null ? parseFloat(projectRow.travel_expenses) : undefined,
+      transportExpenses: projectRow.transport_expenses != null ? parseFloat(projectRow.transport_expenses) : undefined,
       protocolPreparationStartDate: projectRow.protocol_preparation_start_date ? new Date(projectRow.protocol_preparation_start_date) : undefined,
       protocolPreparationEndDate: projectRow.protocol_preparation_end_date ? new Date(projectRow.protocol_preparation_end_date) : undefined,
       testingStartDate: projectRow.testing_start_date ? new Date(projectRow.testing_start_date) : undefined,

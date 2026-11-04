@@ -11,7 +11,7 @@ export interface TaxSettings {
   reportPrintCost: number;
   monthlyOverheadCosts: number;
   monthlyMarketingCosts: number;
-  projectBonusAmount: number;
+  projectBonusPercent: number;
   validationRevenueShare: number;
 }
 
@@ -33,7 +33,7 @@ export const DEFAULT_TAX_SETTINGS: TaxSettings = {
   reportPrintCost: 70,
   monthlyOverheadCosts: 1000,
   monthlyMarketingCosts: 800,
-  projectBonusAmount: 100,
+  projectBonusPercent: 10,
   validationRevenueShare: 45
 };
 
@@ -55,7 +55,7 @@ export function loadTaxSettingsFromLocalStorage(): TaxSettings {
       reportPrintCost: typeof parsed.reportPrintCost === 'number' ? parsed.reportPrintCost : DEFAULT_TAX_SETTINGS.reportPrintCost,
       monthlyOverheadCosts: typeof parsed.monthlyOverheadCosts === 'number' ? parsed.monthlyOverheadCosts : DEFAULT_TAX_SETTINGS.monthlyOverheadCosts,
       monthlyMarketingCosts: typeof parsed.monthlyMarketingCosts === 'number' ? parsed.monthlyMarketingCosts : DEFAULT_TAX_SETTINGS.monthlyMarketingCosts,
-      projectBonusAmount: typeof parsed.projectBonusAmount === 'number' ? parsed.projectBonusAmount : DEFAULT_TAX_SETTINGS.projectBonusAmount,
+      projectBonusPercent: typeof parsed.projectBonusPercent === 'number' ? parsed.projectBonusPercent : DEFAULT_TAX_SETTINGS.projectBonusPercent,
       validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare
     };
   } catch {
