@@ -81,8 +81,8 @@ const UserDirectory: React.FC = () => {
     admin: 'Администратор',
     administrator: 'Администратор',
     specialist: 'Специалист',
-    manager: 'Руководитель',
-    director: 'Менеджер'
+    manager: 'Менеджер',
+    director: 'Руководитель'
   };
 
   const handleAddUser = async () => {

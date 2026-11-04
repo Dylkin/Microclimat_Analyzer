@@ -33,8 +33,8 @@ const roleLabels: Record<UserRole, string> = {
   admin: 'Администратор',
   administrator: 'Администратор',
   specialist: 'Специалист',
-  manager: 'Руководитель',
-  director: 'Менеджер'
+  manager: 'Менеджер',
+  director: 'Руководитель'
 };
 
 export const PersonalProfilePage: React.FC = () => {
