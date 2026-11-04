@@ -3,8 +3,19 @@ export interface CostCalculationLine {
   value: string;
 }
 
+/** Числовые значения расчёта — нужны для пересчёта итога при корректировке плановой прибыли */
+export interface CostCalculationValues {
+  directExpenses: number;
+  fotEnterprise: number;
+  marketing: number;
+  planProfit: number;
+  bonusPercent: number;
+  vatPercent: number;
+}
+
 export interface CostCalculationDetails {
   lines: CostCalculationLine[];
+  values?: CostCalculationValues;
 }
 
 export interface CostCalculation {

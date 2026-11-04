@@ -335,8 +335,8 @@ const UserDirectory: React.FC = () => {
                 aria-label="Роль пользователя"
               >
                 <option value="specialist">Специалист</option>
-                <option value="manager">Руководитель</option>
-                <option value="director">Менеджер</option>
+                <option value="manager">Менеджер</option>
+                <option value="director">Руководитель</option>
                 <option value="admin">Администратор</option>
               </select>
             </div>
@@ -494,8 +494,8 @@ const UserDirectory: React.FC = () => {
                         aria-label="Роль пользователя"
                       >
                         <option value="specialist">Специалист</option>
-                        <option value="manager">Руководитель</option>
-                        <option value="director">Менеджер</option>
+                        <option value="manager">Менеджер</option>
+                        <option value="director">Руководитель</option>
                         <option value="admin">Администратор</option>
                       </select>
                     ) : (

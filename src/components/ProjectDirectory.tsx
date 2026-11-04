@@ -277,7 +277,17 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       await costCalculationService.saveCalculation({
         contractorId: newProject.contractorId,
         totalWithVat: recommendedCostWithVat,
-        details: { lines: calculationLines }
+        details: {
+          lines: calculationLines,
+          values: {
+            directExpenses,
+            fotEnterprise,
+            marketing: marketingTerm,
+            planProfit: planProfitTerm,
+            bonusPercent: taxSettings.projectBonusPercent,
+            vatPercent: taxSettings.vat
+          }
+        }
       });
       setCalculatedCost(recommendedCostWithVat);
     } catch (error) {
