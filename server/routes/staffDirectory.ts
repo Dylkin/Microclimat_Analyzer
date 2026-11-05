@@ -96,22 +96,11 @@ const mapPosition = (row: any) => ({
   salaryEffectiveFrom: formatPgDate(row.salary_effective_from),
   isDefault: row.is_default,
   archived: row.archived === true,
-  /** Количество сотрудников (users) с этой должностью */
-  employeeCount: 0,
+  /** Количество сотрудников по должности — задаётся вручную на странице «Структура предприятия» */
+  employeeCount: Number(row.employee_count ?? 1),
   createdAt: row.created_at,
   updatedAt: row.updated_at
 });
-
-// Количество сотрудников по каждой должности (справочник пользователей, users.staff_position_id)
-const getEmployeeCountByPosition = async (): Promise<Map<string, number>> => {
-  const result = await pool.query(
-    `SELECT staff_position_id AS position_id, COUNT(*)::int AS count
-     FROM users
-     WHERE staff_position_id IS NOT NULL
-     GROUP BY staff_position_id`
-  );
-  return new Map(result.rows.map((row) => [row.position_id as string, Number(row.count)]));
-};
 
 const mapDepartment = (row: any, positions: any[]) => ({
   id: row.id,
@@ -123,31 +112,19 @@ const mapDepartment = (row: any, positions: any[]) => ({
 });
 
 const getPayrollTotals = async () => {
-  // ФОТ = Σ оклад × кол-во сотрудников с должностью (users.staff_position_id).
+  // ФОТ = Σ оклад × кол-во сотрудников по должности (employee_count, задаётся вручную).
   // Архивные должности в расчёте не участвуют.
   const totalResult = await pool.query(`
-    SELECT COALESCE(SUM(sp.salary * COALESCE(cnt.count, 0)), 0) AS total
-    FROM staff_positions sp
-    LEFT JOIN (
-      SELECT staff_position_id, COUNT(*) AS count
-      FROM users
-      WHERE staff_position_id IS NOT NULL
-      GROUP BY staff_position_id
-    ) cnt ON cnt.staff_position_id = sp.id
-    WHERE sp.archived IS NOT TRUE
+    SELECT COALESCE(SUM(salary * employee_count), 0) AS total
+    FROM staff_positions
+    WHERE archived IS NOT TRUE
   `);
 
   const byDepartmentResult = await pool.query(`
     SELECT d.id AS department_id, d.name AS department_name,
-           COALESCE(SUM(sp.salary * COALESCE(cnt.count, 0)), 0) AS total
+           COALESCE(SUM(sp.salary * sp.employee_count), 0) AS total
     FROM staff_departments d
     LEFT JOIN staff_positions sp ON sp.department_id = d.id AND sp.archived IS NOT TRUE
-    LEFT JOIN (
-      SELECT staff_position_id, COUNT(*) AS count
-      FROM users
-      WHERE staff_position_id IS NOT NULL
-      GROUP BY staff_position_id
-    ) cnt ON cnt.staff_position_id = sp.id
     GROUP BY d.id, d.name
     ORDER BY d.name ASC
   `);
@@ -168,14 +145,12 @@ router.get('/', async (_req, res) => {
       'SELECT id, name, is_default, created_at, updated_at FROM staff_departments ORDER BY name ASC'
     );
     const positionsResult = await pool.query(
-      'SELECT id, department_id, name, salary, salary_effective_from, is_default, archived, created_at, updated_at FROM staff_positions ORDER BY name ASC'
+      'SELECT id, department_id, name, salary, salary_effective_from, is_default, archived, employee_count, created_at, updated_at FROM staff_positions ORDER BY name ASC'
     );
 
-    const employeeCounts = await getEmployeeCountByPosition();
     const positionsByDepartment = new Map<string, any[]>();
     for (const positionRow of positionsResult.rows) {
       const mapped = mapPosition(positionRow);
-      mapped.employeeCount = employeeCounts.get(mapped.id) ?? 0;
       const bucket = positionsByDepartment.get(mapped.departmentId) || [];
       bucket.push(mapped);
       positionsByDepartment.set(mapped.departmentId, bucket);
@@ -229,7 +204,7 @@ router.put('/departments/:id', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Отдел не найден' });
 
     const positionsResult = await pool.query(
-      'SELECT id, department_id, name, salary, salary_effective_from, is_default, archived, created_at, updated_at FROM staff_positions WHERE department_id = $1 ORDER BY name ASC',
+      'SELECT id, department_id, name, salary, salary_effective_from, is_default, archived, employee_count, created_at, updated_at FROM staff_positions WHERE department_id = $1 ORDER BY name ASC',
       [id]
     );
     const positions = positionsResult.rows.map(mapPosition);
@@ -260,9 +235,13 @@ router.post('/departments/:id/positions', async (req, res) => {
   const { id: departmentId } = req.params;
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   const salary = Number(req.body?.salary);
+  const employeeCount = Number(req.body?.employeeCount ?? 1);
 
   if (!name) return res.status(400).json({ error: 'Название должности обязательно' });
   if (!Number.isFinite(salary) || salary < 0) return res.status(400).json({ error: 'Оклад должен быть неотрицательным числом' });
+  if (!Number.isFinite(employeeCount) || employeeCount < 0 || !Number.isInteger(employeeCount)) {
+    return res.status(400).json({ error: 'Количество сотрудников должно быть целым неотрицательным числом' });
+  }
 
   let effectiveFrom = parseSalaryEffectiveFrom(req.body?.salaryEffectiveFrom);
   if (effectiveFrom == null) effectiveFrom = firstDayOfNextMonthDateString();
@@ -275,10 +254,10 @@ router.post('/departments/:id/positions', async (req, res) => {
   try {
     await client.query('BEGIN');
     const result = await client.query(
-      `INSERT INTO staff_positions (department_id, name, salary, salary_effective_from, is_default)
-       VALUES ($1, $2, $3, $4::date, FALSE)
-       RETURNING id, department_id, name, salary, salary_effective_from, is_default, archived, created_at, updated_at`,
-      [departmentId, name, salary, effectiveFrom]
+      `INSERT INTO staff_positions (department_id, name, salary, salary_effective_from, is_default, employee_count)
+       VALUES ($1, $2, $3, $4::date, FALSE, $5)
+       RETURNING id, department_id, name, salary, salary_effective_from, is_default, archived, employee_count, created_at, updated_at`,
+      [departmentId, name, salary, effectiveFrom, employeeCount]
     );
     const row = result.rows[0];
     await insertSalaryHistoryRow(client, row.id, null, Number(row.salary), actor);
@@ -300,6 +279,10 @@ router.put('/positions/:id', async (req, res) => {
   const salary = Number(req.body?.salary);
   if (!name) return res.status(400).json({ error: 'Название должности обязательно' });
   if (!Number.isFinite(salary) || salary < 0) return res.status(400).json({ error: 'Оклад должен быть неотрицательным числом' });
+  const employeeCount = Number(req.body?.employeeCount ?? 1);
+  if (!Number.isFinite(employeeCount) || employeeCount < 0 || !Number.isInteger(employeeCount)) {
+    return res.status(400).json({ error: 'Количество сотрудников должно быть целым неотрицательным числом' });
+  }
 
   const effectiveParsed = parseSalaryEffectiveFrom(req.body?.salaryEffectiveFrom);
   if (effectiveParsed == null) {
@@ -319,10 +302,10 @@ router.put('/positions/:id', async (req, res) => {
 
     const result = await client.query(
       `UPDATE staff_positions
-       SET name = $1, salary = $2, salary_effective_from = $3::date, updated_at = NOW()
-       WHERE id = $4
-       RETURNING id, department_id, name, salary, salary_effective_from, is_default, archived, created_at, updated_at`,
-      [name, salary, effectiveParsed, id]
+       SET name = $1, salary = $2, salary_effective_from = $3::date, employee_count = $4, updated_at = NOW()
+       WHERE id = $5
+       RETURNING id, department_id, name, salary, salary_effective_from, is_default, archived, employee_count, created_at, updated_at`,
+      [name, salary, effectiveParsed, employeeCount, id]
     );
 
     if (salariesDiffer(oldSalary, salary)) {
@@ -358,7 +341,7 @@ router.post('/positions/:id/archive', async (req, res) => {
       `UPDATE staff_positions
        SET archived = $1, updated_at = NOW()
        WHERE id = $2
-       RETURNING id, department_id, name, salary, salary_effective_from, is_default, archived, created_at, updated_at`,
+       RETURNING id, department_id, name, salary, salary_effective_from, is_default, archived, employee_count, created_at, updated_at`,
       [archived, id]
     );
     res.json(mapPosition(result.rows[0]));
@@ -449,15 +432,9 @@ router.get('/departments/:id/payroll', async (req, res) => {
     const { id } = req.params;
     const result = await pool.query(
       `SELECT d.id AS department_id, d.name AS department_name,
-              COALESCE(SUM(p.salary * COALESCE(cnt.count, 0)), 0) AS total
+              COALESCE(SUM(p.salary * p.employee_count), 0) AS total
        FROM staff_departments d
        LEFT JOIN staff_positions p ON p.department_id = d.id AND p.archived IS NOT TRUE
-       LEFT JOIN (
-         SELECT staff_position_id, COUNT(*) AS count
-         FROM users
-         WHERE staff_position_id IS NOT NULL
-         GROUP BY staff_position_id
-       ) cnt ON cnt.staff_position_id = p.id
        WHERE d.id = $1
        GROUP BY d.id, d.name`,
       [id]

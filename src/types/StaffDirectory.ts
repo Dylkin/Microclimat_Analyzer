@@ -8,7 +8,7 @@ export interface Position {
   isDefault: boolean;
   /** Архивные должности не участвуют в расчёте ФОТ */
   archived: boolean;
-  /** Количество сотрудников (справочник пользователей) с этой должностью */
+  /** Количество сотрудников по должности — задаётся вручную на странице «Структура предприятия» */
   employeeCount: number;
   createdAt?: string;
   updatedAt?: string;

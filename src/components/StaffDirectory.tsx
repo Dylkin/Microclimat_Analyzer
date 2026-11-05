@@ -44,12 +44,14 @@ interface PositionDraft {
   name: string;
   salary: string;
   effectiveFrom: string;
+  employeeCount: string;
 }
 
 const createEmptyPositionDraft = (): PositionDraft => ({
   name: '',
   salary: '',
-  effectiveFrom: getFirstDayOfNextMonthDateString()
+  effectiveFrom: getFirstDayOfNextMonthDateString(),
+  employeeCount: '1'
 });
 
 const StaffDirectory: React.FC = () => {
@@ -190,6 +192,7 @@ const StaffDirectory: React.FC = () => {
     const name = draft.name.trim();
     const salary = Number(draft.salary);
     const salaryEffectiveFrom = draft.effectiveFrom.trim();
+    const employeeCount = Number(draft.employeeCount);
     if (!name) {
       alert('Введите название должности');
       return;
@@ -198,13 +201,17 @@ const StaffDirectory: React.FC = () => {
       alert('Введите корректный оклад');
       return;
     }
+    if (!Number.isInteger(employeeCount) || employeeCount < 0) {
+      alert('Введите корректное количество сотрудников (целое неотрицательное число)');
+      return;
+    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(salaryEffectiveFrom)) {
       alert('Укажите дату «Действует с»');
       return;
     }
     setOperationLoading(true);
     try {
-      await staffDirectoryService.addPosition(departmentId, { name, salary, salaryEffectiveFrom });
+      await staffDirectoryService.addPosition(departmentId, { name, salary, salaryEffectiveFrom, employeeCount });
       setPositionDraftByDepartment((prev) => ({ ...prev, [departmentId]: createEmptyPositionDraft() }));
       await loadDirectory();
     } catch (error) {
@@ -219,12 +226,14 @@ const StaffDirectory: React.FC = () => {
     name: string;
     salary: number;
     salaryEffectiveFrom: string;
+    employeeCount: number;
   }) => {
     setEditingPositionId(position.id);
     setEditingPositionDraft({
       name: position.name,
       salary: String(position.salary),
-      effectiveFrom: position.salaryEffectiveFrom || getFirstDayOfNextMonthDateString()
+      effectiveFrom: position.salaryEffectiveFrom || getFirstDayOfNextMonthDateString(),
+      employeeCount: String(position.employeeCount ?? 1)
     });
   };
 
@@ -232,6 +241,7 @@ const StaffDirectory: React.FC = () => {
     const name = editingPositionDraft.name.trim();
     const salary = Number(editingPositionDraft.salary);
     const salaryEffectiveFrom = editingPositionDraft.effectiveFrom.trim();
+    const employeeCount = Number(editingPositionDraft.employeeCount);
     if (!name) {
       alert('Введите название должности');
       return;
@@ -240,13 +250,17 @@ const StaffDirectory: React.FC = () => {
       alert('Введите корректный оклад');
       return;
     }
+    if (!Number.isInteger(employeeCount) || employeeCount < 0) {
+      alert('Введите корректное количество сотрудников (целое неотрицательное число)');
+      return;
+    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(salaryEffectiveFrom)) {
       alert('Укажите дату «Действует с»');
       return;
     }
     setOperationLoading(true);
     try {
-      await staffDirectoryService.updatePosition(positionId, { name, salary, salaryEffectiveFrom });
+      await staffDirectoryService.updatePosition(positionId, { name, salary, salaryEffectiveFrom, employeeCount });
       setEditingPositionId(null);
       setEditingPositionDraft(createEmptyPositionDraft());
       await loadDirectory();
@@ -353,10 +367,9 @@ const StaffDirectory: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Фонд оплаты труда (ФОТ)</h2>
         <p className="text-sm text-gray-600 mb-3">
-          ФОТ отдела = Σ (оклад должности × кол-во сотрудников с этой должностью) × коэффициент нагрузки. Количество
-          сотрудников берётся из справочника пользователей (страница «Пользователи»). Коэффициент нагрузки: оклад × (1 +
-          подоходный + белгосстрах + ФСЗН работодателя + % на отпускные) / 100, ставки — со страницы «Переменные»
-          (текущий коэффициент{' '}
+          ФОТ отдела = Σ (оклад должности × кол-во сотрудников по должности) × коэффициент нагрузки. Количество
+          сотрудников задаётся вручную при добавлении/редактировании должности. Коэффициент нагрузки: оклад × (1 +
+          подоходный + белгосстрах + ФСЗН работодателя) / 100, ставки — со страницы «Переменные» (текущий коэффициент{' '}
           {new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 4 }).format(payrollMultiplier)}). НДС и рентабельность в
           расчёт ФОТ не входят. Архивные должности не участвуют.
         </p>
@@ -468,8 +481,20 @@ const StaffDirectory: React.FC = () => {
                         formatRub(position.salary)
                       )}
                     </td>
-                    <td className="px-4 py-2 text-center text-gray-800" title="Количество сотрудников с этой должностью (страница «Пользователи»)">
-                      {position.employeeCount ?? 0}
+                    <td className="px-4 py-2 text-center text-gray-800" title="Количество сотрудников по должности (задаётся вручную)">
+                      {editingPositionId === position.id ? (
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={editingPositionDraft.employeeCount}
+                          onChange={(e) => setEditingPositionDraft((prev) => ({ ...prev, employeeCount: e.target.value }))}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
+                          aria-label="Количество сотрудников"
+                        />
+                      ) : (
+                        position.employeeCount ?? 0
+                      )}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       {editingPositionId === position.id ? (
@@ -547,7 +572,7 @@ const StaffDirectory: React.FC = () => {
             </table>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <input
               type="text"
               value={(positionDraftByDepartment[department.id] ?? createEmptyPositionDraft()).name}
@@ -573,6 +598,22 @@ const StaffDirectory: React.FC = () => {
               }
               className="px-3 py-2 border border-gray-300 rounded-lg"
               placeholder="Оклад"
+            />
+            <input
+              type="number"
+              min="0"
+              step="1"
+              title="Количество сотрудников по должности"
+              aria-label="Количество сотрудников"
+              value={(positionDraftByDepartment[department.id] ?? createEmptyPositionDraft()).employeeCount}
+              onChange={(e) =>
+                setPositionDraftByDepartment((prev) => ({
+                  ...prev,
+                  [department.id]: { ...(prev[department.id] ?? createEmptyPositionDraft()), employeeCount: e.target.value }
+                }))
+              }
+              className="px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="Сотрудников"
             />
             <input
               type="date"

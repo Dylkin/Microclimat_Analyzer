@@ -264,6 +264,8 @@ const main = async () => {
         if (file === '20261104103000_add_project_transport_expenses.sql') return true;
         // История расчётов стоимости квалификации
         if (file === '20261104110000_add_cost_calculations.sql') return true;
+        // Количество сотрудников по должности (задаётся вручную)
+        if (file === '20261105120000_staff_position_employee_count.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:

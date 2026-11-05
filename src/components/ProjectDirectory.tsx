@@ -122,9 +122,9 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     qualificationObjectIds: []
   });
 
-  // Данные для расчёта рекомендуемой стоимости: ФОТ отделов (со страницы «Структура предприятия») и переменные
-  const [departments, setDepartments] = useState<Department[]>([]);
+  // Переменные для расчёта рекомендуемой стоимости (со страницы «Переменные») и ФОТ отделов («Структура предприятия»)
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(() => loadTaxSettingsFromLocalStorage());
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   useEffect(() => {
     staffDirectoryService
@@ -158,7 +158,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const fotValidation = fotOf('Отдел валидации');
   const fotAdministration = fotOf('Администрация');
   const fotSales = fotOf('Отдел продаж');
-  // Среднее кол-во рабочих дней в месяце — для перевода месячного ФОТ в дневную ставку
+  // Среднее кол-во рабочих дней в месяце — для перевода месячного ФОТ и месячных расходов в дневную ставку
   const AVERAGE_WORKING_DAYS_PER_MONTH = 20.6;
 
   const fmtCalc = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
@@ -168,8 +168,10 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const loggerCostTerm = (newProject.loggersCount ?? 0) * taxSettings.loggerDayCost * testingCalendarDays;
   const protocolPrintTerm = (newProject.protocolPrintCopies ?? 0) * taxSettings.protocolPrintCost;
   const reportPrintTerm = (newProject.reportPrintCopies ?? 0) * taxSettings.reportPrintCost;
-  // Трудоёмкость подготовки документов: 1 протокол = 2 дня, 1 отчёт = 3 дня
-  const fotDays = (newProject.protocolPrintCopies ?? 0) * 2 + (newProject.reportPrintCopies ?? 0) * 3;
+  // Трудоёмкость подготовки документов: дни на разработку проекта (протокола) и отчёта — из «Переменных»
+  const fotDays =
+    (newProject.protocolPrintCopies ?? 0) * taxSettings.projectDevelopmentDays +
+    (newProject.reportPrintCopies ?? 0) * taxSettings.reportDevelopmentDays;
   // Обеспечение ФОТ Отдела валидации: ФОТ / 20,6 × кол-во дней подготовки протоколов и отчётов
   const fotValidationTerm = (fotValidation / AVERAGE_WORKING_DAYS_PER_MONTH) * fotDays;
   // Обеспечение % ФОТ Администрации и Отдела продаж: ФОТ / 20,6 × % отдела Валидации в доходах × кол-во дней подготовки
@@ -187,11 +189,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     (newProject.transportExpenses ?? 0);
   // Обеспечение ФОТ предприятия: валидация + администрация + продажи
   const fotEnterprise = fotValidationTerm + fotAdministrationTerm + fotSalesTerm;
-  const profitBase = directExpenses + fotEnterprise + marketingTerm;
+  // Плановая прибыль считается только от обеспечения ФОТ и маркетинга (без прямых расходов)
+  const profitBase = fotEnterprise + marketingTerm;
   const planProfitTerm = profitBase * (taxSettings.profitability / 100);
   // Премия = % от плановой прибыли
   const bonusTerm = planProfitTerm * (taxSettings.projectBonusPercent / 100);
-  const sumWithoutVat = profitBase + planProfitTerm + bonusTerm;
+  const sumWithoutVat = directExpenses + profitBase + planProfitTerm + bonusTerm;
   const vatTerm = sumWithoutVat * (taxSettings.vat / 100);
   const recommendedCostWithVat = sumWithoutVat + vatTerm;
   const hasRecommendedCostInputs =
@@ -239,7 +242,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     },
     {
       label: 'Плановая прибыль',
-      value: `(${fmtCalc(directExpenses)} + ${fmtCalc(fotEnterprise)} + ${fmtCalc(marketingTerm)}) × ${fmtCalc(taxSettings.profitability)} / 100 = ${fmtCalc(planProfitTerm)}`
+      value: `(${fmtCalc(fotEnterprise)} + ${fmtCalc(marketingTerm)}) × ${fmtCalc(taxSettings.profitability)} / 100 = ${fmtCalc(planProfitTerm)}`
     },
     {
       label: 'Премия % от прибыли',

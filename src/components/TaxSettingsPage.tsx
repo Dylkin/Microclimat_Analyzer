@@ -29,7 +29,6 @@ export const TaxSettingsPage: React.FC = () => {
         belgosstrakh: typeof parsed.belgosstrakh === 'number' ? parsed.belgosstrakh : DEFAULT_TAX_SETTINGS.belgosstrakh,
         fsznEmployer: typeof parsed.fsznEmployer === 'number' ? parsed.fsznEmployer : DEFAULT_TAX_SETTINGS.fsznEmployer,
         fsznEmployee: typeof parsed.fsznEmployee === 'number' ? parsed.fsznEmployee : DEFAULT_TAX_SETTINGS.fsznEmployee,
-        vacationPay: typeof parsed.vacationPay === 'number' ? parsed.vacationPay : DEFAULT_TAX_SETTINGS.vacationPay,
         vat: typeof parsed.vat === 'number' ? parsed.vat : DEFAULT_TAX_SETTINGS.vat,
         profitability: typeof parsed.profitability === 'number' ? parsed.profitability : DEFAULT_TAX_SETTINGS.profitability,
         loggerDayCost: typeof parsed.loggerDayCost === 'number' ? parsed.loggerDayCost : DEFAULT_TAX_SETTINGS.loggerDayCost,
@@ -38,7 +37,9 @@ export const TaxSettingsPage: React.FC = () => {
         monthlyOverheadCosts: typeof parsed.monthlyOverheadCosts === 'number' ? parsed.monthlyOverheadCosts : DEFAULT_TAX_SETTINGS.monthlyOverheadCosts,
         monthlyMarketingCosts: typeof parsed.monthlyMarketingCosts === 'number' ? parsed.monthlyMarketingCosts : DEFAULT_TAX_SETTINGS.monthlyMarketingCosts,
         projectBonusPercent: typeof parsed.projectBonusPercent === 'number' ? parsed.projectBonusPercent : DEFAULT_TAX_SETTINGS.projectBonusPercent,
-        validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare
+        validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare,
+        projectDevelopmentDays: typeof parsed.projectDevelopmentDays === 'number' ? parsed.projectDevelopmentDays : DEFAULT_TAX_SETTINGS.projectDevelopmentDays,
+        reportDevelopmentDays: typeof parsed.reportDevelopmentDays === 'number' ? parsed.reportDevelopmentDays : DEFAULT_TAX_SETTINGS.reportDevelopmentDays
       });
     } catch (loadError) {
       console.error('Ошибка загрузки налоговых настроек:', loadError);
@@ -178,19 +179,6 @@ export const TaxSettingsPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">% на отпускные</label>
-            <input
-              type="number"
-              step="0.01"
-              value={settings.vacationPay}
-              onChange={(e) => handleNumberChange('vacationPay', e.target.value)}
-              title="Процент на отпускные"
-              placeholder="9.25"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-            />
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Рентабельность, %</label>
             <input
               type="number"
@@ -241,6 +229,34 @@ export const TaxSettingsPage: React.FC = () => {
               onChange={(e) => handleNumberChange('reportPrintCost', e.target.value)}
               title="Средняя стоимость печати отчёта, руб. без НДС"
               placeholder="70"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Кол-во дней на разработку проекта (протокола)</label>
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              value={settings.projectDevelopmentDays}
+              onChange={(e) => handleNumberChange('projectDevelopmentDays', e.target.value)}
+              title="Количество дней на разработку одного проекта (протокола) — для расчёта трудоёмкости"
+              placeholder="2"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Кол-во дней на разработку отчёта</label>
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              value={settings.reportDevelopmentDays}
+              onChange={(e) => handleNumberChange('reportDevelopmentDays', e.target.value)}
+              title="Количество дней на разработку одного отчёта — для расчёта трудоёмкости"
+              placeholder="3"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             />
           </div>
@@ -329,8 +345,8 @@ export const TaxSettingsPage: React.FC = () => {
             (% отдела Валидации в общих доходах / 100) × кол-во дней подготовки протоколов и отчётов
           </div>
           <div>
-            <span className="font-semibold">Плановая прибыль</span> = (Прямые расходы + Обеспечение ФОТ предприятия +
-            Обеспечение % маркетинга) × Рентабельность / 100
+            <span className="font-semibold">Плановая прибыль</span> = (Обеспечение ФОТ предприятия + Обеспечение %
+            маркетинга) × Рентабельность / 100
           </div>
           <div>
             <span className="font-semibold">Премия</span> = Плановая прибыль × Премия % от прибыли / 100
@@ -344,12 +360,13 @@ export const TaxSettingsPage: React.FC = () => {
           </div>
         </div>
         <p className="text-sm text-gray-600 mt-2">
-          ФОТ отделов берётся со страницы «Структура предприятия» (Σ оклад должности × количество сотрудников с этой
-          должностью, с коэффициентом нагрузки; сотрудники — из справочника пользователей).
-          Деление на 20,6 — среднее количество рабочих дней в месяце (месячный ФОТ и месячные расходы переводятся в дневную ставку).
-          Кол-во дней подготовки протоколов и отчётов считается по документам: один протокол = 2 дня, один отчёт = 3 дня.
-          Ставки (рентабельность, премия % от прибыли, НДС и др.) — со страницы «Переменные».
-          Если отдел с нужным названием не найден, его ФОТ в расчёте принимается равным нулю.
+          ФОТ отделов берётся со страницы «Структура предприятия» (Σ оклад должности × количество сотрудников по
+          должности, задаётся вручную, с коэффициентом нагрузки).
+          Кол-во дней подготовки протоколов и отчётов = кол-во экземпляров протоколов × «Кол-во дней на разработку
+          проекта (протокола)» + кол-во экземпляров отчётов × «Кол-во дней на разработку отчёта» (значения — со страницы
+          «Переменные»). Деление на 20,6 — среднее количество рабочих дней в месяце (месячный ФОТ и месячные расходы
+          переводятся в дневную ставку). Ставки (рентабельность, премия % от прибыли, НДС и др.) — со страницы
+          «Переменные». Если отдел с нужным названием не найден, его ФОТ в расчёте принимается равным нулю.
         </p>
       </div>
     </div>

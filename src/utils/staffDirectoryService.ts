@@ -19,12 +19,14 @@ interface CreatePositionPayload {
   name: string;
   salary: number;
   salaryEffectiveFrom: string;
+  employeeCount: number;
 }
 
 interface UpdatePositionPayload {
   name: string;
   salary: number;
   salaryEffectiveFrom: string;
+  employeeCount: number;
 }
 
 class StaffDirectoryService {

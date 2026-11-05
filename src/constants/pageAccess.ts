@@ -1,5 +1,6 @@
 // Матрица доступа к страницам приложения по ролям пользователя.
-// Роли: Специалист (specialist), Менеджер (manager), Руководитель (director), Администратор (admin/administrator).
+// Роли: Администратор (admin/administrator), Менеджер (manager), Специалист (specialist).
+// Роль «Руководитель» (director) удалена из проекта.
 
 export type PageKey =
   | 'users'                 // Пользователи
@@ -29,32 +30,39 @@ export type PageKey =
   | 'data_analysis'
   | 'logger_plan_editor';
 
-type AccessRole = 'specialist' | 'manager' | 'director';
+type AccessRole = 'specialist' | 'manager';
 
-const ALL_ROLES: AccessRole[] = ['specialist', 'manager', 'director'];
+const ALL_ROLES: AccessRole[] = ['specialist', 'manager'];
 
 const PAGE_ROLES: Record<PageKey, AccessRole[]> = {
-  // Специалист: Контрагенты, Проекты, Оборудование, Объекты квалификации, Справка
-  // Менеджер: Контрагенты, Проекты, Товары, Объекты квалификации, Справка
-  // Руководитель: Пользователи, Структура предприятия, Контрагенты, Проекты, Оборудование,
-  //               Товары, Объекты квалификации, Справка, Сервис
-  users: ['director'],
-  'staff-directory': ['director'],
+  // Матрица доступа:
+  //                        Администратор  Менеджер    Специалист
+  // Пользователи           +              —           —
+  // Структура предприятия  +              —           —
+  // Контрагенты            +              +           +
+  // Проекты                +              +           +
+  // Оборудование           +              —           +
+  // Товары                 +              +           —
+  // Объекты квалификации   +              +           +
+  // Справка                +              +           +
+  // Сервис (все страницы)  +              —           —
+  users: [],                    // только администратор
+  'staff-directory': [],        // только администратор
   contractors: ALL_ROLES,
   projects: ALL_ROLES,
-  equipment: ['director', 'specialist'],
-  products: ['director', 'manager'],
+  equipment: ['specialist'],
+  products: ['manager'],
   'qualification-objects': ALL_ROLES,
   help: ALL_ROLES,
-  service: ['director'],
-  analyzer: ['director'],
-  audit_logs: [], // только администратор
-  'cost-calculations': ['director'],
-  'mail-settings': ['director'],
-  'tax-settings': ['director'],
-  finance: ['director'],
-  release: ['director'],
-  'tender-search': ['director'],
+  service: [],                  // только администратор
+  analyzer: [],
+  audit_logs: [],               // только администратор
+  'cost-calculations': [],
+  'mail-settings': [],
+  'tax-settings': [],
+  finance: [],
+  release: [],
+  'tender-search': [],
   contract_negotiation: ALL_ROLES,
   testing_execution: ALL_ROLES,
   creating_report: ALL_ROLES,
@@ -66,6 +74,7 @@ const PAGE_ROLES: Record<PageKey, AccessRole[]> = {
 
 // Проверяет доступ роли к странице.
 // Страницы вне матрицы (например, 'profile') не ограничиваются.
+// Устаревшая роль 'director' доступа не имеет (роль удалена из проекта).
 export const canAccessPage = (role: string | null | undefined, page: string): boolean => {
   const normalized = (role || '').toLowerCase();
   if (normalized === 'admin' || normalized === 'administrator') return true;

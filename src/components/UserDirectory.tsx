@@ -336,7 +336,6 @@ const UserDirectory: React.FC = () => {
               >
                 <option value="specialist">Специалист</option>
                 <option value="manager">Менеджер</option>
-                <option value="director">Руководитель</option>
                 <option value="admin">Администратор</option>
               </select>
             </div>
@@ -495,7 +494,6 @@ const UserDirectory: React.FC = () => {
                       >
                         <option value="specialist">Специалист</option>
                         <option value="manager">Менеджер</option>
-                        <option value="director">Руководитель</option>
                         <option value="admin">Администратор</option>
                       </select>
                     ) : (
