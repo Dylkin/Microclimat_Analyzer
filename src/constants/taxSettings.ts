@@ -12,10 +12,6 @@ export interface TaxSettings {
   monthlyMarketingCosts: number;
   projectBonusPercent: number;
   validationRevenueShare: number;
-  /** Кол-во дней на разработку проекта (протокола) — для расчёта трудоёмкости */
-  projectDevelopmentDays: number;
-  /** Кол-во дней на разработку отчёта — для расчёта трудоёмкости */
-  reportDevelopmentDays: number;
 }
 
 export const TAX_SETTINGS_STORAGE_KEY = 'microclimat:tax-settings';
@@ -36,9 +32,7 @@ export const DEFAULT_TAX_SETTINGS: TaxSettings = {
   monthlyOverheadCosts: 1000,
   monthlyMarketingCosts: 800,
   projectBonusPercent: 10,
-  validationRevenueShare: 45,
-  projectDevelopmentDays: 2,
-  reportDevelopmentDays: 3
+  validationRevenueShare: 45
 };
 
 export function loadTaxSettingsFromLocalStorage(): TaxSettings {
@@ -59,9 +53,7 @@ export function loadTaxSettingsFromLocalStorage(): TaxSettings {
       monthlyOverheadCosts: typeof parsed.monthlyOverheadCosts === 'number' ? parsed.monthlyOverheadCosts : DEFAULT_TAX_SETTINGS.monthlyOverheadCosts,
       monthlyMarketingCosts: typeof parsed.monthlyMarketingCosts === 'number' ? parsed.monthlyMarketingCosts : DEFAULT_TAX_SETTINGS.monthlyMarketingCosts,
       projectBonusPercent: typeof parsed.projectBonusPercent === 'number' ? parsed.projectBonusPercent : DEFAULT_TAX_SETTINGS.projectBonusPercent,
-      validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare,
-      projectDevelopmentDays: typeof parsed.projectDevelopmentDays === 'number' ? parsed.projectDevelopmentDays : DEFAULT_TAX_SETTINGS.projectDevelopmentDays,
-      reportDevelopmentDays: typeof parsed.reportDevelopmentDays === 'number' ? parsed.reportDevelopmentDays : DEFAULT_TAX_SETTINGS.reportDevelopmentDays
+      validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare
     };
   } catch {
     return { ...DEFAULT_TAX_SETTINGS };

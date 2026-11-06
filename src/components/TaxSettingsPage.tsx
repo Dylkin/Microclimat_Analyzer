@@ -37,9 +37,7 @@ export const TaxSettingsPage: React.FC = () => {
         monthlyOverheadCosts: typeof parsed.monthlyOverheadCosts === 'number' ? parsed.monthlyOverheadCosts : DEFAULT_TAX_SETTINGS.monthlyOverheadCosts,
         monthlyMarketingCosts: typeof parsed.monthlyMarketingCosts === 'number' ? parsed.monthlyMarketingCosts : DEFAULT_TAX_SETTINGS.monthlyMarketingCosts,
         projectBonusPercent: typeof parsed.projectBonusPercent === 'number' ? parsed.projectBonusPercent : DEFAULT_TAX_SETTINGS.projectBonusPercent,
-        validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare,
-        projectDevelopmentDays: typeof parsed.projectDevelopmentDays === 'number' ? parsed.projectDevelopmentDays : DEFAULT_TAX_SETTINGS.projectDevelopmentDays,
-        reportDevelopmentDays: typeof parsed.reportDevelopmentDays === 'number' ? parsed.reportDevelopmentDays : DEFAULT_TAX_SETTINGS.reportDevelopmentDays
+        validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare
       });
     } catch (loadError) {
       console.error('Ошибка загрузки налоговых настроек:', loadError);
@@ -234,34 +232,6 @@ export const TaxSettingsPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Кол-во дней на разработку проекта (протокола)</label>
-            <input
-              type="number"
-              step="0.5"
-              min="0"
-              value={settings.projectDevelopmentDays}
-              onChange={(e) => handleNumberChange('projectDevelopmentDays', e.target.value)}
-              title="Количество дней на разработку одного проекта (протокола) — для расчёта трудоёмкости"
-              placeholder="2"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Кол-во дней на разработку отчёта</label>
-            <input
-              type="number"
-              step="0.5"
-              min="0"
-              value={settings.reportDevelopmentDays}
-              onChange={(e) => handleNumberChange('reportDevelopmentDays', e.target.value)}
-              title="Количество дней на разработку одного отчёта — для расчёта трудоёмкости"
-              placeholder="3"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-            />
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Накладные расходы без НДС (мес.)</label>
             <input
               type="number"
@@ -363,10 +333,10 @@ export const TaxSettingsPage: React.FC = () => {
           ФОТ отделов берётся со страницы «Структура предприятия» (Σ оклад должности × количество сотрудников по
           должности, задаётся вручную, с коэффициентом нагрузки).
           Кол-во дней подготовки протоколов и отчётов = кол-во экземпляров протоколов × «Кол-во дней на разработку
-          проекта (протокола)» + кол-во экземпляров отчётов × «Кол-во дней на разработку отчёта» (значения — со страницы
-          «Переменные»). Деление на 20,6 — среднее количество рабочих дней в месяце (месячный ФОТ и месячные расходы
-          переводятся в дневную ставку). Ставки (рентабельность, премия % от прибыли, НДС и др.) — со страницы
-          «Переменные». Если отдел с нужным названием не найден, его ФОТ в расчёте принимается равным нулю.
+          протокола» + кол-во экземпляров отчётов × «Кол-во дней на разработку отчёта» (значения задаются на странице
+          «Проекты» при добавлении проекта). Деление на 20,6 — среднее количество рабочих дней в месяце (месячный ФОТ и
+          месячные расходы переводятся в дневную ставку). Ставки (рентабельность, премия % от прибыли, НДС и др.) — со
+          страницы «Переменные». Если отдел с нужным названием не найден, его ФОТ в расчёте принимается равным нулю.
         </p>
       </div>
     </div>
