@@ -36,10 +36,8 @@ type ProjectDto = {
   travelExpenses?: number | string | null;
   transport_expenses?: number | string | null;
   transportExpenses?: number | string | null;
-  protocol_development_days?: number | string | null;
-  protocolDevelopmentDays?: number | string | null;
-  report_development_days?: number | string | null;
-  reportDevelopmentDays?: number | string | null;
+  documentation_preparation_days?: number | string | null;
+  documentationPreparationDays?: number | string | null;
   protocol_preparation_start_date?: string | null;
   protocolPreparationStartDate?: string | null;
   protocol_preparation_end_date?: string | null;
@@ -259,17 +257,11 @@ const mapProject = (dto: ProjectDto): Project => {
         : dto.transport_expenses !== undefined && dto.transport_expenses !== null
         ? Number(dto.transport_expenses)
         : undefined,
-    protocolDevelopmentDays:
-      dto.protocolDevelopmentDays !== undefined && dto.protocolDevelopmentDays !== null
-        ? Number(dto.protocolDevelopmentDays)
-        : dto.protocol_development_days !== undefined && dto.protocol_development_days !== null
-        ? Number(dto.protocol_development_days)
-        : undefined,
-    reportDevelopmentDays:
-      dto.reportDevelopmentDays !== undefined && dto.reportDevelopmentDays !== null
-        ? Number(dto.reportDevelopmentDays)
-        : dto.report_development_days !== undefined && dto.report_development_days !== null
-        ? Number(dto.report_development_days)
+    documentationPreparationDays:
+      dto.documentationPreparationDays !== undefined && dto.documentationPreparationDays !== null
+        ? Number(dto.documentationPreparationDays)
+        : dto.documentation_preparation_days !== undefined && dto.documentation_preparation_days !== null
+        ? Number(dto.documentation_preparation_days)
         : undefined,
     protocolPreparationStartDate: toDate(dto.protocolPreparationStartDate || dto.protocol_preparation_start_date),
     protocolPreparationEndDate: toDate(dto.protocolPreparationEndDate || dto.protocol_preparation_end_date),
@@ -321,8 +313,7 @@ class ProjectService {
       reportPrintCopies: project.reportPrintCopies,
       travelExpenses: project.travelExpenses,
       transportExpenses: project.transportExpenses,
-      protocolDevelopmentDays: project.protocolDevelopmentDays,
-      reportDevelopmentDays: project.reportDevelopmentDays,
+      documentationPreparationDays: project.documentationPreparationDays,
       protocolPreparationStartDate: project.protocolPreparationStartDate,
       protocolPreparationEndDate: project.protocolPreparationEndDate,
       testingStartDate: project.testingStartDate,
@@ -373,11 +364,8 @@ class ProjectService {
     if (updates.transportExpenses !== undefined) {
       payload.transportExpenses = updates.transportExpenses;
     }
-    if (updates.protocolDevelopmentDays !== undefined) {
-      payload.protocolDevelopmentDays = updates.protocolDevelopmentDays;
-    }
-    if (updates.reportDevelopmentDays !== undefined) {
-      payload.reportDevelopmentDays = updates.reportDevelopmentDays;
+    if (updates.documentationPreparationDays !== undefined) {
+      payload.documentationPreparationDays = updates.documentationPreparationDays;
     }
     if (updates.protocolPreparationStartDate !== undefined) {
       payload.protocolPreparationStartDate = updates.protocolPreparationStartDate

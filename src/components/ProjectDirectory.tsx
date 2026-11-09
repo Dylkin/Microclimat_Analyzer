@@ -85,8 +85,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     reportPrintCopies?: number;
     travelExpenses?: number;
     transportExpenses?: number;
-    protocolDevelopmentDays?: number;
-    reportDevelopmentDays?: number;
+    documentationPreparationDays?: number;
     protocolPreparationStartDate?: string;
     protocolPreparationEndDate?: string;
     testingStartDate?: string;
@@ -105,8 +104,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     reportPrintCopies: undefined,
     travelExpenses: undefined,
     transportExpenses: undefined,
-    protocolDevelopmentDays: undefined,
-    reportDevelopmentDays: undefined,
+    documentationPreparationDays: undefined,
     protocolPreparationStartDate: '',
     protocolPreparationEndDate: '',
     testingStartDate: '',
@@ -172,10 +170,8 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const loggerCostTerm = (newProject.loggersCount ?? 0) * taxSettings.loggerDayCost * testingCalendarDays;
   const protocolPrintTerm = (newProject.protocolPrintCopies ?? 0) * taxSettings.protocolPrintCost;
   const reportPrintTerm = (newProject.reportPrintCopies ?? 0) * taxSettings.reportPrintCost;
-  // Трудоёмкость подготовки документов: дни на разработку протокола и отчёта — поля проекта (по умолчанию 2 и 3)
-  const fotDays =
-    (newProject.protocolPrintCopies ?? 0) * (newProject.protocolDevelopmentDays ?? 2) +
-    (newProject.reportPrintCopies ?? 0) * (newProject.reportDevelopmentDays ?? 3);
+  // Трудоёмкость подготовки документации: «Кол-во дней на подготовку документации» — поле проекта (по умолчанию 5)
+  const fotDays = newProject.documentationPreparationDays ?? 5;
   // Обеспечение ФОТ Отдела валидации: ФОТ / 20,6 × кол-во дней подготовки протоколов и отчётов
   const fotValidationTerm = (fotValidation / AVERAGE_WORKING_DAYS_PER_MONTH) * fotDays;
   // Обеспечение % ФОТ Администрации и Отдела продаж: ФОТ / 20,6 × % отдела Валидации в доходах × кол-во дней подготовки
@@ -534,8 +530,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         reportPrintCopies: newProject.reportPrintCopies,
         travelExpenses: newProject.travelExpenses,
         transportExpenses: newProject.transportExpenses,
-        protocolDevelopmentDays: newProject.protocolDevelopmentDays,
-        reportDevelopmentDays: newProject.reportDevelopmentDays,
+        documentationPreparationDays: newProject.documentationPreparationDays,
         protocolPreparationStartDate: newProject.protocolPreparationStartDate ? new Date(newProject.protocolPreparationStartDate) : undefined,
         protocolPreparationEndDate: newProject.protocolPreparationEndDate ? new Date(newProject.protocolPreparationEndDate) : undefined,
         testingStartDate: newProject.testingStartDate ? new Date(newProject.testingStartDate) : undefined,
@@ -581,8 +576,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         reportPrintCopies: undefined,
         travelExpenses: undefined,
     transportExpenses: undefined,
-    protocolDevelopmentDays: undefined,
-    reportDevelopmentDays: undefined,
+    documentationPreparationDays: undefined,
         protocolPreparationStartDate: '',
         protocolPreparationEndDate: '',
         testingStartDate: '',
@@ -754,8 +748,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 reportPrintCopies: undefined,
                 travelExpenses: undefined,
     transportExpenses: undefined,
-    protocolDevelopmentDays: undefined,
-    reportDevelopmentDays: undefined,
+    documentationPreparationDays: undefined,
                 protocolPreparationStartDate: '',
                 protocolPreparationEndDate: '',
                 testingStartDate: '',
@@ -784,8 +777,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 reportPrintCopies: undefined,
                 travelExpenses: undefined,
     transportExpenses: undefined,
-    protocolDevelopmentDays: undefined,
-    reportDevelopmentDays: undefined,
+    documentationPreparationDays: undefined,
                 protocolPreparationStartDate: '',
                 protocolPreparationEndDate: '',
                 testingStartDate: '',
@@ -857,8 +849,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 reportPrintCopies: undefined,
                 travelExpenses: undefined,
     transportExpenses: undefined,
-    protocolDevelopmentDays: undefined,
-    reportDevelopmentDays: undefined,
+    documentationPreparationDays: undefined,
                 protocolPreparationStartDate: '',
                 protocolPreparationEndDate: '',
                 testingStartDate: '',
@@ -887,8 +878,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               reportPrintCopies: undefined,
               travelExpenses: undefined,
     transportExpenses: undefined,
-    protocolDevelopmentDays: undefined,
-    reportDevelopmentDays: undefined,
+    documentationPreparationDays: undefined,
               protocolPreparationStartDate: '',
               protocolPreparationEndDate: '',
               testingStartDate: '',
@@ -1075,42 +1065,22 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Кол-во дней на разработку протокола
+                  Кол-во дней на подготовку документации
                 </label>
                 <input
                   type="number"
                   min="0"
                   step="0.5"
-                  value={newProject.protocolDevelopmentDays ?? ''}
+                  value={newProject.documentationPreparationDays ?? ''}
                   onChange={(e) =>
                     setNewProject((prev) => ({
                       ...prev,
-                      protocolDevelopmentDays: e.target.value === '' ? undefined : Number(e.target.value),
+                      documentationPreparationDays: e.target.value === '' ? undefined : Number(e.target.value),
                     }))
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="2"
-                  title="Количество дней на разработку одного протокола (по умолчанию 2)"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Кол-во дней на разработку отчёта
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={newProject.reportDevelopmentDays ?? ''}
-                  onChange={(e) =>
-                    setNewProject((prev) => ({
-                      ...prev,
-                      reportDevelopmentDays: e.target.value === '' ? undefined : Number(e.target.value),
-                    }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="3"
-                  title="Количество дней на разработку одного отчёта (по умолчанию 3)"
+                  placeholder="5"
+                  title="Общее количество дней на подготовку документации — протоколов и отчёта (по умолчанию 5)"
                 />
               </div>
               <div>

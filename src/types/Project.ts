@@ -26,8 +26,7 @@ export interface Project {
   reportPrintCopies?: number;
   travelExpenses?: number;
   transportExpenses?: number;
-  protocolDevelopmentDays?: number;
-  reportDevelopmentDays?: number;
+  documentationPreparationDays?: number;
   protocolPreparationStartDate?: Date;
   protocolPreparationEndDate?: Date;
   testingStartDate?: Date;
@@ -106,8 +105,7 @@ export interface CreateProjectData {
   reportPrintCopies?: number;
   travelExpenses?: number;
   transportExpenses?: number;
-  protocolDevelopmentDays?: number;
-  reportDevelopmentDays?: number;
+  documentationPreparationDays?: number;
   protocolPreparationStartDate?: Date;
   protocolPreparationEndDate?: Date;
   testingStartDate?: Date;
@@ -138,8 +136,7 @@ export interface UpdateProjectData {
   reportPrintCopies?: number;
   travelExpenses?: number;
   transportExpenses?: number;
-  protocolDevelopmentDays?: number;
-  reportDevelopmentDays?: number;
+  documentationPreparationDays?: number;
   protocolPreparationStartDate?: Date;
   protocolPreparationEndDate?: Date;
   testingStartDate?: Date;
