@@ -150,6 +150,8 @@ const main = async () => {
           if (file === '20261105120000_staff_position_employee_count.sql') return true;
           // Дни разработки протокола и отчёта (переменные расчёта на странице «Проекты»)
           if (file === '20261106100000_add_project_development_days.sql') return true;
+          // Единая переменная «Кол-во дней на подготовку документации»
+          if (file === '20261107100000_add_project_documentation_preparation_days.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:
