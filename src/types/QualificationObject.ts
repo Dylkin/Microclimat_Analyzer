@@ -23,6 +23,8 @@ export interface QualificationObject {
   contractorId: string;
   type: QualificationObjectType;
   name?: string;
+  /** Кол-во дней на подготовку документации (по умолчанию 3) */
+  documentationPreparationDays?: number;
   storageZones?: StorageZone[];
   manufacturer?: string;
   climateSystem?: string;
@@ -85,6 +87,8 @@ export interface CreateQualificationObjectData {
   contractorId: string;
   type: QualificationObjectType;
   name?: string;
+  /** Кол-во дней на подготовку документации (по умолчанию 3) */
+  documentationPreparationDays?: number;
   storageZones?: StorageZone[];
   manufacturer?: string;
   climateSystem?: string;

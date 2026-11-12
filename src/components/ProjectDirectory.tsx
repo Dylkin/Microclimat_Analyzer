@@ -438,6 +438,14 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     return qualificationObjects.filter(obj => obj.contractorId === contractorId);
   };
 
+  // Сумма «Кол-во дней на подготовку документации» по выбранным объектам квалификации
+  // (подставляется в расчёт проекта; у объекта без значения берём значение по умолчанию 3)
+  const sumDocumentationPreparationDays = (objectIds: string[]): number =>
+    objectIds.reduce((sum, id) => {
+      const obj = qualificationObjects.find(o => o.id === id);
+      return sum + (obj?.documentationPreparationDays ?? 3);
+    }, 0);
+
   // Добавление проекта
   const handleAddProject = async () => {
     console.log('=== ОТЛАДКА СОЗДАНИЯ ПРОЕКТА ===');
@@ -963,15 +971,23 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                           checked={newProject.qualificationObjectIds.includes(obj.id)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setNewProject(prev => ({
-                                ...prev,
-                                qualificationObjectIds: [...prev.qualificationObjectIds, obj.id]
-                              }));
+                              setNewProject(prev => {
+                                const qualificationObjectIds = [...prev.qualificationObjectIds, obj.id];
+                                return {
+                                  ...prev,
+                                  qualificationObjectIds,
+                                  documentationPreparationDays: sumDocumentationPreparationDays(qualificationObjectIds)
+                                };
+                              });
                             } else {
-                              setNewProject(prev => ({
-                                ...prev,
-                                qualificationObjectIds: prev.qualificationObjectIds.filter(id => id !== obj.id)
-                              }));
+                              setNewProject(prev => {
+                                const qualificationObjectIds = prev.qualificationObjectIds.filter(id => id !== obj.id);
+                                return {
+                                  ...prev,
+                                  qualificationObjectIds,
+                                  documentationPreparationDays: sumDocumentationPreparationDays(qualificationObjectIds)
+                                };
+                              });
                             }
                           }}
                           className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
@@ -1080,7 +1096,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="5"
-                  title="Общее количество дней на подготовку документации — протоколов и отчёта (по умолчанию 5)"
+                  title="Общее количество дней на подготовку документации — протоколов и отчёта. Подставляется автоматически как сумма значений выбранных объектов квалификации, можно изменить вручную (по умолчанию 5)"
                 />
               </div>
               <div>

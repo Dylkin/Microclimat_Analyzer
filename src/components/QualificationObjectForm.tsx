@@ -69,6 +69,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     contractorId,
     type: initialData?.type || 'помещение',
     name: initialData?.name || '',
+    documentationPreparationDays: initialData?.documentationPreparationDays ?? 3,
     storageZones: initialStorageZones,
     manufacturer: initialData?.manufacturer || '',
     climateSystem: initialData?.climateSystem || '',
@@ -882,6 +883,24 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               />
             </div>
           )}
+
+          {/* Кол-во дней на подготовку документации — для всех типов объектов */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Кол-во дней на подготовку документации
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={formData.documentationPreparationDays ?? 3}
+              onChange={(e) => handleInputChange('documentationPreparationDays', e.target.value === '' ? undefined : Number(e.target.value))}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              readOnly={mode === 'view'}
+              placeholder="3"
+              title="Количество дней на подготовку документации по объекту (по умолчанию 3). В расчёте проекта суммируется по выбранным объектам."
+            />
+          </div>
 
           {/* Специфичные для типа поля */}
           {renderTypeSpecificFields()}

@@ -343,6 +343,12 @@ class QualificationObjectService {
       contractorId: data.contractorId || data.contractor_id || '',
       type: mappedType as any,
       name: data.name || '',
+      documentationPreparationDays:
+        data.documentationPreparationDays !== undefined && data.documentationPreparationDays !== null
+          ? parseFloat(data.documentationPreparationDays)
+          : (data.documentation_preparation_days !== undefined && data.documentation_preparation_days !== null
+              ? parseFloat(data.documentation_preparation_days)
+              : undefined),
       storageZones: storageZones,
       manufacturer: data.manufacturer || '',
       climateSystem: data.climateSystem || data.climate_system || '',
@@ -410,6 +416,9 @@ class QualificationObjectService {
         dbData.objectType = data.objectType;
       }
       if (data.name !== undefined) dbData.name = data.name;
+      if (data.documentationPreparationDays !== undefined) {
+        dbData.documentationPreparationDays = data.documentationPreparationDays;
+      }
       if ((data as any).storageZones !== undefined) dbData.storageZones = (data as any).storageZones;
       if (data.manufacturer !== undefined) dbData.manufacturer = data.manufacturer;
       if (data.climateSystem !== undefined) dbData.climateSystem = data.climateSystem;

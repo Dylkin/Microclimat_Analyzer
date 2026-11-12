@@ -107,6 +107,7 @@ router.get('/', async (req, res) => {
           qo.contractor_id,
           qo.name,
           qo.object_type,
+          qo.documentation_preparation_days,
           COALESCE(pqod.storage_zones, qo.storage_zones) as storage_zones,
           COALESCE(pqod.climate_system, qo.climate_system) as climate_system,
           COALESCE(pqod.temperature_limits, qo.temperature_limits) as temperature_limits,
@@ -157,6 +158,7 @@ router.get('/', async (req, res) => {
       query = `
         SELECT 
           qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
+          qo.documentation_preparation_days,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
           qo.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_name,
@@ -190,6 +192,9 @@ router.get('/', async (req, res) => {
       name: row.name,
       storageZones: row.storage_zones || [],
       objectType: row.object_type,
+      documentationPreparationDays: row.documentation_preparation_days !== null && row.documentation_preparation_days !== undefined
+        ? parseFloat(row.documentation_preparation_days)
+        : undefined,
       climateSystem: row.climate_system,
       temperatureLimits: row.temperature_limits || { min: null, max: null },
       humidityLimits: row.humidity_limits || { min: null, max: null },
@@ -245,6 +250,7 @@ router.get('/:id', async (req, res) => {
           qo.contractor_id,
           qo.name,
           qo.object_type,
+          qo.documentation_preparation_days,
           COALESCE(pqod.storage_zones, qo.storage_zones) as storage_zones,
           COALESCE(pqod.climate_system, qo.climate_system) as climate_system,
           COALESCE(pqod.temperature_limits, qo.temperature_limits) as temperature_limits,
@@ -291,6 +297,7 @@ router.get('/:id', async (req, res) => {
         `
         SELECT 
           qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
+          qo.documentation_preparation_days,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
           qo.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_name,
@@ -324,6 +331,9 @@ router.get('/:id', async (req, res) => {
       name: row.name,
       storageZones: row.storage_zones || [],
       objectType: row.object_type,
+      documentationPreparationDays: row.documentation_preparation_days !== null && row.documentation_preparation_days !== undefined
+        ? parseFloat(row.documentation_preparation_days)
+        : undefined,
       climateSystem: row.climate_system,
       temperatureLimits: row.temperature_limits || { min: null, max: null },
       humidityLimits: row.humidity_limits || { min: null, max: null },
@@ -395,6 +405,7 @@ router.post('/', async (req, res) => {
       manufacturer,
       manufactureDate,
       expiryDate,
+      documentationPreparationDays,
       ...restFields
     } = otherFields;
 
@@ -483,6 +494,11 @@ router.post('/', async (req, res) => {
       insertValues.push(expiryDate || null);
       paramIndex++;
     }
+    if (documentationPreparationDays !== undefined) {
+      insertFields.push('documentation_preparation_days');
+      insertValues.push(documentationPreparationDays === '' ? null : documentationPreparationDays);
+      paramIndex++;
+    }
 
     const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ');
 
@@ -530,6 +546,7 @@ router.post('/', async (req, res) => {
           qo.contractor_id,
           qo.name,
           qo.object_type,
+          qo.documentation_preparation_days,
           pqod.storage_zones,
           pqod.climate_system,
           pqod.temperature_limits,
@@ -576,6 +593,7 @@ router.post('/', async (req, res) => {
         `
         SELECT 
           qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
+          qo.documentation_preparation_days,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
           qo.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_name,
@@ -605,6 +623,9 @@ router.post('/', async (req, res) => {
       name: fullRow.name,
       storageZones: fullRow.storage_zones || [],
       objectType: fullRow.object_type,
+      documentationPreparationDays: fullRow.documentation_preparation_days !== null && fullRow.documentation_preparation_days !== undefined
+        ? parseFloat(fullRow.documentation_preparation_days)
+        : undefined,
       climateSystem: fullRow.climate_system,
       temperatureLimits: fullRow.temperature_limits || { min: null, max: null },
       humidityLimits: fullRow.humidity_limits || { min: null, max: null },
@@ -683,6 +704,10 @@ router.put('/:id', async (req, res) => {
       updates.push(`object_type = $${paramIndex++}`);
       params.push(objectType);
     }
+    if (documentationPreparationDays !== undefined) {
+      updates.push(`documentation_preparation_days = $${paramIndex++}`);
+      params.push(documentationPreparationDays === '' ? null : documentationPreparationDays);
+    }
     if (climateSystem !== undefined && !isProjectScoped) {
       updates.push(`climate_system = $${paramIndex++}`);
       params.push(climateSystem);
@@ -723,6 +748,7 @@ router.put('/:id', async (req, res) => {
       manufacturer,
       manufactureDate,
       expiryDate,
+      documentationPreparationDays,
       contractorId: updateContractorId
     } = otherFields;
 
@@ -826,6 +852,7 @@ router.put('/:id', async (req, res) => {
           qo.contractor_id,
           qo.name,
           qo.object_type,
+          qo.documentation_preparation_days,
           pqod.storage_zones,
           pqod.climate_system,
           pqod.temperature_limits,
@@ -872,6 +899,7 @@ router.put('/:id', async (req, res) => {
         `
         SELECT 
           qo.id, qo.project_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
+          qo.documentation_preparation_days,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.created_at, qo.updated_at,
           qo.manufacture_date, qo.expiry_date,
@@ -894,6 +922,9 @@ router.put('/:id', async (req, res) => {
       name: row.name,
       storageZones: row.storage_zones || [],
       objectType: row.object_type,
+      documentationPreparationDays: row.documentation_preparation_days !== null && row.documentation_preparation_days !== undefined
+        ? parseFloat(row.documentation_preparation_days)
+        : undefined,
       climateSystem: row.climate_system,
       temperatureLimits: row.temperature_limits || { min: null, max: null },
       humidityLimits: row.humidity_limits || { min: null, max: null },
@@ -941,6 +972,7 @@ router.patch('/:id', async (req, res) => {
 
     const allowedFields = [
       'project_id', 'contractor_id', 'name', 'object_type', 'climate_system',
+      'documentation_preparation_days',
       'temperature_limits', 'humidity_limits', 'storage_zones', 'measurement_zones', 'work_schedule',
       'plan_file_url', 'plan_file_name',
       'equipment_placement_plan_file_url', 'equipment_placement_plan_file_name',
@@ -1128,6 +1160,7 @@ router.patch('/:id', async (req, res) => {
           qo.contractor_id,
           qo.name,
           qo.object_type,
+          qo.documentation_preparation_days,
           pqod.storage_zones,
           pqod.climate_system,
           pqod.temperature_limits,
@@ -1195,6 +1228,9 @@ router.patch('/:id', async (req, res) => {
       projectId: projectId || row.project_id,
       name: row.name,
       objectType: row.object_type,
+      documentationPreparationDays: row.documentation_preparation_days !== null && row.documentation_preparation_days !== undefined
+        ? parseFloat(row.documentation_preparation_days)
+        : undefined,
       climateSystem: row.climate_system,
       temperatureLimits: row.temperature_limits || { min: null, max: null },
       humidityLimits: row.humidity_limits || { min: null, max: null },
