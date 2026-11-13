@@ -48,7 +48,8 @@ const getTypeFields = (typeKey: string) => {
         { label: 'Адрес', field: 'address', type: 'text' },
         { label: 'Площадь (м²)', field: 'area', type: 'number' },
         { label: 'Производитель', field: 'manufacturer', type: 'text' },
-        { label: 'Климатическая система', field: 'climateSystem', type: 'text' }
+        { label: 'Климатическая система', field: 'climateSystem', type: 'text' },
+        { label: 'Кол-во дней на подготовку документации', field: 'documentationPreparationDays', type: 'number' }
       ];
     case 'автомобиль':
       return [
@@ -56,7 +57,8 @@ const getTypeFields = (typeKey: string) => {
         { label: 'VIN номер', field: 'vin', type: 'text' },
         { label: 'Регистрационный номер', field: 'registrationNumber', type: 'text' },
         { label: 'Объем (м³)', field: 'bodyVolume', type: 'number' },
-        { label: 'Производитель', field: 'manufacturer', type: 'text' }
+        { label: 'Производитель', field: 'manufacturer', type: 'text' },
+        { label: 'Кол-во дней на подготовку документации', field: 'documentationPreparationDays', type: 'number' }
       ];
     case 'холодильная_камера':
       return [
@@ -66,7 +68,8 @@ const getTypeFields = (typeKey: string) => {
         { label: 'Инвентарный номер', field: 'inventoryNumber', type: 'text' },
         { label: 'Серийный номер', field: 'serialNumber', type: 'text' },
         { label: 'Производитель', field: 'manufacturer', type: 'text' },
-        { label: 'Климатическая система', field: 'climateSystem', type: 'text' }
+        { label: 'Климатическая система', field: 'climateSystem', type: 'text' },
+        { label: 'Кол-во дней на подготовку документации', field: 'documentationPreparationDays', type: 'number' }
       ];
     case 'холодильник':
       return [
@@ -75,7 +78,8 @@ const getTypeFields = (typeKey: string) => {
         { label: 'Объем (м³)', field: 'chamberVolume', type: 'number' },
         { label: 'Инвентарный номер', field: 'inventoryNumber', type: 'text' },
         { label: 'Серийный номер', field: 'serialNumber', type: 'text' },
-        { label: 'Производитель', field: 'manufacturer', type: 'text' }
+        { label: 'Производитель', field: 'manufacturer', type: 'text' },
+        { label: 'Кол-во дней на подготовку документации', field: 'documentationPreparationDays', type: 'number' }
       ];
     case 'морозильник':
       return [
@@ -83,7 +87,8 @@ const getTypeFields = (typeKey: string) => {
         { label: 'Объем (м³)', field: 'chamberVolume', type: 'number' },
         { label: 'Инвентарный номер', field: 'inventoryNumber', type: 'text' },
         { label: 'Серийный номер', field: 'serialNumber', type: 'text' },
-        { label: 'Производитель', field: 'manufacturer', type: 'text' }
+        { label: 'Производитель', field: 'manufacturer', type: 'text' },
+        { label: 'Кол-во дней на подготовку документации', field: 'documentationPreparationDays', type: 'number' }
       ];
     case 'термоконтейнер':
       return [
@@ -93,7 +98,8 @@ const getTypeFields = (typeKey: string) => {
         { label: 'Объем (м³)', field: 'chamberVolume', type: 'number' },
         { label: 'Производитель', field: 'manufacturer', type: 'text' },
         { label: 'Дата изготовления', field: 'manufactureDate', type: 'date' },
-        { label: 'Срок годности до (дата)', field: 'expiryDate', type: 'date' }
+        { label: 'Срок годности до (дата)', field: 'expiryDate', type: 'date' },
+        { label: 'Кол-во дней на подготовку документации', field: 'documentationPreparationDays', type: 'number' }
       ];
     default:
       return [];
