@@ -17,7 +17,7 @@ import {
   TAX_SETTINGS_CHANGED_EVENT,
   type TaxSettings
 } from '../constants/taxSettings';
-// import { QualificationObjectForm } from './QualificationObjectForm';
+import { QualificationObjectForm } from './QualificationObjectForm';
 
 // UUID validation function
 function isValidUUID(uuid: string): boolean {
@@ -73,6 +73,8 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   // UI state
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  // Форма добавления объекта квалификации из формы создания проекта
+  const [showAddObjectForm, setShowAddObjectForm] = useState(false);
 
   // Form state
   const [newProject, setNewProject] = useState<{
@@ -440,11 +442,32 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
 
   // Сумма «Кол-во дней на подготовку документации» по выбранным объектам квалификации
   // (подставляется в расчёт проекта; у объекта без значения берём значение по умолчанию 3)
-  const sumDocumentationPreparationDays = (objectIds: string[]): number =>
+  const sumDocumentationPreparationDays = (objectIds: string[], objects: QualificationObject[] = qualificationObjects): number =>
     objectIds.reduce((sum, id) => {
-      const obj = qualificationObjects.find(o => o.id === id);
+      const obj = objects.find(o => o.id === id);
       return sum + (obj?.documentationPreparationDays ?? 3);
     }, 0);
+
+  // Создание объекта квалификации прямо из формы проекта.
+  // После сохранения объект добавляется в список, отмечается галочкой и подставляется
+  // в сумму дней; введённые в форме проекта данные сохраняются.
+  const handleCreateQualificationObject = async (objectData: any) => {
+    const saved = await qualificationObjectService.createQualificationObject(objectData);
+    const updatedObjects = [...qualificationObjects, saved];
+    setQualificationObjects(updatedObjects);
+    setShowAddObjectForm(false);
+    setNewProject(prev => {
+      const ids = prev.qualificationObjectIds.includes(saved.id)
+        ? prev.qualificationObjectIds
+        : [...prev.qualificationObjectIds, saved.id];
+      return {
+        ...prev,
+        qualificationObjectIds: ids,
+        documentationPreparationDays: sumDocumentationPreparationDays(ids, updatedObjects)
+      };
+    });
+    return saved;
+  };
 
   // Добавление проекта
   const handleAddProject = async () => {
@@ -594,6 +617,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         paymentDate: '',
       });
       setShowAddForm(false);
+      setShowAddObjectForm(false);
       alert('Проект успешно создан');
     } catch (error) {
       console.error('Ошибка создания проекта:', error);
@@ -868,6 +892,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 type: undefined
               });
               setShowAddForm(false);
+              setShowAddObjectForm(false);
             } catch (error: any) {
               console.error('Ошибка создания проекта:', error);
               setError(error?.message || 'Ошибка создания проекта');
@@ -897,6 +922,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               type: undefined
             });
             setShowAddForm(false);
+            setShowAddObjectForm(false);
           }}
           loading={operationLoading}
         />
@@ -905,7 +931,10 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Квалификация</h2>
             <button
-              onClick={() => setShowAddForm(false)}
+              onClick={() => {
+                setShowAddForm(false);
+                setShowAddObjectForm(false);
+              }}
               className="text-gray-400 hover:text-gray-600"
               title="Закрыть"
               aria-label="Закрыть"
@@ -922,11 +951,14 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               </label>
               <select
                 value={newProject.contractorId}
-                onChange={(e) => setNewProject(prev => ({
-                  ...prev,
-                  contractorId: e.target.value,
-                  qualificationObjectIds: [] // Сбрасываем выбранные объекты
-                }))}
+                onChange={(e) => {
+                  setShowAddObjectForm(false);
+                  setNewProject(prev => ({
+                    ...prev,
+                    contractorId: e.target.value,
+                    qualificationObjectIds: [] // Сбрасываем выбранные объекты
+                  }));
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 required
                 title="Выберите контрагента"
@@ -957,9 +989,23 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
 
             {/* Объекты квалификации */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Объекты квалификации *
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Объекты квалификации *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddObjectForm(prev => !prev)}
+                  disabled={!newProject.contractorId}
+                  className="inline-flex items-center px-3 py-1.5 border border-indigo-600 text-sm font-medium rounded-md text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={newProject.contractorId
+                    ? 'Добавить объект квалификации для выбранного контрагента'
+                    : 'Сначала выберите контрагента'}
+                >
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Добавить
+                </button>
+              </div>
               {newProject.contractorId ? (
                 <div className="border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
                   {getQualificationObjectsForContractor(newProject.contractorId).map(obj => {
@@ -1016,6 +1062,19 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                   <p className="text-sm text-gray-500 text-center">
                     Сначала выберите контрагента для отображения объектов квалификации
                   </p>
+                </div>
+              )}
+
+              {/* Форма добавления объекта квалификации для выбранного контрагента */}
+              {showAddObjectForm && newProject.contractorId && (
+                <div className="mt-4 border border-indigo-200 rounded-lg p-4 bg-indigo-50/50">
+                  <QualificationObjectForm
+                    contractorId={newProject.contractorId}
+                    contractorAddress={contractors.find(c => c.id === newProject.contractorId)?.address}
+                    mode="create"
+                    onSubmit={handleCreateQualificationObject}
+                    onCancel={() => setShowAddObjectForm(false)}
+                  />
                 </div>
               )}
             </div>
@@ -1282,7 +1341,10 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
             {/* Кнопки */}
             <div className="flex justify-end space-x-3">
               <button
-                onClick={() => setShowAddForm(false)}
+                onClick={() => {
+                setShowAddForm(false);
+                setShowAddObjectForm(false);
+              }}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Отмена
