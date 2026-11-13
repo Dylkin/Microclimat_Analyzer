@@ -75,6 +75,14 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const [showAddForm, setShowAddForm] = useState(false);
   // Форма добавления объекта квалификации из формы создания проекта
   const [showAddObjectForm, setShowAddObjectForm] = useState(false);
+  // Просмотр / редактирование объекта квалификации из формы создания проекта
+  const [viewingQualificationObject, setViewingQualificationObject] = useState<QualificationObject | null>(null);
+  const [editingQualificationObject, setEditingQualificationObject] = useState<QualificationObject | null>(null);
+  const closeObjectForms = () => {
+    setShowAddObjectForm(false);
+    setViewingQualificationObject(null);
+    setEditingQualificationObject(null);
+  };
 
   // Form state
   const [newProject, setNewProject] = useState<{
@@ -469,6 +477,23 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     return saved;
   };
 
+  // Обновление объекта квалификации из формы проекта: сохраняем изменения,
+  // обновляем список и пересчитываем сумму дней, если объект выбран
+  const handleUpdateQualificationObject = async (objectData: any) => {
+    if (!objectData?.id) {
+      throw new Error('Не указан объект квалификации');
+    }
+    const saved = await qualificationObjectService.updateQualificationObject(objectData.id, objectData);
+    const updatedObjects = qualificationObjects.map(o => (o.id === saved.id ? saved : o));
+    setQualificationObjects(updatedObjects);
+    setEditingQualificationObject(null);
+    setNewProject(prev => ({
+      ...prev,
+      documentationPreparationDays: sumDocumentationPreparationDays(prev.qualificationObjectIds, updatedObjects)
+    }));
+    return saved;
+  };
+
   // Добавление проекта
   const handleAddProject = async () => {
     console.log('=== ОТЛАДКА СОЗДАНИЯ ПРОЕКТА ===');
@@ -617,7 +642,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
         paymentDate: '',
       });
       setShowAddForm(false);
-      setShowAddObjectForm(false);
+      closeObjectForms();
       alert('Проект успешно создан');
     } catch (error) {
       console.error('Ошибка создания проекта:', error);
@@ -892,7 +917,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 type: undefined
               });
               setShowAddForm(false);
-              setShowAddObjectForm(false);
+              closeObjectForms();
             } catch (error: any) {
               console.error('Ошибка создания проекта:', error);
               setError(error?.message || 'Ошибка создания проекта');
@@ -922,7 +947,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               type: undefined
             });
             setShowAddForm(false);
-            setShowAddObjectForm(false);
+            closeObjectForms();
           }}
           loading={operationLoading}
         />
@@ -933,7 +958,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
             <button
               onClick={() => {
                 setShowAddForm(false);
-                setShowAddObjectForm(false);
+                closeObjectForms();
               }}
               className="text-gray-400 hover:text-gray-600"
               title="Закрыть"
@@ -952,7 +977,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               <select
                 value={newProject.contractorId}
                 onChange={(e) => {
-                  setShowAddObjectForm(false);
+                  closeObjectForms();
                   setNewProject(prev => ({
                     ...prev,
                     contractorId: e.target.value,
@@ -995,7 +1020,11 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 </label>
                 <button
                   type="button"
-                  onClick={() => setShowAddObjectForm(prev => !prev)}
+                  onClick={() => {
+                    setViewingQualificationObject(null);
+                    setEditingQualificationObject(null);
+                    setShowAddObjectForm(prev => !prev);
+                  }}
                   disabled={!newProject.contractorId}
                   className="inline-flex items-center px-3 py-1.5 border border-indigo-600 text-sm font-medium rounded-md text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   title={newProject.contractorId
@@ -1047,6 +1076,38 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                             {obj.serialNumber && ` • S/N: ${obj.serialNumber}`}
                           </div>
                         </div>
+                        <div className="flex items-center space-x-1 shrink-0">
+                          <button
+                            type="button"
+                            title="Просмотр объекта квалификации"
+                            aria-label="Просмотр объекта квалификации"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowAddObjectForm(false);
+                              setEditingQualificationObject(null);
+                              setViewingQualificationObject(obj);
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Редактировать объект квалификации"
+                            aria-label="Редактировать объект квалификации"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowAddObjectForm(false);
+                              setViewingQualificationObject(null);
+                              setEditingQualificationObject(obj);
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </label>
                     );
                   })}
@@ -1073,7 +1134,22 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                     contractorAddress={contractors.find(c => c.id === newProject.contractorId)?.address}
                     mode="create"
                     onSubmit={handleCreateQualificationObject}
-                    onCancel={() => setShowAddObjectForm(false)}
+                    onCancel={closeObjectForms}
+                  />
+                </div>
+              )}
+
+              {/* Просмотр / редактирование объекта квалификации */}
+              {(viewingQualificationObject || editingQualificationObject) && newProject.contractorId && (
+                <div className="mt-4 border border-indigo-200 rounded-lg p-4 bg-indigo-50/50">
+                  <QualificationObjectForm
+                    contractorId={newProject.contractorId}
+                    contractorAddress={contractors.find(c => c.id === newProject.contractorId)?.address}
+                    initialData={editingQualificationObject || viewingQualificationObject || undefined}
+                    mode={viewingQualificationObject ? 'view' : 'edit'}
+                    hideTypeSelection
+                    onSubmit={handleUpdateQualificationObject}
+                    onCancel={closeObjectForms}
                   />
                 </div>
               )}
@@ -1343,7 +1419,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               <button
                 onClick={() => {
                 setShowAddForm(false);
-                setShowAddObjectForm(false);
+                closeObjectForms();
               }}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
