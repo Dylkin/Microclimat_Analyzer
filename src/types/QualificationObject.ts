@@ -25,6 +25,10 @@ export interface QualificationObject {
   name?: string;
   /** Кол-во дней на подготовку документации (по умолчанию 3) */
   documentationPreparationDays?: number;
+  /** Кол-во объемов (для автомобиля, по умолчанию 1) */
+  volumesCount?: number;
+  /** Кол-во температурных режимов (для автомобиля, по умолчанию 1) */
+  temperatureRegimesCount?: number;
   storageZones?: StorageZone[];
   manufacturer?: string;
   climateSystem?: string;
@@ -89,6 +93,10 @@ export interface CreateQualificationObjectData {
   name?: string;
   /** Кол-во дней на подготовку документации (по умолчанию 3) */
   documentationPreparationDays?: number;
+  /** Кол-во объемов (для автомобиля, по умолчанию 1) */
+  volumesCount?: number;
+  /** Кол-во температурных режимов (для автомобиля, по умолчанию 1) */
+  temperatureRegimesCount?: number;
   storageZones?: StorageZone[];
   manufacturer?: string;
   climateSystem?: string;

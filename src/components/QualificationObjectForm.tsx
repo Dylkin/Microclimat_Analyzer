@@ -70,6 +70,8 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
     type: initialData?.type || 'помещение',
     name: initialData?.name || '',
     documentationPreparationDays: initialData?.documentationPreparationDays ?? 3,
+    volumesCount: initialData?.volumesCount ?? 1,
+    temperatureRegimesCount: initialData?.temperatureRegimesCount ?? 1,
     storageZones: initialStorageZones,
     manufacturer: initialData?.manufacturer || '',
     climateSystem: initialData?.climateSystem || '',
@@ -103,6 +105,30 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
   const handleInputChange = (field: keyof CreateQualificationObjectData, value: any) => {
     if (mode === 'view') return; // Не изменяем данные в режиме просмотра
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Для автомобиля: при изменении количества объемов/температурных режимов пересчитываем
+  // «Кол-во дней на подготовку документации»: итог = базовые дни × 0,5 × (объемы + режимы).
+  // Базовые дни восстанавливаем из текущего итогового значения и текущих количеств,
+  // поэтому ручная правка поля дней сохраняется до следующего изменения объемов/режимов.
+  const handleVehicleCountChange = (field: 'volumesCount' | 'temperatureRegimesCount', rawValue: string) => {
+    if (mode === 'view') return;
+    const value = rawValue === '' ? 1 : Math.max(1, Math.floor(Number(rawValue)) || 1);
+    setFormData(prev => {
+      const prevVolumes = prev.volumesCount ?? 1;
+      const prevRegimes = prev.temperatureRegimesCount ?? 1;
+      const prevFactor = 0.5 * (prevVolumes + prevRegimes);
+      const baseDays = prevFactor > 0 ? (prev.documentationPreparationDays ?? 3) / prevFactor : 3;
+      const volumesCount = field === 'volumesCount' ? value : prevVolumes;
+      const temperatureRegimesCount = field === 'temperatureRegimesCount' ? value : prevRegimes;
+      const effectiveDays = baseDays * 0.5 * (volumesCount + temperatureRegimesCount);
+      return {
+        ...prev,
+        volumesCount,
+        temperatureRegimesCount,
+        documentationPreparationDays: Math.round(effectiveDays * 2) / 2
+      };
+    });
   };
 
   const handleFileChange = (type: 'plan' | 'testData', file: File | null) => {
@@ -301,6 +327,42 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 readOnly={mode === 'view'}
                 placeholder="Введите объем"
+              />
+            </div>
+
+            {/* Кол-во объемов */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Кол-во объемов
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={formData.volumesCount ?? 1}
+                onChange={(e) => handleVehicleCountChange('volumesCount', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="1"
+                title="Количество объемов автомобиля (по умолчанию 1). При увеличении «Кол-во дней на подготовку документации» пересчитывается: дни × 0,5 × (объемы + режимы)"
+              />
+            </div>
+
+            {/* Кол-во температурных режимов */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Кол-во температурных режимов
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={formData.temperatureRegimesCount ?? 1}
+                onChange={(e) => handleVehicleCountChange('temperatureRegimesCount', e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                readOnly={mode === 'view'}
+                placeholder="1"
+                title="Количество температурных режимов автомобиля (по умолчанию 1). При увеличении «Кол-во дней на подготовку документации» пересчитывается: дни × 0,5 × (объемы + режимы)"
               />
             </div>
           </div>
@@ -898,7 +960,7 @@ export const QualificationObjectForm: React.FC<QualificationObjectFormProps> = (
               className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${mode === 'view' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               readOnly={mode === 'view'}
               placeholder="3"
-              title="Количество дней на подготовку документации по объекту (по умолчанию 3). В расчёте проекта суммируется по выбранным объектам."
+              title="Количество дней на подготовку документации по объекту (по умолчанию 3). Для автомобиля пересчитывается автоматически при изменении количества объемов и температурных режимов: базовые дни × 0,5 × (объемы + режимы). В расчёте проекта суммируется по выбранным объектам."
             />
           </div>
 

@@ -58,6 +58,8 @@ const getTypeFields = (typeKey: string) => {
         { label: 'Регистрационный номер', field: 'registrationNumber', type: 'text' },
         { label: 'Объем (м³)', field: 'bodyVolume', type: 'number' },
         { label: 'Производитель', field: 'manufacturer', type: 'text' },
+        { label: 'Кол-во объемов', field: 'volumesCount', type: 'number' },
+        { label: 'Кол-во температурных режимов', field: 'temperatureRegimesCount', type: 'number' },
         { label: 'Кол-во дней на подготовку документации', field: 'documentationPreparationDays', type: 'number' }
       ];
     case 'холодильная_камера':

@@ -349,6 +349,12 @@ class QualificationObjectService {
           : (data.documentation_preparation_days !== undefined && data.documentation_preparation_days !== null
               ? parseFloat(data.documentation_preparation_days)
               : undefined),
+      volumesCount: data.volumesCount !== undefined && data.volumesCount !== null
+        ? parseInt(data.volumesCount, 10)
+        : (data.volumes_count !== undefined && data.volumes_count !== null ? parseInt(data.volumes_count, 10) : undefined),
+      temperatureRegimesCount: data.temperatureRegimesCount !== undefined && data.temperatureRegimesCount !== null
+        ? parseInt(data.temperatureRegimesCount, 10)
+        : (data.temperature_regimes_count !== undefined && data.temperature_regimes_count !== null ? parseInt(data.temperature_regimes_count, 10) : undefined),
       storageZones: storageZones,
       manufacturer: data.manufacturer || '',
       climateSystem: data.climateSystem || data.climate_system || '',
@@ -418,6 +424,12 @@ class QualificationObjectService {
       if (data.name !== undefined) dbData.name = data.name;
       if (data.documentationPreparationDays !== undefined) {
         dbData.documentationPreparationDays = data.documentationPreparationDays;
+      }
+      if (data.volumesCount !== undefined) {
+        dbData.volumesCount = data.volumesCount;
+      }
+      if (data.temperatureRegimesCount !== undefined) {
+        dbData.temperatureRegimesCount = data.temperatureRegimesCount;
       }
       if ((data as any).storageZones !== undefined) dbData.storageZones = (data as any).storageZones;
       if (data.manufacturer !== undefined) dbData.manufacturer = data.manufacturer;

@@ -108,6 +108,8 @@ router.get('/', async (req, res) => {
           qo.name,
           qo.object_type,
           qo.documentation_preparation_days,
+          qo.volumes_count,
+          qo.temperature_regimes_count,
           COALESCE(pqod.storage_zones, qo.storage_zones) as storage_zones,
           COALESCE(pqod.climate_system, qo.climate_system) as climate_system,
           COALESCE(pqod.temperature_limits, qo.temperature_limits) as temperature_limits,
@@ -159,6 +161,8 @@ router.get('/', async (req, res) => {
         SELECT 
           qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
           qo.documentation_preparation_days,
+          qo.volumes_count,
+          qo.temperature_regimes_count,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
           qo.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_name,
@@ -195,6 +199,8 @@ router.get('/', async (req, res) => {
       documentationPreparationDays: row.documentation_preparation_days !== null && row.documentation_preparation_days !== undefined
         ? parseFloat(row.documentation_preparation_days)
         : undefined,
+      volumesCount: row.volumes_count !== null && row.volumes_count !== undefined ? parseInt(row.volumes_count, 10) : undefined,
+      temperatureRegimesCount: row.temperature_regimes_count !== null && row.temperature_regimes_count !== undefined ? parseInt(row.temperature_regimes_count, 10) : undefined,
       climateSystem: row.climate_system,
       temperatureLimits: row.temperature_limits || { min: null, max: null },
       humidityLimits: row.humidity_limits || { min: null, max: null },
@@ -251,6 +257,8 @@ router.get('/:id', async (req, res) => {
           qo.name,
           qo.object_type,
           qo.documentation_preparation_days,
+          qo.volumes_count,
+          qo.temperature_regimes_count,
           COALESCE(pqod.storage_zones, qo.storage_zones) as storage_zones,
           COALESCE(pqod.climate_system, qo.climate_system) as climate_system,
           COALESCE(pqod.temperature_limits, qo.temperature_limits) as temperature_limits,
@@ -298,6 +306,8 @@ router.get('/:id', async (req, res) => {
         SELECT 
           qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
           qo.documentation_preparation_days,
+          qo.volumes_count,
+          qo.temperature_regimes_count,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
           qo.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_name,
@@ -334,6 +344,8 @@ router.get('/:id', async (req, res) => {
       documentationPreparationDays: row.documentation_preparation_days !== null && row.documentation_preparation_days !== undefined
         ? parseFloat(row.documentation_preparation_days)
         : undefined,
+      volumesCount: row.volumes_count !== null && row.volumes_count !== undefined ? parseInt(row.volumes_count, 10) : undefined,
+      temperatureRegimesCount: row.temperature_regimes_count !== null && row.temperature_regimes_count !== undefined ? parseInt(row.temperature_regimes_count, 10) : undefined,
       climateSystem: row.climate_system,
       temperatureLimits: row.temperature_limits || { min: null, max: null },
       humidityLimits: row.humidity_limits || { min: null, max: null },
@@ -406,6 +418,8 @@ router.post('/', async (req, res) => {
       manufactureDate,
       expiryDate,
       documentationPreparationDays,
+      volumesCount,
+      temperatureRegimesCount,
       ...restFields
     } = otherFields;
 
@@ -499,6 +513,16 @@ router.post('/', async (req, res) => {
       insertValues.push(documentationPreparationDays === '' ? null : documentationPreparationDays);
       paramIndex++;
     }
+    if (volumesCount !== undefined) {
+      insertFields.push('volumes_count');
+      insertValues.push(volumesCount === '' || volumesCount === null ? 1 : volumesCount);
+      paramIndex++;
+    }
+    if (temperatureRegimesCount !== undefined) {
+      insertFields.push('temperature_regimes_count');
+      insertValues.push(temperatureRegimesCount === '' || temperatureRegimesCount === null ? 1 : temperatureRegimesCount);
+      paramIndex++;
+    }
 
     const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ');
 
@@ -547,6 +571,8 @@ router.post('/', async (req, res) => {
           qo.name,
           qo.object_type,
           qo.documentation_preparation_days,
+          qo.volumes_count,
+          qo.temperature_regimes_count,
           pqod.storage_zones,
           pqod.climate_system,
           pqod.temperature_limits,
@@ -594,6 +620,8 @@ router.post('/', async (req, res) => {
         SELECT 
           qo.id, qo.project_id, qo.contractor_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
           qo.documentation_preparation_days,
+          qo.volumes_count,
+          qo.temperature_regimes_count,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.plan_file_url, qo.plan_file_name,
           qo.equipment_placement_plan_file_url, qo.equipment_placement_plan_file_name,
@@ -626,6 +654,8 @@ router.post('/', async (req, res) => {
       documentationPreparationDays: fullRow.documentation_preparation_days !== null && fullRow.documentation_preparation_days !== undefined
         ? parseFloat(fullRow.documentation_preparation_days)
         : undefined,
+      volumesCount: fullRow.volumes_count !== null && fullRow.volumes_count !== undefined ? parseInt(fullRow.volumes_count, 10) : undefined,
+      temperatureRegimesCount: fullRow.temperature_regimes_count !== null && fullRow.temperature_regimes_count !== undefined ? parseInt(fullRow.temperature_regimes_count, 10) : undefined,
       climateSystem: fullRow.climate_system,
       temperatureLimits: fullRow.temperature_limits || { min: null, max: null },
       humidityLimits: fullRow.humidity_limits || { min: null, max: null },
@@ -708,6 +738,14 @@ router.put('/:id', async (req, res) => {
       updates.push(`documentation_preparation_days = $${paramIndex++}`);
       params.push(documentationPreparationDays === '' ? null : documentationPreparationDays);
     }
+    if (volumesCount !== undefined) {
+      updates.push(`volumes_count = $${paramIndex++}`);
+      params.push(volumesCount === '' || volumesCount === null ? 1 : volumesCount);
+    }
+    if (temperatureRegimesCount !== undefined) {
+      updates.push(`temperature_regimes_count = $${paramIndex++}`);
+      params.push(temperatureRegimesCount === '' || temperatureRegimesCount === null ? 1 : temperatureRegimesCount);
+    }
     if (climateSystem !== undefined && !isProjectScoped) {
       updates.push(`climate_system = $${paramIndex++}`);
       params.push(climateSystem);
@@ -749,6 +787,8 @@ router.put('/:id', async (req, res) => {
       manufactureDate,
       expiryDate,
       documentationPreparationDays,
+      volumesCount,
+      temperatureRegimesCount,
       contractorId: updateContractorId
     } = otherFields;
 
@@ -853,6 +893,8 @@ router.put('/:id', async (req, res) => {
           qo.name,
           qo.object_type,
           qo.documentation_preparation_days,
+          qo.volumes_count,
+          qo.temperature_regimes_count,
           pqod.storage_zones,
           pqod.climate_system,
           pqod.temperature_limits,
@@ -900,6 +942,8 @@ router.put('/:id', async (req, res) => {
         SELECT 
           qo.id, qo.project_id, qo.name, qo.storage_zones, qo.object_type, qo.climate_system,
           qo.documentation_preparation_days,
+          qo.volumes_count,
+          qo.temperature_regimes_count,
           qo.temperature_limits, qo.humidity_limits, qo.measurement_zones,
           qo.work_schedule, qo.created_at, qo.updated_at,
           qo.manufacture_date, qo.expiry_date,
@@ -925,6 +969,8 @@ router.put('/:id', async (req, res) => {
       documentationPreparationDays: row.documentation_preparation_days !== null && row.documentation_preparation_days !== undefined
         ? parseFloat(row.documentation_preparation_days)
         : undefined,
+      volumesCount: row.volumes_count !== null && row.volumes_count !== undefined ? parseInt(row.volumes_count, 10) : undefined,
+      temperatureRegimesCount: row.temperature_regimes_count !== null && row.temperature_regimes_count !== undefined ? parseInt(row.temperature_regimes_count, 10) : undefined,
       climateSystem: row.climate_system,
       temperatureLimits: row.temperature_limits || { min: null, max: null },
       humidityLimits: row.humidity_limits || { min: null, max: null },
@@ -972,7 +1018,7 @@ router.patch('/:id', async (req, res) => {
 
     const allowedFields = [
       'project_id', 'contractor_id', 'name', 'object_type', 'climate_system',
-      'documentation_preparation_days',
+      'documentation_preparation_days', 'volumes_count', 'temperature_regimes_count',
       'temperature_limits', 'humidity_limits', 'storage_zones', 'measurement_zones', 'work_schedule',
       'plan_file_url', 'plan_file_name',
       'equipment_placement_plan_file_url', 'equipment_placement_plan_file_name',
@@ -1161,6 +1207,8 @@ router.patch('/:id', async (req, res) => {
           qo.name,
           qo.object_type,
           qo.documentation_preparation_days,
+          qo.volumes_count,
+          qo.temperature_regimes_count,
           pqod.storage_zones,
           pqod.climate_system,
           pqod.temperature_limits,
@@ -1231,6 +1279,8 @@ router.patch('/:id', async (req, res) => {
       documentationPreparationDays: row.documentation_preparation_days !== null && row.documentation_preparation_days !== undefined
         ? parseFloat(row.documentation_preparation_days)
         : undefined,
+      volumesCount: row.volumes_count !== null && row.volumes_count !== undefined ? parseInt(row.volumes_count, 10) : undefined,
+      temperatureRegimesCount: row.temperature_regimes_count !== null && row.temperature_regimes_count !== undefined ? parseInt(row.temperature_regimes_count, 10) : undefined,
       climateSystem: row.climate_system,
       temperatureLimits: row.temperature_limits || { min: null, max: null },
       humidityLimits: row.humidity_limits || { min: null, max: null },
