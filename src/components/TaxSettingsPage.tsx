@@ -37,7 +37,8 @@ export const TaxSettingsPage: React.FC = () => {
         monthlyOverheadCosts: typeof parsed.monthlyOverheadCosts === 'number' ? parsed.monthlyOverheadCosts : DEFAULT_TAX_SETTINGS.monthlyOverheadCosts,
         monthlyMarketingCosts: typeof parsed.monthlyMarketingCosts === 'number' ? parsed.monthlyMarketingCosts : DEFAULT_TAX_SETTINGS.monthlyMarketingCosts,
         projectBonusPercent: typeof parsed.projectBonusPercent === 'number' ? parsed.projectBonusPercent : DEFAULT_TAX_SETTINGS.projectBonusPercent,
-        validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare
+        validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare,
+        unexpectedExpensesPercent: typeof parsed.unexpectedExpensesPercent === 'number' ? parsed.unexpectedExpensesPercent : DEFAULT_TAX_SETTINGS.unexpectedExpensesPercent
       });
     } catch (loadError) {
       console.error('Ошибка загрузки налоговых настроек:', loadError);
@@ -285,6 +286,20 @@ export const TaxSettingsPage: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Непредвиденные расходы, %</label>
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              value={settings.unexpectedExpensesPercent}
+              onChange={(e) => handleNumberChange('unexpectedExpensesPercent', e.target.value)}
+              title="Непредвиденные расходы в процентах от суммы (печать протоколов и отчётов + командировочные + транспортные), %"
+              placeholder="5"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
         </div>
       </div>
 
@@ -322,8 +337,13 @@ export const TaxSettingsPage: React.FC = () => {
             <span className="font-semibold">Премия</span> = Плановая прибыль × Премия % от прибыли / 100
           </div>
           <div>
+            <span className="font-semibold">Непредвиденные расходы</span> = (Кол-во печатных экземпляров протоколов ×
+            Средняя стоимость печати протокола, руб. без НДС + Кол-во печатных экземпляров отчётов × Средняя стоимость
+            печати отчёта, руб. без НДС + Командировочные расходы + Транспортные расходы) × Непредвиденные расходы / 100
+          </div>
+          <div>
             <span className="font-semibold">Сумма без НДС</span> = Прямые расходы + Обеспечение ФОТ предприятия + Обеспечение
-            % маркетинга + Плановая прибыль + Премия
+            % маркетинга + Плановая прибыль + Премия + Непредвиденные расходы
           </div>
           <div>
             <span className="font-semibold">Итого с НДС</span> = Сумма без НДС + НДС, где НДС = Сумма без НДС × НДС / 100

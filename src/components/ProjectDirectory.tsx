@@ -204,7 +204,14 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const planProfitTerm = profitBase * (taxSettings.profitability / 100);
   // Премия = % от плановой прибыли
   const bonusTerm = planProfitTerm * (taxSettings.projectBonusPercent / 100);
-  const sumWithoutVat = directExpenses + profitBase + planProfitTerm + bonusTerm;
+  // Непредвиденные расходы: % от суммы (печать протоколов и отчётов + командировочные + транспортные)
+  const unexpectedExpensesBase =
+    protocolPrintTerm +
+    reportPrintTerm +
+    (newProject.travelExpenses ?? 0) +
+    (newProject.transportExpenses ?? 0);
+  const unexpectedExpensesTerm = unexpectedExpensesBase * (taxSettings.unexpectedExpensesPercent / 100);
+  const sumWithoutVat = directExpenses + unexpectedExpensesTerm + profitBase + planProfitTerm + bonusTerm;
   const vatTerm = sumWithoutVat * (taxSettings.vat / 100);
   const recommendedCostWithVat = sumWithoutVat + vatTerm;
   const hasRecommendedCostInputs =
@@ -259,8 +266,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       value: `${fmtCalc(planProfitTerm)} × ${fmtCalc(taxSettings.projectBonusPercent)} / 100 = ${fmtCalc(bonusTerm)}`
     },
     {
+      label: 'Непредвиденные расходи',
+      value: `(${fmtCalc(protocolPrintTerm)} + ${fmtCalc(reportPrintTerm)} + ${fmtCalc(newProject.travelExpenses ?? 0)} + ${fmtCalc(newProject.transportExpenses ?? 0)}) × ${fmtCalc(taxSettings.unexpectedExpensesPercent)} / 100 = ${fmtCalc(unexpectedExpensesTerm)}`
+    },
+    {
       label: 'Сумма без НДС',
-      value: `${fmtCalc(directExpenses)} + ${fmtCalc(fotEnterprise)} + ${fmtCalc(marketingTerm)} + ${fmtCalc(planProfitTerm)} + ${fmtCalc(bonusTerm)} = ${fmtCalc(sumWithoutVat)}`
+      value: `${fmtCalc(directExpenses)} + ${fmtCalc(fotEnterprise)} + ${fmtCalc(marketingTerm)} + ${fmtCalc(planProfitTerm)} + ${fmtCalc(bonusTerm)} + ${fmtCalc(unexpectedExpensesTerm)} = ${fmtCalc(sumWithoutVat)}`
     },
     {
       label: 'Итого с НДС',

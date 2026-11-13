@@ -12,6 +12,7 @@ export interface TaxSettings {
   monthlyMarketingCosts: number;
   projectBonusPercent: number;
   validationRevenueShare: number;
+  unexpectedExpensesPercent: number;
 }
 
 export const TAX_SETTINGS_STORAGE_KEY = 'microclimat:tax-settings';
@@ -32,7 +33,8 @@ export const DEFAULT_TAX_SETTINGS: TaxSettings = {
   monthlyOverheadCosts: 1000,
   monthlyMarketingCosts: 800,
   projectBonusPercent: 10,
-  validationRevenueShare: 45
+  validationRevenueShare: 45,
+  unexpectedExpensesPercent: 5
 };
 
 export function loadTaxSettingsFromLocalStorage(): TaxSettings {
@@ -53,7 +55,8 @@ export function loadTaxSettingsFromLocalStorage(): TaxSettings {
       monthlyOverheadCosts: typeof parsed.monthlyOverheadCosts === 'number' ? parsed.monthlyOverheadCosts : DEFAULT_TAX_SETTINGS.monthlyOverheadCosts,
       monthlyMarketingCosts: typeof parsed.monthlyMarketingCosts === 'number' ? parsed.monthlyMarketingCosts : DEFAULT_TAX_SETTINGS.monthlyMarketingCosts,
       projectBonusPercent: typeof parsed.projectBonusPercent === 'number' ? parsed.projectBonusPercent : DEFAULT_TAX_SETTINGS.projectBonusPercent,
-      validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare
+      validationRevenueShare: typeof parsed.validationRevenueShare === 'number' ? parsed.validationRevenueShare : DEFAULT_TAX_SETTINGS.validationRevenueShare,
+      unexpectedExpensesPercent: typeof parsed.unexpectedExpensesPercent === 'number' ? parsed.unexpectedExpensesPercent : DEFAULT_TAX_SETTINGS.unexpectedExpensesPercent
     };
   } catch {
     return { ...DEFAULT_TAX_SETTINGS };
