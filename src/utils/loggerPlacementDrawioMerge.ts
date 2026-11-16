@@ -5,6 +5,7 @@ import { MeasurementLevel, MeasurementZone } from '../types/QualificationObject'
 function levelPlacementFillColor(equipmentType: EquipmentType | undefined): string {
   if (equipmentType === 'Testo 174H') return '#33FFFF';
   if (equipmentType === 'EClerk-M-RHT') return '#E8D5FF';
+  if (equipmentType === 'SX100-T PDF') return '#FFD966';
   if (equipmentType === 'Testo 174T') return '#FFFFFF';
   return '#FFFFFF';
 }
@@ -205,6 +206,7 @@ function equipmentTypeFromMxCellStyle(style: string | null | undefined): Equipme
   const s = style.toLowerCase();
   if (s.includes('fillcolor=#33ffff')) return 'Testo 174H';
   if (s.includes('fillcolor=#e8d5ff')) return 'EClerk-M-RHT';
+  if (s.includes('fillcolor=#ffd966')) return 'SX100-T PDF';
   if (s.includes('fillcolor=#ffffff') || s.includes('fillcolor=#fff;')) return 'Testo 174T';
   return undefined;
 }

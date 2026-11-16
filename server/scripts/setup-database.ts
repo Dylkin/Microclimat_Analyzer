@@ -51,7 +51,7 @@ const ensureEquipmentTables = async () => {
     // Создаем ENUM тип для типов оборудования
     await pool.query(`
       DO $$ BEGIN
-        CREATE TYPE equipment_type AS ENUM ('-', 'Testo 174T', 'Testo 174H', 'EClerk-M-RHT');
+        CREATE TYPE equipment_type AS ENUM ('-', 'Testo 174T', 'Testo 174H', 'EClerk-M-RHT', 'SX100-T PDF');
       EXCEPTION
         WHEN duplicate_object THEN null;
       END $$;
@@ -274,6 +274,8 @@ const main = async () => {
         if (file === '20261112101800_add_qualification_object_documentation_preparation_days.sql') return true;
         // «Кол-во объемов» и «Кол-во температурных режимов» для объектов квалификации (по умолчанию 1)
         if (file === '20261112110000_add_qualification_object_volume_regime_counts.sql') return true;
+        // Новый тип логгера «SX100-T PDF» в enum equipment_type
+        if (file === '20261116120000_add_sx100_t_pdf_equipment_type.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:

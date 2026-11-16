@@ -156,6 +156,8 @@ const main = async () => {
           if (file === '20261112101800_add_qualification_object_documentation_preparation_days.sql') return true;
           // «Кол-во объемов» и «Кол-во температурных режимов» для объектов квалификации (по умолчанию 1)
           if (file === '20261112110000_add_qualification_object_volume_regime_counts.sql') return true;
+          // Новый тип логгера «SX100-T PDF» в enum equipment_type
+          if (file === '20261116120000_add_sx100_t_pdf_equipment_type.sql') return true;
 
           // Явно пропускаем проблемные/дублирующие миграции,
           // которые в standalone-режиме PostgreSQL вызывают ошибки:

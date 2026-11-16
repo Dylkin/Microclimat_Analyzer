@@ -108,7 +108,8 @@ router.get('/stats', async (req, res) => {
         '-': 0,
         'Testo 174T': 0,
         'Testo 174H': 0,
-        'EClerk-M-RHT': 0
+        'EClerk-M-RHT': 0,
+        'SX100-T PDF': 0
       }
     };
     

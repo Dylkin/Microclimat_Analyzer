@@ -10,7 +10,7 @@ async function createTables() {
     // Создаем ENUM тип для типов оборудования
     await pool.query(`
       DO $$ BEGIN
-        CREATE TYPE equipment_type AS ENUM ('-', 'Testo 174T', 'Testo 174H', 'EClerk-M-RHT');
+        CREATE TYPE equipment_type AS ENUM ('-', 'Testo 174T', 'Testo 174H', 'EClerk-M-RHT', 'SX100-T PDF');
       EXCEPTION
         WHEN duplicate_object THEN null;
       END $$;
