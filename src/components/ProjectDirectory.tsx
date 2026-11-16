@@ -278,7 +278,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
       value: `${fmtCalc(planProfitTerm)} × ${fmtCalc(taxSettings.projectBonusPercent)} / 100 = ${fmtCalc(bonusTerm)}`
     },
     {
-      label: 'Непредвиденные расходи',
+      label: 'Непредвиденные расходы',
       value: `(${fmtCalc(protocolPrintTerm)} + ${fmtCalc(reportPrintTerm)} + ${fmtCalc(newProject.travelExpenses ?? 0)} + ${fmtCalc(newProject.transportExpenses ?? 0)}) × ${fmtCalc(taxSettings.unexpectedExpensesPercent)} / 100 = ${fmtCalc(unexpectedExpensesTerm)}`
     },
     {
