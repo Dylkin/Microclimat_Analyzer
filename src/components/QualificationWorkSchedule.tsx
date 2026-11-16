@@ -8,6 +8,7 @@ import { DocumentationCheckComponent } from './DocumentationCheck';
 import { MeasurementZone } from '../types/QualificationObject';
 import { VI2ParsingService } from '../utils/vi2Parser';
 import { XLSParser } from '../utils/xlsParser';
+import { SX100TCsvParser } from '../utils/sx100tCsvParser';
 import { loggerDataService } from '../utils/loggerDataService';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -1222,8 +1223,8 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         [levelFileKey]: 0
       }));
 
-      // Если это файл .vi2 или .xls/.xlsx, запускаем парсинг
-      if (['.vi2', '.xls', '.xlsx'].includes(fileExtension)) {
+      // Если это файл .vi2, .csv или .xls/.xlsx, запускаем парсинг
+      if (['.vi2', '.csv', '.xls', '.xlsx'].includes(fileExtension)) {
         console.log('QualificationWorkSchedule: Запускаем парсинг файла', {
           fileName: file.name,
           fileExtension
@@ -1583,6 +1584,10 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
         const arrayBuffer = await file.arrayBuffer();
         const xlsParser = new XLSParser(arrayBuffer);
         parsedData = await xlsParser.parse(file.name);
+      } else if (fileExtension === '.csv') {
+        console.log('Используем SX100-T CSV парсер');
+        const sx100tCsvParser = new SX100TCsvParser();
+        parsedData = await sx100tCsvParser.parseFile(file);
       } else {
         throw new Error(`Неподдерживаемый тип файла: ${fileExtension}`);
       }
@@ -2603,7 +2608,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                                                             const fileExtension = '.' + fileName.split('.').pop()?.toLowerCase();
                                                             
                                                             // Запускаем парсинг
-                                                            if (['.vi2', '.xls', '.xlsx'].includes(fileExtension)) {
+                                                            if (['.vi2', '.csv', '.xls', '.xlsx'].includes(fileExtension)) {
                                                               await handleFileParsing(fileKey, file, fileExtension);
                                                             } else {
                                                               setError('Файл не поддерживает автоматическую обработку');
@@ -2678,7 +2683,7 @@ export const QualificationWorkSchedule: React.FC<QualificationWorkScheduleProps>
                               <li>В колонке Наименование отображается название логгера</li>
                               <li>Загрузите файлы, подтверждающие снятие логгеров с каждого уровня</li>
                               <li>Поддерживаются файлы: .vi2, .csv, .xls, .xlsx, .pdf</li>
-                              <li>Файлы .vi2, .xls, .xlsx автоматически обрабатываются и сохраняются в базу данных для анализа</li>
+                              <li>Файлы .vi2, .csv (SX100-T), .xls, .xlsx автоматически обрабатываются и сохраняются в базу данных для анализа</li>
                               <li>XLS файлы должны содержать колонки с датой/временем и температурой (влажность опционально)</li>
                               <li>Поддерживается структура данных логгера с метаданными в верхней части файла</li>
                               <li>Максимальный размер файла: 10 MB</li>
