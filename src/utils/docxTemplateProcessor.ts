@@ -2720,19 +2720,28 @@ export class DocxTemplateProcessor {
     const currentLimits = limits[dataType];
     const unit = dataType === 'temperature' ? '°C' : '%';
     const dataTypeName = dataType === 'temperature' ? 'Температура' : 'Влажность';
-    
+
+    // Значение с явным знаком: +2, -20
+    const formatSigned = (value: any): string => {
+      const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : value;
+      if (typeof num === 'number' && isFinite(num)) {
+        return num >= 0 ? `+${num}` : `${num}`;
+      }
+      return `${value}`;
+    };
+
     const parts: string[] = [];
-    
+
     if (currentLimits.min !== undefined && currentLimits.max !== undefined) {
-      parts.push(`${dataTypeName}: от ${currentLimits.min}${unit} до ${currentLimits.max}${unit}`);
+      parts.push(`${dataTypeName}: от ${formatSigned(currentLimits.min)}${unit} до ${formatSigned(currentLimits.max)}${unit}`);
     } else if (currentLimits.min !== undefined) {
-      parts.push(`${dataTypeName}: минимум ${currentLimits.min}${unit}`);
+      parts.push(`${dataTypeName}: минимум ${formatSigned(currentLimits.min)}${unit}`);
     } else if (currentLimits.max !== undefined) {
-      parts.push(`${dataTypeName}: максимум ${currentLimits.max}${unit}`);
+      parts.push(`${dataTypeName}: максимум ${formatSigned(currentLimits.max)}${unit}`);
     } else {
       return 'Лимиты не установлены';
     }
-    
+
     return parts.join(', ');
   }
 

@@ -734,18 +734,6 @@ router.put('/:id', async (req, res) => {
       updates.push(`object_type = $${paramIndex++}`);
       params.push(objectType);
     }
-    if (documentationPreparationDays !== undefined) {
-      updates.push(`documentation_preparation_days = $${paramIndex++}`);
-      params.push(documentationPreparationDays === '' ? null : documentationPreparationDays);
-    }
-    if (volumesCount !== undefined) {
-      updates.push(`volumes_count = $${paramIndex++}`);
-      params.push(volumesCount === '' || volumesCount === null ? 1 : volumesCount);
-    }
-    if (temperatureRegimesCount !== undefined) {
-      updates.push(`temperature_regimes_count = $${paramIndex++}`);
-      params.push(temperatureRegimesCount === '' || temperatureRegimesCount === null ? 1 : temperatureRegimesCount);
-    }
     if (climateSystem !== undefined && !isProjectScoped) {
       updates.push(`climate_system = $${paramIndex++}`);
       params.push(climateSystem);
@@ -792,6 +780,18 @@ router.put('/:id', async (req, res) => {
       contractorId: updateContractorId
     } = otherFields;
 
+    if (documentationPreparationDays !== undefined) {
+      updates.push(`documentation_preparation_days = $${paramIndex++}`);
+      params.push(documentationPreparationDays === '' ? null : documentationPreparationDays);
+    }
+    if (volumesCount !== undefined) {
+      updates.push(`volumes_count = $${paramIndex++}`);
+      params.push(volumesCount === '' || volumesCount === null ? 1 : volumesCount);
+    }
+    if (temperatureRegimesCount !== undefined) {
+      updates.push(`temperature_regimes_count = $${paramIndex++}`);
+      params.push(temperatureRegimesCount === '' || temperatureRegimesCount === null ? 1 : temperatureRegimesCount);
+    }
     if (updateContractorId !== undefined) {
       updates.push(`contractor_id = $${paramIndex++}`);
       params.push(updateContractorId);

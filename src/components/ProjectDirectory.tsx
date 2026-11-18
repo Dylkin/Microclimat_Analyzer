@@ -41,8 +41,8 @@ function countWorkingDays(start: string | undefined, end: string | undefined): n
   return count;
 }
 
-// Объекты мониторинга для расчёта: константы количества логгеров на объект
-// и количества дней проведения испытаний по типу объекта мониторинга
+// Объекты квалификации для расчёта стоимости: константы количества логгеров на объект
+// и количества дней проведения испытаний по типу объекта квалификации
 const MONITORING_OBJECT_CALC_ROWS = [
   { key: 'auto_1zone', label: 'Автомобиль 1 зона', loggersPerObject: 12, testingDays: 10 },
   { key: 'auto_2zone', label: 'Автомобиль 2 зоны', loggersPerObject: 24, testingDays: 10 },
@@ -81,7 +81,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   // Просмотр / редактирование объекта квалификации из формы создания проекта
   const [viewingQualificationObject, setViewingQualificationObject] = useState<QualificationObject | null>(null);
   const [editingQualificationObject, setEditingQualificationObject] = useState<QualificationObject | null>(null);
-  // Количества объектов мониторинга для расчёта (по умолчанию 1 у каждого типа)
+  // Количества объектов квалификации для расчёта (по умолчанию 0 у каждого типа)
   const [monitoringCounts, setMonitoringCounts] = useState<Record<string, number>>({});
   const closeObjectForms = () => {
     setShowAddObjectForm(false);
@@ -180,10 +180,10 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
 
   const fmtCalc = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
 
-  // Амортизация оборудования: Σ (Кол-во ОМ × логгеров на ОМ × дни испытаний типа) × стоимость логгера в день.
-  // «Кол-во ОМ для расчета» вводит пользователь, планируемое кол-во логгеров = Кол-во ОМ × константа типа.
+  // Амортизация оборудования: Σ (Кол-во ОК × логгеров на ОК × дни испытаний типа) × стоимость логгера в день.
+  // «Кол-во ОК для расчета» вводит пользователь, планируемое кол-во логгеров = Кол-во ОК × константа типа.
   const monitoringRows = MONITORING_OBJECT_CALC_ROWS.map(row => {
-    const count = monitoringCounts[row.key] ?? 1;
+    const count = monitoringCounts[row.key] ?? 0;
     return { ...row, count, plannedLoggers: count * row.loggersPerObject };
   });
   const totalMonitoringObjects = monitoringRows.reduce((sum, row) => sum + row.count, 0);
@@ -500,14 +500,14 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     return saved;
   };
 
-  // Изменение «Кол-во ОМ для расчета»: пересчитываем планируемое кол-во логгеров
+  // Изменение «Кол-во ОК для расчета»: пересчитываем планируемое кол-во логгеров
   // и подставляем его в поле «Кол-во логгеров для проведения испытаний»
   const handleMonitoringCountChange = (key: string, rawValue: string) => {
     const value = rawValue === '' ? 0 : Math.max(0, Math.floor(Number(rawValue)) || 0);
     const next = { ...monitoringCounts, [key]: value };
     setMonitoringCounts(next);
     const totalLoggers = MONITORING_OBJECT_CALC_ROWS.reduce(
-      (sum, row) => sum + (next[row.key] ?? 1) * row.loggersPerObject,
+      (sum, row) => sum + (next[row.key] ?? 0) * row.loggersPerObject,
       0
     );
     setNewProject(prev => ({ ...prev, loggersCount: totalLoggers }));
@@ -1192,17 +1192,17 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
               )}
             </div>
 
-            {/* Объекты мониторинга для расчёта */}
+            {/* Расчет стоимости работ */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Объекты мониторинга
+                Расчет стоимости работ
               </label>
               <div className="border border-gray-200 rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-indigo-50 text-gray-700">
-                      <th className="text-left font-medium px-3 py-2 border-b border-gray-200">Объекты мониторинга</th>
-                      <th className="text-center font-medium px-3 py-2 border-b border-gray-200 w-32">Кол-во ОМ для расчета</th>
+                      <th className="text-left font-medium px-3 py-2 border-b border-gray-200">Объекты квалификации</th>
+                      <th className="text-center font-medium px-3 py-2 border-b border-gray-200 w-32">Кол-во ОК для расчета</th>
                       <th className="text-center font-medium px-3 py-2 border-b border-gray-200 w-36">Планируемое кол-во логгеров</th>
                       <th className="text-center font-medium px-3 py-2 border-b border-gray-200 w-36">Кол-во дней проведения испытаний</th>
                     </tr>
@@ -1219,7 +1219,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                             value={row.count}
                             onChange={(e) => handleMonitoringCountChange(row.key, e.target.value)}
                             className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            aria-label={`Кол-во ОМ для расчета: ${row.label}`}
+                            aria-label={`Кол-во ОК для расчета: ${row.label}`}
                           />
                         </td>
                         <td className="px-3 py-2 text-center text-gray-900">{row.plannedLoggers}</td>
@@ -1236,7 +1236,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                 </table>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Планируемое кол-во логгеров = Кол-во ОМ × константа типа; итог подставляется в «Кол-во логгеров для
+                Планируемое кол-во логгеров = Кол-во ОК × константа типа; итог подставляется в «Кол-во логгеров для
                 проведения испытаний», а дни испытаний типов используются как срок использования логгеров.
               </p>
             </div>
@@ -1260,7 +1260,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="Введите количество"
-                  title="Подставляется автоматически как сумма «Планируемое кол-во логгеров» из таблицы «Объекты мониторинга», можно изменить вручную"
+                  title="Подставляется автоматически как сумма «Планируемое кол-во логгеров» из таблицы «Расчет стоимости работ», можно изменить вручную"
                 />
               </div>
               <div>

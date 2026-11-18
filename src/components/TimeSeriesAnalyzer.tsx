@@ -402,7 +402,6 @@ export const TimeSeriesAnalyzer: React.FC<TimeSeriesAnalyzerProps> = ({ files, o
           result.equipment.forEach((eq: any) => {
             if (eq.name && eq.serialNumber) {
               map.set(eq.name, eq.serialNumber);
-              console.log(`Добавлено оборудование в Map: ${eq.name} -> ${eq.serialNumber}`);
             }
           });
           setEquipmentMap(map);
