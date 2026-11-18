@@ -41,16 +41,16 @@ function countWorkingDays(start: string | undefined, end: string | undefined): n
   return count;
 }
 
-// Объекты квалификации для расчёта стоимости: константы количества логгеров на объект
-// и количества дней проведения испытаний по типу объекта квалификации
+// Объекты квалификации для расчёта стоимости: константы на 1 объект и 1 температурный режим
+// (логгеров на режим, дней проведения испытаний, дней на подготовку документации)
 const MONITORING_OBJECT_CALC_ROWS = [
-  { key: 'auto_1zone', label: 'Автомобиль 1 зона', loggersPerObject: 12, testingDays: 10 },
-  { key: 'auto_2zone', label: 'Автомобиль 2 зоны', loggersPerObject: 24, testingDays: 10 },
-  { key: 'room', label: 'Помещение', loggersPerObject: 8, testingDays: 7 },
-  { key: 'thermo_container', label: 'Термоконтейнер', loggersPerObject: 8, testingDays: 4 },
-  { key: 'refrigerator', label: 'Холодильник', loggersPerObject: 5, testingDays: 4 },
-  { key: 'freezer', label: 'Морозильник', loggersPerObject: 8, testingDays: 4 },
-  { key: 'cold_chamber', label: 'Холодильная камера', loggersPerObject: 10, testingDays: 7 }
+  { key: 'auto_1zone', label: 'Автомобиль 1 зона', loggersPerRegime: 8, testingDays: 5, docDays: 3 },
+  { key: 'auto_2zone', label: 'Автомобиль 2 зоны', loggersPerRegime: 16, testingDays: 5, docDays: 5 },
+  { key: 'room', label: 'Помещение', loggersPerRegime: 8, testingDays: 7, docDays: 3 },
+  { key: 'thermo_container', label: 'Термоконтейнер', loggersPerRegime: 4, testingDays: 8, docDays: 3 },
+  { key: 'refrigerator', label: 'Холодильник', loggersPerRegime: 5, testingDays: 4, docDays: 3 },
+  { key: 'freezer', label: 'Морозильник', loggersPerRegime: 8, testingDays: 4, docDays: 3 },
+  { key: 'cold_chamber', label: 'Холодильная камера', loggersPerRegime: 8, testingDays: 7, docDays: 3 }
 ];
 
 interface ProjectDirectoryProps {
@@ -83,6 +83,12 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const [editingQualificationObject, setEditingQualificationObject] = useState<QualificationObject | null>(null);
   // Количества объектов квалификации для расчёта (по умолчанию 0 у каждого типа)
   const [monitoringCounts, setMonitoringCounts] = useState<Record<string, number>>({});
+  // Количества температурных режимов по типам (по умолчанию 1)
+  const [monitoringRegimes, setMonitoringRegimes] = useState<Record<string, number>>({});
+  // Ручные правки расчётных ячеек: значения, введённые пользователем вместо расчётных
+  const [manualLoggers, setManualLoggers] = useState<Record<string, number>>({});
+  const [manualTestingDays, setManualTestingDays] = useState<Record<string, number>>({});
+  const [manualDocDays, setManualDocDays] = useState<Record<string, number>>({});
   const closeObjectForms = () => {
     setShowAddObjectForm(false);
     setViewingQualificationObject(null);
@@ -179,21 +185,37 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const AVERAGE_WORKING_DAYS_PER_MONTH = 20.6;
 
   const fmtCalc = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v);
+  // Дни: целое — без дробной части, иначе через запятую (3,5)
+  const fmtDays = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1).replace('.', ','));
 
-  // Амортизация оборудования: Σ (Кол-во ОК × логгеров на ОК × дни испытаний типа) × стоимость логгера в день.
-  // «Кол-во ОК для расчета» вводит пользователь, планируемое кол-во логгеров = Кол-во ОК × константа типа.
+  // Амортизация оборудования: Σ (логгеры × дни испытаний) × стоимость логгера в день,
+  // где логгеры и дни — расчётные значения колонок (с учётом ручных правок пользователя).
+  // При увеличении числа режимов дни испытаний растут пропорционально, а к дням подготовки
+  // документации добавляется базовое значение × 0,5 за каждый режим сверх первого.
   const monitoringRows = MONITORING_OBJECT_CALC_ROWS.map(row => {
     const count = monitoringCounts[row.key] ?? 0;
-    return { ...row, count, plannedLoggers: count * row.loggersPerObject };
+    const regimes = monitoringRegimes[row.key] ?? 1;
+    const plannedLoggers = manualLoggers[row.key] ?? count * regimes * row.loggersPerRegime;
+    const testingDays = manualTestingDays[row.key] ?? row.testingDays * regimes;
+    const docDays = manualDocDays[row.key] ?? row.docDays * (1 + 0.5 * (regimes - 1));
+    return { ...row, count, regimes, plannedLoggers, testingDays, docDays };
   });
   const totalMonitoringObjects = monitoringRows.reduce((sum, row) => sum + row.count, 0);
   const totalPlannedLoggers = monitoringRows.reduce((sum, row) => sum + row.plannedLoggers, 0);
+  // Итоговая трудоёмкость подготовки документации по таблице (Σ Кол-во ОК × дни документации)
+  const totalDocDays = monitoringRows.reduce((sum, row) => sum + row.count * row.docDays, 0);
+  // Сумма отображаемых значений колонки «Кол-во дней проведения испытаний» (пустые ячейки = 0)
+  const totalTestingDays = monitoringRows.reduce(
+    (sum, row) => sum + (row.count > 0 || manualTestingDays[row.key] !== undefined ? row.testingDays : 0),
+    0
+  );
   const loggerObjectDays = monitoringRows.reduce((sum, row) => sum + row.plannedLoggers * row.testingDays, 0);
   const loggerCostTerm = loggerObjectDays * taxSettings.loggerDayCost;
   const protocolPrintTerm = (newProject.protocolPrintCopies ?? 0) * taxSettings.protocolPrintCost;
   const reportPrintTerm = (newProject.reportPrintCopies ?? 0) * taxSettings.reportPrintCost;
-  // Трудоёмкость подготовки документации: «Кол-во дней на подготовку документации» — поле проекта (по умолчанию 5)
-  const fotDays = newProject.documentationPreparationDays ?? 5;
+  // Трудоёмкость подготовки документации: итог колонки «Кол-во дней на подготовку документации»
+  // из таблицы «Расчет стоимости работ» (Σ Кол-во ОК × дни документации по строкам)
+  const fotDays = totalDocDays;
   // Обеспечение ФОТ Отдела валидации: ФОТ / 20,6 × кол-во дней подготовки протоколов и отчётов
   const fotValidationTerm = (fotValidation / AVERAGE_WORKING_DAYS_PER_MONTH) * fotDays;
   // Обеспечение % ФОТ Администрации и Отдела продаж: ФОТ / 20,6 × % отдела Валидации в доходах × кол-во дней подготовки
@@ -227,7 +249,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   const vatTerm = sumWithoutVat * (taxSettings.vat / 100);
   const recommendedCostWithVat = sumWithoutVat + vatTerm;
   const hasRecommendedCostInputs =
-    (newProject.loggersCount ?? 0) > 0 ||
+    totalPlannedLoggers > 0 ||
     (newProject.protocolPrintCopies ?? 0) > 0 ||
     (newProject.reportPrintCopies ?? 0) > 0 ||
     (newProject.travelExpenses ?? 0) > 0 ||
@@ -241,7 +263,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     },
     {
       label: '  Амортизация оборудования',
-      value: `(${monitoringRows.map(r => `${r.count}×${r.loggersPerObject}×${r.testingDays}`).join(' + ')}) × ${fmtCalc(taxSettings.loggerDayCost)} = ${fmtCalc(loggerCostTerm)}`
+      value: `(${monitoringRows.map(r => `${r.count}×${r.regimes}×${r.loggersPerRegime}×${r.testingDays}`).join(' + ')}) × ${fmtCalc(taxSettings.loggerDayCost)} = ${fmtCalc(loggerCostTerm)}`
     },
     {
       label: '  Печать протоколов и отчётов',
@@ -249,6 +271,10 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     },
     { label: '  Командировочные', value: fmtCalc(newProject.travelExpenses ?? 0) },
     { label: '  Транспортные', value: fmtCalc(newProject.transportExpenses ?? 0) },
+    {
+      label: 'Непредвиденные расходы',
+      value: `(${fmtCalc(protocolPrintTerm)} + ${fmtCalc(reportPrintTerm)} + ${fmtCalc(newProject.travelExpenses ?? 0)} + ${fmtCalc(newProject.transportExpenses ?? 0)}) × ${fmtCalc(taxSettings.unexpectedExpensesPercent)} / 100 = ${fmtCalc(unexpectedExpensesTerm)}`
+    },
     {
       label: 'Обеспечение ФОТ предприятия',
       value: `${fmtCalc(fotValidationTerm)} + ${fmtCalc(fotAdministrationTerm)} + ${fmtCalc(fotSalesTerm)} = ${fmtCalc(fotEnterprise)}`
@@ -276,10 +302,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     {
       label: 'Премия % от прибыли',
       value: `${fmtCalc(planProfitTerm)} × ${fmtCalc(taxSettings.projectBonusPercent)} / 100 = ${fmtCalc(bonusTerm)}`
-    },
-    {
-      label: 'Непредвиденные расходы',
-      value: `(${fmtCalc(protocolPrintTerm)} + ${fmtCalc(reportPrintTerm)} + ${fmtCalc(newProject.travelExpenses ?? 0)} + ${fmtCalc(newProject.transportExpenses ?? 0)}) × ${fmtCalc(taxSettings.unexpectedExpensesPercent)} / 100 = ${fmtCalc(unexpectedExpensesTerm)}`
     },
     {
       label: 'Сумма без НДС',
@@ -500,17 +522,85 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     return saved;
   };
 
+  // Пересчёт итогового «Кол-во логгеров для проведения испытаний» из колонок таблицы
+  const recalcTotalLoggers = (
+    counts: Record<string, number>,
+    regimes: Record<string, number>,
+    loggersOverrides: Record<string, number>
+  ) => {
+    const totalLoggers = MONITORING_OBJECT_CALC_ROWS.reduce(
+      (sum, row) =>
+        sum +
+        (loggersOverrides[row.key] ?? (counts[row.key] ?? 0) * (regimes[row.key] ?? 1) * row.loggersPerRegime),
+      0
+    );
+    setNewProject(prev => ({ ...prev, loggersCount: totalLoggers }));
+  };
+
+  // Сброс ручных правок расчётных ячеек строки (при изменении исходных данных — кол-ва ОК или режимов)
+  const clearManualOverrides = (key: string) => {
+    setManualLoggers(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setManualTestingDays(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setManualDocDays(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
   // Изменение «Кол-во ОК для расчета»: пересчитываем планируемое кол-во логгеров
   // и подставляем его в поле «Кол-во логгеров для проведения испытаний»
   const handleMonitoringCountChange = (key: string, rawValue: string) => {
     const value = rawValue === '' ? 0 : Math.max(0, Math.floor(Number(rawValue)) || 0);
     const next = { ...monitoringCounts, [key]: value };
+    const clearedLoggers = { ...manualLoggers };
+    delete clearedLoggers[key];
     setMonitoringCounts(next);
-    const totalLoggers = MONITORING_OBJECT_CALC_ROWS.reduce(
-      (sum, row) => sum + (next[row.key] ?? 0) * row.loggersPerObject,
-      0
-    );
-    setNewProject(prev => ({ ...prev, loggersCount: totalLoggers }));
+    clearManualOverrides(key);
+    recalcTotalLoggers(next, monitoringRegimes, clearedLoggers);
+  };
+
+  // Изменение «Кол-во температурных режимов» (минимум 1): пересчитываем логгеры,
+  // дни испытаний и дни подготовки документации
+  const handleRegimesChange = (key: string, rawValue: string) => {
+    const value = rawValue === '' ? 1 : Math.max(1, Math.floor(Number(rawValue)) || 1);
+    const next = { ...monitoringRegimes, [key]: value };
+    const clearedLoggers = { ...manualLoggers };
+    delete clearedLoggers[key];
+    setMonitoringRegimes(next);
+    clearManualOverrides(key);
+    recalcTotalLoggers(monitoringCounts, next, clearedLoggers);
+  };
+
+  // Ручное изменение расчётных ячеек: «Планируемое кол-во логгеров»,
+  // «Кол-во дней проведения испытаний», «Кол-во дней на подготовку документации»
+  const handleManualValueChange = (
+    kind: 'loggers' | 'testingDays' | 'docDays',
+    key: string,
+    rawValue: string
+  ) => {
+    const parsed =
+      rawValue === ''
+        ? 0
+        : kind === 'docDays'
+          ? Math.max(0, Number(rawValue.replace(',', '.')) || 0)
+          : Math.max(0, Math.floor(Number(rawValue)) || 0);
+    if (kind === 'loggers') {
+      setManualLoggers(prev => ({ ...prev, [key]: parsed }));
+      recalcTotalLoggers(monitoringCounts, monitoringRegimes, { ...manualLoggers, [key]: parsed });
+    } else if (kind === 'testingDays') {
+      setManualTestingDays(prev => ({ ...prev, [key]: parsed }));
+    } else {
+      setManualDocDays(prev => ({ ...prev, [key]: parsed }));
+    }
   };
 
   // Обновление объекта квалификации из формы проекта: сохраняем изменения,
@@ -1202,15 +1292,28 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                   <thead>
                     <tr className="bg-indigo-50 text-gray-700">
                       <th className="text-left font-medium px-3 py-2 border-b border-gray-200">Объекты квалификации</th>
+                      <th className="text-center font-medium px-3 py-2 border-b border-gray-200 w-32">Кол-во температурных режимов</th>
                       <th className="text-center font-medium px-3 py-2 border-b border-gray-200 w-32">Кол-во ОК для расчета</th>
                       <th className="text-center font-medium px-3 py-2 border-b border-gray-200 w-36">Планируемое кол-во логгеров</th>
                       <th className="text-center font-medium px-3 py-2 border-b border-gray-200 w-36">Кол-во дней проведения испытаний</th>
+                      <th className="text-center font-medium px-3 py-2 border-b border-gray-200 w-36">Кол-во дней на подготовку документации</th>
                     </tr>
                   </thead>
                   <tbody>
                     {monitoringRows.map(row => (
                       <tr key={row.key} className="border-b border-gray-100 last:border-b-0">
                         <td className="px-3 py-2 text-gray-900">{row.label}</td>
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={row.regimes}
+                            onChange={(e) => handleRegimesChange(row.key, e.target.value)}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            aria-label={`Кол-во температурных режимов: ${row.label}`}
+                          />
+                        </td>
                         <td className="px-3 py-2 text-center">
                           <input
                             type="number"
@@ -1222,47 +1325,64 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                             aria-label={`Кол-во ОК для расчета: ${row.label}`}
                           />
                         </td>
-                        <td className="px-3 py-2 text-center text-gray-900">{row.plannedLoggers}</td>
-                        <td className="px-3 py-2 text-center text-gray-500">{row.testingDays}</td>
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={row.plannedLoggers}
+                            onChange={(e) => handleManualValueChange('loggers', row.key, e.target.value)}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            aria-label={`Планируемое кол-во логгеров: ${row.label}`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={row.count > 0 || manualTestingDays[row.key] !== undefined ? row.testingDays : ''}
+                            onChange={(e) => handleManualValueChange('testingDays', row.key, e.target.value)}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            aria-label={`Кол-во дней проведения испытаний: ${row.label}`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={row.count > 0 || manualDocDays[row.key] !== undefined ? row.docDays : ''}
+                            onChange={(e) => handleManualValueChange('docDays', row.key, e.target.value)}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            aria-label={`Кол-во дней на подготовку документации: ${row.label}`}
+                          />
+                        </td>
                       </tr>
                     ))}
                     <tr className="bg-gray-50 font-medium text-gray-900">
                       <td className="px-3 py-2">Всего:</td>
+                      <td className="px-3 py-2 text-center text-gray-400">—</td>
                       <td className="px-3 py-2 text-center">{totalMonitoringObjects}</td>
                       <td className="px-3 py-2 text-center">{totalPlannedLoggers}</td>
-                      <td className="px-3 py-2 text-center text-gray-400">—</td>
+                      <td className="px-3 py-2 text-center" title="Сумма значений колонки по заполненным строкам">{fmtDays(totalTestingDays)}</td>
+                      <td className="px-3 py-2 text-center" title="Σ кол-во ОК × дни подготовки документации — используется в расчёте ФОТ и маркетинга">{fmtDays(totalDocDays)}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Планируемое кол-во логгеров = Кол-во ОК × константа типа; итог подставляется в «Кол-во логгеров для
-                проведения испытаний», а дни испытаний типов используются как срок использования логгеров.
+                Колонки «Кол-во дней проведения испытаний» и «Кол-во дней на подготовку документации» заполняются
+                расчётными значениями только после ввода «Кол-во ОК для расчета» и могут быть изменены вручную
+                (при изменении кол-ва ОК или режимов ручные значения сбрасываются). Дни испытаний растут
+                пропорционально режимам, к дням подготовки документации добавляется базовое значение × 0,5 за каждый
+                режим сверх первого. Итоги «Всего» по логгерам и дням документации используются при расчёте стоимости;
+                итог по логгерам подставляется в «Кол-во логгеров для проведения испытаний».
               </p>
             </div>
 
             {/* Расходы на испытания */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Кол-во логгеров для проведения испытаний
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={newProject.loggersCount ?? ''}
-                  onChange={(e) =>
-                    setNewProject((prev) => ({
-                      ...prev,
-                      loggersCount: e.target.value === '' ? undefined : Number(e.target.value),
-                    }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Введите количество"
-                  title="Подставляется автоматически как сумма «Планируемое кол-во логгеров» из таблицы «Расчет стоимости работ», можно изменить вручную"
-                />
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Кол-во печатных экземпляров протоколов
@@ -1299,26 +1419,6 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="Введите количество"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Кол-во дней на подготовку документации
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={newProject.documentationPreparationDays ?? ''}
-                  onChange={(e) =>
-                    setNewProject((prev) => ({
-                      ...prev,
-                      documentationPreparationDays: e.target.value === '' ? undefined : Number(e.target.value),
-                    }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="5"
-                  title="Общее количество дней на подготовку документации — протоколов и отчёта. Подставляется автоматически как сумма значений выбранных объектов квалификации, можно изменить вручную (по умолчанию 5)"
                 />
               </div>
               <div>
