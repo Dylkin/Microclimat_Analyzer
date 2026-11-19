@@ -188,28 +188,29 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
   // Дни: целое — без дробной части, иначе через запятую (3,5)
   const fmtDays = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1).replace('.', ','));
 
-  // Амортизация оборудования: Σ (логгеры × дни испытаний) × стоимость логгера в день,
-  // где логгеры и дни — расчётные значения колонок (с учётом ручных правок пользователя).
+  // Амортизация оборудования: Σ (логгеры × дни испытаний на 1 объект) × стоимость логгера в день.
+  // Ячейки колонок дней показывают СУММАРНЫЕ значения по строке (на всё кол-во ОК) и пересчитываются
+  // при изменении «Кол-во ОК» и «Кол-во температурных режимов»; вручную можно ввести своё значение.
   // При увеличении числа режимов дни испытаний растут пропорционально, а к дням подготовки
   // документации добавляется базовое значение × 0,5 за каждый режим сверх первого.
   const monitoringRows = MONITORING_OBJECT_CALC_ROWS.map(row => {
     const count = monitoringCounts[row.key] ?? 0;
     const regimes = monitoringRegimes[row.key] ?? 1;
     const plannedLoggers = manualLoggers[row.key] ?? count * regimes * row.loggersPerRegime;
-    const testingDays = manualTestingDays[row.key] ?? row.testingDays * regimes;
-    const docDays = manualDocDays[row.key] ?? row.docDays * (1 + 0.5 * (regimes - 1));
-    return { ...row, count, regimes, plannedLoggers, testingDays, docDays };
+    // Дни на 1 объект (для расчёта амортизации)
+    const perObjectTestingDays = row.testingDays * regimes;
+    const perObjectDocDays = row.docDays * (1 + 0.5 * (regimes - 1));
+    // Суммарные значения по строке — то, что отображается в ячейках
+    const testingDays = manualTestingDays[row.key] ?? count * perObjectTestingDays;
+    const docDays = manualDocDays[row.key] ?? count * perObjectDocDays;
+    return { ...row, count, regimes, plannedLoggers, perObjectTestingDays, perObjectDocDays, testingDays, docDays };
   });
   const totalMonitoringObjects = monitoringRows.reduce((sum, row) => sum + row.count, 0);
   const totalPlannedLoggers = monitoringRows.reduce((sum, row) => sum + row.plannedLoggers, 0);
-  // Итоговая трудоёмкость подготовки документации по таблице (Σ Кол-во ОК × дни документации)
-  const totalDocDays = monitoringRows.reduce((sum, row) => sum + row.count * row.docDays, 0);
-  // Сумма отображаемых значений колонки «Кол-во дней проведения испытаний» (пустые ячейки = 0)
-  const totalTestingDays = monitoringRows.reduce(
-    (sum, row) => sum + (row.count > 0 || manualTestingDays[row.key] !== undefined ? row.testingDays : 0),
-    0
-  );
-  const loggerObjectDays = monitoringRows.reduce((sum, row) => sum + row.plannedLoggers * row.testingDays, 0);
+  // Итог «Всего» по колонкам дней — сумма ячеек (пустые строки дают 0)
+  const totalDocDays = monitoringRows.reduce((sum, row) => sum + row.docDays, 0);
+  const totalTestingDays = monitoringRows.reduce((sum, row) => sum + row.testingDays, 0);
+  const loggerObjectDays = monitoringRows.reduce((sum, row) => sum + row.plannedLoggers * row.perObjectTestingDays, 0);
   const loggerCostTerm = loggerObjectDays * taxSettings.loggerDayCost;
   const protocolPrintTerm = (newProject.protocolPrintCopies ?? 0) * taxSettings.protocolPrintCost;
   const reportPrintTerm = (newProject.reportPrintCopies ?? 0) * taxSettings.reportPrintCost;
@@ -263,7 +264,7 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
     },
     {
       label: '  Амортизация оборудования',
-      value: `(${monitoringRows.map(r => `${r.count}×${r.regimes}×${r.loggersPerRegime}×${r.testingDays}`).join(' + ')}) × ${fmtCalc(taxSettings.loggerDayCost)} = ${fmtCalc(loggerCostTerm)}`
+      value: `(${monitoringRows.map(r => `${r.count}×${r.regimes}×${r.loggersPerRegime}×${r.perObjectTestingDays}`).join(' + ')}) × ${fmtCalc(taxSettings.loggerDayCost)} = ${fmtCalc(loggerCostTerm)}`
     },
     {
       label: '  Печать протоколов и отчётов',
@@ -1365,15 +1366,16 @@ const ProjectDirectory: React.FC<ProjectDirectoryProps> = ({ onPageChange }) => 
                       <td className="px-3 py-2 text-center text-gray-400">—</td>
                       <td className="px-3 py-2 text-center">{totalMonitoringObjects}</td>
                       <td className="px-3 py-2 text-center">{totalPlannedLoggers}</td>
-                      <td className="px-3 py-2 text-center" title="Сумма значений колонки по заполненным строкам">{fmtDays(totalTestingDays)}</td>
-                      <td className="px-3 py-2 text-center" title="Σ кол-во ОК × дни подготовки документации — используется в расчёте ФОТ и маркетинга">{fmtDays(totalDocDays)}</td>
+                      <td className="px-3 py-2 text-center" title="Сумма значений колонки по заполненным строкам">{totalMonitoringObjects > 0 ? fmtDays(totalTestingDays) : ''}</td>
+                      <td className="px-3 py-2 text-center" title="Сумма значений колонки по заполненным строкам — используется в расчёте ФОТ и маркетинга">{totalMonitoringObjects > 0 ? fmtDays(totalDocDays) : ''}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 Колонки «Кол-во дней проведения испытаний» и «Кол-во дней на подготовку документации» заполняются
-                расчётными значениями только после ввода «Кол-во ОК для расчета» и могут быть изменены вручную
+                расчётными значениями только после ввода «Кол-во ОК для расчета» и показывают сумму по всем объектам
+                строки — они пересчитываются при изменении кол-ва ОК и режимов и могут быть изменены вручную
                 (при изменении кол-ва ОК или режимов ручные значения сбрасываются). Дни испытаний растут
                 пропорционально режимам, к дням подготовки документации добавляется базовое значение × 0,5 за каждый
                 режим сверх первого. Итоги «Всего» по логгерам и дням документации используются при расчёте стоимости;
